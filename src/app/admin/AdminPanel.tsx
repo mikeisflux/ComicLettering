@@ -37,7 +37,7 @@ export default function AdminPanel({ adminEmail }: { adminEmail: string }) {
       <div className="admBody">
         {tab === "inbox" && <Inbox />}
         {tab === "settings" && <Settings />}
-        {tab === "users" && <Users />}
+        {tab === "users" && <Users adminEmail={adminEmail} />}
         {tab === "payments" && <Payments />}
       </div>
     </div>
@@ -203,41 +203,120 @@ function Settings() {
 
 /* ---------------- Users ---------------- */
 
-function Users() {
+const SUB_STATUSES = ["none", "active", "cancelled", "suspended"];
+const SUB_PLANS = ["", "monthly", "yearly", "lifetime", "comp"];
+
+function Users({ adminEmail }: { adminEmail: string }) {
   const [users, setUsers] = useState<UserRow[] | null>(null);
+  const [note, setNote] = useState("");
+  const [editId, setEditId] = useState<string | null>(null);
+  const [showAdd, setShowAdd] = useState(false);
   const load = useCallback(async () => {
     const res = await fetch("/api/admin/users");
     if (res.ok) setUsers(await res.json());
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  async function update(id: string, patch: Record<string, unknown>) {
-    await fetch("/api/admin/users", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, ...patch }) });
+  async function api(method: string, body: Record<string, unknown>): Promise<boolean> {
+    const res = await fetch("/api/admin/users", {
+      method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) { setNote(d.error || "Request failed."); return false; }
+    setNote("");
     load();
+    return true;
   }
 
   if (!users) return <div className="admCard">Loading users…</div>;
   return (
     <div className="admCard">
       <h2>Users ({users.length})</h2>
-      <p className="hint">Grant complimentary access with “Activate”, or suspend an account. PayPal keeps statuses in sync automatically via the webhook.</p>
+      <p className="hint">
+        Add accounts by hand, edit any account&apos;s details or subscription, grant complimentary
+        access, or remove an account entirely. PayPal keeps paid statuses in sync via the webhook.
+      </p>
+      {note && <p className="admNote" style={{ color: "#b02020" }}>{note}</p>}
+
+      {showAdd ? (
+        <form className="admUserForm" onSubmit={async (e) => {
+          e.preventDefault();
+          const f = new FormData(e.currentTarget);
+          const ok = await api("POST", {
+            email: f.get("email"), name: f.get("name"), password: f.get("password"),
+            subStatus: f.get("subStatus"), subPlan: f.get("subPlan"), isAdmin: f.get("isAdmin") === "on",
+          });
+          if (ok) setShowAdd(false);
+        }}>
+          <input className="admInput" name="email" type="email" placeholder="email@example.com" required />
+          <input className="admInput" name="name" placeholder="Name" />
+          <input className="admInput" name="password" type="text" placeholder="Password (min 6)" required minLength={6} />
+          <select className="admInput" name="subStatus" defaultValue="none">
+            {SUB_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <select className="admInput" name="subPlan" defaultValue="">
+            {SUB_PLANS.map((p) => <option key={p} value={p}>{p || "no plan"}</option>)}
+          </select>
+          <label style={{ fontSize: 13 }}><input type="checkbox" name="isAdmin" /> admin</label>
+          <button className="admBtn primary">Create</button>
+          <button className="admBtn" type="button" onClick={() => setShowAdd(false)}>Cancel</button>
+        </form>
+      ) : (
+        <button className="admBtn primary" style={{ marginBottom: 10 }} onClick={() => setShowAdd(true)}>＋ Add user</button>
+      )}
+
       <table className="admTable">
         <thead><tr><th>Email</th><th>Name</th><th>Status</th><th>Plan</th><th>Joined</th><th>Actions</th></tr></thead>
         <tbody>
-          {users.map((u) => (
+          {users.map((u) => editId === u.id ? (
+            <tr key={u.id} className="admEditRow">
+              <td colSpan={6}>
+                <form className="admUserForm" onSubmit={async (e) => {
+                  e.preventDefault();
+                  const f = new FormData(e.currentTarget);
+                  const ok = await api("PUT", {
+                    id: u.id, email: f.get("email"), name: f.get("name"),
+                    password: f.get("password") || undefined,
+                    subStatus: f.get("subStatus"), subPlan: f.get("subPlan"),
+                    isAdmin: f.get("isAdmin") === "on",
+                  });
+                  if (ok) setEditId(null);
+                }}>
+                  <input className="admInput" name="email" type="email" defaultValue={u.email} required />
+                  <input className="admInput" name="name" defaultValue={u.name} placeholder="Name" />
+                  <input className="admInput" name="password" type="text" placeholder="New password (blank = keep)" />
+                  <select className="admInput" name="subStatus" defaultValue={u.subStatus}>
+                    {SUB_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                  <select className="admInput" name="subPlan" defaultValue={u.subPlan || ""}>
+                    {SUB_PLANS.map((p) => <option key={p} value={p}>{p || "no plan"}</option>)}
+                  </select>
+                  <label style={{ fontSize: 13 }}>
+                    <input type="checkbox" name="isAdmin" defaultChecked={u.isAdmin} disabled={u.email === adminEmail} /> admin
+                  </label>
+                  <button className="admBtn primary">Save</button>
+                  <button className="admBtn" type="button" onClick={() => setEditId(null)}>Cancel</button>
+                </form>
+              </td>
+            </tr>
+          ) : (
             <tr key={u.id}>
               <td>{u.email} {u.isAdmin && <span className="admin-badge b-admin">admin</span>}</td>
               <td>{u.name}</td>
               <td><span className={`admin-badge b-${u.subStatus}`}>{u.subStatus}</span></td>
               <td>{u.subPlan || "—"}</td>
               <td>{new Date(u.createdAt).toLocaleDateString()}</td>
-              <td style={{ display: "flex", gap: 4 }}>
+              <td style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                <button className="admBtn" onClick={() => { setNote(""); setEditId(u.id); }}>Edit</button>
                 {u.subStatus !== "active"
-                  ? <button className="admBtn" onClick={() => update(u.id, { subStatus: "active" })}>Activate</button>
-                  : <button className="admBtn" onClick={() => update(u.id, { subStatus: "suspended" })}>Suspend</button>}
-                {!u.isAdmin
-                  ? <button className="admBtn" onClick={() => update(u.id, { isAdmin: true })}>Make admin</button>
-                  : <button className="admBtn" onClick={() => update(u.id, { isAdmin: false })}>Remove admin</button>}
+                  ? <button className="admBtn" onClick={() => api("PUT", { id: u.id, subStatus: "active" })}>Activate</button>
+                  : <button className="admBtn" onClick={() => api("PUT", { id: u.id, subStatus: "suspended" })}>Suspend</button>}
+                {u.email !== adminEmail && (
+                  <button className="admBtn danger" onClick={() => {
+                    if (window.confirm(`Delete ${u.email}? Their projects and uploads are removed too. This cannot be undone.`))
+                      api("DELETE", { id: u.id });
+                  }}>Delete</button>
+                )}
               </td>
             </tr>
           ))}

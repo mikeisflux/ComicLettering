@@ -35,6 +35,12 @@
 }
 .admBtn:hover { border-color: #2f7fd6; }
 .admBtn.primary { background: #f0812c; border-color: #c46316; color: #1d1105; font-weight: 700; }
+.admBtn.danger { background: #fbe9e9; border-color: #d0908f; color: #8f1d1a; }
+.admBtn.danger:hover { border-color: #b02020; }
+.admUserForm { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 10px; }
+.admUserForm .admInput { max-width: 210px; }
+.admEditRow td { background: #f5f8fc; }
+.admNote { font-size: 13px; margin: 4px 0 8px; }
 .admInput { width: 100%; padding: 6px 8px; font: inherit; border: 1px solid #b9c0ca; border-radius: 5px; }
 .admRow { display: flex; gap: 10px; align-items: center; margin: 8px 0; }
 .admRow label { flex: 0 0 240px; font-weight: 600; font-size: 13px; }
