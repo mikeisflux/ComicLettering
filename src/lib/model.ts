@@ -351,6 +351,8 @@ export const FONTS: Record<string, FontDef> = {
   lmccosmos:  { label: "LMC Cosmos (Ours)",  css: '"LMC Cosmos",cursive',  group: "Themed", variants: ALL },
   cinzeldeco: { label: "Cinzel Decorative (Occult)", css: '"Cinzel Decorative",serif', group: "Themed", variants: RB },
   pirata:     { label: "Pirata One (Pirate)", css: '"Pirata One",cursive', group: "Themed", variants: R },
+  metamorph:  { label: "Metamorphous (Gladiator)", css: '"Metamorphous",serif', group: "Themed", variants: R },
+  limelight:  { label: "Limelight (Noir Deco)", css: '"Limelight",cursive', group: "Themed", variants: R },
   creepster: { label: "Creepster",        css: '"Creepster",cursive',      group: "Themed", variants: R },
   nosifer:   { label: "Nosifer (Drip)",   css: '"Nosifer",cursive',        group: "Themed", variants: R },
   audiowide: { label: "Audiowide (Sci-Fi)", css: '"Audiowide",sans-serif', group: "Themed", variants: R },
