@@ -483,6 +483,7 @@ const WORD_STAMPS: [string, string, number][] = [
   ["ZAP!", "Hazard", -6], ["POW!", "Sunburst", 5], ["BAM!", "Crimson", -4],
   ["BOOM!", "Blaze", 3], ["KRAK!", "Stone", -5], ["WHAM!", "Panic", 6],
   ["HA HA!", "Classic", -3], ["SPLOOSH!", "Ocean", 4],
+  ["#$@%!", "Crimson", -3],
 ];
 const LT_URL = "https://api.languagetool.org/v2/check";
 

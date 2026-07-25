@@ -430,6 +430,12 @@ input[type="range"] { width: 110px; }
 @font-face { font-family: "LMC Mumble"; font-style: normal; font-weight: 700; font-display: swap; src: url(/fonts/LMCMumble-Bold.woff2) format("woff2"); }
 @font-face { font-family: "LMC Mumble"; font-style: italic; font-weight: 400; font-display: swap; src: url(/fonts/LMCMumble-Italic.woff2) format("woff2"); }
 @font-face { font-family: "LMC Mumble"; font-style: italic; font-weight: 700; font-display: swap; src: url(/fonts/LMCMumble-BoldItalic.woff2) format("woff2"); }
+@font-face { font-family: "LMC Dragon"; font-style: normal; font-weight: 400; font-display: swap; src: url(/fonts/LMCDragon-Regular.woff2) format("woff2"); }
+@font-face { font-family: "LMC Dragon"; font-style: normal; font-weight: 700; font-display: swap; src: url(/fonts/LMCDragon-Bold.woff2) format("woff2"); }
+@font-face { font-family: "LMC Dragon"; font-style: italic; font-weight: 400; font-display: swap; src: url(/fonts/LMCDragon-Italic.woff2) format("woff2"); }
+@font-face { font-family: "LMC Dragon"; font-style: italic; font-weight: 700; font-display: swap; src: url(/fonts/LMCDragon-BoldItalic.woff2) format("woff2"); }
+@font-face { font-family: "LMC Alien"; font-style: normal; font-weight: 400; font-display: swap; src: url(/fonts/LMCAlien-Regular.woff2) format("woff2"); }
+@font-face { font-family: "LMC Alien"; font-style: normal; font-weight: 700; font-display: swap; src: url(/fonts/LMCAlien-Bold.woff2) format("woff2"); }
 
 /* connector tilt axis satellites */
 .handle.tiltDot {

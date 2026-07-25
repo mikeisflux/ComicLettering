@@ -171,6 +171,32 @@ def scribble_strokes(name, w):
         pts.append((x, y))
     return [pts]
 
+def alien_strokes(name, w):
+    """alien sigils: every key renders an original geometric glyph"""
+    ph = ghash("alien" + name)
+    cx = w / 2
+    out = []
+    r0 = 110 + (ph >> 3) % 90
+    kind = ph % 4
+    if kind == 0:
+        out.append(ringpts(cx, 300 + (ph >> 5) % 150, r0, r0, 20))
+    elif kind == 1:
+        a0 = (ph >> 4) % 360
+        out.append(arc(cx, 360, r0, r0, a0, a0 + 180 + (ph >> 6) % 130))
+    elif kind == 2:
+        out.append([(cx - r0, 120), (cx, 520 + (ph >> 5) % 160), (cx + r0, 120)])
+    else:
+        out.append([(cx - r0 * 0.7, 640), (cx + r0 * 0.4, 60)])
+    acc = (ph >> 8) % 3
+    if acc == 0:
+        out.append([(cx, 620), (cx + ((ph >> 10) % 80) - 40, 60)])
+    elif acc == 1:
+        out.append([(cx + r0 * 0.7, 110), (cx + r0 * 0.7, 114)])
+    else:
+        yb = 380 + (ph >> 7) % 220
+        out.append([(cx - r0, yb), (cx + r0, yb)])
+    return out
+
 def capsule_path(p, q, r, cap="round", n=12):
     if cap == "square":
         # rectangle extended r beyond both endpoints — blocky chopped stroke
@@ -216,18 +242,34 @@ def build_glyph(name, strokes, r, amp, freq, shear, narrow, bounce, drips, cap="
         stroke_list += drip_strokes(name, strokes)
     elif drips == "droplets":
         stroke_list += droplet_strokes(name, strokes)
+    taper = drips == "taper"
     dy0 = (((ghash(name + "b") % 100) / 100) - 0.5) * 2 * bounce
     paths = []
     for stroke, rmul in stroke_list:
         pts = decimate(list(stroke), decim)
+        if taper and len(pts) > 1:
+            # densify so the brush profile has room to swell and thin out
+            dense = [pts[0]]
+            for i in range(len(pts) - 1):
+                for k in range(1, 7):
+                    t = k / 6
+                    dense.append((pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t,
+                                  pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t))
+            pts = dense
         pts = wobble(name, pts, amp, freq)
         pts = [(x * narrow, y + dy0) for (x, y) in pts]
         if shear:
             pts = [(x + y * shear, y) for (x, y) in pts]
         if len(pts) == 1:
             pts = pts + [(pts[0][0] + 0.5, pts[0][1])]
-        for i in range(len(pts) - 1):
-            paths.append(capsule_path(pts[i], pts[i + 1], r * rmul, cap))
+        n_seg = len(pts) - 1
+        for i in range(n_seg):
+            rr = r * rmul
+            if taper and n_seg > 1:
+                # brush stroke: pointed entry/exit, full belly mid-stroke
+                t = (i + 0.5) / n_seg
+                rr *= 0.28 + 0.72 * (math.sin(math.pi * t) ** 0.6)
+            paths.append(capsule_path(pts[i], pts[i + 1], rr, cap))
     if not paths:
         return None
     out = Path()
@@ -253,6 +295,8 @@ def make_font(family, style, r, amp, freq, shear, narrow, bounce, drips, out_ttf
     for name, (w, strokes) in GLYPHS.items():
         if drips == "scribble" and name != "space":
             strokes = scribble_strokes(name, w)
+        elif drips == "alien" and name != "space":
+            strokes = alien_strokes(name, w)
         path = build_glyph(name, strokes, r, amp, freq, shear, narrow, bounce, drips, cap, decim)
         pen = TTGlyphPen(None)
         if path is not None:
@@ -307,6 +351,8 @@ FAMILIES = {
     "LMC Slasher":  (64, 84, 8.0, 2.2, 3, 0.90, 12, "", "square", 4),
     "LMC Sneeze":   (82, 102, 5.0, 1.0, 2, 1.02, 8, "droplets", "round", 0),
     "LMC Mumble":   (24, 36, 6.0, 1.3, 0, 1.00, 26, "scribble", "round", 0),
+    "LMC Dragon":   (58, 76, 6.0, 1.1, 4, 0.98, 10, "taper", "round", 0),
+    "LMC Alien":    (42, 58, 3.0, 1.0, 0, 1.00, 12, "alien", "round", 0),
 }
 
 def main(outdir):
