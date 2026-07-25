@@ -21,6 +21,8 @@ SERVICE="${SERVICE:-lettermycomic}"
 PORT="${PORT:-3000}"
 DOMAIN="${DOMAIN:-lettermycomic.com}"
 HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-30}"
+DB_NAME="${DB_NAME:-comiclettering}"
+DB_USER="${DB_USER:-comiclettering}"
 
 log()  { echo -e "\033[1;36m==>\033[0m $*"; }
 fail() { echo -e "\033[1;31mERROR:\033[0m $*" >&2; exit 1; }
@@ -29,6 +31,66 @@ ensure_pm2() {
   if ! command -v pm2 >/dev/null; then
     log "Installing PM2 globally…"
     npm install -g pm2 >/dev/null
+  fi
+}
+
+# Export the app's .env (DATABASE_URL etc.) into this shell so prisma, the
+# seed and the migration scripts can see it.
+load_env() {
+  if [ -f "$APP_DIR/.env" ]; then
+    set -a; . "$APP_DIR/.env"; set +a
+  fi
+}
+
+# Install PostgreSQL, ensure a role + database exist, and record the
+# connection string in $APP_DIR/.env (generated once, then reused).
+provision_postgres() {
+  [ "$(id -u)" -eq 0 ] || fail "Provisioning PostgreSQL needs root (sudo)."
+  if ! command -v psql >/dev/null; then
+    log "Installing PostgreSQL…"
+    apt-get install -y -qq postgresql postgresql-contrib >/dev/null
+  fi
+  systemctl enable --now postgresql >/dev/null 2>&1 || true
+
+  touch "$APP_DIR/.env"
+  if grep -qE '^DATABASE_URL="postgresql://' "$APP_DIR/.env"; then
+    log "PostgreSQL DATABASE_URL already configured — reusing."
+    return
+  fi
+
+  local pw
+  pw=$(head -c 24 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 24)
+  log "Creating PostgreSQL role & database (${DB_USER}/${DB_NAME})…"
+  runuser -u postgres -- psql -v ON_ERROR_STOP=1 >/dev/null <<SQL
+DO \$\$ BEGIN
+  IF EXISTS (SELECT FROM pg_roles WHERE rolname='${DB_USER}') THEN
+    ALTER ROLE ${DB_USER} LOGIN PASSWORD '${pw}';
+  ELSE
+    CREATE ROLE ${DB_USER} LOGIN PASSWORD '${pw}';
+  END IF;
+END \$\$;
+SQL
+  if ! runuser -u postgres -- psql -tAc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'" | grep -q 1; then
+    runuser -u postgres -- createdb -O "${DB_USER}" "${DB_NAME}"
+  fi
+
+  local url="postgresql://${DB_USER}:${pw}@localhost:5432/${DB_NAME}"
+  if grep -q '^DATABASE_URL=' "$APP_DIR/.env"; then
+    sed -i "s|^DATABASE_URL=.*|DATABASE_URL=\"${url}\"|" "$APP_DIR/.env"
+  else
+    echo "DATABASE_URL=\"${url}\"" >> "$APP_DIR/.env"
+  fi
+  log "PostgreSQL ready."
+}
+
+# Copy any legacy SQLite data into PostgreSQL, then archive the old file so
+# it never migrates twice. Idempotent (rows are upserted).
+migrate_legacy_sqlite() {
+  if [ -f "$APP_DIR/prisma/dev.db" ]; then
+    log "Legacy SQLite database found — migrating its data into PostgreSQL…"
+    ( cd "$APP_DIR" && SQLITE_PATH=prisma/dev.db node scripts/migrate-sqlite-to-postgres.mjs )
+    mv "$APP_DIR/prisma/dev.db" "$APP_DIR/prisma/dev.db.migrated"
+    log "Legacy SQLite archived to prisma/dev.db.migrated"
   fi
 }
 
@@ -54,14 +116,23 @@ build_app() {
 }
 
 backup_db() {
+  mkdir -p "$APP_DIR/backups"
+  local stamp
+  stamp=$(date +%Y%m%d-%H%M%S)
+  # legacy SQLite file, if this server hasn't migrated yet
   if [ -f "$APP_DIR/prisma/dev.db" ]; then
-    mkdir -p "$APP_DIR/backups"
-    local stamp
-    stamp=$(date +%Y%m%d-%H%M%S)
-    cp "$APP_DIR/prisma/dev.db" "$APP_DIR/backups/dev-${stamp}.db"
-    log "SQLite backup: backups/dev-${stamp}.db"
-    # keep the 30 most recent backups
-    ls -1t "$APP_DIR"/backups/dev-*.db 2>/dev/null | tail -n +31 | xargs -r rm -f
+    cp "$APP_DIR/prisma/dev.db" "$APP_DIR/backups/sqlite-${stamp}.db"
+    log "SQLite backup: backups/sqlite-${stamp}.db"
+  fi
+  # PostgreSQL dump
+  if command -v pg_dump >/dev/null && [[ "${DATABASE_URL:-}" == postgresql://* ]]; then
+    if pg_dump "$DATABASE_URL" > "$APP_DIR/backups/pg-${stamp}.sql" 2>/dev/null; then
+      log "PostgreSQL backup: backups/pg-${stamp}.sql"
+    else
+      rm -f "$APP_DIR/backups/pg-${stamp}.sql"
+    fi
+    # keep the 30 most recent dumps
+    ls -1t "$APP_DIR"/backups/pg-*.sql 2>/dev/null | tail -n +31 | xargs -r rm -f
   fi
 }
 
@@ -106,14 +177,14 @@ cmd_setup() {
   cd "$APP_DIR"
   git checkout "$BRANCH"
 
+  provision_postgres
+  load_env
+
   build_app
+  migrate_legacy_sqlite
 
   log "Seeding database (superuser)…"
-  if [ -n "${SEED_ADMIN_PASSWORD:-}" ]; then
-    SEED_ADMIN_PASSWORD="$SEED_ADMIN_PASSWORD" node prisma/seed.mjs
-  else
-    node prisma/seed.mjs
-  fi
+  node prisma/seed.mjs
 
   pm2_up
   # start PM2 (and this app) automatically on server boot
@@ -155,8 +226,6 @@ cmd_deploy() {
   prev=$(git rev-parse HEAD)
   log "Current version: ${prev:0:10}"
 
-  backup_db
-
   log "Pulling latest ${BRANCH}…"
   git fetch origin "$BRANCH"
   git checkout "$BRANCH"
@@ -167,8 +236,13 @@ cmd_deploy() {
     log "Already up to date — rebuilding anyway."
   fi
 
+  provision_postgres   # installs PG + writes DATABASE_URL on the first run
+  load_env
+  backup_db            # dumps the current DB (and any legacy SQLite file)
+
   # Build first — the running PM2 cluster keeps serving the whole time.
-  build_app
+  build_app            # includes `prisma db push` → creates PG tables
+  migrate_legacy_sqlite # one-time: copy SQLite rows into PG, then archive it
 
   # Swap workers only now that the new build is ready.
   pm2_up

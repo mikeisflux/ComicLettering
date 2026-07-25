@@ -1,13 +1,13 @@
 // LetterMyComic — SQL schema (Prisma ORM).
-// Default provider is SQLite for zero-config local use; switch to
-// "postgresql" (and DATABASE_URL in .env) for a hosted SQL database.
+// Runs on PostgreSQL. Set DATABASE_URL in .env, e.g.
+//   DATABASE_URL="postgresql://user:pass@localhost:5432/comiclettering"
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
