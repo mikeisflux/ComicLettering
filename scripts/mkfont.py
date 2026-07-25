@@ -1,19 +1,29 @@
 #!/usr/bin/env python3
-"""LMC Dialogue — an original comic-book dialogue typeface, built from
-scratch: every glyph is a hand-authored stroke skeleton, expanded to
-outlines with round caps/joins and a light hand-lettered wobble.
-No existing font's outlines are used or referenced. Licensed OFL 1.1."""
-import math, hashlib
+"""LMC font family generator — original comic lettering typefaces built
+from scratch. Every glyph is a hand-authored stroke skeleton, expanded to
+outlines with round caps/joins and deterministic hand-lettered wobble.
+No existing font's outlines are used or referenced. Licensed OFL 1.1.
+
+Families (each in Regular / Bold / Italic / Bold Italic):
+  LMC Dialogue — balanced everyday dialogue caps
+  LMC Agent    — crisp, tidy dialogue caps (minimal wobble)
+  LMC Hero     — round, friendly, heavier dialogue caps with a slight lean
+  LMC Alley    — loose, condensed, scrawled hand caps with heavy bounce
+  LMC Whisper  — thin, airy, wavering caps for whispers and asides
+  LMC Shout    — heavy, narrow, leaning display caps for yelling and SFX
+  LMC Horror   — rough caps with dripping strokes
+
+Usage: pip install fonttools skia-pathops brotli && python3 mkfont.py <outdir>
+"""
+import math, hashlib, io, os, sys
 from pathops import Path, union
 from fontTools.fontBuilder import FontBuilder
 from fontTools.pens.ttGlyphPen import TTGlyphPen
 from fontTools.ttLib import woff2
-import io, os
 
-UPM, CAP, DESC_LIM = 1000, 700, -220
+UPM, CAP = 1000, 700
 
 def arc(cx, cy, rx, ry, a0, a1, n=18):
-    """sampled elliptical arc, degrees"""
     return [(cx + rx * math.cos(math.radians(a0 + (a1 - a0) * i / n)),
              cy + ry * math.sin(math.radians(a0 + (a1 - a0) * i / n))) for i in range(n + 1)]
 
@@ -25,15 +35,13 @@ def quad(p0, c, p1, n=12):
              (1-t)**2*p0[1] + 2*(1-t)*t*c[1] + t*t*p1[1]) for t in [i/n for i in range(n+1)]]
 
 def chain(*segs):
-    """join point lists, dropping duplicate joints"""
     out = []
     for s in segs:
         out.extend(s if not out else s[1:])
     return out
 
-L = lambda *pts: list(pts)  # polyline stroke
+L = lambda *pts: list(pts)
 
-# glyph -> (advance-ish width of drawing, [strokes])
 GLYPHS = {
     "A": (500, [L((30,0),(250,700)), L((250,700),(470,0)), L((120,235),(385,235))]),
     "B": (480, [L((60,0),(60,700)),
@@ -105,25 +113,54 @@ CMAP_EXTRA = {
     "semicolon":";","parenleft":"(","parenright":")","slash":"/","space":" ",
 }
 
-def wobble(name, pts, amp):
-    ph = int(hashlib.md5(name.encode()).hexdigest()[:6], 16)
+def ghash(name):
+    return int(hashlib.md5(name.encode()).hexdigest()[:8], 16)
+
+def wobble(name, pts, amp, freq):
+    ph = ghash(name)
     p1, p2, p3, p4 = ph % 7, (ph >> 3) % 7, (ph >> 6) % 7, (ph >> 9) % 7
     out = []
     for (x, y) in pts:
-        dx = amp * math.sin(y * 0.011 + p1) + amp * 0.6 * math.sin(x * 0.017 + p2)
-        dy = amp * math.sin(x * 0.012 + p3) + amp * 0.6 * math.sin(y * 0.016 + p4)
+        dx = amp * math.sin(y * 0.011 * freq + p1) + amp * 0.6 * math.sin(x * 0.017 * freq + p2)
+        dy = amp * math.sin(x * 0.012 * freq + p3) + amp * 0.6 * math.sin(y * 0.016 * freq + p4)
         out.append((x + dx, y + dy))
     return out
 
-def capsule_path(p, q, r, n=12):
-    a = math.atan2(q[1] - p[1], q[0] - p[0])
-    pts = []
-    for i in range(n + 1):
-        t = a - math.pi / 2 + math.pi * i / n
-        pts.append((q[0] + r * math.cos(t), q[1] + r * math.sin(t)))
-    for i in range(n + 1):
-        t = a + math.pi / 2 + math.pi * i / n
-        pts.append((p[0] + r * math.cos(t), p[1] + r * math.sin(t)))
+def drip_strokes(name, strokes):
+    """dripping-paint strokes hanging from the letter's low points"""
+    lows = sorted({round(p[0]) for s in strokes for p in s if p[1] < 40})
+    if not lows:
+        return []
+    ph = ghash(name + "drip")
+    picks = sorted({lows[(ph >> (i * 5)) % len(lows)] for i in range(min(2, len(lows)))})
+    out = []
+    for i, x in enumerate(picks):
+        ln = 70 + ((ph >> (i * 7)) % 90)
+        sway = ((ph >> (i * 3)) % 21) - 10
+        out.append(([(x, 25), (x + sway * 0.4, -ln * 0.55), (x + sway, -ln)], 0.45))
+    return out
+
+def capsule_path(p, q, r, cap="round", n=12):
+    if cap == "square":
+        # rectangle extended r beyond both endpoints — blocky chopped stroke
+        a = math.atan2(q[1] - p[1], q[0] - p[0])
+        ux, uy = math.cos(a), math.sin(a)
+        px, py = -uy, ux
+        pts = [
+            (q[0] + ux * r + px * r, q[1] + uy * r + py * r),
+            (q[0] + ux * r - px * r, q[1] + uy * r - py * r),
+            (p[0] - ux * r - px * r, p[1] - uy * r - py * r),
+            (p[0] - ux * r + px * r, p[1] - uy * r + py * r),
+        ]
+    else:
+        a = math.atan2(q[1] - p[1], q[0] - p[0])
+        pts = []
+        for i in range(n + 1):
+            t = a - math.pi / 2 + math.pi * i / n
+            pts.append((q[0] + r * math.cos(t), q[1] + r * math.sin(t)))
+        for i in range(n + 1):
+            t = a + math.pi / 2 + math.pi * i / n
+            pts.append((p[0] + r * math.cos(t), p[1] + r * math.sin(t)))
     path = Path()
     pen = path.getPen()
     pen.moveTo(pts[0])
@@ -132,23 +169,39 @@ def capsule_path(p, q, r, n=12):
     pen.closePath()
     return path
 
-def build_glyph(name, strokes, r, amp, shear):
+def decimate(pts, k):
+    """keep every k-th point (always keeping the last) — turns sampled
+    curves into angular chunks"""
+    if k <= 1 or len(pts) <= 2:
+        return pts
+    out = pts[::k]
+    if out[-1] != pts[-1]:
+        out.append(pts[-1])
+    return out
+
+def build_glyph(name, strokes, r, amp, freq, shear, narrow, bounce, drips, cap="round", decim=0):
+    stroke_list = [(s, 1.0) for s in strokes]
+    if drips:
+        stroke_list += drip_strokes(name, strokes)
+    dy0 = (((ghash(name + "b") % 100) / 100) - 0.5) * 2 * bounce
     paths = []
-    for stroke in strokes:
-        pts = wobble(name, stroke, amp)
+    for stroke, rmul in stroke_list:
+        pts = decimate(list(stroke), decim)
+        pts = wobble(name, pts, amp, freq)
+        pts = [(x * narrow, y + dy0) for (x, y) in pts]
         if shear:
             pts = [(x + y * shear, y) for (x, y) in pts]
         if len(pts) == 1:
             pts = pts + [(pts[0][0] + 0.5, pts[0][1])]
         for i in range(len(pts) - 1):
-            paths.append(capsule_path(pts[i], pts[i + 1], r))
+            paths.append(capsule_path(pts[i], pts[i + 1], r * rmul, cap))
     if not paths:
         return None
     out = Path()
     union(paths, out.getPen())
     return out
 
-def make_font(style, r, amp, shear, out_ttf):
+def make_font(family, style, r, amp, freq, shear, narrow, bounce, drips, out_ttf, cap="round", decim=0):
     names = [".notdef"] + list(GLYPHS.keys())
     fb = FontBuilder(UPM, isTTF=True)
     fb.setupGlyphOrder(names)
@@ -160,39 +213,35 @@ def make_font(style, r, amp, shear, out_ttf):
         elif g in CMAP_EXTRA:
             cmap[ord(CMAP_EXTRA[g])] = g
     fb.setupCharacterMap(cmap)
-    glyphs, metrics = {}, {}
+    glyphs, adv = {}, {}
     pen = TTGlyphPen(None)
     glyphs[".notdef"] = pen.glyph()
-    metrics[".notdef"] = (600, 50)
+    adv[".notdef"] = 600
     for name, (w, strokes) in GLYPHS.items():
-        path = build_glyph(name, strokes, r, amp, shear)
+        path = build_glyph(name, strokes, r, amp, freq, shear, narrow, bounce, drips, cap, decim)
         pen = TTGlyphPen(None)
         if path is not None:
             path.draw(pen)
-        g = pen.glyph()
-        glyphs[name] = g
-        adv = int(w + 60 + (CAP * shear if shear else 0))
-        metrics[name] = (adv, 0)
+        glyphs[name] = pen.glyph()
+        adv[name] = int(w * narrow + 60 + (CAP * shear if shear else 0))
     fb.setupGlyf(glyphs)
-    # recompute lsb from actual bounds
     hmtx = {}
     for name in names:
         g = fb.font["glyf"][name]
         lsb = g.xMin if hasattr(g, "xMin") and g.numberOfContours else 0
-        hmtx[name] = (metrics.get(name, (600, 0))[0], lsb)
+        hmtx[name] = (adv.get(name, 600), lsb)
     fb.setupHorizontalMetrics(hmtx)
-    fb.setupHorizontalHeader(ascent=800, descent=-220)
-    fb.setupOS2(sTypoAscender=800, sTypoDescender=-220, sTypoLineGap=90,
-                usWinAscent=860, usWinDescent=260,
-                sxHeight=490, sCapHeight=CAP,
-                achVendID="LMC ",
+    fb.setupHorizontalHeader(ascent=800, descent=-260)
+    fb.setupOS2(sTypoAscender=800, sTypoDescender=-260, sTypoLineGap=90,
+                usWinAscent=880, usWinDescent=320,
+                sxHeight=490, sCapHeight=CAP, achVendID="LMC ",
                 fsSelection=0x40 if style == "Regular" else (0x20 if style == "Bold" else 0x01),
                 usWeightClass=700 if "Bold" in style else 400)
-    st = style
+    ps = family.replace(" ", "") + "-" + style.replace(" ", "")
     fb.setupNameTable({
-        "familyName": "LMC Dialogue", "styleName": st,
-        "uniqueFontIdentifier": f"LMCDialogue-{st}-1.0",
-        "fullName": f"LMC Dialogue {st}", "psName": f"LMCDialogue-{st.replace(' ','')}",
+        "familyName": family, "styleName": style,
+        "uniqueFontIdentifier": ps + "-1.0",
+        "fullName": f"{family} {style}", "psName": ps,
         "version": "Version 1.000",
         "copyright": "Copyright 2026 LetterMyComic. An original typeface. Licensed under the SIL Open Font License 1.1.",
         "licenseDescription": "This Font Software is licensed under the SIL Open Font License, Version 1.1.",
@@ -200,7 +249,6 @@ def make_font(style, r, amp, shear, out_ttf):
     })
     fb.setupPost(italicAngle=-9.0 if "Italic" in style else 0.0)
     fb.save(out_ttf)
-    # woff2
     out_woff2 = out_ttf.replace(".ttf", ".woff2")
     with open(out_ttf, "rb") as f:
         data = io.BytesIO(f.read())
@@ -208,11 +256,32 @@ def make_font(style, r, amp, shear, out_ttf):
     woff2.compress(data, outbuf)
     with open(out_woff2, "wb") as f:
         f.write(outbuf.getvalue())
-    print(style, "->", out_ttf, os.path.getsize(out_ttf), "B /", out_woff2, os.path.getsize(out_woff2), "B")
+    print(f"{family} {style}: {os.path.basename(out_ttf)} {os.path.getsize(out_ttf)}B  woff2 {os.path.getsize(out_woff2)}B")
 
-OUT = os.path.dirname(os.path.abspath(__file__))
-make_font("Regular", 46, 5.0, 0.0, os.path.join(OUT, "LMCDialogue-Regular.ttf"))
-make_font("Bold", 64, 4.0, 0.0, os.path.join(OUT, "LMCDialogue-Bold.ttf"))
-make_font("Italic", 46, 5.0, math.tan(math.radians(9)), os.path.join(OUT, "LMCDialogue-Italic.ttf"))
-make_font("Bold Italic", 64, 4.0, math.tan(math.radians(9)), os.path.join(OUT, "LMCDialogue-BoldItalic.ttf"))
-print("done")
+# family: (regular_r, bold_r, amp, freq, lean_deg, narrow, bounce, drips, cap, decim)
+FAMILIES = {
+    "LMC Dialogue": (46, 64, 5.0, 1.0, 0, 1.00, 0, False, "round", 0),
+    "LMC Agent":    (52, 70, 2.5, 0.8, 0, 0.94, 0, False, "round", 0),
+    "LMC Hero":     (78, 100, 4.0, 0.9, 3, 1.04, 6, False, "round", 0),
+    "LMC Alley":    (34, 50, 10.0, 1.9, 1, 0.88, 18, False, "round", 0),
+    "LMC Whisper":  (26, 40, 9.0, 1.6, 0, 1.02, 14, False, "round", 0),
+    "LMC Shout":    (88, 108, 6.0, 1.3, 4, 0.84, 10, False, "round", 0),
+    "LMC Horror":   (50, 68, 13.0, 2.6, 0, 0.95, 16, True, "round", 0),
+    "LMC Brawl":    (80, 100, 3.0, 1.0, 2, 0.92, 8, False, "square", 5),
+    "LMC Cosmos":   (42, 62, 1.2, 0.8, 0, 1.14, 0, False, "square", 4),
+    "LMC Slasher":  (64, 84, 8.0, 2.2, 3, 0.90, 12, False, "square", 4),
+}
+
+def main(outdir):
+    os.makedirs(outdir, exist_ok=True)
+    for family, (r, rb, amp, freq, lean, narrow, bounce, drips, cap, decim) in FAMILIES.items():
+        base = family.replace(" ", "")
+        lean_sh = math.tan(math.radians(lean))
+        ital_sh = math.tan(math.radians(9 + lean))
+        for style, rr, sh in [("Regular", r, lean_sh), ("Bold", rb, lean_sh),
+                              ("Italic", r, ital_sh), ("Bold Italic", rb, ital_sh)]:
+            fn = os.path.join(outdir, f"{base}-{style.replace(' ', '')}.ttf")
+            make_font(family, style, rr, amp, freq, sh, narrow, bounce, drips, fn, cap, decim)
+
+if __name__ == "__main__":
+    main(sys.argv[1] if len(sys.argv) > 1 else ".")

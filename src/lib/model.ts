@@ -260,6 +260,10 @@ const R: FontVariant[] = ["regular"];
 export const FONTS: Record<string, FontDef> = {
   /* Dialogue */
   lmcdialogue: { label: "LMC Dialogue (Ours)", css: '"LMC Dialogue",cursive', group: "Dialogue", variants: ALL },
+  lmcagent:   { label: "LMC Agent (Ours)",   css: '"LMC Agent",cursive',   group: "Dialogue", variants: ALL },
+  lmchero:    { label: "LMC Hero (Ours)",    css: '"LMC Hero",cursive',    group: "Dialogue", variants: ALL },
+  lmcalley:   { label: "LMC Alley (Ours)",   css: '"LMC Alley",cursive',   group: "Dialogue", variants: ALL },
+  lmcwhisper: { label: "LMC Whisper (Ours)", css: '"LMC Whisper",cursive', group: "Dialogue", variants: ALL },
   comicneue: { label: "Comic Neue",       css: '"Comic Neue","Comic Sans MS",cursive', group: "Dialogue", variants: ALL },
   patrick:   { label: "Patrick Hand",     css: '"Patrick Hand",cursive',               group: "Dialogue", variants: R },
   kalam:     { label: "Kalam",            css: '"Kalam",cursive',                      group: "Dialogue", variants: RB },
@@ -293,6 +297,8 @@ export const FONTS: Record<string, FontDef> = {
   crafty:    { label: "Crafty Girls",     css: '"Crafty Girls",cursive',               group: "Dialogue", variants: R },
   comicsans: { label: "Comic Sans",       css: '"Comic Sans MS","Comic Sans","Chalkboard SE",cursive', group: "Dialogue", variants: ALL },
   /* Display / SFX */
+  lmcshout:  { label: "LMC Shout (Ours)",  css: '"LMC Shout",cursive',  group: "Display", variants: ALL },
+  lmcbrawl:  { label: "LMC Brawl (Ours)",  css: '"LMC Brawl",cursive',  group: "Display", variants: ALL },
   bangers:   { label: "Bangers",          css: '"Bangers",cursive',        group: "Display", variants: R },
   luckiest:  { label: "Luckiest Guy",     css: '"Luckiest Guy",cursive',   group: "Display", variants: R },
   boogaloo:  { label: "Boogaloo",         css: '"Boogaloo",cursive',       group: "Display", variants: R },
@@ -340,6 +346,9 @@ export const FONTS: Record<string, FontDef> = {
   freckle:   { label: "Freckle Face",     css: '"Freckle Face",cursive',   group: "Display", variants: R },
   kranky:    { label: "Kranky",           css: '"Kranky",cursive',         group: "Display", variants: R },
   /* Themed */
+  lmchorror:  { label: "LMC Horror (Ours)",  css: '"LMC Horror",cursive',  group: "Themed", variants: ALL },
+  lmcslasher: { label: "LMC Slasher (Ours)", css: '"LMC Slasher",cursive', group: "Themed", variants: ALL },
+  lmccosmos:  { label: "LMC Cosmos (Ours)",  css: '"LMC Cosmos",cursive',  group: "Themed", variants: ALL },
   creepster: { label: "Creepster",        css: '"Creepster",cursive',      group: "Themed", variants: R },
   nosifer:   { label: "Nosifer (Drip)",   css: '"Nosifer",cursive',        group: "Themed", variants: R },
   audiowide: { label: "Audiowide (Sci-Fi)", css: '"Audiowide",sans-serif', group: "Themed", variants: R },

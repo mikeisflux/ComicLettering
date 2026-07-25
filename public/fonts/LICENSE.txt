@@ -2,10 +2,11 @@ The font files in this directory are open-licensed and redistributed here
 under their original license terms. Sources: Google Fonts
 (fonts.google.com), except where noted.
 
-LMC Dialogue (LMCDialogue-*.woff2) is an ORIGINAL typeface created for
+The LMC families (LMC*-*.woff2: Dialogue, Agent, Hero, Alley, Whisper,
+Shout, Brawl, Slasher, Horror, Cosmos) are ORIGINAL typefaces created for
 LetterMyComic (generator source: scripts/mkfont.py in this repository).
-It is not derived from any existing font's outlines. Released under the
-SIL Open Font License 1.1.
+They are not derived from any existing font's outlines. Released under
+the SIL Open Font License 1.1.
 
 SIL Open Font License 1.1 (OFL) families:
 Comic Neue, Patrick Hand, Patrick Hand SC, Kalam, Bangers, Luckiest Guy,
