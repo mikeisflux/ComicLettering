@@ -69,6 +69,10 @@ export interface BaseEl {
   id: string;
   x: number; y: number; w: number; h: number; rot: number;
   shadow: boolean;
+  opacity?: number;   // 0..1, default 1
+  flipH?: boolean;
+  flipV?: boolean;
+  locked?: boolean;
 }
 export interface PanelEl extends BaseEl {
   type: "panel";
@@ -86,7 +90,44 @@ export interface BalloonEl extends BaseEl {
   text: string;
   ts: TextStyle;
   fill: FillStyle; stroke: string; strokeW: number;
-  tail: { dx: number; dy: number } | null;
+  /* dx/dy: tail tip relative to the balloon centre (local, unrotated).
+     bx/by: optional bend point the tail curves through. */
+  tail: { dx: number; dy: number; bx?: number; by?: number } | null;
+  /* id of a balloon this one is attached to: they render joined, with the
+     connector tail aimed at the partner automatically */
+  attachTo?: string | null;
+  /* optional image content (e.g. pre-made lettering stamps), clipped to the
+     balloon shape and drawn behind the text */
+  img?: string | null;
+}
+
+/* Resolve a balloon's effective tail: attached balloons aim at their partner. */
+export function resolveBalloon(page: Page, el: BalloonEl): { el: BalloonEl; base: BalloonEl | null } {
+  if (!el.attachTo) return { el, base: null };
+  const base = page.els.find((e) => e.id === el.attachTo && e.type === "balloon") as BalloonEl | undefined;
+  if (!base) return { el: { ...el, attachTo: null }, base: null };
+  const bc = [el.x + el.w / 2, el.y + el.h / 2];
+  const ac = [base.x + base.w / 2, base.y + base.h / 2];
+  const [dx, dy] = rotVec(ac[0] - bc[0], ac[1] - bc[1], -el.rot);
+  return {
+    el: { ...el, tail: { ...(el.tail ?? {}), dx: Math.round(dx), dy: Math.round(dy) } },
+    base,
+  };
+}
+
+export const aabbOverlap = (
+  a: Pick<BaseEl, "x" | "y" | "w" | "h">, b: Pick<BaseEl, "x" | "y" | "w" | "h">
+) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+
+/* The balloon underneath `el` that overlaps it (candidate to attach to). */
+export function findMergeBase(page: Page, el: BalloonEl): BalloonEl | null {
+  const idx = page.els.indexOf(el);
+  for (let i = idx - 1; i >= 0; i--) {
+    const o = page.els[i];
+    if (o.type !== "balloon" || o.id === el.attachTo) continue;
+    if (aabbOverlap(el, o)) return o;
+  }
+  return null;
 }
 export interface TextEl extends BaseEl {
   type: "text";
@@ -95,7 +136,44 @@ export interface TextEl extends BaseEl {
 }
 export type El = PanelEl | ImageEl | BalloonEl | TextEl;
 
-export interface Page { w: number; h: number; bg: FillStyle; els: El[] }
+export interface PageMargin { t: number; r: number; b: number; l: number }
+export interface Page { w: number; h: number; bg: FillStyle; els: El[]; margin?: PageMargin }
+
+/* Pixels per inch used across rulers, paper sizes and Page Setup. */
+export const DPI = 225;
+
+export interface PaperCategory { name: string; sizes: [string, number, number][] }
+export const PAPER_CATEGORIES: PaperCategory[] = [
+  {
+    name: "Comic Sizes",
+    sizes: [
+      ["Standard Comic", 6.625, 10.25],
+      ["Golden Age", 7.75, 10.5],
+      ["Digest", 5.5, 8.25],
+      ["Magazine", 8.5, 11],
+      ["Webcomic Strip", 8, 2.75],
+      ["Square Album", 8.5, 8.5],
+    ],
+  },
+  {
+    name: "US Paper Sizes",
+    sizes: [
+      ["Tabloid", 11, 17],
+      ["US Legal", 8.5, 14],
+      ["US Letter", 8.5, 11],
+    ],
+  },
+  {
+    name: "International Paper Sizes",
+    sizes: [
+      ["A3", 11.693, 16.535],
+      ["A4", 8.268, 11.693],
+      ["A5", 5.827, 8.268],
+      ["B4", 9.843, 13.898],
+      ["B5 (Manga)", 6.929, 9.843],
+    ],
+  },
+];
 export interface Doc { app: "comiclettering"; version: 2; pages: Page[] }
 export type Assets = Record<string, string>;
 
@@ -326,8 +404,9 @@ export const defaultTextStyle = (over: Partial<TextStyle> = {}): TextStyle => ({
   ...over,
 });
 
-export function newPage(w = 1500, h = 2250): Page {
-  return { w, h, bg: solid("#ffffff"), els: [] };
+export function newPage(w = 1500, h = 2250, margin?: PageMargin): Page {
+  const m = margin ?? (() => { const v = Math.round(w * 0.035); return { t: v, r: v, b: v, l: v }; })();
+  return { w, h, bg: solid("#ffffff"), els: [], margin: m };
 }
 export function newDoc(): Doc {
   return { app: "comiclettering", version: 2, pages: [newPage()] };
@@ -371,14 +450,15 @@ export function makeText(x: number, y: number, w: number, h: number, sfx: boolea
 }
 
 export function applyLayout(page: Page, fracs: LayoutRect[]) {
-  const m = Math.round(page.w * 0.035);
+  const def = Math.round(page.w * 0.035);
+  const mg = page.margin ?? { t: def, r: def, b: def, l: def };
   const g = Math.round(page.w * 0.02);
-  const cw = page.w - 2 * m, ch = page.h - 2 * m;
+  const cw = page.w - mg.l - mg.r, ch = page.h - mg.t - mg.b;
   const panels = fracs.map(([fx, fy, fw, fh, rot]) => {
-    const x0 = m + fx * cw + (fx > 0.001 ? g / 2 : 0);
-    const x1 = m + (fx + fw) * cw - (fx + fw < 0.999 ? g / 2 : 0);
-    const y0 = m + fy * ch + (fy > 0.001 ? g / 2 : 0);
-    const y1 = m + (fy + fh) * ch - (fy + fh < 0.999 ? g / 2 : 0);
+    const x0 = mg.l + fx * cw + (fx > 0.001 ? g / 2 : 0);
+    const x1 = mg.l + (fx + fw) * cw - (fx + fw < 0.999 ? g / 2 : 0);
+    const y0 = mg.t + fy * ch + (fy > 0.001 ? g / 2 : 0);
+    const y1 = mg.t + (fy + fh) * ch - (fy + fh < 0.999 ? g / 2 : 0);
     const p = makePanel(Math.round(x0), Math.round(y0), Math.round(x1 - x0), Math.round(y1 - y0));
     if (rot) p.rot = rot;
     return p;

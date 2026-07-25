@@ -1,0 +1,45 @@
+.adm { min-height: 100vh; background: #eef1f5; font-size: 14px; }
+.admHeader {
+  display: flex; align-items: center; gap: 20px;
+  background: linear-gradient(#46586e, #24303f); color: #e8edf4;
+  padding: 12px 24px;
+}
+.admHeader .brand { font-family: "Bangers", cursive; font-size: 22px; color: #fff; }
+.admHeader .brand span { color: #f0812c; }
+.admHeader nav { display: flex; gap: 6px; flex: 1; }
+.admHeader nav button {
+  background: transparent; border: 1px solid transparent; color: #cdd6e2;
+  padding: 6px 14px; border-radius: 6px; font: inherit; font-weight: 600; cursor: pointer;
+}
+.admHeader nav button.on { background: #ffffff1c; color: #fff; border-color: #ffffff30; }
+.admHeader a { color: #cdd6e2; text-decoration: none; font-size: 13px; }
+.admBody { max-width: 1080px; margin: 24px auto; padding: 0 20px; }
+.admCard {
+  background: #fff; border: 1px solid #cdd3db; border-radius: 10px;
+  padding: 18px 20px; margin-bottom: 18px; box-shadow: 0 1px 3px #0000000d;
+}
+.admCard h2 { margin: 0 0 4px; font-size: 16px; }
+.admCard .hint { color: #6a7280; font-size: 12.5px; margin: 0 0 14px; }
+.admTable { width: 100%; border-collapse: collapse; }
+.admTable th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #6a7280; padding: 6px 8px; border-bottom: 2px solid #e3e7ec; }
+.admTable td { padding: 8px; border-bottom: 1px solid #eef0f4; vertical-align: middle; }
+.admTable tr.unread td { font-weight: 700; background: #f7fafd; }
+.admin-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+.b-active { background: #d9f2e0; color: #17693a; }
+.b-none { background: #eee; color: #666; }
+.b-cancelled, .b-suspended { background: #fde3e3; color: #a02525; }
+.b-admin { background: #e3e9fd; color: #2540a0; }
+.admBtn {
+  background: #fff; border: 1px solid #b9c0ca; border-radius: 5px;
+  padding: 4px 10px; font: inherit; font-size: 12.5px; cursor: pointer;
+}
+.admBtn:hover { border-color: #2f7fd6; }
+.admBtn.primary { background: #f0812c; border-color: #c46316; color: #1d1105; font-weight: 700; }
+.admInput { width: 100%; padding: 6px 8px; font: inherit; border: 1px solid #b9c0ca; border-radius: 5px; }
+.admRow { display: flex; gap: 10px; align-items: center; margin: 8px 0; }
+.admRow label { flex: 0 0 240px; font-weight: 600; font-size: 13px; }
+.admRow .k-hint { color: #8a919c; font-size: 11.5px; }
+.msgBody { white-space: pre-wrap; background: #f7f8fa; border: 1px solid #e3e7ec; border-radius: 6px; padding: 12px; margin: 10px 0; max-height: 320px; overflow-y: auto; font-weight: 400; }
+.replyBox textarea { width: 100%; min-height: 110px; font: inherit; padding: 8px; border: 1px solid #b9c0ca; border-radius: 6px; }
+.okNote { color: #17693a; font-weight: 600; }
+.errNote { color: #a02525; font-weight: 600; }

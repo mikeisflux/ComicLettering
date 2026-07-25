@@ -1,0 +1,147 @@
+/* LetterMyComic marketing site */
+.mkt {
+  --navy: #24303f;
+  --navy2: #46586e;
+  --orange: #f0812c;
+  --paper: #ffffff;
+  --ink: #1c2129;
+  --mute: #5a6270;
+  background: var(--paper);
+  color: var(--ink);
+  min-height: 100vh;
+  display: flex; flex-direction: column;
+  font-size: 16px; line-height: 1.6;
+}
+.mkt a { color: #1a6fd4; text-decoration: none; }
+.mkt a:hover { text-decoration: underline; }
+
+.mktHeader {
+  position: sticky; top: 0; z-index: 100;
+  display: flex; align-items: center; gap: 26px;
+  padding: 14px 5vw;
+  background: linear-gradient(var(--navy2), var(--navy));
+  color: #e8edf4;
+}
+.mktLogo {
+  font-family: "Bangers", cursive; font-size: 26px; letter-spacing: 1px;
+  color: #fff; text-decoration: none !important;
+}
+.mktLogo span { color: var(--orange); }
+.mktNav { display: flex; gap: 22px; flex: 1; }
+.mktNav a { color: #cdd6e2; font-weight: 600; font-size: 14px; text-decoration: none; }
+.mktNav a:hover { color: #fff; text-decoration: none; }
+.mktHeader .cta {
+  background: var(--orange); color: #1d1105; font-weight: 800;
+  padding: 8px 18px; border-radius: 6px; text-decoration: none !important;
+}
+.mktHeader .ghost {
+  color: #e8edf4; font-weight: 600; padding: 8px 6px; text-decoration: none !important;
+}
+
+/* hero */
+.hero {
+  position: relative; overflow: hidden;
+  background:
+    radial-gradient(circle at 8px 8px, #dfe5ec 2.4px, transparent 2.6px) 0 0/26px 26px,
+    linear-gradient(180deg, #f4f7fb, #e9eef5);
+  padding: 76px 5vw 70px;
+  text-align: center;
+}
+.hero h1 {
+  font-family: "Bangers", cursive;
+  font-size: clamp(38px, 6vw, 68px);
+  line-height: 1.05; letter-spacing: 1px; margin: 0 auto 18px;
+  max-width: 900px; color: var(--navy);
+  text-shadow: 3px 3px 0 #ffffff, 5px 5px 0 var(--orange);
+}
+.hero p.lead { font-size: 19px; color: var(--mute); max-width: 680px; margin: 0 auto 30px; }
+.heroBtns { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+.btnBig {
+  display: inline-block; padding: 14px 34px; border-radius: 8px;
+  font-weight: 800; font-size: 17px; text-decoration: none !important;
+}
+.btnBig.primary { background: var(--orange); color: #1d1105; box-shadow: 0 4px 0 #b95c14; }
+.btnBig.primary:hover { transform: translateY(-1px); }
+.btnBig.secondary { background: var(--navy); color: #fff; box-shadow: 0 4px 0 #10161e; }
+.heroNote { margin-top: 16px; color: var(--mute); font-size: 13px; }
+
+/* sections */
+.mktSection { padding: 64px 5vw; max-width: 1120px; margin: 0 auto; width: 100%; }
+.mktSection.alt { max-width: none; background: #f4f6f9; }
+.mktSection.alt > div { max-width: 1120px; margin: 0 auto; }
+.mktSection h2 {
+  font-family: "Bangers", cursive; font-size: clamp(28px, 4vw, 42px);
+  letter-spacing: 1px; color: var(--navy); margin: 0 0 8px;
+}
+.mktSection .sub { color: var(--mute); margin: 0 0 34px; max-width: 700px; }
+.featGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 22px; }
+.featCard {
+  background: #fff; border: 2px solid var(--ink); border-radius: 10px;
+  padding: 22px; box-shadow: 6px 6px 0 #d8dde4;
+}
+.featCard h3 { margin: 0 0 8px; font-size: 17px; }
+.featCard p { margin: 0; color: var(--mute); font-size: 14.5px; }
+.featCard .emoji { font-size: 28px; display: block; margin-bottom: 10px; }
+
+/* pricing */
+.priceGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 26px; max-width: 720px; margin: 0 auto; }
+.priceCard {
+  background: #fff; border: 3px solid var(--ink); border-radius: 12px;
+  padding: 30px; text-align: center; box-shadow: 8px 8px 0 #d8dde4;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.priceCard.best { border-color: var(--orange); box-shadow: 8px 8px 0 #f7cfae; }
+.priceCard .plan { font-weight: 800; text-transform: uppercase; letter-spacing: 2px; font-size: 13px; color: var(--mute); }
+.priceCard .amount { font-family: "Bangers", cursive; font-size: 54px; color: var(--navy); line-height: 1; }
+.priceCard .per { color: var(--mute); font-size: 14px; }
+.priceCard .save { color: #1d8a3c; font-weight: 700; font-size: 14px; }
+.priceCard ul { text-align: left; margin: 12px 0; padding-left: 20px; color: var(--mute); font-size: 14.5px; }
+.ppButtons { min-height: 48px; margin-top: 8px; }
+.ppNote { color: var(--mute); font-size: 13px; text-align: center; margin-top: 18px; }
+
+/* faq */
+.faqList { max-width: 760px; }
+.faqList details {
+  background: #fff; border: 2px solid var(--ink); border-radius: 8px;
+  padding: 14px 18px; margin-bottom: 12px;
+}
+.faqList summary { font-weight: 700; cursor: pointer; }
+.faqList p { color: var(--mute); margin: 10px 0 0; }
+
+/* forms */
+.formCard {
+  max-width: 460px; margin: 60px auto; background: #fff;
+  border: 3px solid var(--ink); border-radius: 12px; padding: 32px;
+  box-shadow: 8px 8px 0 #d8dde4;
+}
+.formCard h1 { font-family: "Bangers", cursive; letter-spacing: 1px; color: var(--navy); margin: 0 0 18px; }
+.formCard label { display: block; font-weight: 600; font-size: 14px; margin: 14px 0 4px; }
+.formCard input, .formCard textarea {
+  width: 100%; padding: 10px 12px; font: inherit;
+  border: 2px solid #b3b9c2; border-radius: 6px;
+}
+.formCard textarea { min-height: 140px; resize: vertical; }
+.formCard button {
+  margin-top: 20px; width: 100%; padding: 12px;
+  background: var(--orange); color: #1d1105; font-weight: 800; font-size: 16px;
+  border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 3px 0 #b95c14;
+}
+.formCard .formErr { color: #c22; margin-top: 12px; font-size: 14px; }
+.formCard .formOk { color: #1d8a3c; margin-top: 12px; font-weight: 600; }
+.formCard .alt { margin-top: 16px; font-size: 14px; color: var(--mute); }
+
+/* prose pages */
+.prose { max-width: 760px; }
+.prose h1 { font-family: "Bangers", cursive; letter-spacing: 1px; color: var(--navy); }
+.prose h2 { font-size: 20px; margin-top: 28px; }
+.prose p, .prose li { color: #333a44; font-size: 15.5px; }
+
+/* footer */
+.mktFooter {
+  margin-top: auto; background: var(--navy); color: #93a1b3;
+  padding: 34px 5vw; font-size: 14px;
+}
+.mktFooter .cols { display: flex; flex-wrap: wrap; gap: 40px; max-width: 1120px; margin: 0 auto; }
+.mktFooter a { color: #cdd6e2; display: block; margin-bottom: 6px; }
+.mktFooter .foot-brand { font-family: "Bangers", cursive; font-size: 22px; color: #fff; }
+.mktFooter .legal { margin-top: 18px; text-align: center; color: #6d7b8d; font-size: 12px; }

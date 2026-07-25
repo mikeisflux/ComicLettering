@@ -128,8 +128,16 @@ function ellipseTailPath(
   const A = ellipsePt(cx, cy, rx, ry, t + delta);
   const B = ellipsePt(cx, cy, rx, ry, t - delta);
   const E = ellipsePt(cx, cy, rx, ry, t);
-  const mB = lerpPt(lerpPt(B, tip, 0.45), lerpPt(E, tip, 0.45), 0.55);
-  const mA = lerpPt(lerpPt(tip, A, 0.55), lerpPt(tip, E, 0.55), 0.55);
+  let mB: number[], mA: number[];
+  if (tail.bx != null && tail.by != null) {
+    /* user-bent tail: both edges curve through the bend point */
+    const M = [cx + tail.bx, cy + tail.by];
+    mB = [M[0] + (B[0] - E[0]) * 0.45, M[1] + (B[1] - E[1]) * 0.45];
+    mA = [M[0] + (A[0] - E[0]) * 0.45, M[1] + (A[1] - E[1]) * 0.45];
+  } else {
+    mB = lerpPt(lerpPt(B, tip, 0.45), lerpPt(E, tip, 0.45), 0.55);
+    mA = lerpPt(lerpPt(tip, A, 0.55), lerpPt(tip, E, 0.55), 0.55);
+  }
   return `M ${fmt(A[0])} ${fmt(A[1])}` +
     ` A ${fmt(rx)} ${fmt(ry)} 0 1 1 ${fmt(B[0])} ${fmt(B[1])}` +
     ` Q ${fmt(mB[0])} ${fmt(mB[1])} ${fmt(tip[0])} ${fmt(tip[1])}` +
@@ -221,8 +229,15 @@ export function balloonGeom(el: BalloonEl): BalloonGeom {
         const t = Math.atan2(tail.dy, tail.dx);
         const E = ellipsePt(cx, cy, rx, ry, t);
         const base = Math.min(w, h);
+        const M = tail.bx != null && tail.by != null ? [cx + tail.bx, cy + tail.by] : null;
         ([[0.32, 0.085], [0.62, 0.055], [0.88, 0.035]] as const).forEach(([f, rf]) => {
-          const c = lerpPt(E, tip, f);
+          /* trail follows the bend point when set (quadratic bezier) */
+          const c = M
+            ? [
+                (1 - f) * (1 - f) * E[0] + 2 * (1 - f) * f * M[0] + f * f * tip[0],
+                (1 - f) * (1 - f) * E[1] + 2 * (1 - f) * f * M[1] + f * f * tip[1],
+              ]
+            : lerpPt(E, tip, f);
           d += circleSub(c[0], c[1], Math.max(3, base * rf));
         });
       }

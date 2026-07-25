@@ -1,7 +1,9 @@
-# ComicLettering Studio
+# LetterMyComic — lettermycomic.com
 
-A modern, crash-proof **web-based comic lettering studio** in the spirit of the
-classic desktop comic apps — rebuilt from scratch on the latest stack:
+A complete commercial platform for **lettermycomic.com**: an SEO-ready marketing
+site, PayPal subscriptions ($20/mo · $160/yr, no trials), an admin console with
+an internal inbox, and a professional **web-based comic lettering studio** at
+`/app` — built on the latest stack:
 
 - **Next.js 15** (App Router) + **React 19** + TypeScript
 - **SQL project library** via **Prisma ORM** — SQLite by default (zero config),
@@ -78,3 +80,32 @@ fills/patterns are generated procedurally.
 
 > ⚠️ Because Comic Life 3 is commercial software, consider removing those zip
 > archives from this public repository.
+
+## Platform (lettermycomic.com)
+
+- **Marketing site** at `/` — landing, features, pricing, FAQ (with FAQ/SoftwareApplication
+  JSON-LD), contact, terms, privacy, sitemap.xml, robots.txt, OpenGraph image.
+- **Subscriptions**: PayPal ($20/month, $160/year, no trials). Admin → Payments creates
+  the PayPal plans automatically; webhook keeps statuses in sync.
+- **/app** — the studio, gated to active subscribers (admins bypass).
+- **/admin** — Inbox (contact form + SendGrid Inbound Parse email, reply via SendGrid),
+  Settings (all API keys stored in SQL: SendGrid, PayPal, reCAPTCHA v3, custom keys),
+  Users (activate/suspend, comp access, admin roles), Payments setup.
+- **Auth**: plain email/password (scrypt + HMAC session cookie), reCAPTCHA v3 on
+  signup/login/contact when keys are set. First registered account becomes admin;
+  `npm run db:seed` seeds divinitycomicsinc@gmail.com as admin with lifetime access
+  (password from SEED_ADMIN_PASSWORD, printed once if unset).
+
+## Studio highlights
+
+Comic Life-style UI with pages/styles sidebars, rulers, tabbed right panel
+(Layouts · Inspector · Layers · Photos · Library · Proof) and the balloon tray.
+Balloons auto-join when dragged near each other (bendable connector lever, drag
+tip to detach), images/PDFs drop straight into balloons and panels, Instant
+Alpha background removal, procedural fills (gradients/halftones/tiles/speedlines/
+textures), 28 lettering style presets + SFX word stamps, snapping with bleed/
+margin/center/mirror/equal-spacing guides, Ctrl+[ / Ctrl+] centering, Shift for
+proportional resize, auto-locking layers with a full right-click menu,
+LanguageTool proofing + native spellcheck, Page Setup (paper sizes in inches,
+orientation, document margins), print, and export to PNG/JPG/TIFF/PDF/CBZ with
+a DPI selector and page ranges.

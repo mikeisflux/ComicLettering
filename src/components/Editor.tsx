@@ -9,14 +9,14 @@ import {
   Assets, BALLOON_KINDS, BalloonEl, BalloonKind, Doc, El, FILTERS, FONTS,
   FONT_GROUPS, FillStyle, GRADIENT_PRESETS, HALFTONE_VARIANTS, LAYOUT_CATEGORIES,
   LayoutRect, PAGE_SIZES, PATTERN_VARIANTS, Page, PanelEl, SPEEDLINE_VARIANTS,
-  TAILLESS_KINDS, TEXTURE_VARIANTS, TextEl, TextStyle, applyLayout, clamp,
-  makeBalloon, makeImage, makePanel, makeText, newPage, reseedIds, rotVec,
-  solid, starterDoc, uid,
+  DPI, PAPER_CATEGORIES, PageMargin, TAILLESS_KINDS, TEXTURE_VARIANTS, TextEl,
+  TextStyle, aabbOverlap, applyLayout, clamp, makeBalloon, makeImage, makePanel,
+  makeText, newPage, reseedIds, resolveBalloon, rotVec, solid, starterDoc, uid,
 } from "@/lib/model";
 import { balloonGeom } from "@/lib/geometry";
 import { LETTER_STYLES, LetterStyle, applyLetterStyle } from "@/lib/presets";
 import { defaultFillFor, fillCss, fillOverlayTile, fillOverlayURL, isRepeating } from "@/lib/fills";
-import { docThumbnail, exportPagePNG, loadImage, pageThumbnail } from "@/lib/exportPng";
+import { ImageFormat, docThumbnail, exportPageImage, exportPagePNG, loadImage, pageThumbnail } from "@/lib/exportPng";
 
 const AUTOSAVE_KEY = "comiclettering.autosave.v2";
 const MIN_SIZE = 24;
@@ -205,12 +205,15 @@ function FillPicker({ value, onChange }: { value: FillStyle; onChange: (f: FillS
 
 /* ---------------- balloon SVG ---------------- */
 
-function BalloonShape({ el }: { el: BalloonEl }) {
+export interface MergeBaseInfo { d: string; color: string; tf: string }
+
+function BalloonShape({ el, mergeBase, imgSrc }: { el: BalloonEl; mergeBase?: MergeBaseInfo | null; imgSrc?: string | null }) {
   const g = balloonGeom(el);
   const f = el.fill;
   const gid = `grad-${el.id}`, cid = `clip-${el.id}`, pid = `pat-${el.id}`;
   const tile = f.kind !== "solid" && f.kind !== "gradient" ? fillOverlayTile(f) : null;
   const tileURL = tile ? fillOverlayURL(f) : null;
+  const needClip = !!tileURL || !!imgSrc;
   const repeating = isRepeating(f);
   let fillRef = "#ffffff";
   if (f.kind === "solid") fillRef = f.a;
@@ -228,22 +231,32 @@ function BalloonShape({ el }: { el: BalloonEl }) {
             <stop offset="1" stopColor={f.b} />
           </linearGradient>
         )}
-        {tileURL && <clipPath id={cid}><path d={g.d} /></clipPath>}
+        {needClip && <clipPath id={cid}><path d={g.d} /></clipPath>}
         {tileURL && repeating && tile && (
           <pattern id={pid} patternUnits="userSpaceOnUse" width={tile.width} height={tile.height}>
             <image href={tileURL} width={tile.width} height={tile.height} />
           </pattern>
         )}
       </defs>
+      {mergeBase && el.strokeW > 0 && (
+        /* joined balloons: stroke under, fills over → outlines union */
+        <path d={g.d} fill="none" stroke={el.stroke} strokeWidth={el.strokeW * 2}
+          strokeLinejoin="round" strokeDasharray={g.dash ? g.dash.join(" ") : undefined} />
+      )}
       <path d={g.d} fill={fillRef} />
       {tileURL && (repeating
         ? <rect x={-el.w} y={-el.h} width={el.w * 3} height={el.h * 3} fill={`url(#${pid})`} clipPath={`url(#${cid})`} />
         : <image href={tileURL} x={0} y={0} width={el.w} height={el.h} preserveAspectRatio="none" clipPath={`url(#${cid})`} />)}
-      {el.strokeW > 0 && (
+      {imgSrc && (
+        <image href={imgSrc} x={0} y={0} width={el.w} height={el.h}
+          preserveAspectRatio="xMidYMid slice" clipPath={`url(#${cid})`} />
+      )}
+      {mergeBase && <g transform={mergeBase.tf}><path d={mergeBase.d} fill={mergeBase.color} /></g>}
+      {!mergeBase && el.strokeW > 0 && (
         <path d={g.d} fill="none" stroke={el.stroke} strokeWidth={el.strokeW}
           strokeLinejoin="round" strokeDasharray={g.dash ? g.dash.join(" ") : undefined} />
       )}
-      {el.strokeW > 0 && g.d2 && (
+      {!mergeBase && el.strokeW > 0 && g.d2 && (
         <path d={g.d2} fill="none" stroke={el.stroke} strokeWidth={el.strokeW}
           strokeLinejoin="round" strokeDasharray={g.dash ? g.dash.join(" ") : undefined} />
       )}
@@ -254,6 +267,22 @@ function BalloonShape({ el }: { el: BalloonEl }) {
 /* ==================================================================== */
 
 interface ProjectMeta { id: string; name: string; updatedAt: string; thumbnail: string | null }
+interface ProofMatch { elId: string; message: string; context: string; offset: number; length: number; reps: string[] }
+
+const STAMPS = ["💥", "⚡", "🔥", "💫", "⭐", "💢", "💦", "💤", "❗", "❓", "🎯", "🏆", "❤️", "💀", "🤖", "👊"];
+/* Pre-made SFX word stamps, each paired with a lettering style preset + tilt */
+const WORD_STAMPS: [string, string, number][] = [
+  ["ZAP!", "Hazard", -6], ["POW!", "Sunburst", 5], ["BAM!", "Crimson", -4],
+  ["BOOM!", "Blaze", 3], ["KRAK!", "Stone", -5], ["WHAM!", "Panic", 6],
+  ["HA HA!", "Classic", -3], ["SPLOOSH!", "Ocean", 4],
+];
+const LT_URL = "https://api.languagetool.org/v2/check";
+
+const elLabel = (el: El) =>
+  el.type === "balloon" ? `Balloon: ${el.text.slice(0, 18) || "(empty)"}`
+    : el.type === "text" ? `Lettering: ${el.text.slice(0, 18) || "(empty)"}`
+    : el.type === "panel" ? "Panel"
+    : "Image";
 
 export default function Editor() {
   const [, force] = useReducer((c: number) => c + 1, 0);
@@ -271,7 +300,7 @@ export default function Editor() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(0.35);
   const [userZoomed, setUserZoomed] = useState(false);
-  const [tab, setTab] = useState<"layouts" | "inspector" | "photos" | "library">("layouts");
+  const [tab, setTab] = useState<"layouts" | "inspector" | "layers" | "photos" | "library" | "proof">("layouts");
   const [layoutCat, setLayoutCat] = useState(0);
   const [status, setStatusRaw] = useState(HINT);
   const [thumbs, setThumbs] = useState<Record<number, string>>({});
@@ -281,6 +310,51 @@ export default function Editor() {
   const statusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const thumbTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const panelImageTarget = useRef<string | null>(null);
+  const pendingLockRef = useRef<Set<string>>(new Set());
+  const snapRef = useRef<{ x: number | null; y: number | null }>({ x: null, y: null });
+  const autoLockRef = useRef(true);
+  const [autoLock, setAutoLockState] = useState(true);
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; id: string } | null>(null);
+  const [showSetup, setShowSetup] = useState(false);
+  const [showExport, setShowExport] = useState(false);
+  const [exportFmt, setExportFmt] = useState<ImageFormat | "pdf" | "cbz">("png");
+  const [exportScope, setExportScope] = useState<"current" | "all" | "range">("all");
+  const [exportDpi, setExportDpi] = useState(225);
+  const [exportFrom, setExportFrom] = useState(1);
+  const [exportTo, setExportTo] = useState(1);
+  const [stampOpen, setStampOpen] = useState(false);
+  const [proof, setProof] = useState<{ busy: boolean; error: string | null; matches: ProofMatch[] } | null>(null);
+
+  useEffect(() => {
+    try { autoLockRef.current = localStorage.getItem("lmc.autolock") !== "0"; } catch { /* ignore */ }
+    setAutoLockState(autoLockRef.current);
+  }, []);
+  const setAutoLock = (v: boolean) => {
+    autoLockRef.current = v;
+    setAutoLockState(v);
+    try { localStorage.setItem("lmc.autolock", v ? "1" : "0"); } catch { /* ignore */ }
+  };
+
+  /* auto-lock: newly placed items lock themselves once you click away */
+  const settlePendingLock = useCallback((exceptId: string | null) => {
+    const pend = pendingLockRef.current;
+    if (!pend.size) return;
+    const d = docRef.current;
+    if (!d) return;
+    let changed = false;
+    for (const id of [...pend]) {
+      if (id === exceptId) continue;
+      pend.delete(id);
+      if (!autoLockRef.current) continue;
+      for (const p of d.pages) {
+        const el = p.els.find((e) => e.id === id);
+        if (el) { el.locked = true; changed = true; }
+      }
+    }
+    if (changed) setTimeout(() => commitRef.current?.(), 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const commitRef = useRef<(() => void) | null>(null);
 
   const doc = docRef.current;
   const page: Page | null = doc ? doc.pages[Math.min(pageIndex, doc.pages.length - 1)] : null;
@@ -326,6 +400,7 @@ export default function Editor() {
 
   const pageIndexRef = useRef(0);
   useEffect(() => { pageIndexRef.current = pageIndex; }, [pageIndex]);
+  useEffect(() => { commitRef.current = commit; }, [commit]);
 
   const undo = useCallback(() => {
     if (hIndexRef.current <= 0) return;
@@ -408,9 +483,11 @@ export default function Editor() {
 
   const select = useCallback((id: string | null) => {
     setSelId(id);
+    setCtxMenu(null);
+    settlePendingLock(id);
     if (editingId && editingId !== id) finishEditing();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editingId]);
+  }, [editingId, settlePendingLock]);
 
   const finishEditing = useCallback(() => {
     setEditingId((eid) => {
@@ -448,7 +525,7 @@ export default function Editor() {
 
   const startDrag = useCallback((
     e: React.PointerEvent, el: El,
-    mode: "move" | "resize" | "rotate" | "tail", handle = ""
+    mode: "move" | "resize" | "rotate" | "tail" | "bow", handle = ""
   ) => {
     e.preventDefault();
     e.stopPropagation();
@@ -464,14 +541,70 @@ export default function Editor() {
       const dx = pt.x - start.x, dy = pt.y - start.y;
       if (Math.abs(dx) + Math.abs(dy) > 1) moved = true;
       if (mode === "move") {
-        cur.x = Math.round(orig.x + dx);
-        cur.y = Math.round(orig.y + dy);
+        let nx = Math.round(orig.x + dx), ny = Math.round(orig.y + dy);
+        snapRef.current = { x: null, y: null };
+        if (!ev.altKey) {
+          /* snap to margins, page centre and other elements (Alt disables) */
+          const tol = Math.max(4, 8 / zoom);
+          const def = Math.round(p.w * 0.035);
+          const m = p.margin ?? { t: def, r: def, b: def, l: def };
+          const others = p.els.filter((o) => o.id !== cur.id);
+          /* snap targets: page bleed edges, margins, centre, other elements */
+          const vTargets = [0, p.w, m.l, p.w - m.r, p.w / 2, ...others.flatMap((o) => [o.x, o.x + o.w / 2, o.x + o.w])];
+          const hTargets = [0, p.h, m.t, p.h - m.b, p.h / 2, ...others.flatMap((o) => [o.y, o.y + o.h / 2, o.y + o.h])];
+          /* level/mirror helpers: same spot on the opposite side of the page */
+          for (const o of others) {
+            vTargets.push(p.w - (o.x + o.w), p.w - o.x, p.w - (o.x + o.w / 2));
+            hTargets.push(p.h - (o.y + o.h), p.h - o.y, p.h - (o.y + o.h / 2));
+          }
+          /* equal-spacing helpers: reuse existing gaps between stacked items */
+          const colMates = others.filter((o) => o.x < nx + cur.w && o.x + o.w > nx).sort((a, b) => a.y - b.y);
+          const vGaps = new Set<number>();
+          for (let i = 0; i < colMates.length - 1; i++) {
+            const gap = colMates[i + 1].y - (colMates[i].y + colMates[i].h);
+            if (gap > 4) vGaps.add(Math.round(gap));
+          }
+          for (const o of colMates) for (const gap of vGaps) {
+            hTargets.push(o.y + o.h + gap, o.y - gap - cur.h);
+          }
+          const rowMates = others.filter((o) => o.y < ny + cur.h && o.y + o.h > ny).sort((a, b) => a.x - b.x);
+          const hGaps = new Set<number>();
+          for (let i = 0; i < rowMates.length - 1; i++) {
+            const gap = rowMates[i + 1].x - (rowMates[i].x + rowMates[i].w);
+            if (gap > 4) hGaps.add(Math.round(gap));
+          }
+          for (const o of rowMates) for (const gap of hGaps) {
+            vTargets.push(o.x + o.w + gap, o.x - gap - cur.w);
+          }
+          let best = tol + 1;
+          for (const own of [0, cur.w / 2, cur.w]) for (const t of vTargets) {
+            const delta = t - (nx + own);
+            if (Math.abs(delta) < Math.abs(best)) { best = delta; snapRef.current.x = t; }
+          }
+          if (Math.abs(best) <= tol) nx += Math.round(best); else snapRef.current.x = null;
+          best = tol + 1;
+          for (const own of [0, cur.h / 2, cur.h]) for (const t of hTargets) {
+            const delta = t - (ny + own);
+            if (Math.abs(delta) < Math.abs(best)) { best = delta; snapRef.current.y = t; }
+          }
+          if (Math.abs(best) <= tol) ny += Math.round(best); else snapRef.current.y = null;
+        }
+        cur.x = nx;
+        cur.y = ny;
       } else if (mode === "resize") {
         const [ldx, ldy] = rotVec(dx, dy, -orig.rot);
         if (handle.includes("e")) cur.w = Math.max(MIN_SIZE, Math.round(orig.w + ldx));
         if (handle.includes("s")) cur.h = Math.max(MIN_SIZE, Math.round(orig.h + ldy));
         if (handle.includes("w")) { cur.w = Math.max(MIN_SIZE, Math.round(orig.w - ldx)); cur.x = orig.x + (orig.w - cur.w); }
         if (handle.includes("n")) { cur.h = Math.max(MIN_SIZE, Math.round(orig.h - ldy)); cur.y = orig.y + (orig.h - cur.h); }
+        /* Shift on a corner handle: keep proportions locked */
+        if (ev.shiftKey && handle.length === 2) {
+          const s = Math.max(cur.w / orig.w, cur.h / orig.h);
+          cur.w = Math.max(MIN_SIZE, Math.round(orig.w * s));
+          cur.h = Math.max(MIN_SIZE, Math.round(orig.h * s));
+          if (handle.includes("w")) cur.x = orig.x + (orig.w - cur.w);
+          if (handle.includes("n")) cur.y = orig.y + (orig.h - cur.h);
+        }
       } else if (mode === "rotate") {
         const cx = orig.x + orig.w / 2, cy = orig.y + orig.h / 2;
         let ang = (Math.atan2(pt.y - cy, pt.x - cx) * 180) / Math.PI + 90;
@@ -480,16 +613,60 @@ export default function Editor() {
         if (norm < 3 || norm > 357) ang = 0;
         cur.rot = Math.round(ang * 10) / 10;
       } else if (mode === "tail" && cur.type === "balloon") {
+        cur.attachTo = null; // dragging the tip detaches a joined balloon
         const cx = orig.x + orig.w / 2, cy = orig.y + orig.h / 2;
         const [ldx, ldy] = rotVec(pt.x - cx, pt.y - cy, -orig.rot);
-        cur.tail = { dx: Math.round(ldx), dy: Math.round(ldy) };
+        const oldTail = (orig as BalloonEl).tail;
+        const next: NonNullable<BalloonEl["tail"]> = { dx: Math.round(ldx), dy: Math.round(ldy) };
+        /* keep the bend proportional when the tip moves */
+        if (oldTail && oldTail.bx != null && oldTail.by != null) {
+          const t0 = Math.atan2(oldTail.dy, oldTail.dx);
+          const e0 = [(orig.w / 2) * Math.cos(t0), (orig.h / 2) * Math.sin(t0)];
+          const a0 = [oldTail.dx - e0[0], oldTail.dy - e0[1]];
+          const len0 = a0[0] * a0[0] + a0[1] * a0[1];
+          if (len0 > 1) {
+            const rel = [oldTail.bx - e0[0], oldTail.by - e0[1]];
+            const u = (rel[0] * a0[0] + rel[1] * a0[1]) / len0;
+            const v = (rel[0] * -a0[1] + rel[1] * a0[0]) / len0;
+            const t1 = Math.atan2(next.dy, next.dx);
+            const e1 = [(orig.w / 2) * Math.cos(t1), (orig.h / 2) * Math.sin(t1)];
+            const a1 = [next.dx - e1[0], next.dy - e1[1]];
+            next.bx = Math.round(e1[0] + u * a1[0] + v * -a1[1]);
+            next.by = Math.round(e1[1] + u * a1[1] + v * a1[0]);
+          }
+        }
+        cur.tail = next;
+      } else if (mode === "bow" && cur.type === "balloon" && cur.tail) {
+        const cx = orig.x + orig.w / 2, cy = orig.y + orig.h / 2;
+        const [ldx, ldy] = rotVec(pt.x - cx, pt.y - cy, -orig.rot);
+        cur.tail = { ...cur.tail, bx: Math.round(ldx), by: Math.round(ldy) };
       }
       force();
     };
     const onUp = () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
-      if (moved) commit();
+      snapRef.current = { x: null, y: null };
+      if (moved) {
+        /* balloons auto-join when dragged close to another balloon */
+        if (mode === "move" && el.type === "balloon") {
+          const d = docRef.current!;
+          const p = d.pages[pageIndexRef.current];
+          const cur = p.els.find((x) => x.id === el.id) as BalloonEl | undefined;
+          if (cur) {
+            const near = Math.round(Math.min(cur.w, cur.h) * 0.18);
+            const probe = { x: cur.x - near, y: cur.y - near, w: cur.w + near * 2, h: cur.h + near * 2 };
+            const cand = p.els.find((o) =>
+              o.id !== cur.id && o.type === "balloon" &&
+              (o as BalloonEl).attachTo !== cur.id && aabbOverlap(probe, o)) as BalloonEl | undefined;
+            if (cand) {
+              if (cur.attachTo !== cand.id) setStatus("Balloons joined — drag the red lever to bend the link, drag the orange tip to detach.");
+              cur.attachTo = cand.id;
+            }
+          }
+        }
+        commit();
+      }
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
@@ -512,11 +689,25 @@ export default function Editor() {
       if (mod && (e.key.toLowerCase() === "y" || (e.key.toLowerCase() === "z" && e.shiftKey))) { e.preventDefault(); redo(); return; }
       if (mod && e.key.toLowerCase() === "d") { e.preventDefault(); duplicateSel(); return; }
       if (mod && e.key.toLowerCase() === "s") { e.preventDefault(); saveProject(false); return; }
+      if (mod && e.key.toLowerCase() === "c") { e.preventDefault(); copySel(); return; }
+      if (mod && e.key.toLowerCase() === "x") { e.preventDefault(); cutSel(); return; }
+      if (mod && e.key.toLowerCase() === "v") { e.preventDefault(); pasteClip(); return; }
+      if (mod && e.key === "[") { e.preventDefault(); alignSel("hcenter"); return; }
+      if (mod && e.key === "]") { e.preventDefault(); alignSel("vcenter"); return; }
+      /* letterer hotkeys: B balloon, T text, L lettering, P panel */
+      if (!mod && !e.altKey) {
+        const k = e.key.toLowerCase();
+        if (k === "b") { e.preventDefault(); addFromTray("speech"); return; }
+        if (k === "t") { e.preventDefault(); addFromTray("text"); return; }
+        if (k === "l") { e.preventDefault(); addFromTray("sfx"); return; }
+        if (k === "p") { e.preventDefault(); addFromTray("panel"); return; }
+      }
       const d = docRef.current!;
       const p = d.pages[pageIndexRef.current];
       const el = p.els.find((x) => x.id === selId);
       if (!el) return;
       if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); deleteSel(); return; }
+      if (el.locked) return;
       const step = e.shiftKey ? 10 : 2;
       const dxy: Record<string, [number, number]> = {
         ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step],
@@ -550,6 +741,8 @@ export default function Editor() {
     const p = d.pages[pageIndexRef.current];
     const i = p.els.findIndex((x) => x.id === selId);
     if (i < 0) return;
+    if (p.els[i].locked) { setStatus("This item is locked — right-click it to unlock before deleting."); return; }
+    pendingLockRef.current.delete(p.els[i].id);
     p.els.splice(i, 1);
     setSelId(null);
     commit();
@@ -563,9 +756,62 @@ export default function Editor() {
     const copy = JSON.parse(JSON.stringify(el)) as El;
     copy.id = uid();
     copy.x += 40; copy.y += 40;
+    copy.locked = false;
     p.els.push(copy);
+    pendingLockRef.current.add(copy.id);
     commit();
     setSelId(copy.id);
+  }
+
+  const clipboardRef = useRef<El | null>(null);
+
+  function copySel() {
+    const el = page?.els.find((x) => x.id === selId);
+    if (!el) return;
+    clipboardRef.current = JSON.parse(JSON.stringify(el));
+    setStatus("Copied.");
+  }
+  function cutSel() {
+    const el = page?.els.find((x) => x.id === selId);
+    if (!el) return;
+    if (el.locked) { setStatus("This item is locked — unlock it to cut."); return; }
+    clipboardRef.current = JSON.parse(JSON.stringify(el));
+    deleteSel();
+  }
+  function pasteClip() {
+    if (!clipboardRef.current || !page) return;
+    const copy = JSON.parse(JSON.stringify(clipboardRef.current)) as El;
+    copy.id = uid();
+    copy.x += 30; copy.y += 30;
+    copy.locked = false;
+    page.els.push(copy);
+    pendingLockRef.current.add(copy.id);
+    commit();
+    setSelId(copy.id);
+  }
+  function alignSel(mode: "left" | "hcenter" | "right" | "top" | "vcenter" | "bottom") {
+    const el = page?.els.find((x) => x.id === selId);
+    if (!el || !page) return;
+    if (el.locked) { setStatus("This item is locked."); return; }
+    const def = Math.round(page.w * 0.035);
+    const m = page.margin ?? { t: def, r: def, b: def, l: def };
+    if (mode === "left") el.x = m.l;
+    if (mode === "hcenter") el.x = Math.round((page.w - el.w) / 2);
+    if (mode === "right") el.x = page.w - m.r - el.w;
+    if (mode === "top") el.y = m.t;
+    if (mode === "vcenter") el.y = Math.round((page.h - el.h) / 2);
+    if (mode === "bottom") el.y = page.h - m.b - el.h;
+    commit();
+  }
+  async function resizeToActual() {
+    const el = page?.els.find((x) => x.id === selId);
+    if (!el || (el.type !== "image" && el.type !== "panel") || !el.img) return;
+    if (el.locked) { setStatus("This item is locked."); return; }
+    const src = assetsRef.current[el.img];
+    if (!src) return;
+    const img = await loadImage(src);
+    el.w = img.naturalWidth; el.h = img.naturalHeight;
+    commit();
   }
 
   function reorder(delta: number) {
@@ -605,6 +851,7 @@ export default function Editor() {
     }
     if (el) {
       p.els.push(el);
+      pendingLockRef.current.add(el.id);
       commit();
       setSelId(el.id);
     }
@@ -623,35 +870,147 @@ export default function Editor() {
     r.readAsDataURL(f);
   });
 
-  async function importImageFile(f: File, x?: number, y?: number) {
-    const url = await readAsDataURL(f);
-    const img = await loadImage(url);
-    const aid = "a" + aidRef.current++;
-    assetsRef.current[aid] = url;
+  function placeAsset(aid: string, natW: number, natH: number, x?: number, y?: number) {
     const d = docRef.current!;
     const p = d.pages[pageIndexRef.current];
-    const w = Math.min(Math.round(p.w * 0.45), img.naturalWidth);
-    const h = Math.round(w * (img.naturalHeight / img.naturalWidth));
+    const w = Math.min(Math.round(p.w * 0.45), natW);
+    const h = Math.round(w * (natH / natW));
     const el = makeImage(Math.round((x ?? p.w / 2) - w / 2), Math.round((y ?? p.h / 2) - h / 2), w, h, aid);
     p.els.push(el);
+    pendingLockRef.current.add(el.id);
     commit();
     setSelId(el.id);
   }
 
+  async function importPdfFile(f: File, x?: number, y?: number) {
+    setStatus("Rendering PDF…");
+    const pdfjs = await import("pdfjs-dist");
+    pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+    const pdf = await pdfjs.getDocument({ data: await f.arrayBuffer() }).promise;
+    const n = Math.min(pdf.numPages, 10);
+    let first: { aid: string; w: number; h: number } | null = null;
+    for (let i = 1; i <= n; i++) {
+      const pg = await pdf.getPage(i);
+      const vp1 = pg.getViewport({ scale: 1 });
+      const scale = Math.min(3, 1600 / vp1.width);
+      const vp = pg.getViewport({ scale });
+      const c = document.createElement("canvas");
+      c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+      await pg.render({ canvas: c, canvasContext: c.getContext("2d")!, viewport: vp }).promise;
+      const url = c.toDataURL("image/png");
+      const aid = "a" + aidRef.current++;
+      assetsRef.current[aid] = url;
+      await loadImage(url);
+      if (!first) first = { aid, w: c.width, h: c.height };
+    }
+    if (first) placeAsset(first.aid, first.w, first.h, x, y);
+    setStatus(`Imported ${n} PDF page${n > 1 ? "s" : ""} — extra pages are in the Photos tab.`);
+  }
+
+  async function importImageFile(f: File, x?: number, y?: number) {
+    if (f.type === "application/pdf" || /\.pdf$/i.test(f.name)) {
+      await importPdfFile(f, x, y);
+      return;
+    }
+    const url = await readAsDataURL(f);
+    const img = await loadImage(url);
+    const aid = "a" + aidRef.current++;
+    assetsRef.current[aid] = url;
+    placeAsset(aid, img.naturalWidth, img.naturalHeight, x, y);
+  }
+
+  /* Instant Alpha: flood-remove the background color from the image edges. */
+  async function runInstantAlpha(elId: string, aid: string) {
+    const tolStr = window.prompt("Background removal strength (1–100):", "30");
+    if (!tolStr) return;
+    const tol = clamp(+tolStr || 30, 1, 100);
+    const src = assetsRef.current[aid];
+    if (!src) return;
+    setStatus("Removing background…");
+    const img = await loadImage(src);
+    const W = img.naturalWidth, H = img.naturalHeight;
+    const c = document.createElement("canvas");
+    c.width = W; c.height = H;
+    const ctx = c.getContext("2d")!;
+    ctx.drawImage(img, 0, 0);
+    const imgData = ctx.getImageData(0, 0, W, H);
+    const d = imgData.data;
+    const thr2 = (tol * 4.41) ** 2;
+    const visited = new Uint8Array(W * H);
+    for (const [sx, sy] of [[0, 0], [W - 1, 0], [0, H - 1], [W - 1, H - 1]]) {
+      const si = sy * W + sx;
+      if (visited[si]) continue;
+      const sr = d[si * 4], sg = d[si * 4 + 1], sb = d[si * 4 + 2];
+      const q = [si];
+      visited[si] = 1;
+      while (q.length) {
+        const i = q.pop()!;
+        const o = i * 4;
+        const dr = d[o] - sr, dg = d[o + 1] - sg, db = d[o + 2] - sb;
+        if (dr * dr + dg * dg + db * db > thr2) continue;
+        d[o + 3] = 0;
+        const px = i % W, py = (i / W) | 0;
+        if (px > 0 && !visited[i - 1]) { visited[i - 1] = 1; q.push(i - 1); }
+        if (px < W - 1 && !visited[i + 1]) { visited[i + 1] = 1; q.push(i + 1); }
+        if (py > 0 && !visited[i - W]) { visited[i - W] = 1; q.push(i - W); }
+        if (py < H - 1 && !visited[i + W]) { visited[i + W] = 1; q.push(i + W); }
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+    const url = c.toDataURL("image/png");
+    const newAid = "a" + aidRef.current++;
+    assetsRef.current[newAid] = url;
+    await loadImage(url);
+    const p = docRef.current!.pages[pageIndexRef.current];
+    const el = p.els.find((e) => e.id === elId);
+    if (el && (el.type === "image" || el.type === "panel")) {
+      el.img = newAid;
+      commit();
+      setStatus("Background removed — undo (Ctrl+Z) if it took too much.");
+    }
+  }
+
+  function hitElAt(x: number, y: number): El | null {
+    const p = docRef.current!.pages[pageIndexRef.current];
+    for (let i = p.els.length - 1; i >= 0; i--) {
+      const el = p.els[i];
+      if (x >= el.x && x <= el.x + el.w && y >= el.y && y <= el.y + el.h) return el;
+    }
+    return null;
+  }
+
   async function onDrop(e: React.DragEvent) {
     e.preventDefault();
-    const files = [...(e.dataTransfer?.files || [])].filter((f) => f.type.startsWith("image/"));
+    const files = [...(e.dataTransfer?.files || [])].filter(
+      (f) => f.type.startsWith("image/") || f.type === "application/pdf" || /\.pdf$/i.test(f.name));
     if (!files.length) return;
     const pt = pagePoint(e);
     let off = 0;
-    for (const f of files) { await importImageFile(f, pt.x + off, pt.y + off); off += 60; }
+    for (const f of files) {
+      const isPdf = f.type === "application/pdf" || /\.pdf$/i.test(f.name);
+      /* dropping an image onto a balloon or panel fills it in place */
+      const target = !isPdf && off === 0 ? hitElAt(pt.x, pt.y) : null;
+      if (target && (target.type === "balloon" || target.type === "panel" || target.type === "image") && !target.locked) {
+        const url = await readAsDataURL(f);
+        await loadImage(url);
+        const aid = "a" + aidRef.current++;
+        assetsRef.current[aid] = url;
+        target.img = aid;
+        commit();
+        setSelId(target.id);
+        setStatus(target.type === "balloon" ? "Image placed inside the balloon." : "Image placed in the panel.");
+      } else {
+        await importImageFile(f, pt.x + off, pt.y + off);
+      }
+      off += 60;
+    }
   }
 
   async function assignImageToPanel(elId: string, aid: string) {
     const d = docRef.current!;
     const p = d.pages[pageIndexRef.current];
     const el = p.els.find((x) => x.id === elId);
-    if (!el || (el.type !== "panel" && el.type !== "image")) return;
+    if (!el || (el.type !== "panel" && el.type !== "image" && el.type !== "balloon")) return;
     el.img = aid;
     await loadImage(assetsRef.current[aid]);
     commit();
@@ -766,12 +1125,56 @@ export default function Editor() {
     }
   }
 
-  async function doExportPNG() {
+  async function printPage() {
+    if (!page) return;
+    setStatus("Preparing print…");
+    const { renderPageToCanvas } = await import("@/lib/exportPng");
+    const canvas = await renderPageToCanvas(page, assetsRef.current, 1);
+    const url = canvas.toDataURL("image/png");
+    const w = window.open("", "_blank");
+    if (!w) { setStatus("Pop-up blocked — allow pop-ups to print."); return; }
+    w.document.write(`<!doctype html><title>Print — LetterMyComic</title><style>body{margin:0}img{width:100%}</style><img src="${url}" onload="setTimeout(function(){window.print()},150)">`);
+    w.document.close();
+    setStatus("Sent to print.");
+  }
+
+  async function exportAllPages() {
     const d = docRef.current!;
-    setStatus("Rendering page…");
+    for (let i = 0; i < d.pages.length; i++) {
+      setStatus(`Exporting page ${i + 1}/${d.pages.length}…`);
+      await exportPagePNG(d.pages[i], assetsRef.current, `comic-page-${i + 1}.png`);
+    }
+    setStatus(`Exported ${d.pages.length} page${d.pages.length > 1 ? "s" : ""}.`);
+  }
+
+  async function runExport(
+    format: ImageFormat | "pdf" | "cbz",
+    scope: "current" | "all" | "range", dpi: number
+  ) {
+    const d = docRef.current!;
+    const nameBase = (current?.name || "comic").replace(/[^\w\- ]+/g, "");
+    const idxs =
+      scope === "current" ? [pageIndexRef.current]
+        : scope === "all" ? d.pages.map((_, i) => i)
+        : d.pages.map((_, i) => i).filter((i) =>
+            i + 1 >= Math.min(exportFrom, exportTo) && i + 1 <= Math.max(exportFrom, exportTo));
+    if (!idxs.length) { setStatus("No pages in that range."); return; }
     try {
-      await exportPagePNG(d.pages[pageIndexRef.current], assetsRef.current, `comic-page-${pageIndexRef.current + 1}.png`);
-      setStatus(`Exported comic-page-${pageIndexRef.current + 1}.png`);
+      if (format === "pdf") {
+        const sub = { ...d, pages: idxs.map((i) => d.pages[i]) };
+        const { exportPdf } = await import("@/lib/pdfExport");
+        await exportPdf(sub, assetsRef.current, `${nameBase}.pdf`, (i, n) => setStatus(`Rendering PDF page ${i}/${n}…`), dpi);
+      } else if (format === "cbz") {
+        const { exportCbz } = await import("@/lib/cbz");
+        await exportCbz(d, assetsRef.current, `${nameBase}.cbz`, dpi, idxs, (i, n) => setStatus(`Packing CBZ page ${i}/${n}…`));
+      } else {
+        for (const pi of idxs) {
+          setStatus(`Exporting page ${pi + 1} (${format.toUpperCase()} @ ${dpi} dpi)…`);
+          await exportPageImage(d.pages[pi], assetsRef.current, `${nameBase}-page-${pi + 1}.${format}`, format, dpi);
+        }
+      }
+      setStatus("Export complete.");
+      setShowExport(false);
     } catch (err) {
       setStatus("Export failed: " + String(err).slice(0, 120));
     }
@@ -780,9 +1183,15 @@ export default function Editor() {
   /* ---------------- render helpers ---------------- */
 
   function renderEl(el: El) {
+    const tf = [
+      el.rot ? `rotate(${el.rot}deg)` : "",
+      el.flipH ? "scaleX(-1)" : "",
+      el.flipV ? "scaleY(-1)" : "",
+    ].filter(Boolean).join(" ");
     const style: CSSProperties = {
       left: el.x, top: el.y, width: el.w, height: el.h,
-      transform: el.rot ? `rotate(${el.rot}deg)` : undefined,
+      transform: tf || undefined,
+      opacity: el.opacity ?? 1,
     };
     const common = {
       key: el.id,
@@ -790,11 +1199,18 @@ export default function Editor() {
       onPointerDown: (e: React.PointerEvent) => {
         if (editingId === el.id) return;
         select(el.id);
-        startDrag(e, el, "move");
+        if (!el.locked) startDrag(e, el, "move");
+        else e.preventDefault();
       },
       onDoubleClick: () => {
+        if (el.locked) { setStatus("This item is locked — right-click it to unlock."); return; }
         if (el.type === "balloon" || el.type === "text") { select(el.id); setEditingId(el.id); }
         else if (el.type === "panel" || el.type === "image") { panelImageTarget.current = el.id; filePanelImageRef.current?.click(); }
+      },
+      onContextMenu: (e: React.MouseEvent) => {
+        e.preventDefault();
+        select(el.id);
+        setCtxMenu({ x: e.clientX, y: e.clientY, id: el.id });
       },
     };
 
@@ -818,19 +1234,32 @@ export default function Editor() {
     }
 
     if (el.type === "balloon") {
-      const g = balloonGeom(el);
+      const { el: bEl, base } = resolveBalloon(page!, el);
+      let mergeBase: MergeBaseInfo | null = null;
+      if (base && aabbOverlap(el, base)) {
+        const bg = balloonGeom(resolveBalloon(page!, base).el);
+        const [rx, ry] = rotVec(
+          base.x + base.w / 2 - (el.x + el.w / 2),
+          base.y + base.h / 2 - (el.y + el.h / 2), -el.rot);
+        mergeBase = {
+          d: bg.d,
+          color: base.fill.a,
+          tf: `translate(${el.w / 2 + rx} ${el.h / 2 + ry}) rotate(${base.rot - el.rot}) translate(${-base.w / 2} ${-base.h / 2})`,
+        };
+      }
+      const g = balloonGeom(bEl);
       const [tx, ty, tw, th] = g.textRect;
       const editing = editingId === el.id;
       return (
         <div {...common} className="el balloon" style={style}>
-          <BalloonShape el={el} />
+          <BalloonShape el={bEl} mergeBase={mergeBase} imgSrc={el.img ? assetsRef.current[el.img] : null} />
           <div
             key={editing ? "edit" : "static"}
             className="txt"
             style={{ ...textCss(el.ts), left: tx, top: ty, width: tw, height: th }}
             contentEditable={editing}
             suppressContentEditableWarning
-            spellCheck={false}
+            spellCheck={editing}
             onBlur={() => editing && finishEditing()}
           >{el.text}</div>
         </div>
@@ -847,7 +1276,7 @@ export default function Editor() {
           style={{ ...textCss(el.ts), left: 0, top: 0, width: el.w, height: el.h }}
           contentEditable={editing}
           suppressContentEditableWarning
-          spellCheck={false}
+          spellCheck={editing}
           onBlur={() => editing && finishEditing()}
         >{el.text}</div>
       </div>
@@ -856,8 +1285,19 @@ export default function Editor() {
 
   function renderOverlay() {
     if (!selEl || !page) return null;
-    const el = selEl;
+    const el = selEl.type === "balloon" ? resolveBalloon(page, selEl).el : selEl;
     const z = zoom;
+    if (el.locked) {
+      return (
+        <div className="overlay" style={{
+          left: el.x * z, top: el.y * z, width: el.w * z, height: el.h * z,
+          transform: el.rot ? `rotate(${el.rot}deg)` : undefined,
+        }}>
+          <div className="box" style={{ borderStyle: "dashed" }} />
+          <div className="lockBadge" title="Locked — unlock in the Inspector">🔒</div>
+        </div>
+      );
+    }
     const handles: [string, number, number][] = [
       ["nw", 0, 0], ["n", 0.5, 0], ["ne", 1, 0], ["e", 1, 0.5],
       ["se", 1, 1], ["s", 0.5, 1], ["sw", 0, 1], ["w", 0, 0.5],
@@ -880,10 +1320,22 @@ export default function Editor() {
           style={{ left: "calc(50% - 6px)", top: -28 }}
           onPointerDown={(e) => startDrag(e, el, "rotate")} />
         {el.type === "balloon" && el.tail && (
-          <div className="handle tail" title="Drag to aim the tail"
+          <div className="handle tail" title="Drag to aim the tail tip"
             style={{ left: (el.w / 2 + el.tail.dx) * z - 7, top: (el.h / 2 + el.tail.dy) * z - 7 }}
             onPointerDown={(e) => startDrag(e, el, "tail")} />
         )}
+        {el.type === "balloon" && el.tail && ["speech", "whisper", "double", "thought"].includes(el.kind) && (() => {
+          const t = Math.atan2(el.tail.dy, el.tail.dx);
+          const ex = el.w / 2 + (el.w / 2) * Math.cos(t);
+          const ey = el.h / 2 + (el.h / 2) * Math.sin(t);
+          const bx = el.tail.bx ?? (ex + el.w / 2 + el.tail.dx) / 2 - el.w / 2;
+          const by = el.tail.by ?? (ey + el.h / 2 + el.tail.dy) / 2 - el.h / 2;
+          return (
+            <div className="handle tailBow" title="Drag to bend the tail"
+              style={{ left: (el.w / 2 + bx) * z - 6, top: (el.h / 2 + by) * z - 6 }}
+              onPointerDown={(e) => startDrag(e, el, "bow")} />
+          );
+        })()}
       </div>
     );
   }
@@ -965,6 +1417,9 @@ export default function Editor() {
               onChange={(e) => { p.w = clamp(+e.target.value || 200, 200, 6000); commit(); fitZoom(true); }} /></Fld>
             <Fld label="Height px"><input type="number" min={200} max={6000} value={p.h}
               onChange={(e) => { p.h = clamp(+e.target.value || 200, 200, 6000); commit(); fitZoom(true); }} /></Fld>
+            <div className="btnRow">
+              <button onClick={() => setShowSetup(true)}>Page Setup… (inches &amp; margins)</button>
+            </div>
           </div>
           <div className="inspSection">
             <div className="inspHead">Page background</div>
@@ -1007,6 +1462,12 @@ export default function Editor() {
             </Fld>
             <Fld label="Shadow"><input type="checkbox" checked={el.shadow}
               onChange={(e) => mutateSel((b) => { b.shadow = e.target.checked; })} /></Fld>
+            <div className="btnRow">
+              <button onClick={() => { panelImageTarget.current = el.id; filePanelImageRef.current?.click(); }}>
+                {el.img ? "Replace inner image…" : "Place image inside…"}
+              </button>
+              {el.img && <button onClick={() => mutateSel<BalloonEl>((b) => { b.img = null; })}>Remove image</button>}
+            </div>
           </div>
         )}
         {(el.type === "balloon") && (
@@ -1043,6 +1504,12 @@ export default function Editor() {
                   <button onClick={() => mutateSel<PanelEl>((b) => { b.img = null; })}>Remove image</button>
                 )}
               </div>
+              {el.img && (
+                <div className="btnRow">
+                  <button title="Instant Alpha: makes the background around the image edges transparent"
+                    onClick={() => runInstantAlpha(el.id, el.img!)}>Instant Alpha (remove bg)</button>
+                </div>
+              )}
             </div>
             {el.type === "panel" && (
               <div className="inspSection">
@@ -1064,8 +1531,23 @@ export default function Editor() {
             <button onClick={duplicateSel}>Duplicate</button>
             <button onClick={deleteSel}>Delete</button>
           </div>
+          {(el.type === "image" || el.type === "panel") && (
+            <div className="btnRow">
+              <button onClick={() => mutateSel((b) => { b.flipH = !b.flipH; })}>Flip ↔</button>
+              <button onClick={() => mutateSel((b) => { b.flipV = !b.flipV; })}>Flip ↕</button>
+            </div>
+          )}
           <Fld label="Rotation °"><input type="number" min={-180} max={180} value={Math.round(el.rot)}
             onChange={(e) => mutateSel((b) => { b.rot = clamp(+e.target.value || 0, -180, 180); })} /></Fld>
+          <Fld label="Opacity">
+            <input type="range" min={10} max={100} value={Math.round((el.opacity ?? 1) * 100)}
+              onChange={(e) => mutateSel((b) => { b.opacity = (+e.target.value) / 100; }, false)}
+              onPointerUp={() => commit()} />
+          </Fld>
+          <Fld label="Lock position">
+            <input type="checkbox" checked={!!el.locked}
+              onChange={(e) => mutateSel((b) => { b.locked = e.target.checked; })} />
+          </Fld>
         </div>
       </div>
     );
@@ -1099,6 +1581,122 @@ export default function Editor() {
     );
   }
 
+  /* ---------------- layers tab ---------------- */
+
+  function renderLayersTab() {
+    if (!page) return null;
+    const els = [...page.els].reverse(); // top layer first, like CL3
+    const move = (id: string, delta: number) => {
+      const p = page;
+      const i = p.els.findIndex((e) => e.id === id);
+      if (i < 0) return;
+      const [el] = p.els.splice(i, 1);
+      p.els.splice(clamp(i + delta, 0, p.els.length), 0, el);
+      commit();
+    };
+    return (
+      <div className="inspBody">
+        <div className="fld">
+          <label>Auto-lock new items</label>
+          <input type="checkbox" checked={autoLock} onChange={(e) => setAutoLock(e.target.checked)} />
+        </div>
+        <div className="tips">Every item you place is its own layer. Top of this list = front of the page. New items lock automatically when you click away — right-click any item (or use 🔒) to unlock.</div>
+        <div className="layerList">
+          {els.map((el) => (
+            <div key={el.id} className={"layerRow" + (selId === el.id ? " on" : "")}
+              onClick={() => select(el.id)}>
+              <span className="layerName">{elLabel(el)}</span>
+              <button className="layerBtn" title="Forward" onClick={(e) => { e.stopPropagation(); move(el.id, 1); }}>▲</button>
+              <button className="layerBtn" title="Backward" onClick={(e) => { e.stopPropagation(); move(el.id, -1); }}>▼</button>
+              <button className={"layerBtn" + (el.locked ? " lockOn" : "")} title={el.locked ? "Unlock" : "Lock"}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  el.locked = !el.locked;
+                  pendingLockRef.current.delete(el.id);
+                  commit();
+                }}>{el.locked ? "🔒" : "🔓"}</button>
+            </div>
+          ))}
+          {els.length === 0 && <div className="tips">Nothing on this page yet.</div>}
+        </div>
+      </div>
+    );
+  }
+
+  /* ---------------- proofing tab (open-source LanguageTool) ---------------- */
+
+  async function runProof() {
+    if (!page) return;
+    setProof({ busy: true, error: null, matches: [] });
+    const targets = page.els.filter((e): e is BalloonEl | TextEl => e.type === "balloon" || e.type === "text");
+    const all: ProofMatch[] = [];
+    try {
+      for (const el of targets) {
+        if (!el.text.trim()) continue;
+        const res = await fetch(LT_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({ text: el.text, language: "en-US" }),
+        });
+        if (!res.ok) throw new Error(`LanguageTool ${res.status}`);
+        const data = await res.json();
+        for (const m of data.matches || []) {
+          all.push({
+            elId: el.id,
+            message: m.message,
+            context: m.context?.text || "",
+            offset: m.offset, length: m.length,
+            reps: (m.replacements || []).slice(0, 3).map((r: { value: string }) => r.value),
+          });
+        }
+      }
+      setProof({ busy: false, error: null, matches: all });
+    } catch (err) {
+      setProof({ busy: false, error: "Check failed: " + String(err).slice(0, 120) + " (LanguageTool is a free open-source service — it rate-limits heavy use)", matches: all });
+    }
+  }
+
+  function applyProofFix(m: ProofMatch, rep: string) {
+    if (!page) return;
+    const el = page.els.find((e) => e.id === m.elId) as BalloonEl | TextEl | undefined;
+    if (!el) return;
+    if (el.locked) { setStatus("That item is locked — unlock it to apply fixes."); return; }
+    el.text = el.text.slice(0, m.offset) + rep + el.text.slice(m.offset + m.length);
+    commit();
+    setProof((p) => p ? { ...p, matches: p.matches.filter((x) => x !== m && x.elId !== m.elId) } : p);
+  }
+
+  function renderProofTab() {
+    return (
+      <div className="inspBody">
+        <div className="btnRow">
+          <button onClick={runProof} disabled={proof?.busy}>
+            {proof?.busy ? "Checking…" : "Check spelling & grammar"}
+          </button>
+        </div>
+        <div className="tips">
+          Checks every balloon and lettering item on this page with LanguageTool
+          (free &amp; open source). Typos also get red underlines while you type.
+        </div>
+        {proof?.error && <div className="tips error">{proof.error}</div>}
+        {proof && !proof.busy && !proof.error && proof.matches.length === 0 && (
+          <div className="tips" style={{ color: "#1d8a3c", fontWeight: 600 }}>No issues found on this page ✓</div>
+        )}
+        {proof?.matches.map((m, i) => (
+          <div key={i} className="proofCard" onClick={() => select(m.elId)}>
+            <div className="proofMsg">{m.message}</div>
+            <div className="proofCtx">…{m.context}…</div>
+            <div className="btnRow">
+              {m.reps.map((r) => (
+                <button key={r} onClick={(e) => { e.stopPropagation(); applyProofFix(m, r); }}>“{r}”</button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   function renderPhotosTab() {
     const entries = Object.entries(assetsRef.current);
     return (
@@ -1112,7 +1710,7 @@ export default function Editor() {
             <button key={aid} className="photoBtn" style={{ backgroundImage: `url(${url})` }}
               title="Click: fill selected panel (or add to page)"
               onClick={() => {
-                if (selEl && (selEl.type === "panel" || selEl.type === "image")) assignImageToPanel(selEl.id, aid);
+                if (selEl && (selEl.type === "panel" || selEl.type === "image" || selEl.type === "balloon")) assignImageToPanel(selEl.id, aid);
                 else {
                   const d = docRef.current!;
                   const p = d.pages[pageIndexRef.current];
@@ -1143,6 +1741,19 @@ export default function Editor() {
         <div className="btnRow">
           <button onClick={exportJSON}>Export file</button>
           <button onClick={() => fileOpenRef.current?.click()}>Import file</button>
+        </div>
+        <div className="btnRow">
+          <button onClick={exportAllPages}>Export all pages (PNG)</button>
+          <button onClick={async () => {
+            try {
+              const { exportPdf } = await import("@/lib/pdfExport");
+              await exportPdf(docRef.current!, assetsRef.current, (current?.name || "comic") + ".pdf",
+                (i, n) => setStatus(`Rendering PDF page ${i}/${n}…`));
+              setStatus("PDF exported.");
+            } catch (err) {
+              setStatus("PDF export failed: " + String(err).slice(0, 100));
+            }
+          }}>Export PDF (all pages)</button>
         </div>
         {current && <div className="tips">Current: <b>{current.name}</b></div>}
         {dbError && <div className="tips error">{dbError}<br />Run <code>npm run setup</code> to create the database.</div>}
@@ -1178,7 +1789,7 @@ export default function Editor() {
     <div className="app">
       {/* ---------- toolbar ---------- */}
       <header className="toolbar">
-        <div className="brand">Comic<span>Lettering</span></div>
+        <a className="brand" href="/" title="lettermycomic.com">Letter<span>My</span>Comic</a>
         <ToolBtn label="New" icon="🗋" onClick={() => {
           if (!window.confirm("Start a new document?")) return;
           docRef.current = starterDoc();
@@ -1206,7 +1817,9 @@ export default function Editor() {
         <ToolBtn label="Smaller" icon="A−" disabled={!selTs} onClick={() =>
           mutateSel<BalloonEl | TextEl>((x) => { x.ts.size = clamp(Math.round(x.ts.size / 1.12), 8, 800); })} />
         <span className="tbSep" />
-        <ToolBtn label="Export" icon="🖼⇩" accent onClick={doExportPNG} />
+        <ToolBtn label="Page Setup" icon="📐" onClick={() => setShowSetup(true)} />
+        <ToolBtn label="Print" icon="🖨" onClick={printPage} />
+        <ToolBtn label="Export" icon="🖼⇩" accent onClick={() => setShowExport(true)} />
         <ToolBtn label="Inspector" icon="ⓘ" onClick={() => setTab("inspector")} />
         <div className="tbSpacer" />
         <div className="tbHint">Runs entirely in your browser — nothing is uploaded.</div>
@@ -1342,8 +1955,17 @@ export default function Editor() {
                 onPointerDown={(e) => { if (e.target === e.currentTarget) select(null); }}
               >
                 {page.els.map(renderEl)}
+                {page.margin && (
+                  <div className="marginGuide" style={{
+                    left: page.margin.l, top: page.margin.t,
+                    width: page.w - page.margin.l - page.margin.r,
+                    height: page.h - page.margin.t - page.margin.b,
+                  }} />
+                )}
               </div>
               {renderOverlay()}
+              {snapRef.current.x != null && <div className="snapLineV" style={{ left: snapRef.current.x * zoom }} />}
+              {snapRef.current.y != null && <div className="snapLineH" style={{ top: snapRef.current.y * zoom }} />}
             </div>
           </div>
           <div className="zoomCtl">
@@ -1360,14 +1982,16 @@ export default function Editor() {
 
         <aside className="rightbar">
           <div className="tabs">
-            {([["layouts", "Panel Layouts"], ["inspector", "Inspector"], ["photos", "Photos"], ["library", "Library"]] as const).map(([k, label]) => (
+            {([["layouts", "Layouts"], ["inspector", "Inspect"], ["layers", "Layers"], ["photos", "Photos"], ["library", "Library"], ["proof", "Proof"]] as const).map(([k, label]) => (
               <button key={k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{label}</button>
             ))}
           </div>
           {tab === "layouts" && renderLayoutsTab()}
           {tab === "inspector" && renderInspector()}
+          {tab === "layers" && renderLayersTab()}
           {tab === "photos" && renderPhotosTab()}
           {tab === "library" && renderLibraryTab()}
+          {tab === "proof" && renderProofTab()}
         </aside>
       </div>
 
@@ -1420,6 +2044,54 @@ export default function Editor() {
           <svg viewBox="0 0 40 30"><rect x="4" y="6" width="32" height="18" rx="6" fill="#fff" stroke="#222" strokeWidth="2" /></svg>
         </TrayBtn>
         <span className="traySep" />
+        <div style={{ position: "relative" }}>
+          <TrayBtn onClick={() => setStampOpen((s) => !s)} label="Stamps">
+            <svg viewBox="0 0 40 30"><text x="20" y="23" textAnchor="middle" fontSize="20">💥</text></svg>
+          </TrayBtn>
+          {stampOpen && (
+            <div className="stampPop">
+              <div className="stampWords">
+                {WORD_STAMPS.map(([word, styleName, tilt]) => {
+                  const st = LETTER_STYLES.find((s) => s.name === styleName) || LETTER_STYLES[0];
+                  return (
+                    <button key={word} title={word} onClick={() => {
+                      const p = page!;
+                      const w = Math.round(p.w * 0.34), h = Math.round(p.w * 0.14);
+                      const el = makeText(Math.round(p.w / 2 - w / 2), Math.round(p.h * 0.32), w, h, true);
+                      el.text = word;
+                      el.rot = tilt;
+                      el.ts = applyLetterStyle({ ...el.ts, size: Math.round(p.w * 0.075) }, st);
+                      el.ts.outlineW = Math.round(el.ts.size * st.outlineF);
+                      p.els.push(el);
+                      pendingLockRef.current.add(el.id);
+                      commit();
+                      setSelId(el.id);
+                      setStampOpen(false);
+                    }}>
+                      <span style={{ ...letterStyleCss(st, 15), transform: `rotate(${tilt}deg)`, display: "inline-block" }}>{word}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="stampEmoji">
+                {STAMPS.map((s) => (
+                  <button key={s} onClick={() => {
+                    const p = page!;
+                    const size = Math.round(p.w * 0.16);
+                    const el = makeText(Math.round(p.w / 2 - size / 2), Math.round(p.h * 0.35), size, size, true);
+                    el.text = s;
+                    el.ts = { ...el.ts, size: Math.round(size * 0.7), outlineW: 0, shadow: false, caps: false };
+                    p.els.push(el);
+                    pendingLockRef.current.add(el.id);
+                    commit();
+                    setSelId(el.id);
+                    setStampOpen(false);
+                  }}>{s}</button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
         <TrayBtn onClick={() => addFromTray("panel")} label="Panel">
           <svg viewBox="0 0 40 30"><rect x="3" y="3" width="34" height="24" fill="#fff" stroke="#222" strokeWidth="3" /></svg>
         </TrayBtn>
@@ -1430,8 +2102,141 @@ export default function Editor() {
         <div className="statusbar">{status}</div>
       </footer>
 
+      {/* context menu */}
+      {ctxMenu && (() => {
+        const el = page.els.find((e) => e.id === ctxMenu.id);
+        if (!el) return null;
+        const close = () => setCtxMenu(null);
+        return (
+          <>
+            <div className="ctxBackdrop" onClick={close} onContextMenu={(e) => { e.preventDefault(); close(); }} />
+            <div className="ctxMenu" style={{ left: Math.min(ctxMenu.x, window.innerWidth - 230), top: Math.min(ctxMenu.y, window.innerHeight - 430) }}>
+              <button disabled={el.locked} onClick={() => { reorder(1); close(); }}>Bring Forward</button>
+              <button disabled={el.locked} onClick={() => { reorder(1e9); close(); }}>Bring To Front</button>
+              <button disabled={el.locked} onClick={() => { reorder(-1); close(); }}>Send Backward</button>
+              <button disabled={el.locked} onClick={() => { reorder(-1e9); close(); }}>Send To Back</button>
+              <div className="ctxSep" />
+              <div className="ctxSub">
+                <button disabled={el.locked}>Align Object ▸</button>
+                <div className="ctxSubMenu">
+                  <button disabled={el.locked} onClick={() => { alignSel("left"); close(); }}>Left</button>
+                  <button disabled={el.locked} onClick={() => { alignSel("hcenter"); close(); }}>Center</button>
+                  <button disabled={el.locked} onClick={() => { alignSel("right"); close(); }}>Right</button>
+                  <button disabled={el.locked} onClick={() => { alignSel("top"); close(); }}>Top</button>
+                  <button disabled={el.locked} onClick={() => { alignSel("vcenter"); close(); }}>Middle</button>
+                  <button disabled={el.locked} onClick={() => { alignSel("bottom"); close(); }}>Bottom</button>
+                </div>
+              </div>
+              <div className="ctxSep" />
+              <button onClick={() => { setUserZoomed(true); setZoom((z) => clamp(z * 1.2, 0.05, 4)); close(); }}>Zoom In</button>
+              <button onClick={() => { setUserZoomed(true); setZoom((z) => clamp(z / 1.2, 0.05, 4)); close(); }}>Zoom Out</button>
+              <div className="ctxSep" />
+              <button disabled={el.locked} onClick={() => { el.locked = true; pendingLockRef.current.delete(el.id); commit(); close(); }}>Lock</button>
+              <button disabled={!el.locked} onClick={() => { el.locked = false; pendingLockRef.current.delete(el.id); commit(); close(); }}>Unlock</button>
+              <div className="ctxSep" />
+              <button disabled={el.locked} onClick={() => { cutSel(); close(); }}>Cut</button>
+              <button onClick={() => { copySel(); close(); }}>Copy</button>
+              <button disabled={!clipboardRef.current} onClick={() => { pasteClip(); close(); }}>Paste</button>
+              <button onClick={() => { duplicateSel(); close(); }}>Duplicate</button>
+              <button disabled={el.locked} className="danger" onClick={() => { deleteSel(); close(); }}>Delete</button>
+              {(el.type === "balloon" || el.type === "text") && (
+                <>
+                  <div className="ctxSep" />
+                  <button disabled={el.locked} onClick={() => { setEditingId(el.id); close(); }}>Edit Text</button>
+                  {el.type === "balloon" && el.attachTo && (
+                    <button disabled={el.locked} onClick={() => { el.attachTo = null; commit(); close(); }}>Detach Balloon</button>
+                  )}
+                </>
+              )}
+              {(el.type === "panel" || el.type === "image") && (
+                <>
+                  <div className="ctxSep" />
+                  <button disabled={el.locked} onClick={() => { panelImageTarget.current = el.id; filePanelImageRef.current?.click(); close(); }}>
+                    {el.img ? "Replace Image…" : "Set Image…"}
+                  </button>
+                  {el.img && <button disabled={el.locked} onClick={() => { resizeToActual(); close(); }}>Resize Image to Actual Size</button>}
+                </>
+              )}
+            </div>
+          </>
+        );
+      })()}
+
+      {/* export dialog */}
+      {showExport && (
+        <div className="setupOverlay" onPointerDown={(e) => { if (e.target === e.currentTarget) setShowExport(false); }}>
+          <div className="setupDlg" style={{ width: 430 }}>
+            <div className="setupTitle">Export</div>
+            <div className="setupBody" style={{ flexDirection: "column" }}>
+              <fieldset className="setupGroup">
+                <legend>Format</legend>
+                <div className="setupRow" style={{ flexWrap: "wrap" }}>
+                  {([["png", "PNG"], ["jpg", "JPG"], ["tiff", "TIFF (print)"], ["pdf", "PDF"], ["cbz", "CBZ (comic reader)"]] as const).map(([k, label]) => (
+                    <label key={k}><input type="radio" name="expfmt" checked={exportFmt === k}
+                      onChange={() => setExportFmt(k)} /> {label}</label>
+                  ))}
+                </div>
+              </fieldset>
+              <fieldset className="setupGroup">
+                <legend>Resolution</legend>
+                <div className="setupRow">
+                  <span className="setupLbl">Image limit:</span>
+                  <select value={exportDpi} onChange={(e) => setExportDpi(+e.target.value)}>
+                    <option value={150}>150 dpi (web)</option>
+                    <option value={225}>225 dpi (native)</option>
+                    <option value={300}>300 dpi (print)</option>
+                    <option value={450}>450 dpi (high-res print)</option>
+                  </select>
+                </div>
+              </fieldset>
+              <fieldset className="setupGroup">
+                <legend>Pages</legend>
+                <div className="setupRow" style={{ flexWrap: "wrap" }}>
+                  <label><input type="radio" name="expscope" checked={exportScope === "all"}
+                    onChange={() => setExportScope("all")} /> All ({doc.pages.length})</label>
+                  <label><input type="radio" name="expscope" checked={exportScope === "current"}
+                    onChange={() => setExportScope("current")} /> Current</label>
+                  <label><input type="radio" name="expscope" checked={exportScope === "range"}
+                    onChange={() => setExportScope("range")} /> From</label>
+                  <input type="number" min={1} max={doc.pages.length} value={exportFrom} style={{ width: 54 }}
+                    onFocus={() => setExportScope("range")}
+                    onChange={(e) => setExportFrom(clamp(+e.target.value || 1, 1, doc.pages.length))} />
+                  <span>to</span>
+                  <input type="number" min={1} max={doc.pages.length} value={exportTo} style={{ width: 54 }}
+                    onFocus={() => setExportScope("range")}
+                    onChange={(e) => setExportTo(clamp(+e.target.value || 1, 1, doc.pages.length))} />
+                </div>
+              </fieldset>
+            </div>
+            <div className="setupFoot">
+              <button onClick={() => setShowExport(false)}>Cancel</button>
+              <button className="okBtn" onClick={() => runExport(exportFmt, exportScope, exportDpi)}>Export</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* page setup dialog */}
+      {showSetup && (
+        <PageSetupDialog
+          page={page}
+          onClose={() => setShowSetup(false)}
+          onApply={(w, h, margin, applyAll) => {
+            const d = docRef.current!;
+            const targets = applyAll ? d.pages : [page];
+            for (const p of targets) { p.w = w; p.h = h; p.margin = { ...margin }; }
+            setShowSetup(false);
+            commit();
+            fitZoom(true);
+            setThumbs({});
+            d.pages.forEach((pg, i) =>
+              pageThumbnail(pg, assetsRef.current, 140).then((u) => setThumbs((t) => ({ ...t, [i]: u }))).catch(() => { }));
+          }}
+        />
+      )}
+
       {/* hidden inputs */}
-      <input ref={fileImageRef} type="file" accept="image/*" multiple hidden
+      <input ref={fileImageRef} type="file" accept="image/*,application/pdf,.pdf" multiple hidden
         onChange={async (e) => {
           for (const f of Array.from(e.target.files || [])) await importImageFile(f);
           e.target.value = "";
@@ -1478,5 +2283,100 @@ function TrayBtn({ children, label, onClick }: { children: React.ReactNode; labe
       {children}
       <span>{label}</span>
     </button>
+  );
+}
+
+/* ---------------- Page Setup dialog (paper sizes, orientation, margins) ---------------- */
+
+const inch = (px: number) => (px / DPI).toFixed(3);
+
+function PageSetupDialog({ page, onClose, onApply }: {
+  page: Page;
+  onClose: () => void;
+  onApply: (w: number, h: number, margin: PageMargin, applyAll: boolean) => void;
+}) {
+  const def = Math.round(page.w * 0.035);
+  const m0 = page.margin ?? { t: def, r: def, b: def, l: def };
+  const [cat, setCat] = useState(0);
+  const [wIn, setWIn] = useState(inch(page.w));
+  const [hIn, setHIn] = useState(inch(page.h));
+  const [mT, setMT] = useState(inch(m0.t));
+  const [mR, setMR] = useState(inch(m0.r));
+  const [mB, setMB] = useState(inch(m0.b));
+  const [mL, setML] = useState(inch(m0.l));
+  const [applyAll, setApplyAll] = useState(true);
+  const [selSize, setSelSize] = useState(-1);
+  const landscape = parseFloat(wIn) > parseFloat(hIn);
+
+  const setOrientation = (land: boolean) => {
+    const w = parseFloat(wIn) || 0, h = parseFloat(hIn) || 0;
+    if (land !== (w > h)) { setWIn(hIn); setHIn(wIn); }
+  };
+
+  const ok = () => {
+    const w = Math.round((parseFloat(wIn) || 6.625) * DPI);
+    const h = Math.round((parseFloat(hIn) || 10.25) * DPI);
+    const margin: PageMargin = {
+      t: Math.round((parseFloat(mT) || 0) * DPI),
+      r: Math.round((parseFloat(mR) || 0) * DPI),
+      b: Math.round((parseFloat(mB) || 0) * DPI),
+      l: Math.round((parseFloat(mL) || 0) * DPI),
+    };
+    onApply(clamp(w, 200, 8000), clamp(h, 200, 8000), margin, applyAll);
+  };
+
+  return (
+    <div className="setupOverlay" onPointerDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="setupDlg">
+        <div className="setupTitle">Page Setup</div>
+        <div className="setupBody">
+          <div className="setupLeft">
+            <select value={cat} onChange={(e) => { setCat(+e.target.value); setSelSize(-1); }}>
+              {PAPER_CATEGORIES.map((c, i) => <option key={c.name} value={i}>{c.name}</option>)}
+            </select>
+            <div className="sizeList">
+              {PAPER_CATEGORIES[cat].sizes.map(([name, w, h], i) => (
+                <div key={name} className={"sizeRow" + (i === selSize ? " on" : "")}
+                  onClick={() => {
+                    setSelSize(i);
+                    if (landscape) { setWIn(h.toFixed(3)); setHIn(w.toFixed(3)); }
+                    else { setWIn(w.toFixed(3)); setHIn(h.toFixed(3)); }
+                  }}>{name}</div>
+              ))}
+            </div>
+          </div>
+          <div className="setupRight">
+            <fieldset className="setupGroup">
+              <div className="setupRow">
+                <span className="setupLbl">Page Size:</span>
+                <span className="dimBox"><input value={wIn} onChange={(e) => { setWIn(e.target.value); setSelSize(-1); }} /> in<br /><small>width</small></span>
+                <span className="dimBox"><input value={hIn} onChange={(e) => { setHIn(e.target.value); setSelSize(-1); }} /> in<br /><small>height</small></span>
+              </div>
+              <div className="setupRow">
+                <span className="setupLbl">Orientation:</span>
+                <label><input type="radio" name="orient" checked={!landscape} onChange={() => setOrientation(false)} /> Portrait</label>
+                <label><input type="radio" name="orient" checked={landscape} onChange={() => setOrientation(true)} /> Landscape</label>
+              </div>
+            </fieldset>
+            <fieldset className="setupGroup">
+              <legend>Document Margins</legend>
+              <div className="marginGrid">
+                <span className="dimBox mid"><input value={mT} onChange={(e) => setMT(e.target.value)} /> in<br /><small>Top</small></span>
+                <div className="marginMid">
+                  <span className="dimBox"><input value={mL} onChange={(e) => setML(e.target.value)} /> in<br /><small>Left</small></span>
+                  <span className="dimBox"><input value={mR} onChange={(e) => setMR(e.target.value)} /> in<br /><small>Right</small></span>
+                </div>
+                <span className="dimBox mid"><input value={mB} onChange={(e) => setMB(e.target.value)} /> in<br /><small>Bottom</small></span>
+              </div>
+            </fieldset>
+            <label className="setupAll"><input type="checkbox" checked={applyAll} onChange={(e) => setApplyAll(e.target.checked)} /> Apply to all pages in this document</label>
+          </div>
+        </div>
+        <div className="setupFoot">
+          <button onClick={onClose}>Cancel</button>
+          <button className="okBtn" onClick={ok}>OK</button>
+        </div>
+      </div>
+    </div>
   );
 }
