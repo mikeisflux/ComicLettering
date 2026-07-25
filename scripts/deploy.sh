@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
-# LetterMyComic — build & deploy script.
+# LetterMyComic — build & deploy script (PM2).
 #
 #   First-time server setup:   sudo ./scripts/deploy.sh setup
-#   Deploy latest code:        sudo ./scripts/deploy.sh
+#   Deploy latest code:        sudo ./scripts/deploy.sh          (zero-downtime)
 #   Tail app logs:             ./scripts/deploy.sh logs
 #   Service status:            ./scripts/deploy.sh status
+#
+# Deploys are zero-downtime: the app is built first while the running PM2
+# cluster keeps serving, then `pm2 reload` swaps workers only once the new
+# build binds the port. A build never takes the site down.
 #
 # Configuration can be overridden via environment variables:
 #   APP_DIR=/opt/lettermycomic BRANCH=main DOMAIN=lettermycomic.com ./scripts/deploy.sh
@@ -20,6 +24,13 @@ HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-30}"
 
 log()  { echo -e "\033[1;36m==>\033[0m $*"; }
 fail() { echo -e "\033[1;31mERROR:\033[0m $*" >&2; exit 1; }
+
+ensure_pm2() {
+  if ! command -v pm2 >/dev/null; then
+    log "Installing PM2 globally…"
+    npm install -g pm2 >/dev/null
+  fi
+}
 
 health_check() {
   log "Health check on http://localhost:${PORT} (up to ${HEALTH_TIMEOUT}s)…"
@@ -54,6 +65,25 @@ backup_db() {
   fi
 }
 
+# Start fresh, or reload in place if the app is already under PM2.
+pm2_up() {
+  ensure_pm2
+  # migrate away from any old systemd unit so it can't fight for the port
+  if systemctl list-unit-files 2>/dev/null | grep -q "^${SERVICE}.service"; then
+    log "Disabling old systemd service '${SERVICE}'…"
+    systemctl disable --now "$SERVICE" 2>/dev/null || true
+  fi
+  cd "$APP_DIR"
+  if pm2 describe "$SERVICE" >/dev/null 2>&1; then
+    log "Reloading ${SERVICE} (zero-downtime)…"
+    pm2 reload ecosystem.config.js --update-env
+  else
+    log "Starting ${SERVICE} under PM2…"
+    pm2 start ecosystem.config.js --update-env
+  fi
+  pm2 save >/dev/null
+}
+
 cmd_setup() {
   [ "$(id -u)" -eq 0 ] || fail "Run setup as root (sudo)."
 
@@ -67,6 +97,7 @@ cmd_setup() {
     apt-get install -y -qq nodejs >/dev/null
   fi
   log "Node $(node -v), npm $(npm -v)"
+  ensure_pm2
 
   if [ ! -d "$APP_DIR/.git" ]; then
     log "Cloning $REPO_URL → $APP_DIR"
@@ -84,27 +115,13 @@ cmd_setup() {
     node prisma/seed.mjs
   fi
 
-  log "Installing systemd service '${SERVICE}'…"
-  cat > "/etc/systemd/system/${SERVICE}.service" <<EOF
-[Unit]
-Description=LetterMyComic (Next.js)
-After=network.target
+  pm2_up
+  # start PM2 (and this app) automatically on server boot
+  log "Enabling PM2 on boot…"
+  pm2 startup systemd -u root --hp /root >/dev/null 2>&1 || true
+  pm2 save >/dev/null
 
-[Service]
-WorkingDirectory=${APP_DIR}
-ExecStart=$(command -v npm) start
-Restart=always
-RestartSec=5
-Environment=NODE_ENV=production
-Environment=PORT=${PORT}
-
-[Install]
-WantedBy=multi-user.target
-EOF
-  systemctl daemon-reload
-  systemctl enable --now "$SERVICE"
-
-  health_check || fail "App did not come up — check: journalctl -u ${SERVICE} -n 50"
+  health_check || fail "App did not come up — check: pm2 logs ${SERVICE}"
 
   if ! command -v caddy >/dev/null; then
     log "Installing Caddy (HTTPS reverse proxy)…"
@@ -127,7 +144,7 @@ EOF
 
   log "Setup complete ✔  Point ${DOMAIN}'s DNS A record at this server."
   log "App:    http://localhost:${PORT}  (public via Caddy once DNS resolves)"
-  log "Logs:   journalctl -u ${SERVICE} -f"
+  log "Logs:   pm2 logs ${SERVICE}"
 }
 
 cmd_deploy() {
@@ -150,31 +167,32 @@ cmd_deploy() {
     log "Already up to date — rebuilding anyway."
   fi
 
+  # Build first — the running PM2 cluster keeps serving the whole time.
   build_app
 
-  log "Restarting ${SERVICE}…"
-  systemctl restart "$SERVICE"
+  # Swap workers only now that the new build is ready.
+  pm2_up
 
   if health_check; then
-    log "Deployed ${next_rev:0:10} ✔"
+    log "Deployed ${next_rev:0:10} ✔  (zero-downtime reload)"
     exit 0
   fi
 
   log "Health check FAILED — rolling back to ${prev:0:10}…"
   git reset --hard "$prev"
   build_app
-  systemctl restart "$SERVICE"
+  pm2_up
   if health_check; then
-    fail "Deploy failed; rolled back to previous version (now healthy). Check: journalctl -u ${SERVICE} -n 100"
+    fail "Deploy failed; rolled back to previous version (now healthy). Check: pm2 logs ${SERVICE}"
   else
-    fail "Deploy failed AND rollback is unhealthy — investigate: journalctl -u ${SERVICE} -n 100"
+    fail "Deploy failed AND rollback is unhealthy — investigate: pm2 logs ${SERVICE}"
   fi
 }
 
 case "${1:-deploy}" in
   setup)  cmd_setup ;;
   deploy) cmd_deploy ;;
-  logs)   journalctl -u "$SERVICE" -f ;;
-  status) systemctl status "$SERVICE" --no-pager; curl -s -o /dev/null -w "HTTP %{http_code}\n" "http://localhost:${PORT}/" ;;
+  logs)   ensure_pm2; pm2 logs "$SERVICE" ;;
+  status) ensure_pm2; pm2 status; curl -s -o /dev/null -w "HTTP %{http_code}\n" "http://localhost:${PORT}/" ;;
   *) echo "Usage: $0 [setup|deploy|logs|status]"; exit 1 ;;
 esac
