@@ -381,6 +381,7 @@ export const FONTS: Record<string, FontDef> = {
   sedgwick:  { label: "Sedgwick Ave (Graffiti)", css: '"Sedgwick Ave",cursive', group: "Themed", variants: R },
   sedgwickd: { label: "Sedgwick Ave Display", css: '"Sedgwick Ave Display",cursive', group: "Themed", variants: R },
   /* System */
+  jost:      { label: "Jost (Geometric)", css: '"Jost",sans-serif',        group: "System", variants: ALL },
   sans:      { label: "Arial",            css: "Arial,Helvetica,sans-serif", group: "System", variants: ALL },
   serif:     { label: "Georgia",          css: 'Georgia,"Times New Roman",serif', group: "System", variants: ALL },
 };

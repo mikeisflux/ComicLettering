@@ -128,3 +128,7 @@
 @font-face{font-family:'MedievalSharp';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/MedievalSharp-400.woff2) format('woff2');}
 @font-face{font-family:'Poiret One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/PoiretOne-400.woff2) format('woff2');}
 @font-face{font-family:'Wallpoet';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/Wallpoet-400.woff2) format('woff2');}
+@font-face{font-family:'Jost';font-style:italic;font-weight:400;font-display:swap;src:url(/fonts/Jost-400i.woff2) format('woff2');}
+@font-face{font-family:'Jost';font-style:italic;font-weight:700;font-display:swap;src:url(/fonts/Jost-700i.woff2) format('woff2');}
+@font-face{font-family:'Jost';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/Jost-400.woff2) format('woff2');}
+@font-face{font-family:'Jost';font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/Jost-700.woff2) format('woff2');}
