@@ -66,8 +66,9 @@ function letterStyleCss(s: LetterStyle, size: number): CSSProperties {
 
 /* ---------------- font menu with live previews ---------------- */
 
-function FontMenu({ value, disabled, onPick, onImport }: {
-  value: string; disabled?: boolean; onPick: (key: string) => void; onImport?: () => void;
+function FontMenu({ value, disabled, onPick, onImport, onDeleteFont }: {
+  value: string; disabled?: boolean; onPick: (key: string) => void;
+  onImport?: () => void; onDeleteFont?: (key: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const f = FONTS[value] || FONTS.comicneue;
@@ -88,11 +89,17 @@ function FontMenu({ value, disabled, onPick, onImport }: {
                 <div key={gr}>
                   <div className="fontGroup">{gr}</div>
                   {entries.map(([k, x]) => (
-                    <button key={k} className={"fontItem" + (k === value ? " on" : "")}
-                      style={{ fontFamily: x.css }}
-                      onClick={() => { onPick(k); setOpen(false); }}>
-                      {x.label}
-                    </button>
+                    <span key={k} className="fontRow">
+                      <button className={"fontItem" + (k === value ? " on" : "")}
+                        style={{ fontFamily: x.css }}
+                        onClick={() => { onPick(k); setOpen(false); }}>
+                        {x.label}
+                      </button>
+                      {gr === "My Fonts" && onDeleteFont && (
+                        <i className="fontDel" title="Remove from your library"
+                          onClick={(e) => { e.stopPropagation(); onDeleteFont(k); }}>✕</i>
+                      )}
+                    </span>
                   ))}
                 </div>
               );
@@ -1016,8 +1023,9 @@ export default function Editor() {
   const fileOpenRef = useRef<HTMLInputElement>(null);
   const fileFontRef = useRef<HTMLInputElement>(null);
   const fileStampRef = useRef<HTMLInputElement>(null);
-  const [customStamps, setCustomStamps] = useState<{ id: string; url: string }[]>([]);
+  const [customStamps, setCustomStamps] = useState<{ id: string; url: string; serverId?: string }[]>([]);
   const [, bumpFonts] = useReducer((c: number) => c + 1, 0);
+  const customFontIdsRef = useRef<Record<string, string>>({}); // font key -> server asset id
 
   /* ---------------- custom fonts & stamps (persisted in this browser) ---------------- */
 
@@ -1032,6 +1040,7 @@ export default function Editor() {
   }, []);
 
   useEffect(() => {
+    /* local cache first (instant), then the account library from SQL */
     try {
       const stamps = JSON.parse(localStorage.getItem("lmc.stamps") || "[]");
       if (Array.isArray(stamps)) setCustomStamps(stamps);
@@ -1040,7 +1049,39 @@ export default function Editor() {
       const fonts = JSON.parse(localStorage.getItem("lmc.fonts") || "[]");
       if (Array.isArray(fonts)) fonts.forEach((f) => registerRuntimeFont(f));
     } catch { /* ignore */ }
+    (async () => {
+      try {
+        const res = await fetch("/api/assets");
+        if (!res.ok) return;
+        const assets: { id: string; kind: string; name: string; data: string }[] = await res.json();
+        const stamps = assets.filter((a) => a.kind === "stamp")
+          .map((a) => ({ id: a.id, url: a.data, serverId: a.id }));
+        setCustomStamps((prev) => [
+          ...stamps,
+          ...prev.filter((p) => !p.serverId && !stamps.some((s) => s.url === p.url)),
+        ]);
+        for (const a of assets.filter((x) => x.kind === "font")) {
+          const key = "custom_" + a.name.toLowerCase().replace(/\W+/g, "");
+          customFontIdsRef.current[key] = a.id;
+          if (!FONTS[key]) {
+            await registerRuntimeFont({ key, label: a.name, family: "LMC " + a.name, data: a.data });
+          }
+        }
+      } catch { /* offline — local cache still works */ }
+    })();
   }, [registerRuntimeFont]);
+
+  async function uploadAsset(kind: "font" | "stamp", name: string, data: string): Promise<string | null> {
+    try {
+      const res = await fetch("/api/assets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind, name, data }),
+      });
+      if (!res.ok) return null;
+      return (await res.json()).id as string;
+    } catch { return null; }
+  }
 
   async function importFontFiles(files: File[]) {
     let list: { key: string; label: string; family: string; data: string }[] = [];
@@ -1054,24 +1095,35 @@ export default function Editor() {
       await registerRuntimeFont(rec);
       if (!FONTS[key]) { setStatus(`Could not load font "${f.name}".`); continue; }
       list = [...list.filter((x) => x.key !== key), rec];
+      const serverId = await uploadAsset("font", label, data);
+      if (serverId) customFontIdsRef.current[key] = serverId;
     }
+    try { localStorage.setItem("lmc.fonts", JSON.stringify(list)); } catch { /* cache only */ }
+    setStatus("Font imported — find it under “My Fonts”. It's saved to your account and follows you to any computer.");
+  }
+
+  async function deleteCustomFont(key: string) {
+    const serverId = customFontIdsRef.current[key];
+    if (serverId) fetch(`/api/assets/${serverId}`, { method: "DELETE" }).catch(() => { });
+    delete customFontIdsRef.current[key];
+    delete FONTS[key];
+    bumpFonts();
     try {
+      const list = JSON.parse(localStorage.getItem("lmc.fonts") || "[]").filter((x: { key: string }) => x.key !== key);
       localStorage.setItem("lmc.fonts", JSON.stringify(list));
-      setStatus("Font imported — find it under “My Fonts”. (Stored in this browser; projects opened elsewhere fall back to a standard font.)");
-    } catch {
-      setStatus("Font loaded for this session, but it's too large to remember in browser storage.");
-    }
+    } catch { /* ignore */ }
   }
 
   async function importStampFiles(files: File[]) {
     const list = [...customStamps];
     for (const f of files) {
       const url = await readAsDataURL(f);
-      list.push({ id: crypto.randomUUID(), url });
+      const serverId = await uploadAsset("stamp", f.name.replace(/\.\w+$/, ""), url);
+      list.push({ id: serverId || crypto.randomUUID(), url, serverId: serverId || undefined });
     }
     setCustomStamps(list);
-    try { localStorage.setItem("lmc.stamps", JSON.stringify(list)); setStatus("Stamps added to your library."); }
-    catch { setStatus("Stamps added for this session, but too large to remember in browser storage."); }
+    try { localStorage.setItem("lmc.stamps", JSON.stringify(list)); } catch { /* cache only */ }
+    setStatus("Stamps added — saved to your account library.");
   }
 
   async function insertCustomStamp(url: string) {
@@ -1083,6 +1135,8 @@ export default function Editor() {
   }
 
   function removeCustomStamp(id: string) {
+    const gone = customStamps.find((s) => s.id === id);
+    if (gone?.serverId) fetch(`/api/assets/${gone.serverId}`, { method: "DELETE" }).catch(() => { });
     const list = customStamps.filter((s) => s.id !== id);
     setCustomStamps(list);
     try { localStorage.setItem("lmc.stamps", JSON.stringify(list)); } catch { /* ignore */ }
@@ -1578,7 +1632,7 @@ export default function Editor() {
       <div className="inspSection">
         <div className="inspHead">Lettering</div>
         <Fld label="Font">
-          <FontMenu value={ts.font} onImport={() => fileFontRef.current?.click()} onPick={(k) => {
+          <FontMenu value={ts.font} onImport={() => fileFontRef.current?.click()} onDeleteFont={(k) => deleteCustomFont(k)} onPick={(k) => {
             const vars = FONTS[k]?.variants || ["regular"];
             const keep = vars.includes(tsVariant(ts) as never);
             set({ font: k, ...(keep ? {} : { bold: false, italic: false }) });
@@ -2251,6 +2305,7 @@ export default function Editor() {
         <span className="tbSep" />
         <FontMenu value={selTs?.font || "comicneue"} disabled={!selTs}
           onImport={() => fileFontRef.current?.click()}
+          onDeleteFont={(k) => deleteCustomFont(k)}
           onPick={(k) => mutateSel<BalloonEl | TextEl>((x) => {
             x.ts.font = k;
             const vars = FONTS[k]?.variants || ["regular"];

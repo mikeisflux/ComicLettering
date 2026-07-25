@@ -20,9 +20,23 @@ model User {
   subStatus    String    @default("none") // none | active | cancelled | suspended
   subPlan      String?   // monthly | yearly
   subId        String?   // PayPal subscription id
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
   projects     Project[]
+  assets       UserAsset[]
+}
+
+// Per-account custom assets: imported fonts and stamps.
+model UserAsset {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      String   // font | stamp
+  name      String
+  data      String   // data URL
+  createdAt DateTime @default(now())
+
+  @@index([userId, kind])
 }
 
 model Project {
