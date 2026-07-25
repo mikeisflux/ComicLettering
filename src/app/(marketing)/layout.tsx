@@ -34,14 +34,18 @@ export default async function MarketingLayout({ children }: { children: React.Re
             <p>Professional comic lettering,<br />right in your browser.</p>
           </div>
           <div>
+            <div className="foot-h">Product</div>
             <Link href="/features">Features</Link>
             <Link href="/pricing">Pricing</Link>
             <Link href="/faq">FAQ</Link>
+            <Link href="/contact">Contact</Link>
           </div>
           <div>
-            <Link href="/contact">Contact</Link>
-            <Link href="/terms">Terms of Service</Link>
-            <Link href="/privacy">Privacy Policy</Link>
+            <div className="foot-h">Comic lettering</div>
+            <Link href="/comic-lettering-software">Comic lettering software</Link>
+            <Link href="/manga-lettering">Manga lettering</Link>
+            <Link href="/comic-book-lettering">Comic book lettering</Link>
+            <Link href="/comic-book-fonts">Comic book fonts</Link>
           </div>
           <div>
             <Link href="/login">Sign in</Link>
