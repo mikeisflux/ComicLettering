@@ -9,10 +9,10 @@ import {
   Assets, BALLOON_KINDS, BalloonEl, BalloonKind, Doc, El, FILTERS, FONTS,
   FONT_GROUPS, FillStyle, GRADIENT_PRESETS, HALFTONE_VARIANTS, LAYOUT_CATEGORIES,
   LayoutRect, PAGE_SIZES, PATTERN_VARIANTS, Page, PanelEl, SPEEDLINE_VARIANTS,
-  COLOR_PALETTE, DPI, PAPER_CATEGORIES, PageMargin, TAILLESS_KINDS,
-  TEXTURE_VARIANTS, TextEl, TextStyle, aabbOverlap, applyLayout, clamp,
-  lightenHex, makeBalloon, makeImage, makePanel, makeText, newPage, reseedIds,
-  resolveBalloon, rotVec, solid, starterDoc, uid,
+  COLOR_PALETTE, DPI, GradStop, MULTI_GRADIENTS, PAPER_CATEGORIES, PageMargin,
+  TAILLESS_KINDS, TEXTURE_VARIANTS, TextEl, TextStyle, aabbOverlap, applyLayout,
+  clamp, lightenHex, makeBalloon, makeImage, makePanel, makeText, newPage,
+  reseedIds, resolveBalloon, rotVec, solid, starterDoc, uid,
 } from "@/lib/model";
 import { balloonGeom } from "@/lib/geometry";
 import { LETTER_STYLES, LetterStyle, applyLetterStyle } from "@/lib/presets";
@@ -299,8 +299,9 @@ function BalloonShape({ el, mergeBase, imgSrc }: { el: BalloonEl; mergeBase?: Me
       <defs>
         {f.kind === "gradient" && (
           <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1" gradientTransform={`rotate(${f.angle - 180}, 0.5, 0.5)`}>
-            <stop offset="0" stopColor={f.a} />
-            <stop offset="1" stopColor={f.b} />
+            {f.stops?.length
+              ? f.stops.map(([c, p], i) => <stop key={i} offset={p} stopColor={c} />)
+              : <><stop offset="0" stopColor={f.a} /><stop offset="1" stopColor={f.b} /></>}
           </linearGradient>
         )}
         {needClip && <clipPath id={cid}><path d={g.d} /></clipPath>}
@@ -696,6 +697,12 @@ export default function Editor() {
           if (handle.includes("w")) cur.x = orig.x + (orig.w - cur.w);
           if (handle.includes("n")) cur.y = orig.y + (orig.h - cur.h);
         }
+        /* lettering scales with its box, like Comic Life */
+        if (cur.type === "text" && orig.type === "text") {
+          const ratio = Math.min(cur.w / orig.w, cur.h / orig.h);
+          cur.ts.size = clamp(Math.round(orig.ts.size * ratio), 8, 800);
+          cur.ts.outlineW = Math.max(0, Math.round(orig.ts.outlineW * ratio));
+        }
       } else if (mode === "rotate") {
         const cx = orig.x + orig.w / 2, cy = orig.y + orig.h / 2;
         let ang = (Math.atan2(pt.y - cy, pt.x - cx) * 180) / Math.PI + 90;
@@ -845,18 +852,21 @@ export default function Editor() {
 
   /* quick fill/stroke from the format-bar pickers — applies to the selected
      balloon/panel/lettering, or the page background when nothing is selected */
-  function applyQuickFill(opt: { solidColor?: string; gradient?: [string, string] }) {
+  function applyQuickFill(opt: { solidColor?: string; gradient?: [string, string]; stops?: GradStop[] }) {
     const d = docRef.current!;
     const p = d.pages[pageIndexRef.current];
     const el = p.els.find((e) => e.id === selId);
     if (el?.locked) { setStatus("That item is locked — unlock it first."); return; }
-    const asFill = (): FillStyle => opt.gradient
-      ? { kind: "gradient", a: opt.gradient[0], b: opt.gradient[1], angle: 180 }
-      : solid(opt.solidColor!);
+    const asFill = (): FillStyle => opt.stops
+      ? { kind: "gradient", a: opt.stops[0][0], b: opt.stops[opt.stops.length - 1][0], angle: 180, stops: opt.stops }
+      : opt.gradient
+        ? { kind: "gradient", a: opt.gradient[0], b: opt.gradient[1], angle: 180 }
+        : solid(opt.solidColor!);
     if (el && (el.type === "balloon" || el.type === "panel")) {
       el.fill = asFill();
     } else if (el && el.type === "text") {
-      if (opt.gradient) { el.ts.fillA = opt.gradient[0]; el.ts.fillB = opt.gradient[1]; }
+      if (opt.stops) { el.ts.fillA = opt.stops[0][0]; el.ts.fillB = opt.stops[opt.stops.length - 1][0]; }
+      else if (opt.gradient) { el.ts.fillA = opt.gradient[0]; el.ts.fillB = opt.gradient[1]; }
       else { el.ts.fillA = opt.solidColor!; el.ts.fillB = null; }
     } else if (el && el.type === "image") {
       setStatus("Images have no fill — select a balloon, panel or lettering.");
@@ -2127,6 +2137,14 @@ export default function Editor() {
                     {GRADIENT_PRESETS.map(([a, b], i) => (
                       <button key={i} style={{ background: `linear-gradient(180deg, ${a}, ${b})` }}
                         onClick={() => { applyQuickFill({ gradient: [a, b] }); }} />
+                    ))}
+                  </div>
+                  <div className="fillPopHead" style={{ marginTop: 8 }}>Multi-tier</div>
+                  <div className="palGrid grads">
+                    {MULTI_GRADIENTS.map((m) => (
+                      <button key={m.name} title={m.name}
+                        style={{ background: `linear-gradient(180deg, ${m.stops.map(([c, p]) => `${c} ${Math.round(p * 100)}%`).join(", ")})` }}
+                        onClick={() => { applyQuickFill({ stops: m.stops }); }} />
                     ))}
                   </div>
                 </div>

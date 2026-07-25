@@ -16,9 +16,11 @@ export type PatternVariant =
 export type SpeedlineVariant = "burst" | "burst2" | "ring" | "corner" | "horiz" | "horizfade";
 export type TextureVariant = "speckle" | "grit" | "static" | "murk" | "daubs" | "stone";
 
+export type GradStop = [string, number]; // [color, position 0..1]
+
 export type FillStyle =
   | { kind: "solid"; a: string }
-  | { kind: "gradient"; a: string; b: string; angle: number }
+  | { kind: "gradient"; a: string; b: string; angle: number; stops?: GradStop[] }
   | { kind: "halftone"; a: string; dot: string; cell: 8 | 16 | 32; variant: HalftoneVariant }
   | { kind: "pattern"; a: string; fg: string; variant: PatternVariant; scale: number }
   | { kind: "speedlines"; a: string; line: string; variant: SpeedlineVariant }
@@ -64,13 +66,32 @@ const CURATED_GRADIENTS: [string, string][] = [
   ["#0fd8c8", "#0a4f8f"], ["#ff9a9e", "#fecfef"], ["#a1c4fd", "#c2e9fb"],
   ["#f6d365", "#fda085"], ["#84fab0", "#8fd3f4"], ["#161a20", "#4a5568"],
 ];
+/* Multi-tier gradients: banded metallics and comic-classic ramps. */
+export const MULTI_GRADIENTS: { name: string; stops: GradStop[] }[] = [
+  { name: "Gold", stops: [["#fff7cc", 0], ["#ffd21f", 0.35], ["#8a5a00", 0.5], ["#ffd21f", 0.68], ["#fffbe6", 1]] },
+  { name: "Chrome", stops: [["#f8fbff", 0], ["#c7d3e0", 0.42], ["#5a6d80", 0.5], ["#e8eff5", 0.58], ["#8ea2b5", 1]] },
+  { name: "Silver", stops: [["#ffffff", 0], ["#d7dde4", 0.4], ["#9aa5b1", 0.55], ["#eef2f6", 1]] },
+  { name: "Copper", stops: [["#ffe0c2", 0], ["#e08a3c", 0.4], ["#7a3a10", 0.55], ["#ffb26e", 1]] },
+  { name: "Fire", stops: [["#fff23e", 0], ["#ff9d1f", 0.4], ["#e8330f", 0.75], ["#7a0b00", 1]] },
+  { name: "Magma", stops: [["#ffd21f", 0], ["#ff5a00", 0.35], ["#a30f0f", 0.7], ["#26060a", 1]] },
+  { name: "Sunset", stops: [["#ffd76e", 0], ["#ff8a5c", 0.4], ["#e0498a", 0.75], ["#5b2a86", 1]] },
+  { name: "Ocean", stops: [["#b8f1ff", 0], ["#3fc3e8", 0.35], ["#1a6fd4", 0.7], ["#0c2a5e", 1]] },
+  { name: "Emerald", stops: [["#d8ffd0", 0], ["#4ecb5f", 0.45], ["#0f7a2a", 0.75], ["#06381a", 1]] },
+  { name: "Toxic", stops: [["#f4ff5e", 0], ["#8fe000", 0.5], ["#2e6b00", 1]] },
+  { name: "Candy", stops: [["#ffd9ec", 0], ["#ff6eb4", 0.45], ["#ffffff", 0.55], ["#ff45a4", 1]] },
+  { name: "Grape", stops: [["#ecd9ff", 0], ["#a05ce8", 0.5], ["#4a1580", 1]] },
+  { name: "Night", stops: [["#4a5a8a", 0], ["#252a55", 0.55], ["#0a0b1e", 1]] },
+  { name: "Rainbow", stops: [["#ff3b30", 0], ["#ff9500", 0.2], ["#ffe14d", 0.4], ["#34c759", 0.6], ["#2e86d4", 0.8], ["#8a4fd8", 1]] },
+  { name: "Steel", stops: [["#e8ecf0", 0], ["#8d99a6", 0.5], ["#3c4650", 0.85], ["#c2ccd6", 1]] },
+  { name: "Cream", stops: [["#fffdf2", 0], ["#ffe9b0", 0.55], ["#e0a83c", 1]] },
+];
+
 export const GRADIENT_PRESETS: [string, string][] = (() => {
   const out = [...CURATED_GRADIENTS];
   for (let i = 0; i < 12; i++) {
     const h = i * 30;
-    out.push([hslHex(h, 0.95, 0.75), hslHex(h, 0.9, 0.5)]);   // highlight fade
-    out.push([hslHex(h, 0.9, 0.5), hslHex(h, 0.95, 0.22)]);   // deep fade
-    out.push([hslHex(h, 0.6, 0.94), hslHex(h, 0.85, 0.6)]);   // pastel fade
+    out.push([hslHex(h, 1, 0.68), hslHex(h, 1, 0.44)]);      // vivid pop
+    out.push([hslHex(h, 0.95, 0.5), hslHex(h, 1, 0.24)]);    // rich deep
   }
   return out;
 })();

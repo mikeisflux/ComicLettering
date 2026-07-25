@@ -315,10 +315,17 @@ export function fillOverlayURL(f: FillStyle): string | null {
 export const isRepeating = (f: FillStyle) => f.kind === "pattern";
 
 /* CSS for DOM rendering of any fill */
+export function gradientCss(f: Extract<FillStyle, { kind: "gradient" }>): string {
+  if (f.stops?.length) {
+    return `linear-gradient(${f.angle}deg, ${f.stops.map(([c, p]) => `${c} ${Math.round(p * 100)}%`).join(", ")})`;
+  }
+  return `linear-gradient(${f.angle}deg, ${f.a}, ${f.b})`;
+}
+
 export function fillCss(f: FillStyle): CSSProperties {
   switch (f.kind) {
     case "solid": return { background: f.a };
-    case "gradient": return { background: `linear-gradient(${f.angle}deg, ${f.a}, ${f.b})` };
+    case "gradient": return { background: gradientCss(f) };
     default: {
       const url = fillOverlayURL(f);
       return {
@@ -346,7 +353,12 @@ export function paintFill(
       cx - Math.cos(rad) * len, cy - Math.sin(rad) * len,
       cx + Math.cos(rad) * len, cy + Math.sin(rad) * len
     );
-    g.addColorStop(0, f.a); g.addColorStop(1, f.b);
+    if (f.stops?.length) {
+      for (const [c, p] of f.stops) g.addColorStop(Math.min(1, Math.max(0, p)), c);
+    } else {
+      g.addColorStop(0, f.a);
+      g.addColorStop(1, f.b);
+    }
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, w, h);
   } else {
