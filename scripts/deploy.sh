@@ -83,6 +83,36 @@ SQL
   log "PostgreSQL ready."
 }
 
+# Install the BotBlock firewall: a root watcher that drops abusive IPs at
+# iptables within ~5s of the app flagging them, plus a 5-minute DB
+# reconciliation cron. Idempotent — safe to run on every deploy.
+provision_botblock() {
+  [ "$(id -u)" -eq 0 ] || return 0
+  local src="$APP_DIR/scripts/botblock"
+  [ -d "$src" ] || return 0
+  command -v iptables >/dev/null 2>&1 || apt-get install -y -qq iptables >/dev/null 2>&1 || true
+  log "Installing BotBlock firewall…"
+  install -m 0755 "$src/botblock-watcher.sh" /usr/local/bin/botblock-watcher
+  install -m 0755 "$src/botblock-manual.sh"  /usr/local/bin/botblock-manual
+  install -m 0755 "$src/botblock-sync.sh"    /usr/local/bin/botblock-sync
+  # wrapper feeds DATABASE_URL (from the app .env) to the sync script
+  cat > /usr/local/bin/botblock-sync-run <<WRAP
+#!/bin/bash
+set -a; [ -f "$APP_DIR/.env" ] && . "$APP_DIR/.env"; set +a
+exec /usr/local/bin/botblock-sync
+WRAP
+  chmod 0755 /usr/local/bin/botblock-sync-run
+  install -m 0644 "$src/botblock-watcher.service" /etc/systemd/system/botblock-watcher.service
+  systemctl daemon-reload
+  systemctl enable --now botblock-watcher >/dev/null 2>&1 || true
+  cat > /etc/cron.d/botblock <<CRON
+# BotBlock: reconcile iptables with the BlockedIP table every 5 minutes
+*/5 * * * * root /usr/local/bin/botblock-sync-run >> /var/log/botblock.log 2>&1
+CRON
+  chmod 0644 /etc/cron.d/botblock
+  log "BotBlock installed (watcher service + 5-min sync cron)."
+}
+
 # Copy any legacy SQLite data into PostgreSQL, then archive the old file so
 # it never migrates twice. Idempotent (rows are upserted).
 migrate_legacy_sqlite() {
@@ -201,6 +231,7 @@ cmd_setup() {
   node prisma/seed.mjs
 
   pm2_up
+  provision_botblock
   # start PM2 (and this app) automatically on server boot
   log "Enabling PM2 on boot…"
   pm2 startup systemd -u root --hp /root >/dev/null 2>&1 || true
@@ -260,6 +291,7 @@ cmd_deploy() {
 
   # Swap workers only now that the new build is ready.
   pm2_up
+  provision_botblock
 
   if health_check; then
     log "Deployed ${next_rev:0:10} ✔  (zero-downtime reload)"

@@ -59,6 +59,41 @@ model Setting {
   updatedAt DateTime @updatedAt
 }
 
+// BotBlock firewall: IPs to drop at the Linux firewall (iptables) via the
+// botblock-watcher/botblock-sync scripts. The app writes rows here (and to
+// /tmp/botblock-pending) when it detects abuse.
+model BlockedIP {
+  id             String   @id @default(cuid())
+  ipAddress      String   @unique
+  reason         String
+  violationCount Int      @default(1)
+  blockedAt      DateTime @default(now())
+  expiresAt      DateTime
+  lastUserAgent  String?
+  lastPath       String?
+  lastActionId   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([ipAddress])
+  @@index([expiresAt])
+}
+
+// Audit log of suspicious activity, used to tune thresholds and to escalate
+// repeat offenders into BlockedIP.
+model SuspiciousActivity {
+  id        String   @id @default(cuid())
+  ipAddress String
+  reason    String
+  actionId  String?
+  path      String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([ipAddress])
+  @@index([createdAt])
+}
+
 // Internal messaging: contact-form submissions, inbound site email
 // (SendGrid Inbound Parse) and outbound replies sent via SendGrid.
 model Message {
