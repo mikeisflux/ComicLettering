@@ -4,6 +4,7 @@ License 1.1 (OFL) and are redistributed here under its terms.
 Families: Comic Neue, Patrick Hand, Kalam, Bangers, Luckiest Guy, Boogaloo,
 Shantell Sans, Gochi Hand, Schoolbell, Walter Turncoat, Caveat, Amatic SC,
 Special Elite, Sniglet, Fredoka, Titan One, Lilita One, Passion One, Rampart One,
+Delius, Delius Swash Caps, Delius Unicase, Gloria Hallelujah, Happy Monkey,
 Chewy, Alfa Slab One, Bungee, Creepster, Nosifer, Audiowide, Permanent
 Marker, Courier Prime, League Gothic.
 

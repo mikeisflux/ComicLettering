@@ -255,6 +255,11 @@ export const FONTS: Record<string, FontDef> = {
   gochi:     { label: "Gochi Hand",       css: '"Gochi Hand",cursive',                 group: "Dialogue", variants: R },
   schoolbell:{ label: "Schoolbell",       css: '"Schoolbell",cursive',                 group: "Dialogue", variants: R },
   walter:    { label: "Walter Turncoat",  css: '"Walter Turncoat",cursive',            group: "Dialogue", variants: R },
+  delius:    { label: "Delius",           css: '"Delius",cursive',                     group: "Dialogue", variants: R },
+  deliussw:  { label: "Delius Swash",     css: '"Delius Swash Caps",cursive',          group: "Dialogue", variants: R },
+  deliusuni: { label: "Delius Unicase",   css: '"Delius Unicase",cursive',             group: "Dialogue", variants: RB },
+  gloria:    { label: "Gloria Hallelujah", css: '"Gloria Hallelujah",cursive',         group: "Dialogue", variants: R },
+  happymonkey: { label: "Happy Monkey",   css: '"Happy Monkey",sans-serif',            group: "Dialogue", variants: R },
   comicsans: { label: "Comic Sans",       css: '"Comic Sans MS","Comic Sans","Chalkboard SE",cursive', group: "Dialogue", variants: ALL },
   /* Display / SFX */
   bangers:   { label: "Bangers",          css: '"Bangers",cursive',        group: "Display", variants: R },
