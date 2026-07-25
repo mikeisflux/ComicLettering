@@ -335,6 +335,7 @@ export const FONTS: Record<string, FontDef> = {
   baloo:     { label: "Baloo 2",          css: '"Baloo 2",cursive',        group: "Display", variants: RB },
   bungeeshade:{ label: "Bungee Shade",    css: '"Bungee Shade",cursive',   group: "Display", variants: R },
   bungeeinline:{ label: "Bungee Inline",  css: '"Bungee Inline",cursive',  group: "Display", variants: R },
+  bungeeoutline:{ label: "Bungee Outline", css: '"Bungee Outline",cursive', group: "Display", variants: R },
   fasterone: { label: "Faster One (Speed)", css: '"Faster One",cursive',   group: "Display", variants: R },
   racing:    { label: "Racing Sans One",  css: '"Racing Sans One",cursive', group: "Display", variants: R },
   blackops:  { label: "Black Ops One (Stencil)", css: '"Black Ops One",cursive', group: "Display", variants: R },
