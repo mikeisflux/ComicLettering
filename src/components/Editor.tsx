@@ -2346,10 +2346,10 @@ export default function Editor() {
           <svg viewBox="0 0 40 30"><ellipse cx="20" cy="11" rx="15" ry="9" fill="#fff" stroke="#222" strokeWidth="2" /><circle cx="12" cy="23" r="3" fill="#fff" stroke="#222" strokeWidth="2" /><circle cx="8" cy="28" r="1.7" fill="#fff" stroke="#222" strokeWidth="1.5" /></svg>
         </TrayBtn>
         <TrayBtn onClick={() => addFromTray("shout")} label="Shout">
-          <svg viewBox="0 0 40 30"><path d="M20 2 L24 8 L31 5 L29 12 L37 14 L30 18 L34 25 L26 22 L24 29 L20 23 L15 28 L14 21 L5 23 L11 16 L3 12 L12 10 L9 3 L17 8 Z" fill="#fff" stroke="#222" strokeWidth="2" /></svg>
+          <svg viewBox="0 0 40 30"><path d="M36.2 10.5 L30.5 14.1 L36.1 17.9 L28.4 18.5 L29.8 23.8 L23.1 21.1 L19.8 26.0 L16.6 21.0 L9.8 23.6 L11.4 18.3 L3.8 17.5 L9.5 13.9 L3.9 10.1 L11.6 9.5 L10.2 4.2 L16.9 6.9 L20.2 2.0 L23.4 7.0 L30.2 4.4 L28.6 9.7 Z" fill="#fff" stroke="#222" strokeWidth="1.6" strokeLinejoin="miter" /></svg>
         </TrayBtn>
         <TrayBtn onClick={() => addFromTray("burst2")} label="Exclaim 2">
-          <svg viewBox="0 0 40 30"><path d="M20 1 L22 6 L26 2 L27 7 L32 5 L31 10 L37 10 L33 14 L38 17 L32 18 L35 23 L29 21 L29 27 L24 23 L21 29 L18 23 L14 28 L13 22 L7 24 L10 19 L3 18 L8 14 L2 11 L9 10 L7 4 L13 7 L14 1 L17 6 Z" fill="#fff" stroke="#222" strokeWidth="1.5" /></svg>
+          <svg viewBox="0 0 40 30"><path d="M36.9 15.2 L31.0 16.6 L34.5 20.3 L28.3 19.7 L29.2 24.1 L24.0 21.7 L22.1 25.9 L18.8 22.1 L14.6 25.4 L14.0 21.0 L8.1 22.6 L10.3 18.4 L4.0 18.1 L8.5 15.0 L3.1 12.8 L9.0 11.4 L5.5 7.7 L11.7 8.3 L10.8 3.9 L16.0 6.3 L17.9 2.1 L21.2 5.9 L25.4 2.6 L26.0 7.0 L31.9 5.4 L29.7 9.6 L36.0 9.9 L31.5 13.0 Z" fill="#fff" stroke="#222" strokeWidth="1.4" strokeLinejoin="miter" /></svg>
         </TrayBtn>
         <TrayBtn onClick={() => addFromTray("whisper")} label="Whisper">
           <svg viewBox="0 0 40 30"><ellipse cx="20" cy="12" rx="16" ry="10" fill="#fff" stroke="#222" strokeWidth="2" strokeDasharray="4 3" /><path d="M14 20 L10 28 L21 21 Z" fill="#fff" stroke="#222" strokeWidth="2" strokeDasharray="3 3" /></svg>
