@@ -57,7 +57,7 @@ function textCss(ts: TextStyle): CSSProperties {
 
 function letterStyleCss(s: LetterStyle, size: number): CSSProperties {
   return textCss({
-    font: s.font, size, bold: false, italic: false, caps: true, align: "center",
+    font: s.font, size, bold: false, italic: !!s.italic, caps: !s.lower, align: "center",
     fillA: s.fillA, fillB: s.fillB, outlineC: s.outlineC,
     outlineW: Math.max(s.outlineF > 0 ? 1 : 0, Math.round(size * s.outlineF)),
     shadow: s.shadow, shadowC: "#00000066",

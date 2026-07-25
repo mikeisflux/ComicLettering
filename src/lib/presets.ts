@@ -1,7 +1,8 @@
 /* Lettering style presets — the STYLES panel "ABC" swatches.
    Original preset library in the spirit of classic comic lettering styles:
-   gradient fills, heavy outlines and drop shadows. outlineF is the outline
-   width as a fraction of the font size. */
+   glossy two-tone gradient fills, thin outlines, drop shadows, and a font
+   matched to each look. outlineF is the outline width as a fraction of the
+   font size — kept small so the letterforms stay readable. */
 import { TextStyle } from "./model";
 
 export interface LetterStyle {
@@ -12,40 +13,78 @@ export interface LetterStyle {
   outlineC: string;
   outlineF: number;
   shadow: boolean;
+  italic?: boolean;
+  lower?: boolean;
 }
 
 export const LETTER_STYLES: LetterStyle[] = [
-  { name: "Sunburst",   font: "bangers",  fillA: "#ffe14d", fillB: "#ff7a00", outlineC: "#d42a00", outlineF: 0.10, shadow: true },
-  { name: "Blaze",      font: "luckiest", fillA: "#ff9d2e", fillB: "#e03000", outlineC: "#7a1400", outlineF: 0.10, shadow: true },
-  { name: "Crimson",    font: "bangers",  fillA: "#e01018", fillB: "#8f0007", outlineC: "#20000a", outlineF: 0.10, shadow: true },
-  { name: "Bubblegum",  font: "chewy",    fillA: "#ff9de0", fillB: "#ff45a4", outlineC: "#ffffff", outlineF: 0.10, shadow: true },
-  { name: "Banana",     font: "boogaloo", fillA: "#fff06a", fillB: "#ffcc00", outlineC: "#8a5a00", outlineF: 0.09, shadow: true },
-  { name: "Fireball",   font: "creepster", fillA: "#ff5a00", fillB: "#b40000", outlineC: "#3d0000", outlineF: 0.07, shadow: true },
-  { name: "Chrome",     font: "bungee",   fillA: "#ffffff", fillB: "#9aa0a8", outlineC: "#555b64", outlineF: 0.08, shadow: true },
-  { name: "Stone",      font: "alfa",     fillA: "#d8c9a3", fillB: "#a8946a", outlineC: "#6d5a35", outlineF: 0.09, shadow: true },
-  { name: "Tangerine",  font: "luckiest", fillA: "#ffb020", fillB: null,      outlineC: "#b45800", outlineF: 0.10, shadow: true },
-  { name: "Slime",      font: "creepster", fillA: "#a5ec3a", fillB: "#2e8f00", outlineC: "#143f0a", outlineF: 0.07, shadow: false },
-  { name: "Ice",        font: "chewy",    fillA: "#e6faff", fillB: "#59c8f2", outlineC: "#ffffff", outlineF: 0.10, shadow: true },
-  { name: "Hazard",     font: "bangers",  fillA: "#ffe600", fillB: null,      outlineC: "#e00000", outlineF: 0.11, shadow: false },
-  { name: "Toxic",      font: "nosifer",  fillA: "#8fe000", fillB: "#4f9a00", outlineC: "#223b00", outlineF: 0.05, shadow: false },
-  { name: "Grape",      font: "boogaloo", fillA: "#c77dff", fillB: "#7b2fbf", outlineC: "#3a0f66", outlineF: 0.09, shadow: true },
-  { name: "Silver",     font: "league",   fillA: "#ffffff", fillB: "#b9c0c9", outlineC: "#6a7078", outlineF: 0.07, shadow: true },
-  { name: "Gold",       font: "alfa",     fillA: "#ffd75e", fillB: "#c8901a", outlineC: "#7a5405", outlineF: 0.08, shadow: true },
-  { name: "Classic",    font: "bangers",  fillA: "#ffffff", fillB: null,      outlineC: "#111111", outlineF: 0.10, shadow: true },
-  { name: "Ocean",      font: "audiowide", fillA: "#7fd4ff", fillB: "#1a6fd4", outlineC: "#0c3a72", outlineF: 0.08, shadow: false },
-  { name: "Marker",     font: "marker",   fillA: "#ff6a00", fillB: null,      outlineC: "#000000", outlineF: 0,    shadow: true },
-  { name: "Blood",      font: "nosifer",  fillA: "#c80000", fillB: "#6e0000", outlineC: "#2b0000", outlineF: 0.045, shadow: false },
-  { name: "Mint",       font: "patrick",  fillA: "#7fe8b0", fillB: "#28a06a", outlineC: "#0c4a2c", outlineF: 0.08, shadow: false },
-  { name: "Retro",      font: "bungee",   fillA: "#ffb84f", fillB: "#ff4f79", outlineC: "#5c1030", outlineF: 0.08, shadow: true },
-  { name: "Midnight",   font: "audiowide", fillA: "#b9c6ff", fillB: "#3446a0", outlineC: "#0a1030", outlineF: 0.08, shadow: true },
-  { name: "Sunshine",   font: "kalam",    fillA: "#ffdd55", fillB: "#ff9900", outlineC: "#874c00", outlineF: 0.08, shadow: false },
-  { name: "Panic",      font: "luckiest", fillA: "#ffffff", fillB: "#ffd0d0", outlineC: "#d40000", outlineF: 0.11, shadow: true },
-  { name: "Emerald",    font: "bangers",  fillA: "#5ad46a", fillB: "#0f7a2a", outlineC: "#063a12", outlineF: 0.10, shadow: true },
-  { name: "Royal",      font: "alfa",     fillA: "#ffd21f", fillB: null,      outlineC: "#4020a0", outlineF: 0.10, shadow: true },
-  { name: "Ghost",      font: "creepster", fillA: "#f2f6ff", fillB: "#aab6d0", outlineC: "#3c465c", outlineF: 0.06, shadow: true },
+  /* hot & glossy */
+  { name: "Sunburst",     font: "luckiest",    fillA: "#ffd21f", fillB: "#ff7a00", outlineC: "#7a3400", outlineF: 0.035, shadow: true },
+  { name: "Tango",        font: "chango",      fillA: "#ff9d3c", fillB: "#e8540a", outlineC: "#7a2600", outlineF: 0.03,  shadow: true },
+  { name: "Big Red",      font: "sigmar",      fillA: "#ff4b3a", fillB: "#a80f00", outlineC: "#440b06", outlineF: 0.025, shadow: true },
+  { name: "Crimson",      font: "bangers",     fillA: "#e01018", fillB: "#8f0007", outlineC: "#2b0004", outlineF: 0.04,  shadow: true },
+  { name: "Blaze",        font: "boogaloo",    fillA: "#ff9d2e", fillB: "#e03000", outlineC: "#7a1400", outlineF: 0.035, shadow: true },
+  { name: "Flame Italic", font: "bangers",     fillA: "#ffe14d", fillB: "#ff8a00", outlineC: "#ffffff", outlineF: 0.05,  shadow: true, italic: true },
+  { name: "Citrus",       font: "fugaz",       fillA: "#ffe600", fillB: "#ff9000", outlineC: "#a84e00", outlineF: 0.03,  shadow: true },
+  { name: "Goldenrod",    font: "paytone",     fillA: "#ffd75e", fillB: "#e8940a", outlineC: "#7a5405", outlineF: 0.035, shadow: true },
+  { name: "Amber Slab",   font: "alfa",        fillA: "#ffb84f", fillB: "#e07a10", outlineC: "#7a4005", outlineF: 0.03,  shadow: true },
+  { name: "Vermilion",    font: "bungee",      fillA: "#ff6a3a", fillB: "#d42000", outlineC: "#57120a", outlineF: 0.025, shadow: true },
+  { name: "Cherry Bold",  font: "lilita",      fillA: "#ff3b30", fillB: "#b80f10", outlineC: "#500608", outlineF: 0.035, shadow: true },
+  { name: "Ketchup",      font: "titan",       fillA: "#e01018", fillB: "#a80005", outlineC: "#ffd21f", outlineF: 0.05,  shadow: true },
+  { name: "Spice",        font: "spicyrice",   fillA: "#ff9d2e", fillB: "#e05a00", outlineC: "#7a2e00", outlineF: 0.03,  shadow: false },
+  { name: "Orange Soda",  font: "chewy",       fillA: "#ffc07a", fillB: "#ff7a2a", outlineC: "#9a4008", outlineF: 0.035, shadow: true },
+  /* cool & bright */
+  { name: "Sky Pop",      font: "fredoka",     fillA: "#7fd4ff", fillB: "#1a8ae0", outlineC: "#0c4a86", outlineF: 0.035, shadow: true },
+  { name: "Bubble Blue",  font: "bubblegum",   fillA: "#8ad4ff", fillB: "#2a8ae8", outlineC: "#ffffff", outlineF: 0.045, shadow: true },
+  { name: "Ocean",        font: "racing",      fillA: "#4ad4e8", fillB: "#0f8aae", outlineC: "#06405c", outlineF: 0.03,  shadow: true },
+  { name: "Speedster",    font: "fasterone",   fillA: "#4ad4ff", fillB: "#0f6ae0", outlineC: "#06305c", outlineF: 0.02,  shadow: true },
+  { name: "Deep Teal",    font: "bowlby",      fillA: "#5ad4c2", fillB: "#0f7a8a", outlineC: "#06353e", outlineF: 0.035, shadow: true },
+  { name: "Frostbite",    font: "griffy",      fillA: "#eef6ff", fillB: "#9ac2e8", outlineC: "#4a6a92", outlineF: 0.03,  shadow: true },
+  { name: "Midnight",     font: "audiowide",   fillA: "#b9c6ff", fillB: "#3446a0", outlineC: "#0a1030", outlineF: 0.03,  shadow: true },
+  /* greens */
+  { name: "Lime Bubble",  font: "baloo",       fillA: "#a5e83a", fillB: "#4fae12", outlineC: "#1d5406", outlineF: 0.035, shadow: true },
+  { name: "Spring Green", font: "sniglet",     fillA: "#8fe05a", fillB: "#2e9a1a", outlineC: "#0f4a0a", outlineF: 0.035, shadow: false },
+  { name: "Slime Drip",   font: "creepster",   fillA: "#b8f04a", fillB: "#4f9a00", outlineC: "#1d4a05", outlineF: 0.03,  shadow: false },
+  { name: "Swamp Ooze",   font: "nosifer",     fillA: "#8fe000", fillB: "#3f7a00", outlineC: "#1d3a05", outlineF: 0.02,  shadow: false },
+  { name: "Kranky",       font: "kranky",      fillA: "#ffffff", fillB: null,      outlineC: "#2e9a1a", outlineF: 0.04,  shadow: true },
+  { name: "Emerald",      font: "carter",      fillA: "#5ad46a", fillB: "#0f7a2a", outlineC: "#063a12", outlineF: 0.035, shadow: true },
+  /* purples & pinks */
+  { name: "Grape Jam",    font: "shrikhand",   fillA: "#c77dff", fillB: "#7b2fbf", outlineC: "#38105e", outlineF: 0.03,  shadow: true },
+  { name: "Royal",        font: "luckiest",    fillA: "#8a4ae0", fillB: "#5a1aa8", outlineC: "#ffd21f", outlineF: 0.045, shadow: true },
+  { name: "Lilac Gloss",  font: "chango",      fillA: "#d8b8ff", fillB: "#9a6ae8", outlineC: "#4a2a7a", outlineF: 0.03,  shadow: true },
+  { name: "Lavender",     font: "baloo",       fillA: "#d0b0ff", fillB: "#9a6ae0", outlineC: "#4a2a7a", outlineF: 0.03,  shadow: false, lower: true },
+  { name: "Witchy",       font: "hennypenny",  fillA: "#c9a0f2", fillB: "#8a4ae0", outlineC: "#3a1a66", outlineF: 0.03,  shadow: true },
+  { name: "Bubblegum",    font: "modak",       fillA: "#ff9de0", fillB: "#ff45a4", outlineC: "#ffffff", outlineF: 0.04,  shadow: true },
+  { name: "Rose Quartz",  font: "ceviche",     fillA: "#ffe6ee", fillB: "#ffb0cc", outlineC: "#d06a92", outlineF: 0.035, shadow: false, italic: true },
+  /* metallic & stone */
+  { name: "Silver 3D",    font: "anton",       fillA: "#ffffff", fillB: "#c2c8d2", outlineC: "#7a828e", outlineF: 0.035, shadow: true },
+  { name: "Chrome",       font: "archivoblack", fillA: "#f2f6fa", fillB: "#9aa0a8", outlineC: "#555b64", outlineF: 0.03, shadow: true },
+  { name: "Honey Gold",   font: "lemon",       fillA: "#ffd75e", fillB: "#c8901a", outlineC: "#6d4a05", outlineF: 0.03,  shadow: true },
+  { name: "Garnet",       font: "erica",       fillA: "#d46a6a", fillB: "#7a1620", outlineC: "#3a060c", outlineF: 0.03,  shadow: true },
+  { name: "Granite",      font: "blackops",    fillA: "#b0b6be", fillB: "#5c646e", outlineC: "#23282e", outlineF: 0.03,  shadow: true },
+  { name: "Stone",        font: "slackey",     fillA: "#e0cfa0", fillB: "#b09364", outlineC: "#6d5a35", outlineF: 0.035, shadow: true },
+  { name: "Charcoal",     font: "londrina",    fillA: "#c2c6cc", fillB: "#6a7078", outlineC: "#2e3238", outlineF: 0.035, shadow: true },
+  { name: "Sketch",       font: "cabinsketch", fillA: "#e8eaee", fillB: null,      outlineC: "#3a4048", outlineF: 0.02,  shadow: true },
+  /* rough, cracked & horror */
+  { name: "Cracked Earth", font: "frijole",    fillA: "#d9b98a", fillB: "#a8845a", outlineC: "#5c4526", outlineF: 0.02,  shadow: true },
+  { name: "Lava Crack",   font: "eater",       fillA: "#ff5a3a", fillB: "#a80f00", outlineC: "#3d0500", outlineF: 0.02,  shadow: false },
+  { name: "Rough Red",    font: "freckle",     fillA: "#d42a1a", fillB: null,      outlineC: "#5c0f08", outlineF: 0.03,  shadow: false },
+  { name: "Scarlet Horror", font: "butcherman", fillA: "#d42a1a", fillB: "#7a0f06", outlineC: "#2b0000", outlineF: 0.02, shadow: false },
+  { name: "Blood",        font: "nosifer",     fillA: "#c80000", fillB: "#6e0000", outlineC: "#2b0000", outlineF: 0.02,  shadow: false },
+  /* script & brush */
+  { name: "Red Brush",    font: "knewave",     fillA: "#e02a1a", fillB: null,      outlineC: "#7a0f06", outlineF: 0.02,  shadow: true, italic: true },
+  { name: "Parchment",    font: "ceviche",     fillA: "#f2e3c2", fillB: "#d9b98a", outlineC: "#8a6a3a", outlineF: 0.03,  shadow: false, italic: true },
+  { name: "Cream Serif",  font: "serif",       fillA: "#f2e8d0", fillB: "#d9c9a0", outlineC: "#8a7a50", outlineF: 0.02,  shadow: false, italic: true },
+  { name: "Marker",       font: "marker",      fillA: "#ff6a00", fillB: null,      outlineC: "#000000", outlineF: 0,     shadow: true },
+  /* classics */
+  { name: "Classic",      font: "bangers",     fillA: "#ffffff", fillB: null,      outlineC: "#111111", outlineF: 0.05,  shadow: true },
+  { name: "Hazard",       font: "bangers",     fillA: "#ffe600", fillB: null,      outlineC: "#e00000", outlineF: 0.045, shadow: false },
+  { name: "Panic",        font: "luckiest",    fillA: "#ffffff", fillB: "#ffd0d0", outlineC: "#d40000", outlineF: 0.045, shadow: true },
+  { name: "Shade Box",    font: "bungeeshade", fillA: "#ff9d2e", fillB: null,      outlineC: "#000000", outlineF: 0,     shadow: false },
+  { name: "Outliner",     font: "londrinaoutline", fillA: "#222222", fillB: null,  outlineC: "#000000", outlineF: 0,     shadow: false },
 ];
 
-/* Apply a preset onto an existing TextStyle (keeps size/align/caps etc.) */
+/* Apply a preset onto an existing TextStyle (keeps size/align etc.) */
 export function applyLetterStyle(ts: TextStyle, s: LetterStyle): TextStyle {
   return {
     ...ts,
@@ -55,5 +94,7 @@ export function applyLetterStyle(ts: TextStyle, s: LetterStyle): TextStyle {
     outlineC: s.outlineC,
     outlineW: Math.max(0, Math.round(ts.size * s.outlineF)),
     shadow: s.shadow,
+    italic: s.italic ?? ts.italic,
+    caps: s.lower ? false : ts.caps,
   };
 }
