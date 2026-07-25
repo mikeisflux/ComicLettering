@@ -28,7 +28,7 @@ Sedgwick Ave Display, Cinzel Decorative, Pirata One, Metamorphous,
 Limelight, Rubik Spray Paint, Almendra, Give You Glory, Rubik Burned,
 Trade Winds, Bahiana, MedievalSharp, Poiret One, Wallpoet, Jost,
 Rubik Beastly, Bungee Outline, Pacifico, Ultra, Rubik Glitch, Rye,
-Kaushan Script, Uncial Antiqua, Graduate.
+Kaushan Script, Uncial Antiqua, Graduate, Oldenburg.
 Full license text:
 https://openfontlicense.org/open-font-license-official-text/
 
