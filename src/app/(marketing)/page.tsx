@@ -63,8 +63,8 @@ export default function Home() {
           never needs installing, and exports print-ready pages.
         </p>
         <div className="heroBtns">
-          <Link className="btnBig primary" href="/signup">Start Lettering Now</Link>
-          <Link className="btnBig secondary" href="/features">See the Features</Link>
+          <Link className="btnBig primary" href="/signup?next=/app&demo=1">Try the Free Demo</Link>
+          <Link className="btnBig secondary" href="/pricing">Pricing — $20/mo</Link>
         </div>
         <p className="heroNote">$20/month or $160/year · cancel anytime · works on any computer</p>
       </section>
@@ -96,8 +96,10 @@ export default function Home() {
           </figure>
         </div>
         <div className="heroBtns">
-          <Link className="btnBig primary" href="/signup">Try It Yourself</Link>
+          <Link className="btnBig primary" href="/signup?next=/app&demo=1">Try the Demo Free</Link>
+          <Link className="btnBig secondary" href="/pricing">See Pricing</Link>
         </div>
+        <p className="heroNote">Free demo — create an account to start. Saving, export &amp; printing unlock with a subscription.</p>
       </section>
 
       <section className="mktSection" id="features">

@@ -494,7 +494,7 @@ const elLabel = (el: El) =>
     : el.type === "panel" ? "Panel"
     : "Image";
 
-export default function Editor() {
+export default function Editor({ demo = false }: { demo?: boolean }) {
   const [, force] = useReducer((c: number) => c + 1, 0);
   const docRef = useRef<Doc | null>(null);
   const assetsRef = useRef<Assets>({});
@@ -1611,6 +1611,7 @@ export default function Editor() {
   useEffect(() => { if (tab === "library" && projects === null) refreshProjects(); }, [tab, projects]);
 
   async function saveProject(saveAs: boolean) {
+    if (demo) { setStatus("Saving is off in the demo — subscribe to save your comics to your library."); return; }
     const d = docRef.current!;
     let target = current;
     let name = current?.name;
@@ -1676,6 +1677,7 @@ export default function Editor() {
   }
 
   function exportJSON() {
+    if (demo) { setStatus("Export is off in the demo — subscribe to unlock."); return; }
     const blob = new Blob([JSON.stringify({ doc: docRef.current, assets: assetsRef.current })], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -1705,6 +1707,7 @@ export default function Editor() {
   }
 
   async function printPage() {
+    if (demo) { setStatus("Printing is off in the demo — subscribe to print your pages."); return; }
     if (!page) return;
     setStatus("Preparing print…");
     const { renderPageToCanvas } = await import("@/lib/exportPng");
@@ -1718,6 +1721,7 @@ export default function Editor() {
   }
 
   async function exportAllPages() {
+    if (demo) { setStatus("Export is off in the demo — subscribe to unlock."); return; }
     const d = docRef.current!;
     for (let i = 0; i < d.pages.length; i++) {
       setStatus(`Exporting page ${i + 1}/${d.pages.length}…`);
@@ -1730,6 +1734,7 @@ export default function Editor() {
     format: ImageFormat | "pdf" | "cbz",
     scope: "current" | "all" | "range", dpi: number
   ) {
+    if (demo) { setStatus("Export is off in the demo — subscribe to export print-ready pages."); setShowExport(false); return; }
     const d = docRef.current!;
     const nameBase = (current?.name || "comic").replace(/[^\w\- ]+/g, "");
     const idxs =
@@ -2396,7 +2401,13 @@ export default function Editor() {
   const selTs = selEl && (selEl.type === "balloon" || selEl.type === "text") ? selEl.ts : null;
 
   return (
-    <div className="app">
+    <div className={"app" + (demo ? " demo" : "")}>
+      {demo && (
+        <div className="demoBar">
+          <span><b>DEMO MODE</b> — try everything, but saving, export and printing are off, and pages carry a watermark.</span>
+          <a href="/pricing">Subscribe to unlock full access →</a>
+        </div>
+      )}
       {/* ---------- menu bar ---------- */}
       <nav className="menuBar">
         {openMenu && <div className="ctxBackdrop" style={{ zIndex: 179 }} onClick={() => setOpenMenu(null)} />}
@@ -2407,10 +2418,10 @@ export default function Editor() {
             ["Save", () => saveProject(false)],
             ["Save As…", () => saveProject(true)],
             ["Import Project File…", () => fileOpenRef.current?.click()],
-            ["Export Project File", () => exportJSON()],
+            ["Export Project File", () => demo ? setStatus("Export is off in the demo — subscribe to unlock.") : exportJSON()],
             ["—", null],
             ["Page Setup…", () => setShowSetup(true)],
-            ["Export…", () => setShowExport(true)],
+            ["Export…", () => demo ? setStatus("Export is off in the demo — subscribe to unlock.") : setShowExport(true)],
             ["Print…", () => printPage()],
           ]],
           ["Edit", [
@@ -2537,7 +2548,7 @@ export default function Editor() {
           onClick={() => { if (selEl && (selEl.type === "image" || selEl.type === "panel") && selEl.img) runInstantAlpha(selEl.id, selEl.img); }} />
         <ToolBtn label="Page Setup" icon="📐" onClick={() => setShowSetup(true)} />
         <ToolBtn label="Print" icon="🖨" onClick={printPage} />
-        <ToolBtn label="Export" icon="🖼⇩" accent onClick={() => setShowExport(true)} />
+        <ToolBtn label="Export" icon="🖼⇩" accent onClick={() => demo ? setStatus("Export is off in the demo — subscribe to unlock.") : setShowExport(true)} />
         <ToolBtn label="Inspector" icon="ⓘ" onClick={() => setTab("inspector")} />
         <div className="tbSpacer" />
         <div className="tbHint">Runs entirely in your browser — nothing is uploaded.</div>
@@ -2774,6 +2785,7 @@ export default function Editor() {
                     borderWidth: Math.max(2, 1.5 / zoom),
                   }} />
                 )}
+                {demo && <div className="demoWatermark" aria-hidden style={{ width: page.w, height: page.h }} />}
               </div>
               {renderOverlay()}
               {snapRef.current.x != null && <div className="snapLineV" style={{ left: snapRef.current.x * zoom }} />}

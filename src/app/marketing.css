@@ -83,6 +83,11 @@
 .featCard p { margin: 0; color: var(--mute); font-size: 14.5px; }
 .featCard .emoji { font-size: 28px; display: block; margin-bottom: 10px; }
 
+.demoNote {
+  background: #fff6e9; border: 1px solid #f0c48a; border-left: 4px solid #f0812c;
+  border-radius: 8px; padding: 12px 14px; font-size: 14px; color: #5a4326; margin: 0 0 18px;
+}
+
 /* screenshot showcase */
 .showcase { text-align: center; }
 .showcase .sub { margin-left: auto; margin-right: auto; }

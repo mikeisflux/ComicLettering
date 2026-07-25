@@ -8,7 +8,9 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const [err, setErr] = useState("");
   const params = useSearchParams();
   const next = params.get("next");
+  const isDemo = params.get("demo") === "1";
   const getCaptcha = useCaptcha();
+  const suffix = `${next ? `?next=${encodeURIComponent(next)}` : ""}${isDemo ? `${next ? "&" : "?"}demo=1` : ""}`;
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -34,6 +36,13 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
   return (
     <form className="formCard" onSubmit={submit}>
       <h1>{mode === "signup" ? "Create Your Account" : "Welcome Back"}</h1>
+      {isDemo && (
+        <p className="demoNote">
+          In order to access the free demo, you must create an account. It only takes a moment —
+          no credit card required. You can try the full studio; saving, export and printing unlock
+          when you subscribe.
+        </p>
+      )}
       {mode === "signup" && (
         <>
           <label htmlFor="a-name">Name</label>
@@ -49,8 +58,8 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
       {err && <p className="formErr">{err}</p>}
       <p className="alt">
         {mode === "signup"
-          ? <>Already have an account? <a href={`/login${next ? `?next=${encodeURIComponent(next)}` : ""}`}>Sign in</a></>
-          : <>New here? <a href={`/signup${next ? `?next=${encodeURIComponent(next)}` : ""}`}>Create an account</a></>}
+          ? <>Already have an account? <a href={`/login${suffix}`}>Sign in</a></>
+          : <>New here? <a href={`/signup${suffix}`}>Create an account</a></>}
       </p>
     </form>
   );
