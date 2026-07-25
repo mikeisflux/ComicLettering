@@ -343,6 +343,7 @@ export const FONTS: Record<string, FontDef> = {
   londrinashadow:{ label: "Londrina Shadow", css: '"Londrina Shadow",cursive', group: "Display", variants: R },
   londrinaoutline:{ label: "Londrina Outline", css: '"Londrina Outline",cursive', group: "Display", variants: R },
   fingerpaint:{ label: "Finger Paint",    css: '"Finger Paint",cursive',   group: "Display", variants: R },
+  spraypaint: { label: "Rubik Spray Paint (Grunge)", css: '"Rubik Spray Paint",cursive', group: "Display", variants: R },
   freckle:   { label: "Freckle Face",     css: '"Freckle Face",cursive',   group: "Display", variants: R },
   kranky:    { label: "Kranky",           css: '"Kranky",cursive',         group: "Display", variants: R },
   /* Themed */
