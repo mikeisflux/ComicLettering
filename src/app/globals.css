@@ -323,7 +323,7 @@ input[type="range"] { width: 110px; }
 /* margin guides */
 .marginGuide {
   position: absolute; pointer-events: none;
-  border: 2px dashed #9fc4e8; opacity: .55;
+  border: 2px dashed #1e88e5; opacity: .9;
 }
 /* snap guides */
 .snapLineV { position: absolute; top: 0; bottom: 0; width: 0; border-left: 1px solid #e91e63; z-index: 60; pointer-events: none; }
@@ -369,8 +369,8 @@ input[type="range"] { width: 110px; }
 .stampPop button:hover { border-color: var(--sel); background: #eef5fd; }
 .stampWords { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; border-bottom: 1px solid var(--edge2); padding-bottom: 6px; margin-bottom: 6px; }
 .stampWords button { overflow: hidden; white-space: nowrap; }
-.stampEmoji { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; }
-.stampEmoji button { font-size: 20px; }
+.stampEmoji { display: grid; grid-template-columns: repeat(auto-fill, minmax(32px, 1fr)); gap: 2px; }
+.stampEmoji button { font-size: 20px; padding: 2px 0; min-width: 0; text-align: center; }
 
 /* layers */
 .layerList { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }

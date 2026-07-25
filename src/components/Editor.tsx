@@ -2457,6 +2457,7 @@ export default function Editor() {
                     left: page.margin.l, top: page.margin.t,
                     width: page.w - page.margin.l - page.margin.r,
                     height: page.h - page.margin.t - page.margin.b,
+                    borderWidth: Math.max(2, 1.5 / zoom),
                   }} />
                 )}
               </div>
