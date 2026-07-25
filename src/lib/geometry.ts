@@ -79,13 +79,32 @@ function polygonWithTail(
   }
   if (bestI < 0) return linePath(pts);
 
-  const P = pts[bestI], Q = pts[(bestI + 1) % pts.length];
-  const eLen = Math.hypot(Q[0] - P[0], Q[1] - P[1]);
-  const bwU = Math.min(0.45, Math.max(0.05, (Math.min(w, h) * 0.16) / Math.max(eLen, 1)));
-  const uB = Math.max(0.02, bestU - bwU);
-  const uA = Math.min(0.98, bestU + bwU);
-  const B = lerpPt(P, Q, uB);
-  const A = lerpPt(P, Q, uA);
+  /* the base spans real arc-length around the ring on both sides of the
+     exit point, so it stays wide no matter how dense the polygon is */
+  const n = pts.length;
+  const cum: number[] = new Array(n);
+  let per = 0;
+  for (let i = 0; i < n; i++) {
+    cum[i] = per;
+    const q = pts[(i + 1) % n];
+    per += Math.hypot(q[0] - pts[i][0], q[1] - pts[i][1]);
+  }
+  if (per < 8) return linePath(pts);
+  const segLen = (i: number) => (i + 1 < n ? cum[i + 1] : per) - cum[i];
+  const exitS = cum[bestI] + bestU * segLen(bestI);
+  /* same base width as the standard speech balloon tail (delta 0.11 rad on
+     an ellipse ≈ 0.055·(w+h) across), so every balloon's tail matches */
+  const half = Math.min(per * 0.18, Math.max(6, (w + h) * 0.0275));
+  const sB = (exitS - half + per) % per;
+  const sA = (exitS + half) % per;
+  const pointAt = (s: number): number[] => {
+    for (let k = 0; k < n; k++) {
+      const end = k + 1 < n ? cum[k + 1] : per;
+      if (s >= cum[k] && s <= end) return lerpPt(pts[k], pts[(k + 1) % n], (s - cum[k]) / (segLen(k) || 1));
+    }
+    return pts[0];
+  };
+  const B = pointAt(sB), A = pointAt(sA);
 
   const leg = (from: number[], to: number[]): number[][] => {
     if (!zigzag) return [];
@@ -99,10 +118,16 @@ function polygonWithTail(
     ];
   };
 
-  const out: number[][] = [];
-  for (let i = 0; i <= bestI; i++) out.push(pts[i]);
-  out.push(B, ...leg(B, tip), tip, ...leg(tip, A), A);
-  for (let i = bestI + 1; i < pts.length; i++) out.push(pts[i]);
+  /* tail wedge, then the body from A forward around the ring to B */
+  const out: number[][] = [B, ...leg(B, tip), tip, ...leg(tip, A), A];
+  const span = (sB - sA + per) % per;
+  const body: [number, number][] = [];
+  for (let k = 0; k < n; k++) {
+    const rel = (cum[k] - sA + per) % per;
+    if (rel > 1e-6 && rel < span - 1e-6) body.push([rel, k]);
+  }
+  body.sort((a, b) => a[0] - b[0]);
+  for (const [, k] of body) out.push(pts[k]);
   return linePath(out);
 }
 
