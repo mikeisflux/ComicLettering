@@ -1,55 +1,80 @@
 # ComicLettering Studio
 
-A **web-based comic lettering app** that runs entirely in your browser. There is no
-server and nothing is ever uploaded — all layout, lettering, image handling and
-export happen locally, using your own computer's resources.
+A modern, crash-proof **web-based comic lettering studio** in the spirit of the
+classic desktop comic apps — rebuilt from scratch on the latest stack:
 
-**To use it:** open `index.html` in any modern browser (Chrome, Edge, Firefox),
-or host the repository with GitHub Pages (Settings → Pages → deploy from branch,
-root folder) and visit the published URL.
+- **Next.js 15** (App Router) + **React 19** + TypeScript
+- **SQL project library** via **Prisma ORM** — SQLite by default (zero config),
+  switchable to PostgreSQL with one connection string
+- All page editing, image handling and PNG rendering run **in the browser on
+  the user's own computer** — artwork is never uploaded anywhere; the SQL
+  database only stores projects you explicitly save to the Library.
+
+## Running it
+
+```bash
+npm install        # installs deps + generates the Prisma client
+npm run db:push    # creates the SQLite database (prisma/dev.db)
+npm run dev        # http://localhost:3000
+```
+
+Production: `npm run build && npm start`.
+
+To use PostgreSQL instead of SQLite: set `DATABASE_URL` in `.env` and change
+`provider = "postgresql"` in `prisma/schema.prisma`, then `npm run db:push`.
 
 ## Features
 
-- **Pages** — multi-page documents, page thumbnails sidebar, page size presets
-  (US comic, manga B5, A4, square, web strip) or custom pixel sizes, page background color.
-- **Panel layouts** — one-click classic layouts (1, 2, 3, 4, 6, 9 panels and more)
-  with margins and gutters, plus free-form panels you can drag, resize and restyle.
-- **Balloons** — speech, thought (bumpy cloud + trailing bubbles), shout/burst,
-  whisper (dashed), and caption boxes. Every balloon has a draggable tail handle
-  (the orange dot) to aim it at a speaker.
-- **Lettering** — double-click to type; comic-style font choices, size, bold /
-  italic / ALL-CAPS, alignment, text color. SFX display lettering with thick
-  outlines for sound effects ("POW!").
-- **Artwork** — drag image files straight onto the page, or drop them into panels
-  (double-click a panel to choose its image). Photo filters: black & white, sepia,
-  vivid, faded, noir.
-- **Editing** — move / resize / rotate handles, z-order (front/back), duplicate,
-  arrow-key nudging, full undo/redo (Ctrl+Z / Ctrl+Y).
-- **Saving** — projects save to a local `.json` file (images embedded) and reopen
-  later; the app also autosaves to your browser between visits.
-- **Export** — one-click PNG export of each page at full print resolution.
+**Pages & layouts**
+- Multi-page documents, live page thumbnails, size presets (US comic, manga B5,
+  A4, square, web strip) or custom sizes, rulers, zoom control.
+- A full panel-layout library organized by style — Basic, Strips, 40's / 60's /
+  80's Comic, Modern, Euro Comic, Manga, Graphic Novel, Picture-in-Picture and
+  Conceptual (including tilted-panel layouts).
 
-## Keyboard shortcuts
+**Balloons** — every classic type, as crisp vector shapes with draggable tails:
+speech, rough (hand-drawn), buzz, radio (double outline), thought, exclaim,
+dense exclaim, whisper (dashed), square, TV (zigzag tail), pill, rounded box
+and caption.
 
-| Keys | Action |
-| --- | --- |
-| Double-click | Edit balloon/SFX text · choose panel image |
-| Ctrl/Cmd+Z · Ctrl/Cmd+Y | Undo · Redo |
-| Ctrl/Cmd+D | Duplicate selection |
-| Ctrl/Cmd+S | Save project file |
-| Delete / Backspace | Remove selection |
-| Arrow keys (+Shift) | Nudge (faster) |
-| Shift while rotating | Snap to 15° |
-| Esc | Finish typing / deselect |
+**Lettering**
+- A STYLES panel of one-click "ABC" lettering presets — gradient fills, heavy
+  outlines and drop shadows (Sunburst, Chrome, Gold, Toxic, Blood, Ice, …).
+- 19 fonts: 15 bundled open-licensed (OFL) comic/display faces — Comic Neue,
+  Patrick Hand, Kalam, Bangers, Luckiest Guy, Boogaloo, Chewy, Alfa Slab One,
+  Bungee, Creepster, Nosifer, Audiowide, Permanent Marker, Courier Prime,
+  League Gothic — plus system stacks. Self-hosted; nothing loads from CDNs.
+- Full text control: size, bold/italic/ALL CAPS, alignment, solid or gradient
+  fill, outline color/width, shadow. SFX display lettering included.
 
-## About the files in this repository
+**Fills** — for page backgrounds, panels and balloons; all generated
+procedurally so they stay sharp at any size:
+- Solid colors and **gradients** (with a preset swatch library)
+- **Halftone** dot fades (fine/medium/coarse; fade up/down/left/right, uniform, centered)
+- **Tile patterns**: checks, dots, inverted dots, hex dots, hollow dots, small
+  dots, diagonal/horizontal/vertical line screens, crosshatch, zigzag, noise screen
+- **Speedlines**: radial burst (2 densities), ring, corner, motion lines, faded motion
+- **Textures**: speckle, grit, static, murk, daubs, stone
 
-`Comic Life 3.zip` / `.z01`–`.z03` contain a copy of plasq's **Comic Life 3**, a
-commercial desktop application. That program is closed-source, so it cannot be
-"converted" to run in a browser, and its code, artwork, templates and fonts are
-plasq's licensed property — none of them are used here. **ComicLettering Studio
-is an original, independent implementation** (plain HTML/CSS/JavaScript, no
-dependencies) that provides comparable comic-lettering functionality on the web.
+**Artwork** — drag photos onto the page or double-click a panel to fill it;
+imported photos live in the Photos tab for reuse; photo filters (B&W, sepia,
+vivid, faded, noir); move/resize/rotate handles, z-order, duplicate, shadows.
 
-> ⚠️ Note: because Comic Life 3 is commercial software, you may want to remove
-> those zip archives from this public repository.
+**Saving & export**
+- **Library (SQL)**: save/load/delete named projects with thumbnails.
+- Autosave to the browser between visits; JSON file export/import.
+- One-click full-resolution **PNG export** per page.
+- Undo/redo (Ctrl+Z / Ctrl+Y), Ctrl+D duplicate, Ctrl+S save, arrow-key nudge.
+
+## About the other files in this repository
+
+`Comic Life 3.zip` / `.z01`–`.z03` contain a copy of plasq's **Comic Life 3**,
+a commercial desktop application. It is closed-source and cannot be "converted"
+to the web; its code, fonts, artwork and resources are plasq's licensed
+property and **none of them are used here**. ComicLettering Studio is an
+original, independent implementation of a comparable comic-lettering workflow;
+its bundled fonts are OFL-licensed (see `public/fonts/LICENSE.txt`) and all
+fills/patterns are generated procedurally.
+
+> ⚠️ Because Comic Life 3 is commercial software, consider removing those zip
+> archives from this public repository.

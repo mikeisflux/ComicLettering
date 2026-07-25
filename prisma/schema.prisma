@@ -1,0 +1,21 @@
+// ComicLettering Studio — SQL schema (Prisma ORM).
+// Default provider is SQLite for zero-config local use; switch to
+// "postgresql" (and DATABASE_URL in .env) for a hosted SQL database.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Project {
+  id        String   @id @default(cuid())
+  name      String
+  data      String   // full document JSON (pages, elements, embedded images)
+  thumbnail String?  // small JPEG data-URL preview of page 1
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

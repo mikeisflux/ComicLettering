@@ -1,0 +1,27 @@
+{
+  "name": "comiclettering-studio",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Browser-based comic lettering studio — Next.js + React + Prisma/SQL",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "postinstall": "prisma generate",
+    "db:push": "prisma db push",
+    "setup": "prisma generate && prisma db push"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.5.0",
+    "next": "^15.3.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "prisma": "^6.5.0",
+    "typescript": "^5.8.0"
+  }
+}

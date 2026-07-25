@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <ellipse cx="16" cy="13" rx="14" ry="10" fill="#ffffff" stroke="#22262c" stroke-width="2.5"/>
+  <path d="M11 21 L7 29 L18 22 Z" fill="#ffffff" stroke="#22262c" stroke-width="2.5" stroke-linejoin="round"/>
+  <text x="16" y="17" text-anchor="middle" font-family="Impact, Arial Black, sans-serif" font-size="11" fill="#f0812c">ABC</text>
+</svg>

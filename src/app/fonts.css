@@ -1,0 +1,44 @@
+/* Bundled open-licensed (OFL) fonts — self-hosted, no runtime fetches. */
+@font-face{font-family:'Comic Neue';font-style:italic;font-weight:400;font-display:swap;src:url(/fonts/ComicNeue-400i.woff2) format('woff2');}
+@font-face{font-family:'Comic Neue';font-style:italic;font-weight:700;font-display:swap;src:url(/fonts/ComicNeue-700i.woff2) format('woff2');}
+@font-face{font-family:'Comic Neue';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/ComicNeue-400.woff2) format('woff2');}
+@font-face{font-family:'Comic Neue';font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/ComicNeue-700.woff2) format('woff2');}
+@font-face{font-family:'Patrick Hand';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/PatrickHand-400.woff2) format('woff2');}
+@font-face{font-family:'Patrick Hand';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/PatrickHand-400.woff2) format('woff2');}
+@font-face{font-family:'Patrick Hand';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/PatrickHand-400.woff2) format('woff2');}
+@font-face{font-family:'Kalam';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/Kalam-400.woff2) format('woff2');}
+@font-face{font-family:'Kalam';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/Kalam-400.woff2) format('woff2');}
+@font-face{font-family:'Kalam';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/Kalam-400.woff2) format('woff2');}
+@font-face{font-family:'Kalam';font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/Kalam-700.woff2) format('woff2');}
+@font-face{font-family:'Kalam';font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/Kalam-700.woff2) format('woff2');}
+@font-face{font-family:'Kalam';font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/Kalam-700.woff2) format('woff2');}
+@font-face{font-family:'Bangers';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/Bangers-400.woff2) format('woff2');}
+@font-face{font-family:'Bangers';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/Bangers-400.woff2) format('woff2');}
+@font-face{font-family:'Bangers';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/Bangers-400.woff2) format('woff2');}
+@font-face{font-family:'Luckiest Guy';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/LuckiestGuy-400.woff2) format('woff2');}
+@font-face{font-family:'Luckiest Guy';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/LuckiestGuy-400.woff2) format('woff2');}
+@font-face{font-family:'Boogaloo';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/Boogaloo-400.woff2) format('woff2');}
+@font-face{font-family:'Chewy';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/Chewy-400.woff2) format('woff2');}
+@font-face{font-family:'Alfa Slab One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/AlfaSlabOne-400.woff2) format('woff2');}
+@font-face{font-family:'Alfa Slab One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/AlfaSlabOne-400.woff2) format('woff2');}
+@font-face{font-family:'Alfa Slab One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/AlfaSlabOne-400.woff2) format('woff2');}
+@font-face{font-family:'Bungee';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/Bungee-400.woff2) format('woff2');}
+@font-face{font-family:'Bungee';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/Bungee-400.woff2) format('woff2');}
+@font-face{font-family:'Bungee';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/Bungee-400.woff2) format('woff2');}
+@font-face{font-family:'Creepster';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/Creepster-400.woff2) format('woff2');}
+@font-face{font-family:'Nosifer';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/Nosifer-400.woff2) format('woff2');}
+@font-face{font-family:'Nosifer';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/Nosifer-400.woff2) format('woff2');}
+@font-face{font-family:'Audiowide';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/Audiowide-400.woff2) format('woff2');}
+@font-face{font-family:'Audiowide';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/Audiowide-400.woff2) format('woff2');}
+@font-face{font-family:'Permanent Marker';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/PermanentMarker-400.woff2) format('woff2');}
+@font-face{font-family:'Courier Prime';font-style:italic;font-weight:400;font-display:swap;src:url(/fonts/CourierPrime-400i.woff2) format('woff2');}
+@font-face{font-family:'Courier Prime';font-style:italic;font-weight:400;font-display:swap;src:url(/fonts/CourierPrime-400i.woff2) format('woff2');}
+@font-face{font-family:'Courier Prime';font-style:italic;font-weight:700;font-display:swap;src:url(/fonts/CourierPrime-700i.woff2) format('woff2');}
+@font-face{font-family:'Courier Prime';font-style:italic;font-weight:700;font-display:swap;src:url(/fonts/CourierPrime-700i.woff2) format('woff2');}
+@font-face{font-family:'Courier Prime';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/CourierPrime-400.woff2) format('woff2');}
+@font-face{font-family:'Courier Prime';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/CourierPrime-400.woff2) format('woff2');}
+@font-face{font-family:'Courier Prime';font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/CourierPrime-700.woff2) format('woff2');}
+@font-face{font-family:'Courier Prime';font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/CourierPrime-700.woff2) format('woff2');}
+@font-face{font-family:'League Gothic';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/LeagueGothic-400.woff2) format('woff2');}
+@font-face{font-family:'League Gothic';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/LeagueGothic-400.woff2) format('woff2');}
+@font-face{font-family:'League Gothic';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/LeagueGothic-400.woff2) format('woff2');}
