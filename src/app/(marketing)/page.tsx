@@ -41,8 +41,8 @@ const jsonLd = {
 };
 
 const FEATURES = [
-  { e: "💬", t: "13 word balloon types", d: "Speech, thought, whisper, shout, buzz, radio, TV, rough and more — every balloon has a draggable tail you aim at the speaker." },
-  { e: "🅰️", t: "One-click lettering styles", d: "28 pro SFX presets with gradient fills, chunky outlines and drop shadows, plus 19 comic fonts built in." },
+  { e: "💬", t: "19 word balloon types", d: "Speech, thought, whisper, shout, radio, TV, rough, dotted and more — every balloon has a draggable tail you aim at the speaker, or draw your own by hand." },
+  { e: "🅰️", t: "One-click lettering styles", d: "56 pro SFX presets with gradient fills, outlines and drop shadows, plus 150+ built-in comic fonts — including original typefaces you won't find anywhere else." },
   { e: "🗒️", t: "60+ panel layouts", d: "Golden-age grids to modern widescreen, manga, Euro album and tilted action layouts — applied in one click." },
   { e: "🎯", t: "Halftones & speedlines", d: "Classic print halftones, motion lines, bursts, tile screens and textures — generated sharp at any size." },
   { e: "🖼️", t: "Your art, your pages", d: "Drop artwork straight onto panels, apply photo filters, and letter over it. Nothing is ever uploaded." },
@@ -67,6 +67,37 @@ export default function Home() {
           <Link className="btnBig secondary" href="/features">See the Features</Link>
         </div>
         <p className="heroNote">$20/month or $160/year · cancel anytime · works on any computer</p>
+      </section>
+
+      <section className="mktSection showcase" id="see-it">
+        <h2>See It In Action</h2>
+        <p className="sub">
+          A real page lettered entirely in the browser — pro balloons, joined bubbles,
+          SFX lettering styles and print halftones, over your own artwork.
+        </p>
+        <figure className="shotHero">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/shots/studio.png" width={1600} height={1000}
+            alt="The LetterMyComic studio: a comic cover with speech balloons, a BOOM! sound effect and halftones, with the full editor toolbar, lettering-style swatches and balloon tray." />
+          <figcaption>The full studio — toolbar, one-click lettering styles, balloon tray and layouts, all in your browser.</figcaption>
+        </figure>
+        <div className="shotRow">
+          <figure>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/shots/page.png" width={492} height={738}
+              alt="A finished comic cover page with joined speech balloons, a styled BOOM! sound effect and a red halftone gradient." />
+            <figcaption>Finished pages export print-ready at up to 450 DPI.</figcaption>
+          </figure>
+          <figure>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/shots/fonts.png" width={250} height={480}
+              alt="The font menu showing comic lettering fonts, each previewed in its own typeface." />
+            <figcaption>150+ comic fonts with live previews — plus upload your own.</figcaption>
+          </figure>
+        </div>
+        <div className="heroBtns">
+          <Link className="btnBig primary" href="/signup">Try It Yourself</Link>
+        </div>
       </section>
 
       <section className="mktSection" id="features">

@@ -4,7 +4,7 @@ under their original license terms. Sources: Google Fonts
 
 The LMC families (LMC*-*.woff2: Dialogue, Agent, Hero, Alley, Whisper,
 Shout, Brawl, Slasher, Horror, Cosmos, Sneeze, Mumble, Dragon, Alien,
-Vapor) are ORIGINAL typefaces created for
+Vapor, Casual) are ORIGINAL typefaces created for
 LetterMyComic (generator source: scripts/mkfont.py in this repository).
 They are not derived from any existing font's outlines. Released under
 the SIL Open Font License 1.1.

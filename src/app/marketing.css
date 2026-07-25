@@ -83,6 +83,27 @@
 .featCard p { margin: 0; color: var(--mute); font-size: 14.5px; }
 .featCard .emoji { font-size: 28px; display: block; margin-bottom: 10px; }
 
+/* screenshot showcase */
+.showcase { text-align: center; }
+.showcase .sub { margin-left: auto; margin-right: auto; }
+.showcase figure { margin: 0; }
+.showcase figcaption { color: var(--mute); font-size: 13.5px; margin-top: 10px; }
+.shotHero img {
+  width: 100%; height: auto; display: block; border-radius: 12px;
+  border: 2px solid var(--ink); box-shadow: 10px 10px 0 #d8dde4;
+}
+.shotRow {
+  display: grid; grid-template-columns: 2fr 1fr; gap: 26px;
+  align-items: start; margin-top: 40px; text-align: left;
+}
+.shotRow img {
+  width: 100%; height: auto; display: block; border-radius: 10px;
+  border: 2px solid var(--ink); box-shadow: 6px 6px 0 #d8dde4; background: #fff;
+}
+.shotRow figure:last-child img { max-width: 260px; }
+.showcase .heroBtns { justify-content: center; margin-top: 34px; }
+@media (max-width: 720px) { .shotRow { grid-template-columns: 1fr; } }
+
 /* pricing */
 .priceGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 26px; max-width: 720px; margin: 0 auto; }
 .priceCard {

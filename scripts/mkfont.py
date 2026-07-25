@@ -106,6 +106,40 @@ GLYPHS = {
     "space":    (280, []),
 }
 
+# lowercase set for mixed-case families (x-height 480, desc to -190)
+LOWER_GLYPHS = {
+    "a": (430, [ringpts(205, 240, 160, 225, 24), L((365, 455), (365, 0))]),
+    "b": (440, [L((70, 700), (70, 0)), ringpts(245, 240, 160, 225, 24)]),
+    "c": (400, [arc(225, 240, 160, 225, 55, 305)]),
+    "d": (440, [L((375, 700), (375, 0)), ringpts(205, 240, 160, 225, 24)]),
+    "e": (420, [arc(212, 240, 160, 225, 35, 330), L((62, 290), (355, 290))]),
+    "f": (300, [chain(arc(215, 585, 110, 115, 90, 180), L((105, 585), (105, 0))), L((30, 460), (245, 460))]),
+    "g": (440, [ringpts(205, 255, 160, 205, 24),
+                chain(L((365, 460), (365, -70)), arc(230, -70, 135, 120, 0, -180, 10))]),
+    "h": (440, [L((70, 700), (70, 0)), arc(225, 262, 155, 218, 180, 0), L((380, 262), (380, 0))]),
+    "i": (170, [L((85, 480), (85, 0)), L((85, 622), (85, 626))]),
+    "j": (270, [chain(L((180, 480), (180, -80)), arc(70, -80, 110, 110, 0, -140, 10)), L((180, 622), (180, 626))]),
+    "k": (400, [L((70, 700), (70, 0)), L((330, 470), (75, 205)), L((160, 290), (345, 0))]),
+    "l": (180, [L((90, 700), (90, 0))]),
+    "m": (620, [L((65, 480), (65, 0)), arc(175, 272, 110, 208, 180, 0), L((285, 272), (285, 0)),
+                arc(395, 272, 110, 208, 180, 0), L((505, 272), (505, 0))]),
+    "n": (440, [L((70, 480), (70, 0)), arc(225, 265, 155, 215, 180, 0), L((380, 265), (380, 0))]),
+    "o": (440, [ringpts(220, 240, 165, 230, 24)]),
+    "p": (440, [L((70, 480), (70, -190)), ringpts(245, 240, 160, 225, 24)]),
+    "q": (440, [ringpts(205, 240, 160, 225, 24), L((365, 480), (365, -190))]),
+    "r": (330, [L((70, 480), (70, 0)), arc(195, 292, 125, 185, 180, 20, 12)]),
+    "s": (380, [chain(quad((330, 430), (240, 530), (140, 445)), quad((140, 445), (45, 360), (165, 285)),
+                      quad((165, 285), (320, 215), (315, 120)), quad((315, 120), (300, 15), (160, 32)),
+                      quad((160, 32), (60, 42), (48, 108)))]),
+    "t": (320, [L((140, 660), (140, 0)), L((40, 470), (260, 470))]),
+    "u": (440, [chain(L((70, 480), (70, 145)), arc(225, 145, 155, 145, 180, 360), L((380, 145), (380, 480)))]),
+    "v": (420, [L((45, 480), (210, 0)), L((210, 0), (375, 480))]),
+    "w": (600, [L((40, 480), (155, 0)), L((155, 0), (295, 400)), L((295, 400), (435, 0)), L((435, 0), (550, 480))]),
+    "x": (420, [L((50, 480), (370, 0)), L((370, 480), (50, 0))]),
+    "y": (430, [L((55, 480), (215, 60)), L((375, 480), (120, -190))]),
+    "z": (400, [L((55, 480), (345, 480)), L((345, 480), (55, 0)), L((55, 0), (345, 0))]),
+}
+
 CMAP_EXTRA = {
     "zero":"0","one":"1","two":"2","three":"3","four":"4","five":"5","six":"6",
     "seven":"7","eight":"8","nine":"9","period":".","comma":",","exclam":"!",
@@ -291,23 +325,30 @@ def build_glyph(name, strokes, r, amp, freq, shear, narrow, bounce, drips, cap="
     union(paths, out.getPen())
     return out
 
-def make_font(family, style, r, amp, freq, shear, narrow, bounce, drips, out_ttf, cap="round", decim=0):
-    names = [".notdef"] + list(GLYPHS.keys())
+def make_font(family, style, r, amp, freq, shear, narrow, bounce, drips, out_ttf, cap="round", decim=0, mixed=False):
+    glyph_src = dict(GLYPHS)
+    if mixed:
+        glyph_src.update(LOWER_GLYPHS)
+    names = [".notdef"] + list(glyph_src.keys())
     fb = FontBuilder(UPM, isTTF=True)
     fb.setupGlyphOrder(names)
     cmap = {}
     for g in GLYPHS:
         if len(g) == 1 and g.isalpha():
             cmap[ord(g)] = g
-            cmap[ord(g.lower())] = g
+            if not mixed:
+                cmap[ord(g.lower())] = g
         elif g in CMAP_EXTRA:
             cmap[ord(CMAP_EXTRA[g])] = g
+    if mixed:
+        for g in LOWER_GLYPHS:
+            cmap[ord(g)] = g
     fb.setupCharacterMap(cmap)
     glyphs, adv = {}, {}
     pen = TTGlyphPen(None)
     glyphs[".notdef"] = pen.glyph()
     adv[".notdef"] = 600
-    for name, (w, strokes) in GLYPHS.items():
+    for name, (w, strokes) in glyph_src.items():
         if drips == "scribble" and name != "space":
             strokes = scribble_strokes(name, w)
         elif drips == "alien" and name != "space":
@@ -317,7 +358,8 @@ def make_font(family, style, r, amp, freq, shear, narrow, bounce, drips, out_ttf
         if path is not None:
             path.draw(pen)
         glyphs[name] = pen.glyph()
-        adv[name] = int(w * narrow + 60 + (CAP * shear if shear else 0))
+        letter_h = CAP if name in GLYPHS else 480
+        adv[name] = int(w * narrow + 60 + (letter_h * shear if shear else 0))
     fb.setupGlyf(glyphs)
     hmtx = {}
     for name in names:
@@ -369,18 +411,22 @@ FAMILIES = {
     "LMC Dragon":   (58, 76, 6.0, 1.1, 4, 0.98, 10, "taper", "round", 0),
     "LMC Alien":    (42, 58, 3.0, 1.0, 0, 1.00, 12, "alien", "round", 0),
     "LMC Vapor":    (32, 44, 4.0, 1.0, 0, 1.00, 8, "bubbles", "round", 0),
+    # mixed-case casual dialogue hand — full lowercase set
+    "LMC Casual":   (40, 56, 4.0, 1.0, 0, 1.00, 4, "", "round", 0, True),
 }
 
 def main(outdir):
     os.makedirs(outdir, exist_ok=True)
-    for family, (r, rb, amp, freq, lean, narrow, bounce, drips, cap, decim) in FAMILIES.items():
+    for family, cfg in FAMILIES.items():
+        (r, rb, amp, freq, lean, narrow, bounce, drips, cap, decim) = cfg[:10]
+        mixed = cfg[10] if len(cfg) > 10 else False
         base = family.replace(" ", "")
         lean_sh = math.tan(math.radians(lean))
         ital_sh = math.tan(math.radians(9 + lean))
         for style, rr, sh in [("Regular", r, lean_sh), ("Bold", rb, lean_sh),
                               ("Italic", r, ital_sh), ("Bold Italic", rb, ital_sh)]:
             fn = os.path.join(outdir, f"{base}-{style.replace(' ', '')}.ttf")
-            make_font(family, style, rr, amp, freq, sh, narrow, bounce, drips, fn, cap, decim)
+            make_font(family, style, rr, amp, freq, sh, narrow, bounce, drips, fn, cap, decim, mixed)
 
 if __name__ == "__main__":
     main(sys.argv[1] if len(sys.argv) > 1 else ".")

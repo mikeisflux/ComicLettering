@@ -440,6 +440,10 @@ input[type="range"] { width: 110px; }
 @font-face { font-family: "LMC Vapor"; font-style: normal; font-weight: 700; font-display: swap; src: url(/fonts/LMCVapor-Bold.woff2) format("woff2"); }
 @font-face { font-family: "LMC Vapor"; font-style: italic; font-weight: 400; font-display: swap; src: url(/fonts/LMCVapor-Italic.woff2) format("woff2"); }
 @font-face { font-family: "LMC Vapor"; font-style: italic; font-weight: 700; font-display: swap; src: url(/fonts/LMCVapor-BoldItalic.woff2) format("woff2"); }
+@font-face { font-family: "LMC Casual"; font-style: normal; font-weight: 400; font-display: swap; src: url(/fonts/LMCCasual-Regular.woff2) format("woff2"); }
+@font-face { font-family: "LMC Casual"; font-style: normal; font-weight: 700; font-display: swap; src: url(/fonts/LMCCasual-Bold.woff2) format("woff2"); }
+@font-face { font-family: "LMC Casual"; font-style: italic; font-weight: 400; font-display: swap; src: url(/fonts/LMCCasual-Italic.woff2) format("woff2"); }
+@font-face { font-family: "LMC Casual"; font-style: italic; font-weight: 700; font-display: swap; src: url(/fonts/LMCCasual-BoldItalic.woff2) format("woff2"); }
 
 /* connector tilt axis satellites */
 .handle.tiltDot {
