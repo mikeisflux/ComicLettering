@@ -133,6 +133,7 @@ input[type="range"] { width: 110px; }
   padding: 4px 0; overflow: hidden;
 }
 .styleBtn:hover { border-color: var(--sel); background: #ffffff70; }
+.styleBtn.on { border-color: var(--sel); background: #fff; box-shadow: 0 0 0 1px var(--sel); }
 .styleBtn span { display: block; pointer-events: none; }
 
 /* ---------------- canvas area ---------------- */

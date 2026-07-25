@@ -331,6 +331,21 @@ export default function Editor() {
   const [exportFrom, setExportFrom] = useState(1);
   const [exportTo, setExportTo] = useState(1);
   const [stampOpen, setStampOpen] = useState(false);
+  /* active lettering style — like Comic Life, styles are not objects: they
+     restyle the selection and set the style used by new lettering */
+  const [activeStyle, setActiveStyleState] = useState("Sunburst");
+  const activeStyleRef = useRef("Sunburst");
+  useEffect(() => {
+    try {
+      const s = localStorage.getItem("lmc.style");
+      if (s && LETTER_STYLES.some((x) => x.name === s)) { activeStyleRef.current = s; setActiveStyleState(s); }
+    } catch { /* ignore */ }
+  }, []);
+  const setActiveStyle = (name: string) => {
+    activeStyleRef.current = name;
+    setActiveStyleState(name);
+    try { localStorage.setItem("lmc.style", name); } catch { /* ignore */ }
+  };
   const [proof, setProof] = useState<{ busy: boolean; error: string | null; matches: ProofMatch[] } | null>(null);
 
   useEffect(() => {
@@ -850,6 +865,12 @@ export default function Editor() {
       const w = Math.round(p.w * 0.4), h = Math.round(p.w * (kind === "sfx" ? 0.18 : 0.12));
       const s = spawn(w, h);
       el = makeText(s.x, s.y, w, h, kind === "sfx");
+      if (kind === "sfx") {
+        /* new lettering uses the active style from the STYLES panel */
+        const st = LETTER_STYLES.find((x) => x.name === activeStyleRef.current) || LETTER_STYLES[0];
+        el.ts = applyLetterStyle(el.ts, st);
+        el.ts.outlineW = Math.round(el.ts.size * st.outlineF);
+      }
     } else {
       const caption = TAILLESS_KINDS.includes(kind as BalloonKind);
       const w = Math.round(p.w * (caption ? 0.36 : 0.34));
@@ -1921,20 +1942,17 @@ export default function Editor() {
           <div className="sideTitle">Styles</div>
           <div className="stylesGrid">
             {LETTER_STYLES.map((s) => (
-              <button key={s.name} className="styleBtn" title={s.name}
+              <button key={s.name} className={"styleBtn" + (activeStyle === s.name ? " on" : "")} title={s.name}
                 onClick={() => {
+                  setActiveStyle(s.name);
                   if (selEl && (selEl.type === "text" || selEl.type === "balloon")) {
-                    mutateSel<BalloonEl | TextEl>((x) => { x.ts = applyLetterStyle(x.ts, s); });
+                    if (selEl.locked) { setStatus("That item is locked — unlock it to restyle."); return; }
+                    mutateSel<BalloonEl | TextEl>((x) => {
+                      x.ts = applyLetterStyle(x.ts, s);
+                      x.ts.outlineW = Math.round(x.ts.size * s.outlineF);
+                    });
                   } else {
-                    const p = page;
-                    const w = Math.round(p.w * 0.44), h = Math.round(p.w * 0.18);
-                    const el = makeText(Math.round(p.w / 2 - w / 2), Math.round(p.h * 0.35), w, h, true);
-                    el.ts = applyLetterStyle(el.ts, s);
-                    el.ts.size = 140;
-                    el.ts.outlineW = Math.round(140 * s.outlineF);
-                    p.els.push(el);
-                    commit();
-                    setSelId(el.id);
+                    setStatus(`Style “${s.name}” selected — new lettering will use it.`);
                   }
                 }}>
                 <span style={letterStyleCss(s, 21)}>ABC</span>
