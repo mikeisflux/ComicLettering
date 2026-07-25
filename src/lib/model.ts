@@ -163,6 +163,9 @@ export interface BalloonEl extends BaseEl {
   /* hand-drawn outline for kind "custom": closed polygon, points normalised
      to the element box (0..1) */
   pts?: [number, number][];
+  /* how a custom balloon's tail renders: spliced speech taper (default) or
+     a thought-bubble trail */
+  tailStyle?: "speech" | "thought";
 }
 
 /* Resolve a balloon's effective tail: attached balloons aim at their partner. */

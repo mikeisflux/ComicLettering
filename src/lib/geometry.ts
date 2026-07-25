@@ -218,11 +218,30 @@ export function balloonGeom(el: BalloonEl): BalloonGeom {
       const x0 = Math.min(...xs), x1 = Math.max(...xs);
       const y0 = Math.min(...ys), y1 = Math.max(...ys);
       const iw = Math.max(1, x1 - x0), ih = Math.max(1, y1 - y0);
-      return {
-        d: polygonWithTail(pts, w, h, tail),
-        textRect: [x0 + iw * 0.18, y0 + ih * 0.18, iw * 0.64, ih * 0.64],
-        dash: null,
-      };
+      const textRect: [number, number, number, number] =
+        [x0 + iw * 0.18, y0 + ih * 0.18, iw * 0.64, ih * 0.64];
+      if (tail && el.tailStyle === "thought") {
+        /* thought-bubble trail: shrinking circles from the body edge to the tip */
+        const tipX = cx + tail.dx, tipY = cy + tail.dy;
+        const len = Math.hypot(tipX - cx, tipY - cy);
+        let d = linePath(pts);
+        if (len > 8) {
+          const dirX = (tipX - cx) / len, dirY = (tipY - cy) / len;
+          let edge = 0;
+          for (const p of pts) {
+            const proj = (p[0] - cx) * dirX + (p[1] - cy) * dirY;
+            if (proj > edge) edge = proj;
+          }
+          const r0 = Math.min(w, h) * 0.085;
+          for (let k = 0; k < 3; k++) {
+            const t = edge + (len - edge) * ((k + 0.6) / 3.2);
+            if (t <= edge * 0.9) continue;
+            d += circleSub(cx + dirX * t, cy + dirY * t, Math.max(2, r0 * (1 - k * 0.32)));
+          }
+        }
+        return { d, textRect, dash: null };
+      }
+      return { d: polygonWithTail(pts, w, h, tail), textRect, dash: null };
     }
     case "tv":
       return {
