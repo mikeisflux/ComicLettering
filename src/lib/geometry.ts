@@ -123,9 +123,13 @@ function ellipseTailPath(
   if (mode !== "smooth") return jitterRing(el, mode, tail);
 
   const tip = [cx + tail.dx, cy + tail.dy];
-  const t = Math.atan2(tail.dy, tail.dx);
+  /* the bend lever steers where the tail exits the balloon — dragging it
+     walks the tail base all the way around the perimeter */
+  const t = tail.bx != null && tail.by != null
+    ? Math.atan2(tail.by, tail.bx)
+    : Math.atan2(tail.dy, tail.dx);
   /* slim, elegant tail: narrow base that tapers to a point */
-  const delta = 0.22;
+  const delta = 0.11;
   const A = ellipsePt(cx, cy, rx, ry, t + delta);
   const B = ellipsePt(cx, cy, rx, ry, t - delta);
   const E = ellipsePt(cx, cy, rx, ry, t);
@@ -152,7 +156,7 @@ function jitterRing(
 ): string {
   const w = el.w, h = el.h, cx = w / 2, cy = h / 2, rx = w / 2, ry = h / 2;
   const t = tail ? Math.atan2(tail.dy, tail.dx) : 0;
-  const delta = tail ? 0.2 : 0;
+  const delta = tail ? 0.1 : 0;
   const K = mode === "buzz" ? 40 : 20;
   const rnd = prng(mode === "buzz" ? 77 : 13);
   const span = Math.PI * 2 - delta * 2;
@@ -238,7 +242,9 @@ export function balloonGeom(el: BalloonEl): BalloonGeom {
       }
       d += " Z";
       if (tip && tail) {
-        const t = Math.atan2(tail.dy, tail.dx);
+        const t = tail.bx != null && tail.by != null
+          ? Math.atan2(tail.by, tail.bx)
+          : Math.atan2(tail.dy, tail.dx);
         const E = ellipsePt(cx, cy, rx, ry, t);
         const base = Math.min(w, h);
         const M = tail.bx != null && tail.by != null ? [cx + tail.bx, cy + tail.by] : null;

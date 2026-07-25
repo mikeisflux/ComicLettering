@@ -709,22 +709,11 @@ export default function Editor() {
         const [ldx, ldy] = rotVec(pt.x - cx, pt.y - cy, -orig.rot);
         const oldTail = (orig as BalloonEl).tail;
         const next: NonNullable<BalloonEl["tail"]> = { dx: Math.round(ldx), dy: Math.round(ldy) };
-        /* keep the bend proportional when the tip moves */
+        /* the bend lever owns the tail's exit point — keep it planted while
+           the tip moves */
         if (oldTail && oldTail.bx != null && oldTail.by != null) {
-          const t0 = Math.atan2(oldTail.dy, oldTail.dx);
-          const e0 = [(orig.w / 2) * Math.cos(t0), (orig.h / 2) * Math.sin(t0)];
-          const a0 = [oldTail.dx - e0[0], oldTail.dy - e0[1]];
-          const len0 = a0[0] * a0[0] + a0[1] * a0[1];
-          if (len0 > 1) {
-            const rel = [oldTail.bx - e0[0], oldTail.by - e0[1]];
-            const u = (rel[0] * a0[0] + rel[1] * a0[1]) / len0;
-            const v = (rel[0] * -a0[1] + rel[1] * a0[0]) / len0;
-            const t1 = Math.atan2(next.dy, next.dx);
-            const e1 = [(orig.w / 2) * Math.cos(t1), (orig.h / 2) * Math.sin(t1)];
-            const a1 = [next.dx - e1[0], next.dy - e1[1]];
-            next.bx = Math.round(e1[0] + u * a1[0] + v * -a1[1]);
-            next.by = Math.round(e1[1] + u * a1[1] + v * a1[0]);
-          }
+          next.bx = oldTail.bx;
+          next.by = oldTail.by;
         }
         cur.tail = next;
       } else if (mode === "bow" && cur.type === "balloon" && cur.tail) {
