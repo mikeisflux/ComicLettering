@@ -151,8 +151,8 @@ input[type="range"] { width: 110px; }
 .rulerH { display: block; }
 .canvasRow { display: flex; align-items: flex-start; }
 .rulerV { display: block; position: sticky; left: 0; z-index: 30; }
-.stage { position: relative; margin: 26px auto 0; flex: 0 0 auto; }
-.canvasRow .stage { margin: 26px 40px 0; }
+.stage { position: relative; flex: 0 0 auto; }
+.canvasRow .stage { margin: 26px 40px 0 40px; }
 .page {
   position: absolute; left: 0; top: 0; overflow: hidden;
   box-shadow: 0 4px 26px #00000066;

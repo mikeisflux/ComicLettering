@@ -419,7 +419,7 @@ export function makeBalloon(kind: BalloonKind, x: number, y: number, w: number, 
   const caption = TAILLESS_KINDS.includes(kind);
   return {
     ...base(x, y, w, h), type: "balloon", kind,
-    text: caption ? "Meanwhile..." : "Your text here",
+    text: caption ? "Meanwhile..." : "Your words here...",
     ts: defaultTextStyle({
       font: caption ? "serif" : kind === "tv" || kind === "double" ? "audiowide" : "comicneue",
       italic: caption, caps: !caption, bold: kind === "shout" || kind === "burst2",
@@ -466,20 +466,23 @@ export function applyLayout(page: Page, fracs: LayoutRect[]) {
   page.els = [...panels, ...page.els.filter((e) => e.type !== "panel")];
 }
 
+/* New documents start as a single blank page — pick a layout or drop art in. */
 export function starterDoc(): Doc {
-  const d = newDoc();
-  const p = d.pages[0];
-  applyLayout(p, LAYOUT_CATEGORIES[0].layouts[6]); // basic 2×2
-  const b = makeBalloon("speech", p.w * 0.14, p.h * 0.09, 560, 330);
-  b.text = "Welcome! Double-click me and start lettering.";
-  const t = makeText(p.w * 0.5, p.h * 0.42, 640, 240, true);
-  const c = makeBalloon("caption", p.w * 0.55, p.h * 0.6, 520, 170);
-  c.text = "Drop your artwork onto the panels...";
-  p.els.push(b, t, c);
-  return d;
+  return newDoc();
 }
 
 export const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
+
+/* Mix a hex color toward white — used for the glossy top highlight on
+   gradient lettering. */
+export function lightenHex(hex: string, amt = 0.5): string {
+  const m = hex.replace("#", "");
+  const v = m.length === 3 ? m.split("").map((c) => c + c).join("") : m.padEnd(6, "0");
+  const n = parseInt(v.slice(0, 6), 16);
+  const mix = (c: number) => Math.round(c + (255 - c) * amt);
+  const r = mix((n >> 16) & 255), g = mix((n >> 8) & 255), b = mix(n & 255);
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`;
+}
 export const deg2rad = (d: number) => (d * Math.PI) / 180;
 export const rotVec = (x: number, y: number, deg: number): [number, number] => {
   const r = deg2rad(deg), c = Math.cos(r), s = Math.sin(r);

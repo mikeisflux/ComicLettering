@@ -124,7 +124,8 @@ function ellipseTailPath(
 
   const tip = [cx + tail.dx, cy + tail.dy];
   const t = Math.atan2(tail.dy, tail.dx);
-  const delta = 0.42;
+  /* slim, elegant tail: narrow base that tapers to a point */
+  const delta = 0.22;
   const A = ellipsePt(cx, cy, rx, ry, t + delta);
   const B = ellipsePt(cx, cy, rx, ry, t - delta);
   const E = ellipsePt(cx, cy, rx, ry, t);
@@ -132,11 +133,12 @@ function ellipseTailPath(
   if (tail.bx != null && tail.by != null) {
     /* user-bent tail: both edges curve through the bend point */
     const M = [cx + tail.bx, cy + tail.by];
-    mB = [M[0] + (B[0] - E[0]) * 0.45, M[1] + (B[1] - E[1]) * 0.45];
-    mA = [M[0] + (A[0] - E[0]) * 0.45, M[1] + (A[1] - E[1]) * 0.45];
+    mB = [M[0] + (B[0] - E[0]) * 0.35, M[1] + (B[1] - E[1]) * 0.35];
+    mA = [M[0] + (A[0] - E[0]) * 0.35, M[1] + (A[1] - E[1]) * 0.35];
   } else {
-    mB = lerpPt(lerpPt(B, tip, 0.45), lerpPt(E, tip, 0.45), 0.55);
-    mA = lerpPt(lerpPt(tip, A, 0.55), lerpPt(tip, E, 0.55), 0.55);
+    /* gentle inward bow so the tail curves like hand-drawn lettering */
+    mB = lerpPt(lerpPt(B, tip, 0.55), lerpPt(E, tip, 0.5), 0.65);
+    mA = lerpPt(lerpPt(tip, A, 0.45), lerpPt(tip, E, 0.5), 0.65);
   }
   return `M ${fmt(A[0])} ${fmt(A[1])}` +
     ` A ${fmt(rx)} ${fmt(ry)} 0 1 1 ${fmt(B[0])} ${fmt(B[1])}` +
@@ -150,23 +152,33 @@ function jitterRing(
 ): string {
   const w = el.w, h = el.h, cx = w / 2, cy = h / 2, rx = w / 2, ry = h / 2;
   const t = tail ? Math.atan2(tail.dy, tail.dx) : 0;
-  const delta = tail ? 0.38 : 0;
-  const K = mode === "buzz" ? 30 : 24;
+  const delta = tail ? 0.2 : 0;
+  const K = mode === "buzz" ? 40 : 20;
   const rnd = prng(mode === "buzz" ? 77 : 13);
   const span = Math.PI * 2 - delta * 2;
   const pts: number[][] = [];
   for (let i = 0; i <= K; i++) {
     const a = t + delta + (i / K) * span;
     let f: number;
-    if (mode === "buzz") f = i % 2 === 0 ? 1 : 0.88;
-    else f = 1 + (rnd() - 0.5) * 0.09;
+    if (mode === "buzz") f = i % 2 === 0 ? 1 : 0.93;
+    else f = 1 + (rnd() - 0.5) * 0.05;
     pts.push(ellipsePt(cx, cy, rx * f, ry * f, a));
   }
-  if (tail) {
-    const tip = [cx + tail.dx, cy + tail.dy];
-    pts.push(tip);
+  const tip = tail ? [cx + tail.dx, cy + tail.dy] : null;
+  if (mode === "buzz") {
+    if (tip) pts.push(tip);
+    return linePath(pts);
   }
-  return linePath(pts);
+  /* rough: smooth hand-drawn line through the jittered points */
+  let d = `M ${fmt(pts[0][0])} ${fmt(pts[0][1])}`;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const mid = lerpPt(pts[i], pts[i + 1], 0.5);
+    d += ` Q ${fmt(pts[i][0])} ${fmt(pts[i][1])} ${fmt(mid[0])} ${fmt(mid[1])}`;
+  }
+  const last = pts[pts.length - 1];
+  d += ` L ${fmt(last[0])} ${fmt(last[1])}`;
+  if (tip) d += ` L ${fmt(tip[0])} ${fmt(tip[1])}`;
+  return d + " Z";
 }
 
 /* ---------------- main entry ---------------- */
@@ -245,10 +257,10 @@ export function balloonGeom(el: BalloonEl): BalloonGeom {
     }
     case "shout": case "burst2": {
       const dense = el.kind === "burst2";
-      const N = dense ? 20 : 12;
-      const innerF = dense ? 0.62 : 0.72;
+      const N = dense ? 18 : 11;
+      const innerF = dense ? 0.68 : 0.74;
       const irx = rx * innerF, iry = ry * innerF;
-      const wob = dense ? [1, 0.95, 1.04, 0.9, 1.02, 0.97] : [1, 0.93, 1.06, 0.97, 1.02, 0.9];
+      const wob = dense ? [1, 0.97] : [1, 0.96, 1.02];
       const tAng = tail ? Math.atan2(tail.dy, tail.dx) : null;
       let tailIdx = -1, best = 1e9;
       const pts: number[][] = [];

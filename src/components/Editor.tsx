@@ -10,8 +10,9 @@ import {
   FONT_GROUPS, FillStyle, GRADIENT_PRESETS, HALFTONE_VARIANTS, LAYOUT_CATEGORIES,
   LayoutRect, PAGE_SIZES, PATTERN_VARIANTS, Page, PanelEl, SPEEDLINE_VARIANTS,
   DPI, PAPER_CATEGORIES, PageMargin, TAILLESS_KINDS, TEXTURE_VARIANTS, TextEl,
-  TextStyle, aabbOverlap, applyLayout, clamp, makeBalloon, makeImage, makePanel,
-  makeText, newPage, reseedIds, resolveBalloon, rotVec, solid, starterDoc, uid,
+  TextStyle, aabbOverlap, applyLayout, clamp, lightenHex, makeBalloon, makeImage,
+  makePanel, makeText, newPage, reseedIds, resolveBalloon, rotVec, solid,
+  starterDoc, uid,
 } from "@/lib/model";
 import { balloonGeom } from "@/lib/geometry";
 import { LETTER_STYLES, LetterStyle, applyLetterStyle } from "@/lib/presets";
@@ -35,7 +36,8 @@ function textCss(ts: TextStyle): CSSProperties {
     lineHeight: 1.25,
   };
   if (ts.fillB) {
-    st.backgroundImage = `linear-gradient(180deg, ${ts.fillA}, ${ts.fillB})`;
+    /* glossy 3-stop gradient: highlight → colour → depth */
+    st.backgroundImage = `linear-gradient(180deg, ${lightenHex(ts.fillA, 0.55)} 0%, ${ts.fillA} 38%, ${ts.fillB} 100%)`;
     st.WebkitBackgroundClip = "text";
     st.backgroundClip = "text";
     st.color = "transparent";
@@ -63,9 +65,11 @@ function letterStyleCss(s: LetterStyle, size: number): CSSProperties {
 
 /* ---------------- rulers ---------------- */
 
-function Ruler({ length, zoom, vertical }: { length: number; zoom: number; vertical: boolean }) {
+function Ruler({ length, zoom, vertical, offset = 0 }: {
+  length: number; zoom: number; vertical: boolean; offset?: number;
+}) {
   const ref = useRef<HTMLCanvasElement>(null);
-  const px = Math.max(1, Math.round(length * zoom));
+  const px = Math.max(1, Math.round(length * zoom)) + offset;
   useEffect(() => {
     const c = ref.current;
     if (!c) return;
@@ -78,16 +82,16 @@ function Ruler({ length, zoom, vertical }: { length: number; zoom: number; verti
     ctx.strokeStyle = "#8a919c";
     ctx.fillStyle = "#4a505a";
     ctx.font = "9px Arial";
-    const inch = 225; // page px per inch
-    const minor = inch / 8;
+    const minor = DPI / 8;
     ctx.beginPath();
+    /* tick 0 sits exactly at the page's corner (offset = stage margin) */
     for (let v = 0; v <= length; v += minor) {
-      const p = v * zoom;
+      const p = offset + v * zoom;
       const idx = Math.round(v / minor);
       const size = idx % 8 === 0 ? T * 0.85 : idx % 4 === 0 ? T * 0.5 : T * 0.3;
       if (vertical) { ctx.moveTo(T, p); ctx.lineTo(T - size, p); }
       else { ctx.moveTo(p, T); ctx.lineTo(p, T - size); }
-      if (idx % 8 === 0 && idx > 0) {
+      if (idx % 8 === 0) {
         const label = String(idx / 8);
         if (vertical) ctx.fillText(label, 2, p + 9);
         else ctx.fillText(label, p + 3, 9);
@@ -96,9 +100,13 @@ function Ruler({ length, zoom, vertical }: { length: number; zoom: number; verti
     ctx.stroke();
     ctx.strokeStyle = "#70767f";
     ctx.strokeRect(0.5, 0.5, c.width - 1, c.height - 1);
-  }, [px, zoom, length, vertical]);
+  }, [px, zoom, length, vertical, offset]);
   return <canvas ref={ref} className={vertical ? "rulerV" : "rulerH"} />;
 }
+
+/* stage offsets inside the canvas area — rulers compensate so 0 = page corner */
+const STAGE_MX = 40;
+const STAGE_MY = 26;
 
 /* ---------------- fill picker ---------------- */
 
@@ -1939,10 +1947,10 @@ export default function Editor() {
           onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>
           <div className="rulerRow">
             <div className="rulerCorner" />
-            <Ruler length={page.w} zoom={zoom} vertical={false} />
+            <Ruler length={page.w} zoom={zoom} vertical={false} offset={STAGE_MX} />
           </div>
           <div className="canvasRow">
-            <Ruler length={page.h} zoom={zoom} vertical />
+            <Ruler length={page.h} zoom={zoom} vertical offset={STAGE_MY} />
             <div className="stage" style={{ width: page.w * zoom, height: page.h * zoom }}>
               <div
                 ref={pageDivRef}

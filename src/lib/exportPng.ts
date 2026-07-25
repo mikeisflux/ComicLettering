@@ -1,7 +1,7 @@
 /* Full-resolution canvas renderer — used for PNG export and page thumbnails. */
 import {
   Assets, BalloonEl, Doc, El, FILTERS, FONTS, Page, TextStyle,
-  aabbOverlap, deg2rad, resolveBalloon, rotVec,
+  aabbOverlap, deg2rad, lightenHex, resolveBalloon, rotVec,
 } from "./model";
 import { balloonGeom } from "./geometry";
 import { paintFill } from "./fills";
@@ -57,7 +57,8 @@ export function drawStyledText(
   let fill: string | CanvasGradient = ts.fillA;
   if (ts.fillB) {
     const g = ctx.createLinearGradient(0, y0 - lineH / 2, 0, y0 - lineH / 2 + blockH);
-    g.addColorStop(0, ts.fillA);
+    g.addColorStop(0, lightenHex(ts.fillA, 0.55));
+    g.addColorStop(0.38, ts.fillA);
     g.addColorStop(1, ts.fillB);
     fill = g;
   }
