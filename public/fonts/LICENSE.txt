@@ -26,7 +26,8 @@ Mystery Quest, Jolly Lodger, Eater, Butcherman, Barrio, Sedgwick Ave,
 Sedgwick Ave Display, Cinzel Decorative, Pirata One, Metamorphous,
 Limelight, Rubik Spray Paint, Almendra, Give You Glory, Rubik Burned,
 Trade Winds, Bahiana, MedievalSharp, Poiret One, Wallpoet, Jost,
-Rubik Beastly, Bungee Outline, Pacifico, Ultra.
+Rubik Beastly, Bungee Outline, Pacifico, Ultra, Rubik Glitch, Rye,
+Kaushan Script.
 Full license text:
 https://openfontlicense.org/open-font-license-official-text/
 
