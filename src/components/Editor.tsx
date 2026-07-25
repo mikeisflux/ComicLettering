@@ -149,8 +149,9 @@ function SubtypeSelect({ ts, disabled, onSet }: {
 
 /* ---------------- rulers ---------------- */
 
-function Ruler({ length, zoom, vertical, offset = 0 }: {
+function Ruler({ length, zoom, vertical, offset = 0, hi }: {
   length: number; zoom: number; vertical: boolean; offset?: number;
+  hi?: [number, number] | null;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const px = Math.max(1, Math.round(length * zoom)) + offset;
@@ -182,9 +183,20 @@ function Ruler({ length, zoom, vertical, offset = 0 }: {
       }
     }
     ctx.stroke();
+    /* highlight the dragged element's span, like Comic Life */
+    if (hi) {
+      const a = offset + hi[0] * zoom, b = offset + hi[1] * zoom;
+      ctx.fillStyle = "rgba(30,136,229,0.30)";
+      if (vertical) ctx.fillRect(0, a, T, b - a); else ctx.fillRect(a, 0, b - a, T);
+      ctx.strokeStyle = "#1e88e5";
+      ctx.beginPath();
+      if (vertical) { ctx.moveTo(0, a + 0.5); ctx.lineTo(T, a + 0.5); ctx.moveTo(0, b - 0.5); ctx.lineTo(T, b - 0.5); }
+      else { ctx.moveTo(a + 0.5, 0); ctx.lineTo(a + 0.5, T); ctx.moveTo(b - 0.5, 0); ctx.lineTo(b - 0.5, T); }
+      ctx.stroke();
+    }
     ctx.strokeStyle = "#70767f";
     ctx.strokeRect(0.5, 0.5, c.width - 1, c.height - 1);
-  }, [px, zoom, length, vertical, offset]);
+  }, [px, zoom, length, vertical, offset, hi?.[0], hi?.[1]]);
   return <canvas ref={ref} className={vertical ? "rulerV" : "rulerH"} />;
 }
 
@@ -405,6 +417,11 @@ export default function Editor() {
   const panelImageTarget = useRef<string | null>(null);
   const pendingLockRef = useRef<Set<string>>(new Set());
   const snapRef = useRef<{ x: number | null; y: number | null }>({ x: null, y: null });
+  /* live position readout while dragging: ruler span highlight + inch tooltip */
+  const dragTipRef = useRef<{ x: number; y: number; w: number; h: number; mode: string; live: boolean } | null>(null);
+  /* hand-drawn balloon sketching */
+  const [drawMode, setDrawMode] = useState(false);
+  const drawPtsRef = useRef<number[][] | null>(null);
   const autoLockRef = useRef(true);
   const [autoLock, setAutoLockState] = useState(true);
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; id: string } | null>(null);
@@ -709,13 +726,57 @@ export default function Editor() {
         if (handle.includes("s")) cur.h = Math.max(MIN_SIZE, Math.round(orig.h + ldy));
         if (handle.includes("w")) { cur.w = Math.max(MIN_SIZE, Math.round(orig.w - ldx)); cur.x = orig.x + (orig.w - cur.w); }
         if (handle.includes("n")) { cur.h = Math.max(MIN_SIZE, Math.round(orig.h - ldy)); cur.y = orig.y + (orig.h - cur.h); }
-        /* Shift on a corner handle: keep proportions locked */
-        if (ev.shiftKey && handle.length === 2) {
-          const s = Math.max(cur.w / orig.w, cur.h / orig.h);
+        /* images keep their proportions on every handle (Shift stretches
+           freely); other elements lock with Shift on a corner */
+        const lockAspect = cur.type === "image" ? !ev.shiftKey : ev.shiftKey && handle.length === 2;
+        if (lockAspect) {
+          const s = handle.length === 2
+            ? Math.max(cur.w / orig.w, cur.h / orig.h)
+            : handle === "e" || handle === "w" ? cur.w / orig.w : cur.h / orig.h;
           cur.w = Math.max(MIN_SIZE, Math.round(orig.w * s));
           cur.h = Math.max(MIN_SIZE, Math.round(orig.h * s));
           if (handle.includes("w")) cur.x = orig.x + (orig.w - cur.w);
           if (handle.includes("n")) cur.y = orig.y + (orig.h - cur.h);
+          /* an edge drag grows the cross axis out from the middle */
+          if (handle === "e" || handle === "w") cur.y = orig.y + Math.round((orig.h - cur.h) / 2);
+          if (handle === "n" || handle === "s") cur.x = orig.x + Math.round((orig.w - cur.w) / 2);
+        }
+        /* dragged edges snap to the page border, margins, centre and other
+           elements' edges (Alt disables) */
+        snapRef.current = { x: null, y: null };
+        if (!ev.altKey) {
+          const tol = Math.max(4, 8 / zoom);
+          const def = Math.round(p.w * 0.035);
+          const m = p.margin ?? { t: def, r: def, b: def, l: def };
+          const others = p.els.filter((o) => o.id !== cur.id);
+          const vT = [0, p.w, m.l, p.w - m.r, p.w / 2, ...others.flatMap((o) => [o.x, o.x + o.w])];
+          const hT = [0, p.h, m.t, p.h - m.b, p.h / 2, ...others.flatMap((o) => [o.y, o.y + o.h])];
+          const near = (val: number, ts: number[]) => {
+            let best: number | null = null, bd = tol + 1;
+            for (const t of ts) { const dd = Math.abs(t - val); if (dd < bd) { bd = dd; best = t; } }
+            return best;
+          };
+          let sx: number | null = null, sy: number | null = null;
+          if (handle.includes("e")) { const t = near(cur.x + cur.w, vT); if (t != null) { cur.w = Math.max(MIN_SIZE, t - cur.x); sx = t; } }
+          else if (handle.includes("w")) { const t = near(cur.x, vT); if (t != null) { cur.w = Math.max(MIN_SIZE, cur.x + cur.w - t); cur.x = t; sx = t; } }
+          if (handle.includes("s")) { const t = near(cur.y + cur.h, hT); if (t != null) { cur.h = Math.max(MIN_SIZE, t - cur.y); sy = t; } }
+          else if (handle.includes("n")) { const t = near(cur.y, hT); if (t != null) { cur.h = Math.max(MIN_SIZE, cur.y + cur.h - t); cur.y = t; sy = t; } }
+          if (lockAspect && (sx != null || sy != null)) {
+            /* keep proportions: the snapped axis wins, the other follows */
+            if (sx != null) {
+              const s2 = cur.w / orig.w;
+              cur.h = Math.max(MIN_SIZE, Math.round(orig.h * s2));
+              if (handle.includes("n")) cur.y = orig.y + (orig.h - cur.h);
+              if (handle === "e" || handle === "w") cur.y = orig.y + Math.round((orig.h - cur.h) / 2);
+              sy = null;
+            } else if (sy != null) {
+              const s2 = cur.h / orig.h;
+              cur.w = Math.max(MIN_SIZE, Math.round(orig.w * s2));
+              if (handle.includes("w")) cur.x = orig.x + (orig.w - cur.w);
+              if (handle === "n" || handle === "s") cur.x = orig.x + Math.round((orig.w - cur.w) / 2);
+            }
+          }
+          snapRef.current = { x: sx, y: sy };
         }
         /* lettering scales with its box, like Comic Life */
         if (cur.type === "text" && orig.type === "text") {
@@ -748,12 +809,22 @@ export default function Editor() {
         const [ldx, ldy] = rotVec(pt.x - cx, pt.y - cy, -orig.rot);
         cur.tail = { ...cur.tail, bx: Math.round(ldx), by: Math.round(ldy) };
       }
+      if (mode === "move" || mode === "resize")
+        dragTipRef.current = { x: cur.x, y: cur.y, w: cur.w, h: cur.h, mode, live: true };
       force();
     };
     const onUp = () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
       snapRef.current = { x: null, y: null };
+      /* keep the coordinates tooltip up briefly after release, like Comic Life */
+      if (dragTipRef.current) {
+        const tip = dragTipRef.current;
+        tip.live = false;
+        setTimeout(() => {
+          if (dragTipRef.current === tip) { dragTipRef.current = null; force(); }
+        }, 1400);
+      }
       if (moved) {
         /* balloons auto-join when dragged close to another balloon */
         if (mode === "move" && el.type === "balloon") {
@@ -779,6 +850,50 @@ export default function Editor() {
     window.addEventListener("pointerup", onUp);
   }, [pagePoint, commit]);
 
+  /* ---------------- hand-drawn balloon sketching ---------------- */
+
+  const startSketch = useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const pt = pagePoint(e);
+    drawPtsRef.current = [[pt.x, pt.y]];
+    force();
+    const onMove = (ev: PointerEvent) => {
+      const arr = drawPtsRef.current;
+      if (!arr) return;
+      const p = pagePoint(ev);
+      const last = arr[arr.length - 1];
+      if (Math.hypot(p.x - last[0], p.y - last[1]) > 6) { arr.push([p.x, p.y]); force(); }
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      const arr = drawPtsRef.current;
+      drawPtsRef.current = null;
+      setDrawMode(false);
+      if (!arr || arr.length < 8) { setStatus("Sketch cancelled — drag a full outline in one stroke."); force(); return; }
+      const xs = arr.map((q) => q[0]), ys = arr.map((q) => q[1]);
+      const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+      const bw = x1 - x0, bh = y1 - y0;
+      if (bw < 40 || bh < 40) { setStatus("Sketch cancelled — draw a bigger outline."); force(); return; }
+      /* cap the outline at ~100 points, normalise into the element box */
+      const step = Math.max(1, Math.ceil(arr.length / 100));
+      const pts = arr.filter((_, i) => i % step === 0)
+        .map(([qx, qy]) => [(qx - x0) / bw, (qy - y0) / bh] as [number, number]);
+      const d = docRef.current!;
+      const pg = d.pages[pageIndexRef.current];
+      const el = makeBalloon("custom", Math.round(x0), Math.round(y0), Math.round(bw), Math.round(bh));
+      el.pts = pts;
+      pg.els.push(el);
+      pendingLockRef.current.add(el.id);
+      commit();
+      setSelId(el.id);
+      setStatus("Custom balloon created — double-click to type, drag the orange dot to aim the tail.");
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }, [pagePoint, commit]);
+
   /* ---------------- keyboard ---------------- */
 
   useEffect(() => {
@@ -786,6 +901,8 @@ export default function Editor() {
       const t = e.target as HTMLElement;
       const inField = t.closest?.("input, select, textarea") || t.isContentEditable;
       if (e.key === "Escape") {
+        setDrawMode(false);
+        drawPtsRef.current = null;
         if (editingId) finishEditing();
         else setSelId(null);
         return;
@@ -2436,10 +2553,12 @@ export default function Editor() {
           onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>
           <div className="rulerRow">
             <div className="rulerCorner" />
-            <Ruler length={page.w} zoom={zoom} vertical={false} offset={STAGE_MX} />
+            <Ruler length={page.w} zoom={zoom} vertical={false} offset={STAGE_MX}
+              hi={dragTipRef.current?.live ? [dragTipRef.current.x, dragTipRef.current.x + dragTipRef.current.w] : null} />
           </div>
           <div className="canvasRow">
-            <Ruler length={page.h} zoom={zoom} vertical offset={STAGE_MY} />
+            <Ruler length={page.h} zoom={zoom} vertical offset={STAGE_MY}
+              hi={dragTipRef.current?.live ? [dragTipRef.current.y, dragTipRef.current.y + dragTipRef.current.h] : null} />
             <div className="stage" style={{ width: page.w * zoom, height: page.h * zoom }}>
               <div
                 ref={pageDivRef}
@@ -2464,6 +2583,25 @@ export default function Editor() {
               {renderOverlay()}
               {snapRef.current.x != null && <div className="snapLineV" style={{ left: snapRef.current.x * zoom }} />}
               {snapRef.current.y != null && <div className="snapLineH" style={{ top: snapRef.current.y * zoom }} />}
+              {drawMode && (
+                <div className="drawLayer" onPointerDown={startSketch}>
+                  {drawPtsRef.current && drawPtsRef.current.length > 1 && (
+                    <svg>
+                      <path d={"M " + drawPtsRef.current.map(([qx, qy]) => `${Math.round(qx * zoom)} ${Math.round(qy * zoom)}`).join(" L ")} />
+                    </svg>
+                  )}
+                </div>
+              )}
+              {dragTipRef.current && (
+                <div className="dragTip" style={{
+                  left: (dragTipRef.current.x + dragTipRef.current.w / 2) * zoom,
+                  top: (dragTipRef.current.y + dragTipRef.current.h / 2) * zoom,
+                }}>
+                  {dragTipRef.current.mode === "resize"
+                    ? `w: ${(dragTipRef.current.w / DPI).toFixed(3)} in  h: ${(dragTipRef.current.h / DPI).toFixed(3)} in`
+                    : `x: ${(dragTipRef.current.x / DPI).toFixed(3)} in  y: ${(dragTipRef.current.y / DPI).toFixed(3)} in`}
+                </div>
+              )}
             </div>
           </div>
           <div className="zoomCtl">
@@ -2540,6 +2678,12 @@ export default function Editor() {
         </TrayBtn>
         <TrayBtn onClick={() => addFromTray("rounded")} label="Rounded">
           <svg viewBox="0 0 40 30"><rect x="4" y="6" width="32" height="18" rx="6" fill="#fff" stroke="#222" strokeWidth="2" /></svg>
+        </TrayBtn>
+        <TrayBtn active={drawMode} label="Draw" onClick={() => {
+          setDrawMode((d) => !d);
+          if (!drawMode) setStatus("Draw mode: drag on the page to sketch your own balloon outline in one stroke. Esc cancels.");
+        }}>
+          <svg viewBox="0 0 40 30"><path d="M7 20 Q4 11 13 7 Q24 3 33 9 Q39 14 31 20 Q24 25 14 23 L7 27 Z" fill="#fff" stroke="#222" strokeWidth="2" strokeDasharray="3 2" /></svg>
         </TrayBtn>
         <span className="traySep" />
         <div style={{ position: "relative" }}>
@@ -2789,9 +2933,9 @@ function ToolBtn({ label, icon, onClick, disabled, accent }: {
   );
 }
 
-function TrayBtn({ children, label, onClick }: { children: React.ReactNode; label: string; onClick: () => void }) {
+function TrayBtn({ children, label, onClick, active }: { children: React.ReactNode; label: string; onClick: () => void; active?: boolean }) {
   return (
-    <button className="trayBtn" onClick={onClick} title={label}>
+    <button className={`trayBtn${active ? " on" : ""}`} onClick={onClick} title={label}>
       {children}
       <span>{label}</span>
     </button>

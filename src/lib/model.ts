@@ -5,7 +5,7 @@ export type FilterKey = "none" | "bw" | "sepia" | "vivid" | "faded" | "noir";
 export type BalloonKind =
   | "speech" | "rough" | "buzz" | "double" | "thought"
   | "shout" | "burst2" | "whisper" | "square" | "tv"
-  | "extend" | "rounded" | "caption";
+  | "extend" | "rounded" | "caption" | "custom";
 
 /* ---------------- fills: solid / gradient / halftone ---------------- */
 
@@ -160,6 +160,9 @@ export interface BalloonEl extends BaseEl {
   /* optional image content (e.g. pre-made lettering stamps), clipped to the
      balloon shape and drawn behind the text */
   img?: string | null;
+  /* hand-drawn outline for kind "custom": closed polygon, points normalised
+     to the element box (0..1) */
+  pts?: [number, number][];
 }
 
 /* Resolve a balloon's effective tail: attached balloons aim at their partner. */
@@ -526,7 +529,7 @@ export const BALLOON_KINDS: Record<BalloonKind, string> = {
   speech: "Speech", rough: "Rough", buzz: "Buzz", double: "Radio",
   thought: "Thought", shout: "Exclaim", burst2: "Exclaim dense",
   whisper: "Whisper", square: "Square", tv: "TV", extend: "Pill",
-  rounded: "Rounded box", caption: "Caption",
+  rounded: "Rounded box", caption: "Caption", custom: "Hand-drawn",
 };
 
 /* balloon kinds that have no tail */

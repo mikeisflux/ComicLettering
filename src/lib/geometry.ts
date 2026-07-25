@@ -209,6 +209,21 @@ export function balloonGeom(el: BalloonEl): BalloonGeom {
         d: polygonWithTail([[0, 0], [w, 0], [w, h], [0, h]], w, h, tail),
         textRect: padRect(0.1, 0.13), dash: null,
       };
+    case "custom": {
+      /* hand-drawn outline: the user's sketched polygon, tail spliced in */
+      const pts = (el.pts || []).map(([nx, ny]) => [nx * w, ny * h]);
+      if (pts.length < 3)
+        return { d: linePath(roundRectPts(w, h, Math.min(w, h) * 0.18, 6)), textRect: padRect(0.12, 0.14), dash: null };
+      const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+      const x0 = Math.min(...xs), x1 = Math.max(...xs);
+      const y0 = Math.min(...ys), y1 = Math.max(...ys);
+      const iw = Math.max(1, x1 - x0), ih = Math.max(1, y1 - y0);
+      return {
+        d: polygonWithTail(pts, w, h, tail),
+        textRect: [x0 + iw * 0.18, y0 + ih * 0.18, iw * 0.64, ih * 0.64],
+        dash: null,
+      };
+    }
     case "tv":
       return {
         d: polygonWithTail(roundRectPts(w, h, Math.min(w, h) * 0.12, 4), w, h, tail, true),
