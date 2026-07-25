@@ -152,8 +152,10 @@ export interface BalloonEl extends BaseEl {
   ts: TextStyle;
   fill: FillStyle; stroke: string; strokeW: number;
   /* dx/dy: tail tip relative to the balloon centre (local, unrotated).
-     bx/by: optional bend point the tail curves through. */
-  tail: { dx: number; dy: number; bx?: number; by?: number } | null;
+     bx/by: optional bend point the tail curves through.
+     tx/ty: optional tangent direction at the bend (the tilt axis of a
+     joined-balloon connector). */
+  tail: { dx: number; dy: number; bx?: number; by?: number; tx?: number; ty?: number } | null;
   /* id of a balloon this one is attached to: they render joined, with the
      connector tail aimed at the partner automatically */
   attachTo?: string | null;
@@ -166,6 +168,9 @@ export interface BalloonEl extends BaseEl {
   /* how a custom balloon's tail renders: spliced speech taper (default) or
      a thought-bubble trail */
   tailStyle?: "speech" | "thought";
+  /* transient (set by resolveBalloon, never saved): render the tail as a
+     wide connector band between joined balloons instead of a point */
+  band?: boolean;
 }
 
 /* Resolve a balloon's effective tail: attached balloons aim at their partner. */
@@ -177,7 +182,7 @@ export function resolveBalloon(page: Page, el: BalloonEl): { el: BalloonEl; base
   const ac = [base.x + base.w / 2, base.y + base.h / 2];
   const [dx, dy] = rotVec(ac[0] - bc[0], ac[1] - bc[1], -el.rot);
   return {
-    el: { ...el, tail: { ...(el.tail ?? {}), dx: Math.round(dx), dy: Math.round(dy) } },
+    el: { ...el, band: true, tail: { ...(el.tail ?? {}), dx: Math.round(dx), dy: Math.round(dy) } },
     base,
   };
 }

@@ -404,7 +404,7 @@ function FillPicker({ value, onChange }: { value: FillStyle; onChange: (f: FillS
 
 /* ---------------- balloon SVG ---------------- */
 
-export interface MergeBaseInfo { d: string; color: string; tf: string }
+export interface MergeBaseInfo { d: string; color: string; tf: string; stroke?: string; strokeW?: number }
 
 function BalloonShape({ el, mergeBase, imgSrc }: { el: BalloonEl; mergeBase?: MergeBaseInfo | null; imgSrc?: string | null }) {
   const g = balloonGeom(el);
@@ -451,7 +451,15 @@ function BalloonShape({ el, mergeBase, imgSrc }: { el: BalloonEl; mergeBase?: Me
         <image href={imgSrc} x={0} y={0} width={el.w} height={el.h}
           preserveAspectRatio="xMidYMid slice" clipPath={`url(#${cid})`} />
       )}
-      {mergeBase && <g transform={mergeBase.tf}><path d={mergeBase.d} fill={mergeBase.color} /></g>}
+      {mergeBase && (
+        <g transform={mergeBase.tf}>
+          <path d={mergeBase.d} fill={mergeBase.color} />
+          {/* far-apart joined partner: redraw its outline over the band */}
+          {mergeBase.strokeW ? (
+            <path d={mergeBase.d} fill="none" stroke={mergeBase.stroke} strokeWidth={mergeBase.strokeW} strokeLinejoin="round" />
+          ) : null}
+        </g>
+      )}
       {!mergeBase && el.strokeW > 0 && (
         <path d={g.d} fill="none" stroke={el.stroke} strokeWidth={el.strokeW}
           strokeLinejoin="round" strokeDasharray={g.dash ? g.dash.join(" ") : undefined} />
@@ -751,7 +759,7 @@ export default function Editor() {
 
   const startDrag = useCallback((
     e: React.PointerEvent, el: El,
-    mode: "move" | "resize" | "rotate" | "tail" | "bow", handle = ""
+    mode: "move" | "resize" | "rotate" | "tail" | "bow" | "tilt", handle = ""
   ) => {
     e.preventDefault();
     e.stopPropagation();
@@ -905,6 +913,15 @@ export default function Editor() {
         const cx = orig.x + orig.w / 2, cy = orig.y + orig.h / 2;
         const [ldx, ldy] = rotVec(pt.x - cx, pt.y - cy, -orig.rot);
         cur.tail = { ...cur.tail, bx: Math.round(ldx), by: Math.round(ldy) };
+      } else if (mode === "tilt" && cur.type === "balloon" && cur.tail) {
+        /* the two satellite dots tilt the connector's tangent at the bend */
+        const cx = orig.x + orig.w / 2, cy = orig.y + orig.h / 2;
+        const [lx, ly] = rotVec(pt.x - cx, pt.y - cy, -orig.rot);
+        const bx = cur.tail.bx ?? cur.tail.dx / 2, by = cur.tail.by ?? cur.tail.dy / 2;
+        let vx = lx - bx, vy = ly - by;
+        if (handle === "t2") { vx = -vx; vy = -vy; }
+        const L = Math.hypot(vx, vy) || 1;
+        cur.tail = { ...cur.tail, tx: Math.round((vx / L) * 1000) / 1000, ty: Math.round((vy / L) * 1000) / 1000 };
       }
       if (mode === "move" || mode === "resize")
         dragTipRef.current = { x: cur.x, y: cur.y, w: cur.w, h: cur.h, mode, live: true };
@@ -922,30 +939,44 @@ export default function Editor() {
           if (dragTipRef.current === tip) { dragTipRef.current = null; force(); }
         }, 1400);
       }
-      if (moved) {
-        /* balloons auto-join when dragged close to another balloon */
-        if (mode === "move" && el.type === "balloon") {
-          const d = docRef.current!;
-          const p = d.pages[pageIndexRef.current];
-          const cur = p.els.find((x) => x.id === el.id) as BalloonEl | undefined;
-          if (cur) {
-            const near = Math.round(Math.min(cur.w, cur.h) * 0.18);
-            const probe = { x: cur.x - near, y: cur.y - near, w: cur.w + near * 2, h: cur.h + near * 2 };
-            const cand = p.els.find((o) =>
-              o.id !== cur.id && o.type === "balloon" &&
-              (o as BalloonEl).attachTo !== cur.id && aabbOverlap(probe, o)) as BalloonEl | undefined;
-            if (cand) {
-              if (cur.attachTo !== cand.id) setStatus("Balloons joined — drag the red lever to bend the link, drag the orange tip to detach.");
-              cur.attachTo = cand.id;
-            }
-          }
-        }
-        commit();
-      }
+      if (moved) commit();
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
   }, [pagePoint, commit]);
+
+  /* Dedicated add-on bubble: a linked balloon that inherits the parent's
+     look and stays joined (replaces the old drag-to-join behaviour). */
+  function addAttachedBubble() {
+    const d = docRef.current!;
+    const p = d.pages[pageIndexRef.current];
+    const src = p.els.find((x) => x.id === selId);
+    if (!src || src.type !== "balloon") {
+      setStatus("Select a balloon first, then click Add Bubble to link a second one to it.");
+      return;
+    }
+    const b = src as BalloonEl;
+    const w = Math.round(b.w * 0.8), h = Math.round(b.h * 0.8);
+    let x = b.x + Math.round(b.w * 0.72);
+    const y = Math.max(0, Math.min(p.h - h, b.y + Math.round(b.h * 0.45)));
+    if (x + w > p.w) x = Math.max(0, b.x - Math.round(w * 0.9));
+    const el = makeBalloon(b.kind, x, y, w, h);
+    el.fill = JSON.parse(JSON.stringify(b.fill));
+    el.stroke = b.stroke;
+    el.strokeW = b.strokeW;
+    el.shadow = b.shadow;
+    el.ts = { ...b.ts };
+    if (b.kind === "custom") { el.pts = b.pts; el.tailStyle = b.tailStyle; }
+    el.attachTo = b.id;
+    /* seed the connector's bend point midway between the two bubbles */
+    const pcx = b.x + b.w / 2 - (x + w / 2), pcy = b.y + b.h / 2 - (y + h / 2);
+    el.tail = { dx: Math.round(pcx), dy: Math.round(pcy), bx: Math.round(pcx / 2), by: Math.round(pcy / 2) };
+    p.els.push(el);
+    pendingLockRef.current.add(el.id);
+    commit();
+    setSelId(el.id);
+    setStatus("Linked bubble added — it matches the first bubble's style and stays joined. Drag the orange tip to detach.");
+  }
 
   /* ---------------- hand-drawn balloon sketching ---------------- */
 
@@ -1782,7 +1813,7 @@ export default function Editor() {
     if (el.type === "balloon") {
       const { el: bEl, base } = resolveBalloon(page!, el);
       let mergeBase: MergeBaseInfo | null = null;
-      if (base && aabbOverlap(el, base)) {
+      if (base) {
         const bg = balloonGeom(resolveBalloon(page!, base).el);
         const [rx, ry] = rotVec(
           base.x + base.w / 2 - (el.x + el.w / 2),
@@ -1791,6 +1822,9 @@ export default function Editor() {
           d: bg.d,
           color: base.fill.a,
           tf: `translate(${el.w / 2 + rx} ${el.h / 2 + ry}) rotate(${base.rot - el.rot}) translate(${-base.w / 2} ${-base.h / 2})`,
+          /* apart: partner redraws with its outline so the band tucks under;
+             overlapping: fills union with no divider */
+          ...(aabbOverlap(el, base) ? {} : { stroke: base.stroke, strokeW: base.strokeW }),
         };
       }
       const g = balloonGeom(bEl);
@@ -1870,7 +1904,8 @@ export default function Editor() {
             style={{ left: (el.w / 2 + el.tail.dx) * z - 7, top: (el.h / 2 + el.tail.dy) * z - 7 }}
             onPointerDown={(e) => startDrag(e, el, "tail")} />
         )}
-        {el.type === "balloon" && el.tail && ["speech", "whisper", "double", "thought"].includes(el.kind) && (() => {
+        {el.type === "balloon" && el.tail &&
+          (["speech", "whisper", "double", "thought"].includes(el.kind) || el.attachTo) && (() => {
           const t = Math.atan2(el.tail.dy, el.tail.dx);
           const ex = el.w / 2 + (el.w / 2) * Math.cos(t);
           const ey = el.h / 2 + (el.h / 2) * Math.sin(t);
@@ -1880,6 +1915,33 @@ export default function Editor() {
             <div className="handle tailBow" title="Drag to bend the tail"
               style={{ left: (el.w / 2 + bx) * z - 6, top: (el.h / 2 + by) * z - 6 }}
               onPointerDown={(e) => startDrag(e, el, "bow")} />
+          );
+        })()}
+        {el.type === "balloon" && el.tail && el.attachTo && (() => {
+          /* three-point connector axis: middle bends, satellites tilt */
+          const bx = el.tail.bx ?? el.tail.dx / 2, by = el.tail.by ?? el.tail.dy / 2;
+          const M = [el.w / 2 + bx, el.h / 2 + by];
+          const dl = Math.hypot(el.tail.dx, el.tail.dy) || 1;
+          let T = el.tail.tx != null && el.tail.ty != null
+            ? [el.tail.tx, el.tail.ty]
+            : [el.tail.dx / dl, el.tail.dy / dl];
+          const tl = Math.hypot(T[0], T[1]) || 1;
+          T = [T[0] / tl, T[1] / tl];
+          const L = 55 / z;
+          const h1 = [M[0] + T[0] * L, M[1] + T[1] * L];
+          const h2 = [M[0] - T[0] * L, M[1] - T[1] * L];
+          return (
+            <>
+              <svg style={{ position: "absolute", left: 0, top: 0, width: 1, height: 1, overflow: "visible", pointerEvents: "none" }}>
+                <line x1={h1[0] * z} y1={h1[1] * z} x2={h2[0] * z} y2={h2[1] * z} stroke="#777" strokeWidth={1} />
+              </svg>
+              <div className="handle tiltDot" title="Tilt the connector"
+                style={{ left: h1[0] * z - 5, top: h1[1] * z - 5 }}
+                onPointerDown={(e) => startDrag(e, el, "tilt", "t1")} />
+              <div className="handle tiltDot" title="Tilt the connector"
+                style={{ left: h2[0] * z - 5, top: h2[1] * z - 5 }}
+                onPointerDown={(e) => startDrag(e, el, "tilt", "t2")} />
+            </>
           );
         })()}
       </div>
@@ -2815,6 +2877,13 @@ export default function Editor() {
           if (!drawMode) setStatus("Draw mode: drag on the page to sketch your own balloon outline in one stroke. Esc cancels.");
         }}>
           <svg viewBox="0 0 40 30"><path d="M7 20 Q4 11 13 7 Q24 3 33 9 Q39 14 31 20 Q24 25 14 23 L7 27 Z" fill="#fff" stroke="#222" strokeWidth="2" strokeDasharray="3 2" /></svg>
+        </TrayBtn>
+        <TrayBtn onClick={addAttachedBubble} label="Add Bubble">
+          <svg viewBox="0 0 40 30">
+            <ellipse cx="23" cy="12" rx="13" ry="8.5" fill="#fff" stroke="#222" strokeWidth="2" />
+            <path d="M16 18 L11 25 L20 19 Z" fill="#fff" stroke="#222" strokeWidth="1.5" />
+            <path d="M7 21 v8 M3 25 h8" stroke="#222" strokeWidth="2.5" fill="none" />
+          </svg>
         </TrayBtn>
         <span className="traySep" />
         <div style={{ position: "relative" }}>

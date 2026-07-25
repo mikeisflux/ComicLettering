@@ -26,6 +26,59 @@ function circleSub(cx: number, cy: number, r: number) {
 const linePath = (pts: number[][], close = true) =>
   `M ${pts.map((p) => `${fmt(p[0])} ${fmt(p[1])}`).join(" L ")}${close ? " Z" : ""}`;
 
+/* sampled quadratic bezier (excluding the start point) */
+function quadPts(p0: number[], c: number[], p1: number[], n = 14): number[][] {
+  const out: number[][] = [];
+  for (let i = 1; i <= n; i++) {
+    const t = i / n, u = 1 - t;
+    out.push([
+      u * u * p0[0] + 2 * u * t * c[0] + t * t * p1[0],
+      u * u * p0[1] + 2 * u * t * c[1] + t * t * p1[1],
+    ]);
+  }
+  return out;
+}
+
+/* One curved edge of a joined-balloon connector: from base point P through
+   Mside (the offset bend point) to the far point Tp, with tangent T at the
+   bend so the tilt axis controls the curve's lean. */
+function bentSide(P: number[], Mside: number[], Tp: number[], T: number[]): number[][] {
+  const k1 = 0.5 * Math.hypot(P[0] - Mside[0], P[1] - Mside[1]);
+  const k2 = 0.5 * Math.hypot(Tp[0] - Mside[0], Tp[1] - Mside[1]);
+  const c1 = [Mside[0] - T[0] * k1, Mside[1] - T[1] * k1];
+  const c2 = [Mside[0] + T[0] * k2, Mside[1] + T[1] * k2];
+  return [...quadPts(P, c1, Mside), ...quadPts(Mside, c2, Tp)];
+}
+
+/* Resolve the connector's bend geometry shared by all balloon shapes:
+   bend point M, unit tangent T (flipped to point base→tip), tip-end spread
+   points, and the two offset bend points for the band edges. */
+function bendGeom(
+  tail: { dx: number; dy: number; bx?: number; by?: number; tx?: number; ty?: number },
+  cx: number, cy: number, tip: number[], E: number[], B: number[], bandHalf: number
+) {
+  const M = [cx + (tail.bx ?? tail.dx / 2), cy + (tail.by ?? tail.dy / 2)];
+  let T = tail.tx != null && tail.ty != null
+    ? [tail.tx, tail.ty]
+    : [tip[0] - E[0], tip[1] - E[1]];
+  const L = Math.hypot(T[0], T[1]) || 1;
+  T = [T[0] / L, T[1] / L];
+  if (T[0] * (tip[0] - E[0]) + T[1] * (tip[1] - E[1]) < 0) T = [-T[0], -T[1]];
+  const nrm = [-T[1], T[0]];
+  const side = nrm[0] * (B[0] - M[0]) + nrm[1] * (B[1] - M[1]) >= 0 ? 1 : -1;
+  const M_B = [M[0] + nrm[0] * side * bandHalf, M[1] + nrm[1] * side * bandHalf];
+  const M_A = [M[0] - nrm[0] * side * bandHalf, M[1] - nrm[1] * side * bandHalf];
+  /* tip-end spread perpendicular to the arrival direction */
+  const av = [tip[0] - M[0], tip[1] - M[1]];
+  const al = Math.hypot(av[0], av[1]) || 1;
+  const ap = [-av[1] / al, av[0] / al];
+  const t1 = [tip[0] + ap[0] * bandHalf, tip[1] + ap[1] * bandHalf];
+  const t2 = [tip[0] - ap[0] * bandHalf, tip[1] - ap[1] * bandHalf];
+  const near1 = Math.hypot(t1[0] - M_B[0], t1[1] - M_B[1]) <= Math.hypot(t2[0] - M_B[0], t2[1] - M_B[1]);
+  const tipB = near1 ? t1 : t2, tipA = near1 ? t2 : t1;
+  return { M_B, M_A, tipB, tipA, T };
+}
+
 export interface BalloonGeom {
   d: string;
   d2?: string; // decorative second outline (stroked only)
@@ -55,12 +108,15 @@ function roundRectPts(w: number, h: number, r: number, seg = 5): number[][] {
    the tip exits, and splice base points + tail leg(s) into that edge. */
 function polygonWithTail(
   pts: number[][], w: number, h: number,
-  tail: { dx: number; dy: number } | null, zigzag = false
+  tail: { dx: number; dy: number; bx?: number; by?: number; tx?: number; ty?: number } | null,
+  zigzag = false, band = false
 ): string {
   if (!tail) return linePath(pts);
   const cx = w / 2, cy = h / 2;
   const tip = [cx + tail.dx, cy + tail.dy];
-  const dx = tip[0] - cx, dy = tip[1] - cy;
+  /* a joined connector's bend point steers where the band leaves the shape */
+  const aim = band && tail.bx != null && tail.by != null ? [cx + tail.bx, cy + tail.by] : tip;
+  const dx = aim[0] - cx, dy = aim[1] - cy;
   const dLen = Math.hypot(dx, dy);
   if (dLen < 4) return linePath(pts);
   const D = [dx / dLen, dy / dLen];
@@ -118,8 +174,22 @@ function polygonWithTail(
     ];
   };
 
-  /* tail wedge, then the body from A forward around the ring to B */
-  const out: number[][] = [B, ...leg(B, tip), tip, ...leg(tip, A), A];
+  /* tail wedge — or, between joined balloons, a wide connector band curving
+     through the bend point with the tilt axis as tangent */
+  let out: number[][];
+  if (band) {
+    const E2 = pointAt(exitS);
+    const bandHalf = half * 0.85;
+    const g = bendGeom(tail, w / 2, h / 2, tip, E2, B, bandHalf);
+    out = [
+      B,
+      ...bentSide(B, g.M_B, g.tipB, g.T),
+      ...[...bentSide(A, g.M_A, g.tipA, g.T)].reverse(),
+      A,
+    ];
+  } else {
+    out = [B, ...leg(B, tip), tip, ...leg(tip, A), A];
+  }
   const span = (sB - sA + per) % per;
   const body: [number, number][] = [];
   for (let k = 0; k < n; k++) {
@@ -158,6 +228,19 @@ function ellipseTailPath(
   const A = ellipsePt(cx, cy, rx, ry, t + delta);
   const B = ellipsePt(cx, cy, rx, ry, t - delta);
   const E = ellipsePt(cx, cy, rx, ry, t);
+  /* joined balloons: the connector is a near-parallel band, wide at both
+     ends, curving through the bend point with the tilt axis as tangent */
+  if (el.band) {
+    const bandHalf = Math.hypot(A[0] - B[0], A[1] - B[1]) * 0.42;
+    const g = bendGeom(tail, cx, cy, tip, E, B, bandHalf);
+    const sideB = bentSide(B, g.M_B, g.tipB, g.T);
+    const sideA = [...bentSide(A, g.M_A, g.tipA, g.T)].reverse();
+    return `M ${fmt(A[0])} ${fmt(A[1])}` +
+      ` A ${fmt(rx)} ${fmt(ry)} 0 1 1 ${fmt(B[0])} ${fmt(B[1])}` +
+      sideB.map((p) => ` L ${fmt(p[0])} ${fmt(p[1])}`).join("") +
+      sideA.map((p) => ` L ${fmt(p[0])} ${fmt(p[1])}`).join("") +
+      " Z";
+  }
   let mB: number[], mA: number[];
   if (tail.bx != null && tail.by != null) {
     /* user-bent tail: both edges curve through the bend point */
@@ -231,7 +314,7 @@ export function balloonGeom(el: BalloonEl): BalloonGeom {
     }
     case "square":
       return {
-        d: polygonWithTail([[0, 0], [w, 0], [w, h], [0, h]], w, h, tail),
+        d: polygonWithTail([[0, 0], [w, 0], [w, h], [0, h]], w, h, tail, false, !!el.band),
         textRect: padRect(0.1, 0.13), dash: null,
       };
     case "custom": {
@@ -266,16 +349,16 @@ export function balloonGeom(el: BalloonEl): BalloonGeom {
         }
         return { d, textRect, dash: null };
       }
-      return { d: polygonWithTail(pts, w, h, tail), textRect, dash: null };
+      return { d: polygonWithTail(pts, w, h, tail, false, !!el.band), textRect, dash: null };
     }
     case "tv":
       return {
-        d: polygonWithTail(roundRectPts(w, h, Math.min(w, h) * 0.12, 4), w, h, tail, true),
+        d: polygonWithTail(roundRectPts(w, h, Math.min(w, h) * 0.12, 4), w, h, tail, true, !!el.band),
         textRect: padRect(0.11, 0.14), dash: null,
       };
     case "extend":
       return {
-        d: polygonWithTail(roundRectPts(w, h, Math.min(w, h) / 2, 8), w, h, tail),
+        d: polygonWithTail(roundRectPts(w, h, Math.min(w, h) / 2, 8), w, h, tail, false, !!el.band),
         textRect: padRect(0.14, 0.16), dash: null,
       };
     case "rough":

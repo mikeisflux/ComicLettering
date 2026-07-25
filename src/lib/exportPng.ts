@@ -6,7 +6,7 @@ import {
 import { balloonGeom } from "./geometry";
 import { paintFill } from "./fills";
 
-interface MergeInfo { d: string; color: string; cx: number; cy: number; rot: number; bw: number; bh: number }
+interface MergeInfo { d: string; color: string; cx: number; cy: number; rot: number; bw: number; bh: number; stroke?: string; strokeW?: number }
 
 const imgCache = new Map<string, HTMLImageElement>();
 
@@ -224,8 +224,16 @@ function drawEl(ctx: CanvasRenderingContext2D, el: El, assets: Assets, merge?: M
       ctx.translate(merge.cx, merge.cy);
       ctx.rotate(deg2rad(merge.rot));
       ctx.translate(-merge.bw / 2, -merge.bh / 2);
+      const mPath = new Path2D(merge.d);
       ctx.fillStyle = merge.color;
-      ctx.fill(new Path2D(merge.d));
+      ctx.fill(mPath);
+      /* far-apart joined partner keeps its outline over the band */
+      if (merge.strokeW) {
+        ctx.strokeStyle = merge.stroke!;
+        ctx.lineWidth = merge.strokeW;
+        ctx.lineJoin = "round";
+        ctx.stroke(mPath);
+      }
       ctx.restore();
     } else if (el.strokeW > 0) {
       ctx.lineWidth = el.strokeW;
@@ -262,7 +270,7 @@ export async function renderPageToCanvas(
     if (el.type === "balloon") {
       const { el: bEl, base } = resolveBalloon(page, el);
       let merge: MergeInfo | null = null;
-      if (base && aabbOverlap(el, base)) {
+      if (base) {
         const bg = balloonGeom(resolveBalloon(page, base).el);
         const [rx, ry] = rotVec(
           base.x + base.w / 2 - (el.x + el.w / 2),
@@ -271,6 +279,7 @@ export async function renderPageToCanvas(
           d: bg.d, color: base.fill.a,
           cx: el.w / 2 + rx, cy: el.h / 2 + ry,
           rot: base.rot - el.rot, bw: base.w, bh: base.h,
+          ...(aabbOverlap(el, base) ? {} : { stroke: base.stroke, strokeW: base.strokeW }),
         };
       }
       drawEl(ctx, bEl as BalloonEl, assets, merge);
