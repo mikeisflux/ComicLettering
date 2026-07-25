@@ -259,6 +259,7 @@ const R: FontVariant[] = ["regular"];
 
 export const FONTS: Record<string, FontDef> = {
   /* Dialogue */
+  lmcdialogue: { label: "LMC Dialogue (Ours)", css: '"LMC Dialogue",cursive', group: "Dialogue", variants: ALL },
   comicneue: { label: "Comic Neue",       css: '"Comic Neue","Comic Sans MS",cursive', group: "Dialogue", variants: ALL },
   patrick:   { label: "Patrick Hand",     css: '"Patrick Hand",cursive',               group: "Dialogue", variants: R },
   kalam:     { label: "Kalam",            css: '"Kalam",cursive',                      group: "Dialogue", variants: RB },

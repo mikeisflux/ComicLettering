@@ -379,6 +379,14 @@ input[type="range"] { width: 110px; }
 .drawLayer path { fill: rgba(30, 136, 229, 0.08); stroke: #1e88e5; stroke-width: 2; stroke-dasharray: 6 4; }
 .trayBtn.on { background: #dcebfb; box-shadow: inset 0 0 0 1.5px var(--sel); border-radius: 6px; }
 
+/* LMC Dialogue — original typeface made for LetterMyComic (OFL 1.1).
+   Declared here (not fonts.css) so the Google Fonts fetch script never
+   overwrites it. */
+@font-face { font-family: "LMC Dialogue"; font-style: normal; font-weight: 400; font-display: swap; src: url(/fonts/LMCDialogue-Regular.woff2) format("woff2"); }
+@font-face { font-family: "LMC Dialogue"; font-style: normal; font-weight: 700; font-display: swap; src: url(/fonts/LMCDialogue-Bold.woff2) format("woff2"); }
+@font-face { font-family: "LMC Dialogue"; font-style: italic; font-weight: 400; font-display: swap; src: url(/fonts/LMCDialogue-Italic.woff2) format("woff2"); }
+@font-face { font-family: "LMC Dialogue"; font-style: italic; font-weight: 700; font-display: swap; src: url(/fonts/LMCDialogue-BoldItalic.woff2) format("woff2"); }
+
 /* connector tilt axis satellites */
 .handle.tiltDot {
   width: 10px; height: 10px; border-radius: 50%;
