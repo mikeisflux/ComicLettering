@@ -42,13 +42,52 @@ export const TEXTURE_VARIANTS: Record<TextureVariant, string> = {
   speckle: "Speckle", grit: "Grit", static: "Static", murk: "Murk", daubs: "Daubs", stone: "Stone",
 };
 
-/* Gradient defaults (like Comic Life's bundled gradients) — [top, bottom] pairs. */
-export const GRADIENT_PRESETS: [string, string][] = [
+function hslHex(h: number, s: number, l: number): string {
+  const a = s * Math.min(l, 1 - l);
+  const f = (n: number) => {
+    const k = (n + h / 30) % 12;
+    const c = l - a * Math.max(-1, Math.min(k - 3, Math.min(9 - k, 1)));
+    return Math.round(255 * c).toString(16).padStart(2, "0");
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
+}
+
+/* Gradient library — [top, bottom] pairs: curated classics plus a full
+   sweep of every hue (highlight fade, deep fade, white fade). */
+const CURATED_GRADIENTS: [string, string][] = [
   ["#ffffff", "#9ecbff"], ["#c9ecff", "#2e86d4"], ["#fff7b0", "#ff9d2e"],
   ["#ffe14d", "#ff2a00"], ["#ff9d2e", "#e03000"], ["#ff512f", "#dd2476"],
   ["#ffd0e8", "#ff45a4"], ["#eadcff", "#8a4fd8"], ["#d8ffd0", "#3fae4a"],
   ["#fceabb", "#f8b500"], ["#f8f8f8", "#a8aeb8"], ["#41506b", "#0c1220"],
+  ["#fffbe6", "#ffd21f"], ["#ffd21f", "#b8860b"], ["#f5f7fa", "#b8c2cc"],
+  ["#e8e8e8", "#707880"], ["#ffe0b3", "#b06a2c"], ["#ffcccc", "#8f0000"],
+  ["#0fd8c8", "#0a4f8f"], ["#ff9a9e", "#fecfef"], ["#a1c4fd", "#c2e9fb"],
+  ["#f6d365", "#fda085"], ["#84fab0", "#8fd3f4"], ["#161a20", "#4a5568"],
 ];
+export const GRADIENT_PRESETS: [string, string][] = (() => {
+  const out = [...CURATED_GRADIENTS];
+  for (let i = 0; i < 12; i++) {
+    const h = i * 30;
+    out.push([hslHex(h, 0.95, 0.75), hslHex(h, 0.9, 0.5)]);   // highlight fade
+    out.push([hslHex(h, 0.9, 0.5), hslHex(h, 0.95, 0.22)]);   // deep fade
+    out.push([hslHex(h, 0.6, 0.94), hslHex(h, 0.85, 0.6)]);   // pastel fade
+  }
+  return out;
+})();
+
+/* Color palette grid for the Fill picker: grayscale row + hue × lightness. */
+export const COLOR_PALETTE: string[][] = (() => {
+  const rows: string[][] = [];
+  rows.push(Array.from({ length: 14 }, (_, i) => {
+    const v = Math.round((i / 13) * 255);
+    return `#${v.toString(16).padStart(2, "0").repeat(3)}`;
+  }));
+  const lights = [0.88, 0.75, 0.62, 0.5, 0.38, 0.26];
+  for (const l of lights) {
+    rows.push(Array.from({ length: 14 }, (_, i) => hslHex(Math.round((i / 14) * 360), 0.92, l)));
+  }
+  return rows;
+})();
 
 export interface TextStyle {
   font: string;

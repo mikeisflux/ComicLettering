@@ -9,10 +9,10 @@ import {
   Assets, BALLOON_KINDS, BalloonEl, BalloonKind, Doc, El, FILTERS, FONTS,
   FONT_GROUPS, FillStyle, GRADIENT_PRESETS, HALFTONE_VARIANTS, LAYOUT_CATEGORIES,
   LayoutRect, PAGE_SIZES, PATTERN_VARIANTS, Page, PanelEl, SPEEDLINE_VARIANTS,
-  DPI, PAPER_CATEGORIES, PageMargin, TAILLESS_KINDS, TEXTURE_VARIANTS, TextEl,
-  TextStyle, aabbOverlap, applyLayout, clamp, lightenHex, makeBalloon, makeImage,
-  makePanel, makeText, newPage, reseedIds, resolveBalloon, rotVec, solid,
-  starterDoc, uid,
+  COLOR_PALETTE, DPI, PAPER_CATEGORIES, PageMargin, TAILLESS_KINDS,
+  TEXTURE_VARIANTS, TextEl, TextStyle, aabbOverlap, applyLayout, clamp,
+  lightenHex, makeBalloon, makeImage, makePanel, makeText, newPage, reseedIds,
+  resolveBalloon, rotVec, solid, starterDoc, uid,
 } from "@/lib/model";
 import { balloonGeom } from "@/lib/geometry";
 import { LETTER_STYLES, LetterStyle, applyLetterStyle } from "@/lib/presets";
@@ -331,6 +331,8 @@ export default function Editor() {
   const [exportFrom, setExportFrom] = useState(1);
   const [exportTo, setExportTo] = useState(1);
   const [stampOpen, setStampOpen] = useState(false);
+  const [showFill, setShowFill] = useState(false);
+  const [showStroke, setShowStroke] = useState(false);
   /* active lettering style — like Comic Life, styles are not objects: they
      restyle the selection and set the style used by new lettering */
   const [activeStyle, setActiveStyleState] = useState("Sunburst");
@@ -784,6 +786,49 @@ export default function Editor() {
     pendingLockRef.current.add(copy.id);
     commit();
     setSelId(copy.id);
+  }
+
+  /* quick fill/stroke from the format-bar pickers — applies to the selected
+     balloon/panel/lettering, or the page background when nothing is selected */
+  function applyQuickFill(opt: { solidColor?: string; gradient?: [string, string] }) {
+    const d = docRef.current!;
+    const p = d.pages[pageIndexRef.current];
+    const el = p.els.find((e) => e.id === selId);
+    if (el?.locked) { setStatus("That item is locked — unlock it first."); return; }
+    const asFill = (): FillStyle => opt.gradient
+      ? { kind: "gradient", a: opt.gradient[0], b: opt.gradient[1], angle: 180 }
+      : solid(opt.solidColor!);
+    if (el && (el.type === "balloon" || el.type === "panel")) {
+      el.fill = asFill();
+    } else if (el && el.type === "text") {
+      if (opt.gradient) { el.ts.fillA = opt.gradient[0]; el.ts.fillB = opt.gradient[1]; }
+      else { el.ts.fillA = opt.solidColor!; el.ts.fillB = null; }
+    } else if (el && el.type === "image") {
+      setStatus("Images have no fill — select a balloon, panel or lettering.");
+      return;
+    } else {
+      p.bg = asFill();
+    }
+    commit();
+    setShowFill(false);
+  }
+
+  function applyQuickStroke(color: string) {
+    const d = docRef.current!;
+    const p = d.pages[pageIndexRef.current];
+    const el = p.els.find((e) => e.id === selId);
+    if (!el) { setStatus("Select an item to change its stroke."); setShowStroke(false); return; }
+    if (el.locked) { setStatus("That item is locked — unlock it first."); return; }
+    if (el.type === "balloon") el.stroke = color;
+    else if (el.type === "panel" || el.type === "image") {
+      el.borderC = color;
+      if (!el.borderW) el.borderW = 4;
+    } else if (el.type === "text") {
+      el.ts.outlineC = color;
+      if (!el.ts.outlineW) el.ts.outlineW = Math.max(2, Math.round(el.ts.size * 0.08));
+    }
+    commit();
+    setShowStroke(false);
   }
 
   const clipboardRef = useRef<El | null>(null);
@@ -1857,25 +1902,81 @@ export default function Editor() {
       {/* ---------- format bar ---------- */}
       <div className="formatBar">
         <span className="fbLabel">Stroke:</span>
-        <input type="number" min={0} max={40} disabled={!selEl || selEl.type === "text"}
-          value={selEl?.type === "balloon" ? selEl.strokeW : selEl?.type === "panel" || selEl?.type === "image" ? selEl.borderW : 0}
+        <input type="number" min={0} max={80} disabled={!selEl}
+          value={selEl?.type === "balloon" ? selEl.strokeW
+            : selEl?.type === "panel" || selEl?.type === "image" ? selEl.borderW
+            : selEl?.type === "text" ? selEl.ts.outlineW : 0}
           onChange={(e) => mutateSel((x) => {
-            const v = clamp(+e.target.value || 0, 0, 40);
+            const v = clamp(+e.target.value || 0, 0, 80);
             if (x.type === "balloon") x.strokeW = v;
             else if (x.type === "panel" || x.type === "image") x.borderW = v;
+            else if (x.type === "text") x.ts.outlineW = v;
           })} style={{ width: 48 }} />
-        <input type="color" disabled={!selEl || selEl.type === "text"}
-          value={selEl?.type === "balloon" ? selEl.stroke : selEl?.type === "panel" || selEl?.type === "image" ? selEl.borderC : "#111111"}
-          onChange={(e) => mutateSel((x) => {
-            if (x.type === "balloon") x.stroke = e.target.value;
-            else if (x.type === "panel" || x.type === "image") x.borderC = e.target.value;
-          })} />
+        <div style={{ position: "relative" }}>
+          <button className="fillSwatch" title="Stroke / outline color"
+            style={{
+              background: selEl?.type === "balloon" ? selEl.stroke
+                : selEl?.type === "panel" || selEl?.type === "image" ? selEl.borderC
+                : selEl?.type === "text" ? selEl.ts.outlineC : "#111111",
+            }}
+            onClick={() => setShowStroke((s) => !s)} />
+          {showStroke && (
+            <div className="fillPop">
+              <div className="fillPopHead">Stroke color</div>
+              <div className="palGrid">
+                {COLOR_PALETTE.flat().map((c, i) => (
+                  <button key={i} style={{ background: c }} title={c}
+                    onClick={() => applyQuickStroke(c)} />
+                ))}
+              </div>
+              <div className="fld" style={{ marginTop: 6 }}>
+                <label>Custom</label>
+                <input type="color" onChange={(e) => applyQuickStroke(e.target.value)} />
+              </div>
+            </div>
+          )}
+        </div>
         <span className="fbLabel">Fill:</span>
-        <input type="color" disabled={!selEl || (selEl.type !== "balloon" && selEl.type !== "panel")}
-          value={(selEl?.type === "balloon" || selEl?.type === "panel") ? selEl.fill.a : "#ffffff"}
-          onChange={(e) => mutateSel((x) => {
-            if (x.type === "balloon" || x.type === "panel") x.fill = solid(e.target.value);
-          })} />
+        <div style={{ position: "relative" }}>
+          <button className="fillSwatch" title="Fill with a color or gradient"
+            style={(selEl?.type === "balloon" || selEl?.type === "panel")
+              ? fillCss(selEl.fill)
+              : (selEl?.type === "text" && selEl.ts.fillB)
+                ? { background: `linear-gradient(180deg, ${selEl.ts.fillA}, ${selEl.ts.fillB})` }
+                : { background: selEl?.type === "text" ? selEl.ts.fillA : "#ffffff" }}
+            onClick={() => setShowFill((s) => !s)} />
+          {showFill && (
+            <div className="fillPop" onPointerLeave={() => { /* stay open until click */ }}>
+              <div className="fillPopCols">
+                <div>
+                  <div className="fillPopHead">Colors</div>
+                  <div className="palGrid">
+                    {COLOR_PALETTE.flat().map((c, i) => (
+                      <button key={i} style={{ background: c }} title={c}
+                        onClick={() => { applyQuickFill({ solidColor: c }); }} />
+                    ))}
+                  </div>
+                  <div className="fld" style={{ marginTop: 6 }}>
+                    <label>Custom</label>
+                    <input type="color" onChange={(e) => applyQuickFill({ solidColor: e.target.value })} />
+                  </div>
+                </div>
+                <div>
+                  <div className="fillPopHead">Gradients</div>
+                  <div className="palGrid grads">
+                    {GRADIENT_PRESETS.map(([a, b], i) => (
+                      <button key={i} style={{ background: `linear-gradient(180deg, ${a}, ${b})` }}
+                        onClick={() => { applyQuickFill({ gradient: [a, b] }); }} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="tips" style={{ margin: "6px 2px 0" }}>
+                Applies to the selected balloon, panel or lettering — or the page background when nothing is selected.
+              </div>
+            </div>
+          )}
+        </div>
         <label className="fbCheck">
           <input type="checkbox" disabled={!selEl} checked={!!selEl?.shadow}
             onChange={(e) => mutateSel((x) => { x.shadow = e.target.checked; })} /> Shadow

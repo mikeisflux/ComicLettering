@@ -78,6 +78,22 @@ input[type="range"] { width: 110px; }
   min-width: 26px; padding: 3px 6px;
   background: #fff; border: 1px solid var(--edge2); border-radius: 4px;
 }
+.fillSwatch {
+  width: 36px; height: 24px; border: 1px solid var(--edge2); border-radius: 4px;
+  cursor: pointer; padding: 0;
+}
+.fillPop {
+  position: absolute; top: 30px; left: 0; z-index: 150; width: 460px;
+  background: #f4f5f8; border: 1px solid #8f96a1; border-radius: 8px;
+  box-shadow: 0 10px 30px #0005; padding: 10px;
+}
+.fillPopCols { display: flex; gap: 14px; }
+.fillPopHead { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #37507a; margin-bottom: 6px; }
+.palGrid { display: grid; grid-template-columns: repeat(14, 15px); gap: 1px; }
+.palGrid button { width: 15px; height: 15px; border: 1px solid #0002; padding: 0; cursor: pointer; }
+.palGrid button:hover { outline: 2px solid var(--sel); z-index: 1; position: relative; }
+.palGrid.grads { grid-template-columns: repeat(10, 20px); }
+.palGrid.grads button { width: 20px; height: 20px; }
 .fbTog.on { background: #cfe0f5; border-color: var(--sel); }
 .fbTog:disabled { opacity: .4; }
 
