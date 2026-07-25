@@ -477,7 +477,7 @@ function BalloonShape({ el, mergeBase, imgSrc }: { el: BalloonEl; mergeBase?: Me
 interface ProjectMeta { id: string; name: string; updatedAt: string; thumbnail: string | null }
 interface ProofMatch { elId: string; message: string; context: string; offset: number; length: number; reps: string[] }
 
-const STAMPS = ["💥", "⚡", "🔥", "💫", "⭐", "💢", "💦", "💤", "❗", "❓", "🎯", "🏆", "❤️", "💀", "🤖", "👊"];
+const STAMPS = ["💥", "⚡", "🔥", "💫", "⭐", "💢", "💦", "💤", "❗", "❓", "🎯", "🏆", "❤️", "💀", "🤖", "👊", "🎵", "🎶"];
 /* Pre-made SFX word stamps, each paired with a lettering style preset + tilt */
 const WORD_STAMPS: [string, string, number][] = [
   ["ZAP!", "Hazard", -6], ["POW!", "Sunburst", 5], ["BAM!", "Crimson", -4],
