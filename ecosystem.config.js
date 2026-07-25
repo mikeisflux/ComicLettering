@@ -5,9 +5,36 @@
 // fresh workers, waits for them to bind the port, and only then drains the
 // old ones — the site keeps serving throughout a deploy.
 //
-// Two workers share the port via Node's cluster module. SQLite serialises
-// writes across them; if you move to Postgres you can raise `instances`.
-const PORT = process.env.PORT || "3000";
+// Two workers share the port via Node's cluster module. PostgreSQL handles
+// the concurrent connections; raise `instances` for more throughput.
+
+const fs = require("fs");
+const path = require("path");
+
+// Read APP_DIR/.env directly so the workers always get DATABASE_URL even if
+// they are launched without it exported (e.g. a manual `pm2 restart`). This
+// does not depend on Next.js's own .env loading.
+function loadEnvFile(file) {
+  const out = {};
+  try {
+    for (const line of fs.readFileSync(file, "utf8").split("\n")) {
+      const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
+      if (!m) continue;
+      let v = m[2];
+      if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+        v = v.slice(1, -1);
+      }
+      out[m[1]] = v;
+    }
+  } catch {
+    /* no .env yet */
+  }
+  return out;
+}
+
+const fileEnv = loadEnvFile(path.join(__dirname, ".env"));
+const PORT = process.env.PORT || fileEnv.PORT || "3000";
+const DATABASE_URL = process.env.DATABASE_URL || fileEnv.DATABASE_URL || "";
 
 module.exports = {
   apps: [
@@ -25,6 +52,7 @@ module.exports = {
       env: {
         NODE_ENV: "production",
         PORT,
+        DATABASE_URL,
       },
     },
   ],
