@@ -353,6 +353,7 @@ export const FONTS: Record<string, FontDef> = {
   lmcmumble:  { label: "LMC Mumble (Scribble)", css: '"LMC Mumble",cursive', group: "Themed", variants: ALL },
   lmcdragon:  { label: "LMC Dragon (Ours)", css: '"LMC Dragon",cursive', group: "Themed", variants: ALL },
   lmcalien:   { label: "LMC Alien (Sigils)", css: '"LMC Alien",cursive', group: "Themed", variants: RB },
+  lmcvapor:   { label: "LMC Vapor (Bubbles)", css: '"LMC Vapor",cursive', group: "Themed", variants: ALL },
   sacramento: { label: "Sacramento (Thin Script)", css: '"Sacramento",cursive', group: "Themed", variants: R },
   greatvibes: { label: "Great Vibes (Tattoo Script)", css: '"Great Vibes",cursive', group: "Themed", variants: R },
   allerta:    { label: "Allerta Stencil", css: '"Allerta Stencil",sans-serif', group: "Display", variants: R },

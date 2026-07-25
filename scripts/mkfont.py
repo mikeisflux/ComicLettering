@@ -262,6 +262,21 @@ def build_glyph(name, strokes, r, amp, freq, shear, narrow, bounce, drips, cap="
             pts = [(x + y * shear, y) for (x, y) in pts]
         if len(pts) == 1:
             pts = pts + [(pts[0][0] + 0.5, pts[0][1])]
+        if drips == "bubbles":
+            # vapor cloud: the stroke becomes a string of varied dots
+            ph2 = ghash(name + "bub")
+            dense = [pts[0]]
+            for i in range(len(pts) - 1):
+                seg = math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1])
+                steps = max(1, int(seg / 34))
+                for k in range(1, steps + 1):
+                    t = k / steps
+                    dense.append((pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t,
+                                  pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t))
+            for idx, p in enumerate(dense):
+                rv = (r * rmul) * (0.55 + ((ph2 >> (idx % 23)) % 100) / 130)
+                paths.append(capsule_path(p, (p[0] + 0.5, p[1]), rv, "round"))
+            continue
         n_seg = len(pts) - 1
         for i in range(n_seg):
             rr = r * rmul
@@ -353,6 +368,7 @@ FAMILIES = {
     "LMC Mumble":   (24, 36, 6.0, 1.3, 0, 1.00, 26, "scribble", "round", 0),
     "LMC Dragon":   (58, 76, 6.0, 1.1, 4, 0.98, 10, "taper", "round", 0),
     "LMC Alien":    (42, 58, 3.0, 1.0, 0, 1.00, 12, "alien", "round", 0),
+    "LMC Vapor":    (32, 44, 4.0, 1.0, 0, 1.00, 8, "bubbles", "round", 0),
 }
 
 def main(outdir):
