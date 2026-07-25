@@ -200,7 +200,7 @@ function drawEl(ctx: CanvasRenderingContext2D, el: El, assets: Assets, merge?: M
       ctx.fill(path);
       ctx.restore();
     }
-    if (el.strokeW > 0) {
+    if (el.strokeW > 0 && !g.noStroke) {
       ctx.strokeStyle = el.stroke;
       ctx.lineJoin = "round";
       if (g.dash) ctx.setLineDash(g.dash);
@@ -235,10 +235,14 @@ function drawEl(ctx: CanvasRenderingContext2D, el: El, assets: Assets, merge?: M
         ctx.stroke(mPath);
       }
       ctx.restore();
-    } else if (el.strokeW > 0) {
+    } else if (el.strokeW > 0 && !g.noStroke) {
       ctx.lineWidth = el.strokeW;
       ctx.stroke(path);
       if (g.d2) ctx.stroke(new Path2D(g.d2));
+    }
+    if (g.deco && el.strokeW > 0) {
+      ctx.fillStyle = el.stroke;
+      ctx.fill(new Path2D(g.deco));
     }
     ctx.setLineDash([]);
     drawStyledText(ctx, el.ts, el.text, g.textRect);

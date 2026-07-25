@@ -82,6 +82,10 @@ function bendGeom(
 export interface BalloonGeom {
   d: string;
   d2?: string; // decorative second outline (stroked only)
+  /* decorative shapes filled with the stroke colour (e.g. dot borders) */
+  deco?: string;
+  /* suppress stroking the main path (border drawn by deco instead) */
+  noStroke?: boolean;
   textRect: [number, number, number, number];
   dash: number[] | null;
 }
@@ -361,6 +365,39 @@ export function balloonGeom(el: BalloonEl): BalloonGeom {
         d: polygonWithTail(roundRectPts(w, h, Math.min(w, h) / 2, 8), w, h, tail, false, !!el.band),
         textRect: padRect(0.14, 0.16), dash: null,
       };
+    case "cosmic": {
+      /* border made of scattered ink dots around the ellipse */
+      const rnd = prng(99 + Math.round(w + h));
+      const k = 0.9;
+      const d = `M ${fmt(cx + rx * k)} ${fmt(cy)} A ${fmt(rx * k)} ${fmt(ry * k)} 0 1 1 ${fmt(cx - rx * k)} ${fmt(cy)} A ${fmt(rx * k)} ${fmt(ry * k)} 0 1 1 ${fmt(cx + rx * k)} ${fmt(cy)} Z`;
+      let deco = "";
+      const N = 48;
+      for (let i = 0; i < N; i++) {
+        const a = (i / N) * Math.PI * 2 + rnd() * 0.1;
+        const rr = 2.5 + rnd() * Math.min(w, h) * 0.038;
+        const wob = 0.96 + rnd() * 0.1;
+        deco += circleSub(cx + rx * wob * Math.cos(a) * 0.97, cy + ry * wob * Math.sin(a) * 0.97, rr);
+      }
+      return { d, deco, noStroke: true, textRect: ellipseRect, dash: null };
+    }
+    case "sketch": {
+      /* skritchy pen: clean line plus a jittered second pass */
+      return {
+        d: ellipseTailPath(el, "smooth"),
+        d2: jitterRing(el, "rough", tail ? { dx: tail.dx, dy: tail.dy } : null),
+        textRect: ellipseRect, dash: null,
+      };
+    }
+    case "emitter": {
+      /* broken concentric rings radiating outward */
+      const ring = (k: number) =>
+        `M ${fmt(cx + rx * k)} ${fmt(cy)} A ${fmt(rx * k)} ${fmt(ry * k)} 0 1 1 ${fmt(cx - rx * k)} ${fmt(cy)} A ${fmt(rx * k)} ${fmt(ry * k)} 0 1 1 ${fmt(cx + rx * k)} ${fmt(cy)} Z`;
+      return {
+        d: ring(0.88),
+        d2: ring(0.74) + " " + ring(1.0),
+        textRect: [w * 0.2, h * 0.24, w * 0.6, h * 0.52], dash: [26, 15],
+      };
+    }
     case "rough":
       return { d: ellipseTailPath(el, "rough"), textRect: ellipseRect, dash: null };
     case "buzz":

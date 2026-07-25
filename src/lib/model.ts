@@ -5,7 +5,8 @@ export type FilterKey = "none" | "bw" | "sepia" | "vivid" | "faded" | "noir";
 export type BalloonKind =
   | "speech" | "rough" | "buzz" | "double" | "thought"
   | "shout" | "burst2" | "whisper" | "square" | "tv"
-  | "extend" | "rounded" | "caption" | "custom";
+  | "extend" | "rounded" | "caption" | "custom"
+  | "cosmic" | "sketch" | "emitter";
 
 /* ---------------- fills: solid / gradient / halftone ---------------- */
 
@@ -368,6 +369,7 @@ export const FONTS: Record<string, FontDef> = {
   rubikburned:{ label: "Rubik Burned (Char)", css: '"Rubik Burned",cursive', group: "Themed", variants: R },
   bahiana:    { label: "Bahiana (Woodcut)", css: '"Bahiana",cursive', group: "Themed", variants: R },
   beastly:    { label: "Rubik Beastly (Fuzzy)", css: '"Rubik Beastly",cursive', group: "Themed", variants: R },
+  wetpaint:   { label: "Rubik Wet Paint (Splatter)", css: '"Rubik Wet Paint",cursive', group: "Themed", variants: R },
   medieval:   { label: "MedievalSharp (Witchy)", css: '"MedievalSharp",cursive', group: "Themed", variants: R },
   poiret:     { label: "Poiret One (Deco Line)", css: '"Poiret One",cursive', group: "Themed", variants: R },
   wallpoet:   { label: "Wallpoet (Stencil Tech)", css: '"Wallpoet",cursive', group: "Themed", variants: R },
@@ -585,10 +587,11 @@ export const BALLOON_KINDS: Record<BalloonKind, string> = {
   thought: "Thought", shout: "Exclaim", burst2: "Exclaim dense",
   whisper: "Whisper", square: "Square", tv: "TV", extend: "Pill",
   rounded: "Rounded box", caption: "Caption", custom: "Hand-drawn",
+  cosmic: "Dotted ring", sketch: "Sketchy pen", emitter: "Emitter rings",
 };
 
 /* balloon kinds that have no tail */
-export const TAILLESS_KINDS: BalloonKind[] = ["caption", "rounded"];
+export const TAILLESS_KINDS: BalloonKind[] = ["caption", "rounded", "cosmic", "emitter"];
 
 /* ---------------- factories ---------------- */
 

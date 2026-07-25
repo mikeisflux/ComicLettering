@@ -438,7 +438,7 @@ function BalloonShape({ el, mergeBase, imgSrc }: { el: BalloonEl; mergeBase?: Me
           </pattern>
         )}
       </defs>
-      {mergeBase && el.strokeW > 0 && (
+      {mergeBase && el.strokeW > 0 && !g.noStroke && (
         /* joined balloons: stroke under, fills over → outlines union */
         <path d={g.d} fill="none" stroke={el.stroke} strokeWidth={el.strokeW * 2}
           strokeLinejoin="round" strokeDasharray={g.dash ? g.dash.join(" ") : undefined} />
@@ -460,7 +460,7 @@ function BalloonShape({ el, mergeBase, imgSrc }: { el: BalloonEl; mergeBase?: Me
           ) : null}
         </g>
       )}
-      {!mergeBase && el.strokeW > 0 && (
+      {!mergeBase && el.strokeW > 0 && !g.noStroke && (
         <path d={g.d} fill="none" stroke={el.stroke} strokeWidth={el.strokeW}
           strokeLinejoin="round" strokeDasharray={g.dash ? g.dash.join(" ") : undefined} />
       )}
@@ -468,6 +468,7 @@ function BalloonShape({ el, mergeBase, imgSrc }: { el: BalloonEl; mergeBase?: Me
         <path d={g.d2} fill="none" stroke={el.stroke} strokeWidth={el.strokeW}
           strokeLinejoin="round" strokeDasharray={g.dash ? g.dash.join(" ") : undefined} />
       )}
+      {g.deco && el.strokeW > 0 && <path d={g.deco} fill={el.stroke} />}
     </svg>
   );
 }
@@ -2872,6 +2873,27 @@ export default function Editor() {
         </TrayBtn>
         <TrayBtn onClick={() => addFromTray("rounded")} label="Rounded">
           <svg viewBox="0 0 40 30"><rect x="4" y="6" width="32" height="18" rx="6" fill="#fff" stroke="#222" strokeWidth="2" /></svg>
+        </TrayBtn>
+        <TrayBtn onClick={() => addFromTray("cosmic")} label="Dotted">
+          <svg viewBox="0 0 40 30">
+            <ellipse cx="20" cy="15" rx="13" ry="9" fill="#fff" />
+            {[0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330].map((a, i) => (
+              <circle key={a} cx={20 + 15 * Math.cos((a * Math.PI) / 180)} cy={15 + 11 * Math.sin((a * Math.PI) / 180)} r={i % 3 === 0 ? 2 : 1.3} fill="#222" />
+            ))}
+          </svg>
+        </TrayBtn>
+        <TrayBtn onClick={() => addFromTray("sketch")} label="Sketchy">
+          <svg viewBox="0 0 40 30">
+            <ellipse cx="20" cy="13" rx="14" ry="9" fill="#fff" stroke="#222" strokeWidth="1.2" />
+            <ellipse cx="20.6" cy="13.5" rx="13.6" ry="8.6" fill="none" stroke="#222" strokeWidth="1" />
+            <path d="M15 21 L11 28 L21 22 Z" fill="#fff" stroke="#222" strokeWidth="1.2" />
+          </svg>
+        </TrayBtn>
+        <TrayBtn onClick={() => addFromTray("emitter")} label="Emitter">
+          <svg viewBox="0 0 40 30">
+            <ellipse cx="20" cy="15" rx="9" ry="6" fill="#fff" stroke="#222" strokeWidth="1.6" strokeDasharray="5 3" />
+            <ellipse cx="20" cy="15" rx="14" ry="10" fill="none" stroke="#222" strokeWidth="1.6" strokeDasharray="6 4" />
+          </svg>
         </TrayBtn>
         <TrayBtn active={drawMode} label="Draw" onClick={() => {
           setDrawMode((d) => !d);
