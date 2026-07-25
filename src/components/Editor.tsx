@@ -529,8 +529,8 @@ export default function Editor() {
   const drawPtsRef = useRef<number[][] | null>(null);
   /* id of a freshly sketched balloon awaiting a tail choice */
   const [tailAsk, setTailAsk] = useState<string | null>(null);
-  const autoLockRef = useRef(true);
-  const [autoLock, setAutoLockState] = useState(true);
+  const autoLockRef = useRef(false);
+  const [autoLock, setAutoLockState] = useState(false);
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; id: string } | null>(null);
   const [showSetup, setShowSetup] = useState(false);
   const [showExport, setShowExport] = useState(false);
@@ -562,7 +562,7 @@ export default function Editor() {
   const [proof, setProof] = useState<{ busy: boolean; error: string | null; matches: ProofMatch[] } | null>(null);
 
   useEffect(() => {
-    try { autoLockRef.current = localStorage.getItem("lmc.autolock") !== "0"; } catch { /* ignore */ }
+    try { autoLockRef.current = localStorage.getItem("lmc.autolock") === "1"; } catch { /* ignore */ }
     setAutoLockState(autoLockRef.current);
   }, []);
   const setAutoLock = (v: boolean) => {

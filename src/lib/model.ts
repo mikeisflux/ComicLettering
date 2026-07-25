@@ -174,18 +174,43 @@ export interface BalloonEl extends BaseEl {
   band?: boolean;
 }
 
-/* Resolve a balloon's effective tail: attached balloons aim at their partner. */
+/* aim a band-tail from `from` toward the centre of `to` (local, unrotated) */
+function bandToward(from: BalloonEl, to: BalloonEl, keep?: BalloonEl["tail"]): BalloonEl["tail"] {
+  const [dx, dy] = rotVec(
+    to.x + to.w / 2 - (from.x + from.w / 2),
+    to.y + to.h / 2 - (from.y + from.h / 2),
+    -from.rot);
+  const t: NonNullable<BalloonEl["tail"]> = { dx: Math.round(dx), dy: Math.round(dy) };
+  if (keep && keep.bx != null && keep.by != null) { t.bx = keep.bx; t.by = keep.by; t.tx = keep.tx; t.ty = keep.ty; }
+  return t;
+}
+
+/* Resolve a balloon's effective tail for rendering. Joined balloons connect
+   with a wide band that opens into BOTH balloons; once they overlap they melt
+   into one shape and the connector vanishes entirely. */
 export function resolveBalloon(page: Page, el: BalloonEl): { el: BalloonEl; base: BalloonEl | null } {
-  if (!el.attachTo) return { el, base: null };
+  /* is this balloon the parent of a joined child? */
+  const child = page.els.find(
+    (e) => e.type === "balloon" && (e as BalloonEl).attachTo === el.id) as BalloonEl | undefined;
+
+  if (!el.attachTo) {
+    /* a parent opens a band toward its child while they're apart, so the
+       connector flows in instead of butting against a closed outline */
+    if (child && !aabbOverlap(el, child)) {
+      return { el: { ...el, band: true, tail: bandToward(el, child, el.tail) }, base: null };
+    }
+    return { el, base: null };
+  }
+
   const base = page.els.find((e) => e.id === el.attachTo && e.type === "balloon") as BalloonEl | undefined;
   if (!base) return { el: { ...el, attachTo: null }, base: null };
-  const bc = [el.x + el.w / 2, el.y + el.h / 2];
-  const ac = [base.x + base.w / 2, base.y + base.h / 2];
-  const [dx, dy] = rotVec(ac[0] - bc[0], ac[1] - bc[1], -el.rot);
-  return {
-    el: { ...el, band: true, tail: { ...(el.tail ?? {}), dx: Math.round(dx), dy: Math.round(dy) } },
-    base,
-  };
+
+  /* overlapping → melt into one shape: no connector, fills union */
+  if (aabbOverlap(el, base)) {
+    return { el: { ...el, band: false, tail: null }, base };
+  }
+  /* apart → band aimed at the partner's centre */
+  return { el: { ...el, band: true, tail: bandToward(el, base, el.tail) }, base };
 }
 
 export const aabbOverlap = (
