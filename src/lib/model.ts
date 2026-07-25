@@ -365,6 +365,8 @@ export const FONTS: Record<string, FontDef> = {
   tradewinds: { label: "Trade Winds (Circus)", css: '"Trade Winds",cursive', group: "Themed", variants: R },
   giveyouglory:{ label: "Give You Glory (Notes)", css: '"Give You Glory",cursive', group: "Dialogue", variants: R },
   limelight:  { label: "Limelight (Noir Deco)", css: '"Limelight",cursive', group: "Themed", variants: R },
+  pacifico:   { label: "Pacifico (Retro Script)", css: '"Pacifico",cursive', group: "Themed", variants: R },
+  ultra:      { label: "Ultra (Pulp Slab)", css: '"Ultra",serif', group: "Themed", variants: R },
   creepster: { label: "Creepster",        css: '"Creepster",cursive',      group: "Themed", variants: R },
   nosifer:   { label: "Nosifer (Drip)",   css: '"Nosifer",cursive',        group: "Themed", variants: R },
   audiowide: { label: "Audiowide (Sci-Fi)", css: '"Audiowide",sans-serif', group: "Themed", variants: R },
