@@ -144,15 +144,24 @@ backup_db() {
 # Start fresh, or reload in place if the app is already under PM2.
 pm2_up() {
   ensure_pm2
-  # migrate away from any old systemd unit so it can't fight for the port
-  if systemctl list-unit-files 2>/dev/null | grep -q "^${SERVICE}.service"; then
-    log "Disabling old systemd service '${SERVICE}'…"
-    systemctl disable --now "$SERVICE" 2>/dev/null || true
+  # migrate away from any old systemd unit so it can't hold the port
+  if systemctl cat "$SERVICE" >/dev/null 2>&1; then
+    log "Disabling old systemd service '${SERVICE}' (frees the port)…"
+    systemctl disable --now "$SERVICE" >/dev/null 2>&1 || true
   fi
   cd "$APP_DIR"
   if pm2 describe "$SERVICE" >/dev/null 2>&1; then
-    log "Reloading ${SERVICE} (zero-downtime)…"
-    pm2 reload ecosystem.config.js --update-env
+    # if any instance is errored/stopped, a plain reload won't recover it —
+    # fall back to a clean delete + start
+    if pm2 jlist 2>/dev/null | grep -q "\"status\":\"errored\"\|\"status\":\"stopped\""; then
+      log "PM2 process in a bad state — restarting it cleanly…"
+      pm2 delete "$SERVICE" >/dev/null 2>&1 || true
+      pm2 start ecosystem.config.js --update-env
+    else
+      log "Reloading ${SERVICE} (zero-downtime)…"
+      pm2 reload ecosystem.config.js --update-env \
+        || { pm2 delete "$SERVICE" >/dev/null 2>&1; pm2 start ecosystem.config.js --update-env; }
+    fi
   else
     log "Starting ${SERVICE} under PM2…"
     pm2 start ecosystem.config.js --update-env
