@@ -1049,6 +1049,25 @@ export default function Editor() {
       const fonts = JSON.parse(localStorage.getItem("lmc.fonts") || "[]");
       if (Array.isArray(fonts)) fonts.forEach((f) => registerRuntimeFont(f));
     } catch { /* ignore */ }
+    /* site-wide fonts installed by the site owner on the server */
+    (async () => {
+      try {
+        const res = await fetch("/api/site-fonts");
+        if (!res.ok) return;
+        const fonts: { name: string; url: string }[] = await res.json();
+        for (const f of fonts) {
+          const key = "site_" + f.name.toLowerCase().replace(/\W+/g, "");
+          if (FONTS[key]) continue;
+          try {
+            const face = new FontFace("Site " + f.name, `url(${f.url})`);
+            await face.load();
+            document.fonts.add(face);
+            registerFont(key, f.name, "Site " + f.name, "Site Fonts");
+          } catch { /* bad font file — skip */ }
+        }
+        bumpFonts();
+      } catch { /* none */ }
+    })();
     (async () => {
       try {
         const res = await fetch("/api/assets");

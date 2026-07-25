@@ -285,11 +285,11 @@ export const FONTS: Record<string, FontDef> = {
   serif:     { label: "Georgia",          css: 'Georgia,"Times New Roman",serif', group: "System", variants: ALL },
 };
 
-export const FONT_GROUPS = ["My Fonts", "Dialogue", "Display", "Themed", "System"];
+export const FONT_GROUPS = ["My Fonts", "Site Fonts", "Dialogue", "Display", "Themed", "System"];
 
-/* Register a user-imported font at runtime (loaded via the FontFace API). */
-export function registerFont(key: string, label: string, family: string) {
-  FONTS[key] = { label, css: `"${family}", sans-serif`, group: "My Fonts", variants: ["regular"] };
+/* Register a runtime-loaded font (user-imported or site-wide). */
+export function registerFont(key: string, label: string, family: string, group: "My Fonts" | "Site Fonts" = "My Fonts") {
+  FONTS[key] = { label, css: `"${family}", sans-serif`, group, variants: ["regular"] };
 }
 
 /* ---------------- filters ---------------- */
