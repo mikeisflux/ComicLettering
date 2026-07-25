@@ -2,6 +2,8 @@ The font files in this directory are licensed under the SIL Open Font
 License 1.1 (OFL) and are redistributed here under its terms.
 
 Families: Comic Neue, Patrick Hand, Kalam, Bangers, Luckiest Guy, Boogaloo,
+Shantell Sans, Gochi Hand, Schoolbell, Walter Turncoat, Caveat, Amatic SC,
+Special Elite, Sniglet, Fredoka, Titan One, Lilita One, Passion One, Rampart One,
 Chewy, Alfa Slab One, Bungee, Creepster, Nosifer, Audiowide, Permanent
 Marker, Courier Prime, League Gothic.
 

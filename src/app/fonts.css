@@ -42,3 +42,175 @@
 @font-face{font-family:'League Gothic';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/LeagueGothic-400.woff2) format('woff2');}
 @font-face{font-family:'League Gothic';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/LeagueGothic-400.woff2) format('woff2');}
 @font-face{font-family:'League Gothic';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/LeagueGothic-400.woff2) format('woff2');}
+@font-face{font-family:'Shantell Sans';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/ShantellSans-400.woff2) format('woff2');}
+@font-face{font-family:'Shantell Sans';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/ShantellSans-400.woff2) format('woff2');}
+@font-face{font-family:'Shantell Sans';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/ShantellSans-400.woff2) format('woff2');}
+@font-face{font-family:'Shantell Sans';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/ShantellSans-400.woff2) format('woff2');}
+@font-face{font-family:'Shantell Sans';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/ShantellSans-400.woff2) format('woff2');}
+@font-face{font-family:'Shantell Sans';font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/ShantellSans-700.woff2) format('woff2');}
+@font-face{font-family:'Shantell Sans';font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/ShantellSans-700.woff2) format('woff2');}
+@font-face{font-family:'Shantell Sans';font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/ShantellSans-700.woff2) format('woff2');}
+@font-face{font-family:'Shantell Sans';font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/ShantellSans-700.woff2) format('woff2');}
+@font-face{font-family:'Shantell Sans';font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/ShantellSans-700.woff2) format('woff2');}
+@font-face{font-family:'Gochi Hand';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/GochiHand-400.woff2) format('woff2');}
+@font-face{font-family:'Schoolbell';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/Schoolbell-400.woff2) format('woff2');}
+@font-face{font-family:'Walter Turncoat';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/WalterTurncoat-400.woff2) format('woff2');}
+@font-face{font-family:'Caveat';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/Caveat-400.woff2) format('woff2');}
+@font-face{font-family:'Caveat';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/Caveat-400.woff2) format('woff2');}
+@font-face{font-family:'Caveat';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/Caveat-400.woff2) format('woff2');}
+@font-face{font-family:'Caveat';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/Caveat-400.woff2) format('woff2');}
+@font-face{font-family:'Caveat';font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/Caveat-700.woff2) format('woff2');}
+@font-face{font-family:'Caveat';font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/Caveat-700.woff2) format('woff2');}
+@font-face{font-family:'Caveat';font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/Caveat-700.woff2) format('woff2');}
+@font-face{font-family:'Caveat';font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/Caveat-700.woff2) format('woff2');}
+@font-face{font-family:'Amatic SC';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/AmaticSC-400.woff2) format('woff2');}
+@font-face{font-family:'Amatic SC';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/AmaticSC-400.woff2) format('woff2');}
+@font-face{font-family:'Amatic SC';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/AmaticSC-400.woff2) format('woff2');}
+@font-face{font-family:'Amatic SC';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/AmaticSC-400.woff2) format('woff2');}
+@font-face{font-family:'Amatic SC';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/AmaticSC-400.woff2) format('woff2');}
+@font-face{font-family:'Amatic SC';font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/AmaticSC-700.woff2) format('woff2');}
+@font-face{font-family:'Amatic SC';font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/AmaticSC-700.woff2) format('woff2');}
+@font-face{font-family:'Amatic SC';font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/AmaticSC-700.woff2) format('woff2');}
+@font-face{font-family:'Amatic SC';font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/AmaticSC-700.woff2) format('woff2');}
+@font-face{font-family:'Amatic SC';font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/AmaticSC-700.woff2) format('woff2');}
+@font-face{font-family:'Special Elite';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/SpecialElite-400.woff2) format('woff2');}
+@font-face{font-family:'Special Elite';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/SpecialElite-400.woff2) format('woff2');}
+@font-face{font-family:'Sniglet';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/Sniglet-400.woff2) format('woff2');}
+@font-face{font-family:'Sniglet';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/Sniglet-400.woff2) format('woff2');}
+@font-face{font-family:'Fredoka';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/Fredoka-400.woff2) format('woff2');}
+@font-face{font-family:'Fredoka';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/Fredoka-400.woff2) format('woff2');}
+@font-face{font-family:'Fredoka';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/Fredoka-400.woff2) format('woff2');}
+@font-face{font-family:'Fredoka';font-style:normal;font-weight:600;font-display:swap;src:url(/fonts/Fredoka-600.woff2) format('woff2');}
+@font-face{font-family:'Fredoka';font-style:normal;font-weight:600;font-display:swap;src:url(/fonts/Fredoka-600.woff2) format('woff2');}
+@font-face{font-family:'Fredoka';font-style:normal;font-weight:600;font-display:swap;src:url(/fonts/Fredoka-600.woff2) format('woff2');}
+@font-face{font-family:'Titan One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/TitanOne-400.woff2) format('woff2');}
+@font-face{font-family:'Titan One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/TitanOne-400.woff2) format('woff2');}
+@font-face{font-family:'Lilita One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/LilitaOne-400.woff2) format('woff2');}
+@font-face{font-family:'Lilita One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/LilitaOne-400.woff2) format('woff2');}
+@font-face{font-family:'Passion One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/PassionOne-400.woff2) format('woff2');}
+@font-face{font-family:'Passion One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/PassionOne-400.woff2) format('woff2');}
+@font-face{font-family:'Passion One';font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/PassionOne-700.woff2) format('woff2');}
+@font-face{font-family:'Passion One';font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/PassionOne-700.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
+@font-face{font-family:'Rampart One';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/RampartOne-400.woff2) format('woff2');}
