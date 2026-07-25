@@ -140,6 +140,22 @@ def drip_strokes(name, strokes):
         out.append(([(x, 25), (x + sway * 0.4, -ln * 0.55), (x + sway, -ln)], 0.45))
     return out
 
+def droplet_strokes(name, strokes):
+    """little sneeze droplets scattered just off the letterforms"""
+    pts = [p for s in strokes for p in s]
+    if not pts:
+        return []
+    ph = ghash(name + "spot")
+    out = []
+    for i in range(5):
+        p = pts[(ph >> (i * 4)) % len(pts)]
+        ang = ((ph >> (i * 6)) % 360) * math.pi / 180
+        dist = 95 + ((ph >> (i * 3)) % 60)
+        x, y = p[0] + dist * math.cos(ang), p[1] + dist * math.sin(ang)
+        rf = 0.22 + ((ph >> (i * 5)) % 10) / 55
+        out.append(([(x, y), (x + 0.5, y)], rf))
+    return out
+
 def capsule_path(p, q, r, cap="round", n=12):
     if cap == "square":
         # rectangle extended r beyond both endpoints — blocky chopped stroke
@@ -181,8 +197,10 @@ def decimate(pts, k):
 
 def build_glyph(name, strokes, r, amp, freq, shear, narrow, bounce, drips, cap="round", decim=0):
     stroke_list = [(s, 1.0) for s in strokes]
-    if drips:
+    if drips == "drips":
         stroke_list += drip_strokes(name, strokes)
+    elif drips == "droplets":
+        stroke_list += droplet_strokes(name, strokes)
     dy0 = (((ghash(name + "b") % 100) / 100) - 0.5) * 2 * bounce
     paths = []
     for stroke, rmul in stroke_list:
@@ -260,16 +278,17 @@ def make_font(family, style, r, amp, freq, shear, narrow, bounce, drips, out_ttf
 
 # family: (regular_r, bold_r, amp, freq, lean_deg, narrow, bounce, drips, cap, decim)
 FAMILIES = {
-    "LMC Dialogue": (46, 64, 5.0, 1.0, 0, 1.00, 0, False, "round", 0),
-    "LMC Agent":    (52, 70, 2.5, 0.8, 0, 0.94, 0, False, "round", 0),
-    "LMC Hero":     (78, 100, 4.0, 0.9, 3, 1.04, 6, False, "round", 0),
-    "LMC Alley":    (34, 50, 10.0, 1.9, 1, 0.88, 18, False, "round", 0),
-    "LMC Whisper":  (26, 40, 9.0, 1.6, 0, 1.02, 14, False, "round", 0),
-    "LMC Shout":    (88, 108, 6.0, 1.3, 4, 0.84, 10, False, "round", 0),
-    "LMC Horror":   (50, 68, 13.0, 2.6, 0, 0.95, 16, True, "round", 0),
-    "LMC Brawl":    (80, 100, 3.0, 1.0, 2, 0.92, 8, False, "square", 5),
-    "LMC Cosmos":   (42, 62, 1.2, 0.8, 0, 1.14, 0, False, "square", 4),
-    "LMC Slasher":  (64, 84, 8.0, 2.2, 3, 0.90, 12, False, "square", 4),
+    "LMC Dialogue": (46, 64, 5.0, 1.0, 0, 1.00, 0, "", "round", 0),
+    "LMC Agent":    (52, 70, 2.5, 0.8, 0, 0.94, 0, "", "round", 0),
+    "LMC Hero":     (78, 100, 4.0, 0.9, 3, 1.04, 6, "", "round", 0),
+    "LMC Alley":    (34, 50, 10.0, 1.9, 1, 0.88, 18, "", "round", 0),
+    "LMC Whisper":  (26, 40, 9.0, 1.6, 0, 1.02, 14, "", "round", 0),
+    "LMC Shout":    (88, 108, 6.0, 1.3, 4, 0.84, 10, "", "round", 0),
+    "LMC Horror":   (50, 68, 13.0, 2.6, 0, 0.95, 16, "drips", "round", 0),
+    "LMC Brawl":    (80, 100, 3.0, 1.0, 2, 0.92, 8, "", "square", 5),
+    "LMC Cosmos":   (42, 62, 1.2, 0.8, 0, 1.14, 0, "", "square", 4),
+    "LMC Slasher":  (64, 84, 8.0, 2.2, 3, 0.90, 12, "", "square", 4),
+    "LMC Sneeze":   (82, 102, 5.0, 1.0, 2, 1.02, 8, "droplets", "round", 0),
 }
 
 def main(outdir):
