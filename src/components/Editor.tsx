@@ -12,7 +12,7 @@ import {
   COLOR_PALETTE, DPI, GradStop, MULTI_GRADIENTS, PAPER_CATEGORIES, PageMargin,
   TAILLESS_KINDS, TEXTURE_VARIANTS, TextEl, TextStyle, aabbOverlap, applyLayout,
   clamp, lightenHex, makeBalloon, makeImage, makePanel, makeText, newPage,
-  reseedIds, resolveBalloon, rotVec, solid, starterDoc, uid,
+  registerFont, reseedIds, resolveBalloon, rotVec, solid, starterDoc, uid,
 } from "@/lib/model";
 import { balloonGeom } from "@/lib/geometry";
 import { LETTER_STYLES, LetterStyle, applyLetterStyle } from "@/lib/presets";
@@ -66,8 +66,8 @@ function letterStyleCss(s: LetterStyle, size: number): CSSProperties {
 
 /* ---------------- font menu with live previews ---------------- */
 
-function FontMenu({ value, disabled, onPick }: {
-  value: string; disabled?: boolean; onPick: (key: string) => void;
+function FontMenu({ value, disabled, onPick, onImport }: {
+  value: string; disabled?: boolean; onPick: (key: string) => void; onImport?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const f = FONTS[value] || FONTS.comicneue;
@@ -81,18 +81,31 @@ function FontMenu({ value, disabled, onPick }: {
         <>
           <div className="ctxBackdrop" style={{ zIndex: 149 }} onClick={() => setOpen(false)} />
           <div className="fontMenu">
-            {FONT_GROUPS.map((gr) => (
-              <div key={gr}>
-                <div className="fontGroup">{gr}</div>
-                {Object.entries(FONTS).filter(([, x]) => x.group === gr).map(([k, x]) => (
-                  <button key={k} className={"fontItem" + (k === value ? " on" : "")}
-                    style={{ fontFamily: x.css }}
-                    onClick={() => { onPick(k); setOpen(false); }}>
-                    {x.label}
-                  </button>
-                ))}
-              </div>
-            ))}
+            {FONT_GROUPS.map((gr) => {
+              const entries = Object.entries(FONTS).filter(([, x]) => x.group === gr);
+              if (!entries.length) return null;
+              return (
+                <div key={gr}>
+                  <div className="fontGroup">{gr}</div>
+                  {entries.map(([k, x]) => (
+                    <button key={k} className={"fontItem" + (k === value ? " on" : "")}
+                      style={{ fontFamily: x.css }}
+                      onClick={() => { onPick(k); setOpen(false); }}>
+                      {x.label}
+                    </button>
+                  ))}
+                </div>
+              );
+            })}
+            {onImport && (
+              <>
+                <div className="ctxSep" />
+                <button className="fontItem" style={{ fontSize: 13 }}
+                  onClick={() => { setOpen(false); onImport(); }}>
+                  ＋ Import font… (.ttf .otf .woff)
+                </button>
+              </>
+            )}
           </div>
         </>
       )}
@@ -1001,6 +1014,79 @@ export default function Editor() {
   const fileImageRef = useRef<HTMLInputElement>(null);
   const filePanelImageRef = useRef<HTMLInputElement>(null);
   const fileOpenRef = useRef<HTMLInputElement>(null);
+  const fileFontRef = useRef<HTMLInputElement>(null);
+  const fileStampRef = useRef<HTMLInputElement>(null);
+  const [customStamps, setCustomStamps] = useState<{ id: string; url: string }[]>([]);
+  const [, bumpFonts] = useReducer((c: number) => c + 1, 0);
+
+  /* ---------------- custom fonts & stamps (persisted in this browser) ---------------- */
+
+  const registerRuntimeFont = useCallback(async (rec: { key: string; label: string; family: string; data: string }) => {
+    try {
+      const face = new FontFace(rec.family, `url(${rec.data})`);
+      await face.load();
+      document.fonts.add(face);
+      registerFont(rec.key, rec.label, rec.family);
+      bumpFonts();
+    } catch { /* corrupt font file — skip */ }
+  }, []);
+
+  useEffect(() => {
+    try {
+      const stamps = JSON.parse(localStorage.getItem("lmc.stamps") || "[]");
+      if (Array.isArray(stamps)) setCustomStamps(stamps);
+    } catch { /* ignore */ }
+    try {
+      const fonts = JSON.parse(localStorage.getItem("lmc.fonts") || "[]");
+      if (Array.isArray(fonts)) fonts.forEach((f) => registerRuntimeFont(f));
+    } catch { /* ignore */ }
+  }, [registerRuntimeFont]);
+
+  async function importFontFiles(files: File[]) {
+    let list: { key: string; label: string; family: string; data: string }[] = [];
+    try { list = JSON.parse(localStorage.getItem("lmc.fonts") || "[]"); } catch { /* ignore */ }
+    for (const f of files) {
+      const label = f.name.replace(/\.(ttf|otf|woff2?)$/i, "");
+      const key = "custom_" + label.toLowerCase().replace(/\W+/g, "");
+      const family = "LMC " + label;
+      const data = await readAsDataURL(f);
+      const rec = { key, label, family, data };
+      await registerRuntimeFont(rec);
+      if (!FONTS[key]) { setStatus(`Could not load font "${f.name}".`); continue; }
+      list = [...list.filter((x) => x.key !== key), rec];
+    }
+    try {
+      localStorage.setItem("lmc.fonts", JSON.stringify(list));
+      setStatus("Font imported — find it under “My Fonts”. (Stored in this browser; projects opened elsewhere fall back to a standard font.)");
+    } catch {
+      setStatus("Font loaded for this session, but it's too large to remember in browser storage.");
+    }
+  }
+
+  async function importStampFiles(files: File[]) {
+    const list = [...customStamps];
+    for (const f of files) {
+      const url = await readAsDataURL(f);
+      list.push({ id: crypto.randomUUID(), url });
+    }
+    setCustomStamps(list);
+    try { localStorage.setItem("lmc.stamps", JSON.stringify(list)); setStatus("Stamps added to your library."); }
+    catch { setStatus("Stamps added for this session, but too large to remember in browser storage."); }
+  }
+
+  async function insertCustomStamp(url: string) {
+    const img = await loadImage(url);
+    const aid = "a" + aidRef.current++;
+    assetsRef.current[aid] = url;
+    placeAsset(aid, img.naturalWidth, img.naturalHeight);
+    setStampOpen(false);
+  }
+
+  function removeCustomStamp(id: string) {
+    const list = customStamps.filter((s) => s.id !== id);
+    setCustomStamps(list);
+    try { localStorage.setItem("lmc.stamps", JSON.stringify(list)); } catch { /* ignore */ }
+  }
 
   const readAsDataURL = (f: File) => new Promise<string>((res, rej) => {
     const r = new FileReader();
@@ -1492,7 +1578,7 @@ export default function Editor() {
       <div className="inspSection">
         <div className="inspHead">Lettering</div>
         <Fld label="Font">
-          <FontMenu value={ts.font} onPick={(k) => {
+          <FontMenu value={ts.font} onImport={() => fileFontRef.current?.click()} onPick={(k) => {
             const vars = FONTS[k]?.variants || ["regular"];
             const keep = vars.includes(tsVariant(ts) as never);
             set({ font: k, ...(keep ? {} : { bold: false, italic: false }) });
@@ -1973,6 +2059,9 @@ export default function Editor() {
             ["Text", () => addFromTray("text")],
             ["Lettering", () => addFromTray("sfx")],
             ["Stamps…", () => setStampOpen(true)],
+            ["—", null],
+            ["Import Custom Stamps…", () => fileStampRef.current?.click()],
+            ["Import Custom Font…", () => fileFontRef.current?.click()],
           ]],
           ["Format", [
             ["Bold", () => mutateSel<BalloonEl | TextEl>((x) => { if (x.ts) x.ts.bold = !x.ts.bold; })],
@@ -2161,6 +2250,7 @@ export default function Editor() {
         </label>
         <span className="tbSep" />
         <FontMenu value={selTs?.font || "comicneue"} disabled={!selTs}
+          onImport={() => fileFontRef.current?.click()}
           onPick={(k) => mutateSel<BalloonEl | TextEl>((x) => {
             x.ts.font = k;
             const vars = FONTS[k]?.variants || ["regular"];
@@ -2406,6 +2496,16 @@ export default function Editor() {
                   );
                 })}
               </div>
+              <div className="stampCustom">
+                {customStamps.map((s) => (
+                  <span key={s.id} className="stampThumb">
+                    <button style={{ backgroundImage: `url(${s.url})` }} title="Place stamp"
+                      onClick={() => insertCustomStamp(s.url)} />
+                    <i title="Remove from library" onClick={() => removeCustomStamp(s.id)}>✕</i>
+                  </span>
+                ))}
+                <button className="stampImport" onClick={() => fileStampRef.current?.click()}>＋ Import stamps…</button>
+              </div>
               <div className="stampEmoji">
                 {STAMPS.map((s) => (
                   <button key={s} onClick={() => {
@@ -2587,6 +2687,10 @@ export default function Editor() {
           assetsRef.current[aid] = url;
           await assignImageToPanel(targetId, aid);
         }} />
+      <input ref={fileFontRef} type="file" accept=".ttf,.otf,.woff,.woff2" multiple hidden
+        onChange={async (e) => { await importFontFiles(Array.from(e.target.files || [])); e.target.value = ""; }} />
+      <input ref={fileStampRef} type="file" accept="image/*" multiple hidden
+        onChange={async (e) => { await importStampFiles(Array.from(e.target.files || [])); e.target.value = ""; }} />
       <input ref={fileOpenRef} type="file" accept=".json,application/json" hidden
         onChange={(e) => {
           const f = e.target.files?.[0];

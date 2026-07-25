@@ -445,3 +445,18 @@ input[type="range"] { width: 110px; }
 .trayBtn span { font-size: 9.5px; color: var(--dim); }
 .traySep { width: 1px; background: var(--edge2); margin: 3px 5px; }
 .statusbar { align-self: center; color: var(--dim); font-size: 11px; text-align: right; }
+
+/* custom stamps */
+.stampCustom { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--edge2); padding-bottom: 6px; margin-bottom: 6px; }
+.stampThumb { position: relative; }
+.stampThumb button {
+  width: 44px; height: 44px; border: 1px solid var(--edge2); border-radius: 6px;
+  background-size: contain; background-repeat: no-repeat; background-position: center; background-color: #fff;
+}
+.stampThumb i {
+  position: absolute; top: -5px; right: -5px; width: 15px; height: 15px;
+  background: #c33; color: #fff; border-radius: 50%; font: 700 9px/15px sans-serif;
+  text-align: center; cursor: pointer; font-style: normal; display: none;
+}
+.stampThumb:hover i { display: block; }
+.stampImport { font-size: 11.5px; color: #37507a; align-self: center; }
