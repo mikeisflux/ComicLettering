@@ -350,6 +350,8 @@ export const FONTS: Record<string, FontDef> = {
   /* Themed */
   lmchorror:  { label: "LMC Horror (Ours)",  css: '"LMC Horror",cursive',  group: "Themed", variants: ALL },
   lmcsneeze:  { label: "LMC Sneeze (Ours)",  css: '"LMC Sneeze",cursive',  group: "Themed", variants: ALL },
+  lmcmumble:  { label: "LMC Mumble (Scribble)", css: '"LMC Mumble",cursive', group: "Themed", variants: ALL },
+  graduate:   { label: "Graduate (Collegiate)", css: '"Graduate",serif', group: "Display", variants: R },
   lmcslasher: { label: "LMC Slasher (Ours)", css: '"LMC Slasher",cursive', group: "Themed", variants: ALL },
   lmccosmos:  { label: "LMC Cosmos (Ours)",  css: '"LMC Cosmos",cursive',  group: "Themed", variants: ALL },
   cinzeldeco: { label: "Cinzel Decorative (Occult)", css: '"Cinzel Decorative",serif', group: "Themed", variants: RB },

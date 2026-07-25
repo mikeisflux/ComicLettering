@@ -426,6 +426,10 @@ input[type="range"] { width: 110px; }
 @font-face { font-family: "LMC Sneeze"; font-style: normal; font-weight: 700; font-display: swap; src: url(/fonts/LMCSneeze-Bold.woff2) format("woff2"); }
 @font-face { font-family: "LMC Sneeze"; font-style: italic; font-weight: 400; font-display: swap; src: url(/fonts/LMCSneeze-Italic.woff2) format("woff2"); }
 @font-face { font-family: "LMC Sneeze"; font-style: italic; font-weight: 700; font-display: swap; src: url(/fonts/LMCSneeze-BoldItalic.woff2) format("woff2"); }
+@font-face { font-family: "LMC Mumble"; font-style: normal; font-weight: 400; font-display: swap; src: url(/fonts/LMCMumble-Regular.woff2) format("woff2"); }
+@font-face { font-family: "LMC Mumble"; font-style: normal; font-weight: 700; font-display: swap; src: url(/fonts/LMCMumble-Bold.woff2) format("woff2"); }
+@font-face { font-family: "LMC Mumble"; font-style: italic; font-weight: 400; font-display: swap; src: url(/fonts/LMCMumble-Italic.woff2) format("woff2"); }
+@font-face { font-family: "LMC Mumble"; font-style: italic; font-weight: 700; font-display: swap; src: url(/fonts/LMCMumble-BoldItalic.woff2) format("woff2"); }
 
 /* connector tilt axis satellites */
 .handle.tiltDot {

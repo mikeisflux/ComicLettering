@@ -3,7 +3,8 @@ under their original license terms. Sources: Google Fonts
 (fonts.google.com), except where noted.
 
 The LMC families (LMC*-*.woff2: Dialogue, Agent, Hero, Alley, Whisper,
-Shout, Brawl, Slasher, Horror, Cosmos) are ORIGINAL typefaces created for
+Shout, Brawl, Slasher, Horror, Cosmos, Sneeze, Mumble) are ORIGINAL
+typefaces created for
 LetterMyComic (generator source: scripts/mkfont.py in this repository).
 They are not derived from any existing font's outlines. Released under
 the SIL Open Font License 1.1.
@@ -27,7 +28,7 @@ Sedgwick Ave Display, Cinzel Decorative, Pirata One, Metamorphous,
 Limelight, Rubik Spray Paint, Almendra, Give You Glory, Rubik Burned,
 Trade Winds, Bahiana, MedievalSharp, Poiret One, Wallpoet, Jost,
 Rubik Beastly, Bungee Outline, Pacifico, Ultra, Rubik Glitch, Rye,
-Kaushan Script, Uncial Antiqua.
+Kaushan Script, Uncial Antiqua, Graduate.
 Full license text:
 https://openfontlicense.org/open-font-license-official-text/
 

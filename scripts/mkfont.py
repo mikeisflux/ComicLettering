@@ -156,6 +156,21 @@ def droplet_strokes(name, strokes):
         out.append(([(x, y), (x + 0.5, y)], rf))
     return out
 
+def scribble_strokes(name, w):
+    """asemic mumble-scrawl: every key renders an unreadable squiggle"""
+    ph = ghash("mum" + name)
+    n = 8 + ph % 6
+    x0, x1 = 30, max(90, w - 30)
+    base = 300 + (ph >> 4) % 90
+    pts = []
+    for i in range(n + 1):
+        t = i / n
+        x = x0 + (x1 - x0) * t
+        amp = 150 if (ph >> (i * 2)) % 5 == 0 else 70
+        y = base + (((ph >> (i * 3)) % (2 * amp)) - amp)
+        pts.append((x, y))
+    return [pts]
+
 def capsule_path(p, q, r, cap="round", n=12):
     if cap == "square":
         # rectangle extended r beyond both endpoints — blocky chopped stroke
@@ -236,6 +251,8 @@ def make_font(family, style, r, amp, freq, shear, narrow, bounce, drips, out_ttf
     glyphs[".notdef"] = pen.glyph()
     adv[".notdef"] = 600
     for name, (w, strokes) in GLYPHS.items():
+        if drips == "scribble" and name != "space":
+            strokes = scribble_strokes(name, w)
         path = build_glyph(name, strokes, r, amp, freq, shear, narrow, bounce, drips, cap, decim)
         pen = TTGlyphPen(None)
         if path is not None:
@@ -289,6 +306,7 @@ FAMILIES = {
     "LMC Cosmos":   (42, 62, 1.2, 0.8, 0, 1.14, 0, "", "square", 4),
     "LMC Slasher":  (64, 84, 8.0, 2.2, 3, 0.90, 12, "", "square", 4),
     "LMC Sneeze":   (82, 102, 5.0, 1.0, 2, 1.02, 8, "droplets", "round", 0),
+    "LMC Mumble":   (24, 36, 6.0, 1.3, 0, 1.00, 26, "scribble", "round", 0),
 }
 
 def main(outdir):
