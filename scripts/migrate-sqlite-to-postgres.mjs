@@ -34,7 +34,44 @@ const rows = (table) => {
   }
 };
 
+/* Columns this migrator copies for each table. Used to reconcile against the
+   ACTUAL SQLite schema so anything added out-of-band is reported, not lost. */
+const HANDLED = {
+  User: ["id", "email", "name", "passwordHash", "isAdmin", "subStatus", "subPlan", "subId", "createdAt", "updatedAt"],
+  Setting: ["key", "value", "updatedAt"],
+  Project: ["id", "name", "data", "thumbnail", "userId", "createdAt", "updatedAt"],
+  UserAsset: ["id", "userId", "kind", "name", "data", "createdAt"],
+  Message: ["id", "direction", "channel", "fromEmail", "fromName", "toEmail", "subject", "body", "read", "threadId", "createdAt"],
+};
+
+/* Compare what's really in the SQLite file against what we know how to move.
+   Returns true if everything is covered, false (with warnings) otherwise. */
+function reconcileSchema() {
+  const actualTables = sqlite
+    .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_prisma_%'")
+    .all().map((r) => r.name);
+  let clean = true;
+  for (const t of actualTables) {
+    const cols = sqlite.prepare(`PRAGMA table_info("${t}")`).all().map((c) => c.name);
+    if (!HANDLED[t]) {
+      const n = sqlite.prepare(`SELECT count(*) c FROM "${t}"`).get().c;
+      console.warn(`⚠ SQLite table "${t}" (${n} rows) is NOT in the Prisma schema — its data is safe in the backup but was NOT migrated. Add it to prisma/schema.prisma and re-run.`);
+      clean = false;
+      continue;
+    }
+    const extra = cols.filter((c) => !HANDLED[t].includes(c));
+    if (extra.length) {
+      console.warn(`⚠ SQLite table "${t}" has extra column(s) [${extra.join(", ")}] not in the Prisma schema — those values were NOT migrated (data is in the backup).`);
+      clean = false;
+    }
+  }
+  return clean;
+}
+
 async function run() {
+  console.log(`Migrating ${SQLITE_PATH} → PostgreSQL…`);
+  const schemaClean = reconcileSchema();
+
   let total = 0;
   // sqlite user id -> effective Postgres user id (they differ when a user
   // with the same email already exists in Postgres, e.g. a seeded superuser)
@@ -113,7 +150,32 @@ async function run() {
     total++;
   }
 
+  /* reconcile row counts: every SQLite row of a handled table must exist in
+     Postgres (users are counted by the ids they mapped to) */
+  const counts = {
+    User: await prisma.user.count(),
+    Setting: await prisma.setting.count(),
+    Project: await prisma.project.count(),
+    UserAsset: await prisma.userAsset.count(),
+    Message: await prisma.message.count(),
+  };
+  let mismatch = false;
+  for (const t of Object.keys(HANDLED)) {
+    const src = rows(t).length;
+    const dst = counts[t];
+    const ok = dst >= src;
+    if (!ok) mismatch = true;
+    console.log(`  ${ok ? "✓" : "✗"} ${t}: sqlite ${src} → postgres ${dst}`);
+  }
+
   console.log(`✔ Migrated ${total} rows from ${SQLITE_PATH} into PostgreSQL.`);
+  if (mismatch)
+    throw new Error("Row-count check failed: Postgres has fewer rows than SQLite for a handled table. NOT safe to decommission SQLite — investigate.");
+  if (!schemaClean && process.env.ALLOW_PARTIAL_MIGRATION !== "1")
+    throw new Error(
+      "SQLite contains tables/columns the Prisma schema does not cover (see ⚠ above). " +
+      "They are preserved in the backup but were NOT migrated. Update prisma/schema.prisma to include them, then re-deploy. " +
+      "To migrate everything else and proceed anyway, set ALLOW_PARTIAL_MIGRATION=1.");
 }
 
 run()

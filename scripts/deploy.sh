@@ -119,10 +119,15 @@ backup_db() {
   mkdir -p "$APP_DIR/backups"
   local stamp
   stamp=$(date +%Y%m%d-%H%M%S)
-  # legacy SQLite file, if this server hasn't migrated yet
+  # legacy SQLite, if this server hasn't migrated yet: a byte-exact copy of
+  # the file PLUS a schema-agnostic JSON dump of every table/column, so
+  # nothing added out-of-band can be lost.
   if [ -f "$APP_DIR/prisma/dev.db" ]; then
     cp "$APP_DIR/prisma/dev.db" "$APP_DIR/backups/sqlite-${stamp}.db"
-    log "SQLite backup: backups/sqlite-${stamp}.db"
+    ( cd "$APP_DIR" && SQLITE_PATH=prisma/dev.db node scripts/backup-sqlite.mjs \
+        > "$APP_DIR/backups/sqlite-${stamp}.json" ) \
+      && log "SQLite backup: backups/sqlite-${stamp}.db + .json (complete)" \
+      || log "SQLite backup: backups/sqlite-${stamp}.db"
   fi
   # PostgreSQL dump
   if command -v pg_dump >/dev/null && [[ "${DATABASE_URL:-}" == postgresql://* ]]; then
