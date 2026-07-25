@@ -369,6 +369,7 @@ export const FONTS: Record<string, FontDef> = {
   kaushan:    { label: "Kaushan Script (Brush)", css: '"Kaushan Script",cursive', group: "Themed", variants: R },
   rubikglitch:{ label: "Rubik Glitch (Cyber)", css: '"Rubik Glitch",cursive', group: "Themed", variants: R },
   rye:        { label: "Rye (Victorian)", css: '"Rye",cursive', group: "Themed", variants: R },
+  uncial:     { label: "Uncial Antiqua (Norse)", css: '"Uncial Antiqua",cursive', group: "Themed", variants: R },
   ultra:      { label: "Ultra (Pulp Slab)", css: '"Ultra",serif', group: "Themed", variants: R },
   creepster: { label: "Creepster",        css: '"Creepster",cursive',      group: "Themed", variants: R },
   nosifer:   { label: "Nosifer (Drip)",   css: '"Nosifer",cursive',        group: "Themed", variants: R },
