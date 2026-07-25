@@ -1,12 +1,28 @@
-The font files in this directory are licensed under the SIL Open Font
-License 1.1 (OFL) and are redistributed here under its terms.
+The font files in this directory are open-licensed and redistributed here
+under their original license terms. Sources: Google Fonts
+(fonts.google.com).
 
-Families: Comic Neue, Patrick Hand, Kalam, Bangers, Luckiest Guy, Boogaloo,
-Shantell Sans, Gochi Hand, Schoolbell, Walter Turncoat, Caveat, Amatic SC,
-Special Elite, Sniglet, Fredoka, Titan One, Lilita One, Passion One, Rampart One,
-Delius, Delius Swash Caps, Delius Unicase, Gloria Hallelujah, Happy Monkey,
-Chewy, Alfa Slab One, Bungee, Creepster, Nosifer, Audiowide, Permanent
-Marker, Courier Prime, League Gothic.
-
-Sources: Google Fonts (fonts.google.com). Full license text:
+SIL Open Font License 1.1 (OFL) families:
+Comic Neue, Patrick Hand, Patrick Hand SC, Kalam, Bangers, Luckiest Guy,
+Boogaloo, Shantell Sans, Gochi Hand, Schoolbell, Walter Turncoat, Caveat,
+Amatic SC, Sniglet, Fredoka, Titan One, Lilita One, Passion One,
+Rampart One, Delius, Delius Swash Caps, Delius Unicase, Gloria Hallelujah,
+Happy Monkey, Chewy, Alfa Slab One, Bungee, Bungee Shade, Bungee Inline,
+Creepster, Nosifer, Audiowide, Courier Prime, League Gothic, Neucha,
+Pangolin, Itim, Mali, Sriracha, Architects Daughter, Indie Flower,
+Short Stack, Handlee, Love Ya Like A Sister, Bubblegum Sans, Baloo 2,
+Sigmar One, Bowlby One SC, Modak, Shrikhand, Ranchers, Erica One, Frijole,
+Knewave, Lemon, Paytone One, Carter One, Fugaz One, Ceviche One, Chango,
+Slackey, Spicy Rice, Black Ops One, Cabin Sketch, Londrina Solid,
+Londrina Shadow, Londrina Outline, Finger Paint, Freckle Face, Kranky,
+Anton, Archivo Black, Faster One, Racing Sans One, Griffy, Henny Penny,
+Mystery Quest, Jolly Lodger, Eater, Butcherman, Barrio, Sedgwick Ave,
+Sedgwick Ave Display.
+Full license text:
 https://openfontlicense.org/open-font-license-official-text/
+
+Apache License 2.0 families:
+Permanent Marker, Special Elite, Coming Soon, Crafty Girls,
+Just Another Hand, Covered By Your Grace, Sue Ellen Francisco, Rock Salt,
+Shadows Into Light, Annie Use Your Telescope.
+Full license text: https://www.apache.org/licenses/LICENSE-2.0
