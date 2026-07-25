@@ -357,6 +357,7 @@ export const FONTS: Record<string, FontDef> = {
   almendra:   { label: "Almendra (Fantasy)", css: '"Almendra",serif', group: "Themed", variants: ALL },
   rubikburned:{ label: "Rubik Burned (Char)", css: '"Rubik Burned",cursive', group: "Themed", variants: R },
   bahiana:    { label: "Bahiana (Woodcut)", css: '"Bahiana",cursive', group: "Themed", variants: R },
+  beastly:    { label: "Rubik Beastly (Fuzzy)", css: '"Rubik Beastly",cursive', group: "Themed", variants: R },
   medieval:   { label: "MedievalSharp (Witchy)", css: '"MedievalSharp",cursive', group: "Themed", variants: R },
   poiret:     { label: "Poiret One (Deco Line)", css: '"Poiret One",cursive', group: "Themed", variants: R },
   wallpoet:   { label: "Wallpoet (Stencil Tech)", css: '"Wallpoet",cursive', group: "Themed", variants: R },
