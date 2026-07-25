@@ -30,7 +30,7 @@ Trade Winds, Bahiana, MedievalSharp, Poiret One, Wallpoet, Jost,
 Rubik Beastly, Bungee Outline, Pacifico, Ultra, Rubik Glitch, Rye,
 Kaushan Script, Uncial Antiqua, Graduate, Oldenburg, Press Start 2P,
 Charm, Caesar Dressing, Sacramento, Mountains of Christmas, Great Vibes,
-Allerta Stencil.
+Allerta Stencil, VT323.
 Full license text:
 https://openfontlicense.org/open-font-license-official-text/
 

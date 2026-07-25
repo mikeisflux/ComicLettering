@@ -380,6 +380,7 @@ export const FONTS: Record<string, FontDef> = {
   uncial:     { label: "Uncial Antiqua (Norse)", css: '"Uncial Antiqua",cursive', group: "Themed", variants: R },
   oldenburg:  { label: "Oldenburg (News Slab)", css: '"Oldenburg",cursive', group: "Themed", variants: R },
   pressstart: { label: "Press Start 2P (8-Bit)", css: '"Press Start 2P",monospace', group: "Themed", variants: R },
+  vt323:      { label: "VT323 (Digital)", css: '"VT323",monospace', group: "Themed", variants: R },
   charm:      { label: "Charm (Chancery Pen)", css: '"Charm",cursive', group: "Themed", variants: RB },
   caesar:     { label: "Caesar Dressing (Greek)", css: '"Caesar Dressing",cursive', group: "Themed", variants: R },
   ultra:      { label: "Ultra (Pulp Slab)", css: '"Ultra",serif', group: "Themed", variants: R },
