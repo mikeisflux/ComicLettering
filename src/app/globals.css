@@ -441,7 +441,7 @@ input[type="range"] { width: 110px; }
   padding: 2px 6px; background: transparent; border: 1px solid transparent; border-radius: 5px;
 }
 .trayBtn:hover { background: #ffffffa0; border-color: var(--edge2); }
-.trayBtn svg { width: 40px; height: 30px; }
+.trayBtn svg { width: 40px; height: 30px; filter: drop-shadow(1px 1.5px 0.6px #00000038); }
 .trayBtn span { font-size: 9.5px; color: var(--dim); }
 .traySep { width: 1px; background: var(--edge2); margin: 3px 5px; }
 .statusbar { align-self: center; color: var(--dim); font-size: 11px; text-align: right; }
