@@ -64,14 +64,30 @@ export function drawStyledText(
   }
 
   const xFor = (align: TextStyle["align"]) => {
-    if (align === "left") { ctx.textAlign = "left"; return rx; }
+    if (align === "left" || align === "justify") { ctx.textAlign = "left"; return rx; }
     if (align === "right") { ctx.textAlign = "right"; return rx + rw; }
     ctx.textAlign = "center"; return rx + rw / 2;
   };
 
+  /* justified lines: draw word-by-word with distributed gaps */
+  const drawLine = (line: string, x: number, yy: number, op: "fill" | "stroke", justify: boolean) => {
+    const paint = (txt: string, px: number) =>
+      op === "fill" ? ctx.fillText(txt, px, yy) : ctx.strokeText(txt, px, yy);
+    if (!justify) { paint(line, x); return; }
+    const words = line.split(" ").filter(Boolean);
+    if (words.length < 2) { paint(line, x); return; }
+    const wordsW = words.reduce((sum, w) => sum + ctx.measureText(w).width, 0);
+    const gap = (rw - wordsW) / (words.length - 1);
+    let px = rx;
+    ctx.textAlign = "left";
+    for (const w2 of words) { paint(w2, px); px += ctx.measureText(w2).width + gap; }
+  };
+
   ctx.lineJoin = "round";
   let y = y0;
-  for (const line of lines) {
+  for (let li = 0; li < lines.length; li++) {
+    const line = lines[li];
+    const justifyThis = ts.align === "justify" && li < lines.length - 1 && lines[li + 1] !== "";
     const x = xFor(ts.align);
     if (ts.shadow) {
       ctx.save();
@@ -82,20 +98,33 @@ export function drawStyledText(
       if (ts.outlineW > 0) {
         ctx.lineWidth = ts.outlineW;
         ctx.strokeStyle = ts.outlineC;
-        ctx.strokeText(line, x, y);
+        drawLine(line, x, y, "stroke", justifyThis);
       } else {
         ctx.fillStyle = fill;
-        ctx.fillText(line, x, y);
+        drawLine(line, x, y, "fill", justifyThis);
       }
       ctx.restore();
     }
     if (ts.outlineW > 0) {
       ctx.lineWidth = ts.outlineW;
       ctx.strokeStyle = ts.outlineC;
-      ctx.strokeText(line, x, y);
+      drawLine(line, x, y, "stroke", justifyThis);
     }
     ctx.fillStyle = fill;
-    ctx.fillText(line, x, y);
+    drawLine(line, x, y, "fill", justifyThis);
+    if (ts.underline && line.trim()) {
+      const lw = justifyThis ? rw : ctx.measureText(line).width;
+      const ux = ts.align === "right" ? rx + rw - lw
+        : ts.align === "center" ? rx + (rw - lw) / 2 : rx;
+      ctx.save();
+      ctx.strokeStyle = ts.fillA;
+      ctx.lineWidth = Math.max(1, ts.size * 0.06);
+      ctx.beginPath();
+      ctx.moveTo(ux, y + ts.size * 0.45);
+      ctx.lineTo(ux + lw, y + ts.size * 0.45);
+      ctx.stroke();
+      ctx.restore();
+    }
     y += lineH;
   }
 }

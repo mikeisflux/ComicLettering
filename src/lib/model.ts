@@ -1,6 +1,6 @@
 /* ComicLettering Studio — document model, fonts, filters, layouts. */
 
-export type Align = "left" | "center" | "right";
+export type Align = "left" | "center" | "right" | "justify";
 export type FilterKey = "none" | "bw" | "sepia" | "vivid" | "faded" | "noir";
 export type BalloonKind =
   | "speech" | "rough" | "buzz" | "double" | "thought"
@@ -94,6 +94,7 @@ export interface TextStyle {
   size: number;
   bold: boolean;
   italic: boolean;
+  underline?: boolean;
   caps: boolean;
   align: Align;
   fillA: string;
@@ -218,32 +219,36 @@ export type Assets = Record<string, string>;
 
 /* ---------------- fonts ---------------- */
 
-export interface FontDef { label: string; css: string; group: string }
+export type FontVariant = "regular" | "bold" | "italic" | "bolditalic";
+export interface FontDef { label: string; css: string; group: string; variants: FontVariant[] }
+const ALL: FontVariant[] = ["regular", "bold", "italic", "bolditalic"];
+const RB: FontVariant[] = ["regular", "bold"];
+const R: FontVariant[] = ["regular"];
 
 export const FONTS: Record<string, FontDef> = {
   /* Dialogue */
-  comicneue: { label: "Comic Neue",       css: '"Comic Neue","Comic Sans MS",cursive', group: "Dialogue" },
-  patrick:   { label: "Patrick Hand",     css: '"Patrick Hand",cursive',               group: "Dialogue" },
-  kalam:     { label: "Kalam",            css: '"Kalam",cursive',                      group: "Dialogue" },
-  comicsans: { label: "Comic Sans",       css: '"Comic Sans MS","Comic Sans","Chalkboard SE",cursive', group: "Dialogue" },
+  comicneue: { label: "Comic Neue",       css: '"Comic Neue","Comic Sans MS",cursive', group: "Dialogue", variants: ALL },
+  patrick:   { label: "Patrick Hand",     css: '"Patrick Hand",cursive',               group: "Dialogue", variants: R },
+  kalam:     { label: "Kalam",            css: '"Kalam",cursive',                      group: "Dialogue", variants: RB },
+  comicsans: { label: "Comic Sans",       css: '"Comic Sans MS","Comic Sans","Chalkboard SE",cursive', group: "Dialogue", variants: ALL },
   /* Display / SFX */
-  bangers:   { label: "Bangers",          css: '"Bangers",cursive',        group: "Display" },
-  luckiest:  { label: "Luckiest Guy",     css: '"Luckiest Guy",cursive',   group: "Display" },
-  boogaloo:  { label: "Boogaloo",         css: '"Boogaloo",cursive',       group: "Display" },
-  chewy:     { label: "Chewy",            css: '"Chewy",cursive',          group: "Display" },
-  alfa:      { label: "Alfa Slab One",    css: '"Alfa Slab One",serif',    group: "Display" },
-  bungee:    { label: "Bungee",           css: '"Bungee",cursive',         group: "Display" },
-  league:    { label: "League Gothic",    css: '"League Gothic","Arial Narrow",sans-serif', group: "Display" },
-  impact:    { label: "Impact",           css: 'Impact,"Arial Black",sans-serif', group: "Display" },
+  bangers:   { label: "Bangers",          css: '"Bangers",cursive',        group: "Display", variants: R },
+  luckiest:  { label: "Luckiest Guy",     css: '"Luckiest Guy",cursive',   group: "Display", variants: R },
+  boogaloo:  { label: "Boogaloo",         css: '"Boogaloo",cursive',       group: "Display", variants: R },
+  chewy:     { label: "Chewy",            css: '"Chewy",cursive',          group: "Display", variants: R },
+  alfa:      { label: "Alfa Slab One",    css: '"Alfa Slab One",serif',    group: "Display", variants: R },
+  bungee:    { label: "Bungee",           css: '"Bungee",cursive',         group: "Display", variants: R },
+  league:    { label: "League Gothic",    css: '"League Gothic","Arial Narrow",sans-serif', group: "Display", variants: R },
+  impact:    { label: "Impact",           css: 'Impact,"Arial Black",sans-serif', group: "Display", variants: R },
   /* Themed */
-  creepster: { label: "Creepster",        css: '"Creepster",cursive',      group: "Themed" },
-  nosifer:   { label: "Nosifer (Drip)",   css: '"Nosifer",cursive',        group: "Themed" },
-  audiowide: { label: "Audiowide (Sci-Fi)", css: '"Audiowide",sans-serif', group: "Themed" },
-  marker:    { label: "Permanent Marker", css: '"Permanent Marker",cursive', group: "Themed" },
-  courier:   { label: "Courier Prime",    css: '"Courier Prime","Courier New",monospace', group: "Themed" },
+  creepster: { label: "Creepster",        css: '"Creepster",cursive',      group: "Themed", variants: R },
+  nosifer:   { label: "Nosifer (Drip)",   css: '"Nosifer",cursive',        group: "Themed", variants: R },
+  audiowide: { label: "Audiowide (Sci-Fi)", css: '"Audiowide",sans-serif', group: "Themed", variants: R },
+  marker:    { label: "Permanent Marker", css: '"Permanent Marker",cursive', group: "Themed", variants: R },
+  courier:   { label: "Courier Prime",    css: '"Courier Prime","Courier New",monospace', group: "Themed", variants: ALL },
   /* System */
-  sans:      { label: "Arial",            css: "Arial,Helvetica,sans-serif", group: "System" },
-  serif:     { label: "Georgia",          css: 'Georgia,"Times New Roman",serif', group: "System" },
+  sans:      { label: "Arial",            css: "Arial,Helvetica,sans-serif", group: "System", variants: ALL },
+  serif:     { label: "Georgia",          css: 'Georgia,"Times New Roman",serif', group: "System", variants: ALL },
 };
 
 export const FONT_GROUPS = ["Dialogue", "Display", "Themed", "System"];

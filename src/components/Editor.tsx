@@ -32,6 +32,7 @@ function textCss(ts: TextStyle): CSSProperties {
     fontWeight: ts.bold ? 700 : 400,
     fontStyle: ts.italic ? "italic" : "normal",
     textAlign: ts.align,
+    textDecoration: ts.underline ? "underline" : "none",
     textTransform: ts.caps ? "uppercase" : "none",
     lineHeight: 1.25,
   };
@@ -61,6 +62,69 @@ function letterStyleCss(s: LetterStyle, size: number): CSSProperties {
     outlineW: Math.max(s.outlineF > 0 ? 1 : 0, Math.round(size * s.outlineF)),
     shadow: s.shadow, shadowC: "#00000066",
   });
+}
+
+/* ---------------- font menu with live previews ---------------- */
+
+function FontMenu({ value, disabled, onPick }: {
+  value: string; disabled?: boolean; onPick: (key: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const f = FONTS[value] || FONTS.comicneue;
+  return (
+    <div style={{ position: "relative" }}>
+      <button className="fontBtn" disabled={disabled} style={{ fontFamily: f.css }}
+        onClick={() => setOpen((o) => !o)}>
+        {f.label} <span style={{ fontFamily: "sans-serif", fontSize: 10 }}>▾</span>
+      </button>
+      {open && (
+        <>
+          <div className="ctxBackdrop" style={{ zIndex: 149 }} onClick={() => setOpen(false)} />
+          <div className="fontMenu">
+            {FONT_GROUPS.map((gr) => (
+              <div key={gr}>
+                <div className="fontGroup">{gr}</div>
+                {Object.entries(FONTS).filter(([, x]) => x.group === gr).map(([k, x]) => (
+                  <button key={k} className={"fontItem" + (k === value ? " on" : "")}
+                    style={{ fontFamily: x.css }}
+                    onClick={() => { onPick(k); setOpen(false); }}>
+                    {x.label}
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+const VARIANT_LABELS: Record<string, string> = {
+  regular: "Regular", bold: "Bold", italic: "Italic", bolditalic: "Bold Italic",
+};
+
+function tsVariant(ts: TextStyle): string {
+  return ts.bold && ts.italic ? "bolditalic" : ts.bold ? "bold" : ts.italic ? "italic" : "regular";
+}
+
+/* Face subtype selector — only lists the faces the family actually has. */
+function SubtypeSelect({ ts, disabled, onSet }: {
+  ts: TextStyle | null; disabled?: boolean;
+  onSet: (bold: boolean, italic: boolean) => void;
+}) {
+  const variants = (ts && FONTS[ts.font]?.variants) || ["regular"];
+  const cur = ts ? tsVariant(ts) : "regular";
+  return (
+    <select disabled={disabled || !ts || variants.length < 2}
+      value={variants.includes(cur as never) ? cur : "regular"}
+      onChange={(e) => {
+        const v = e.target.value;
+        onSet(v === "bold" || v === "bolditalic", v === "italic" || v === "bolditalic");
+      }}>
+      {variants.map((v) => <option key={v} value={v}>{VARIANT_LABELS[v]}</option>)}
+    </select>
+  );
 }
 
 /* ---------------- rulers ---------------- */
@@ -333,6 +397,8 @@ export default function Editor() {
   const [stampOpen, setStampOpen] = useState(false);
   const [showFill, setShowFill] = useState(false);
   const [showStroke, setShowStroke] = useState(false);
+  const [showTextColor, setShowTextColor] = useState(false);
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
   /* active lettering style — like Comic Life, styles are not objects: they
      restyle the selection and set the style used by new lettering */
   const [activeStyle, setActiveStyleState] = useState("Sunburst");
@@ -1427,23 +1493,23 @@ export default function Editor() {
       <div className="inspSection">
         <div className="inspHead">Lettering</div>
         <Fld label="Font">
-          <select value={ts.font} onChange={(e) => set({ font: e.target.value })}>
-            {FONT_GROUPS.map((gr) => (
-              <optgroup key={gr} label={gr}>
-                {Object.entries(FONTS).filter(([, f]) => f.group === gr).map(([k, f]) =>
-                  <option key={k} value={k}>{f.label}</option>)}
-              </optgroup>
-            ))}
-          </select>
+          <FontMenu value={ts.font} onPick={(k) => {
+            const vars = FONTS[k]?.variants || ["regular"];
+            const keep = vars.includes(tsVariant(ts) as never);
+            set({ font: k, ...(keep ? {} : { bold: false, italic: false }) });
+          }} />
+        </Fld>
+        <Fld label="Face">
+          <SubtypeSelect ts={ts} onSet={(bold, italic) => set({ bold, italic })} />
         </Fld>
         <Fld label="Size"><input type="number" min={8} max={800} value={ts.size}
           onChange={(e) => set({ size: clamp(+e.target.value || 8, 8, 800) })} /></Fld>
-        <Fld label="Bold"><input type="checkbox" checked={ts.bold} onChange={(e) => set({ bold: e.target.checked })} /></Fld>
-        <Fld label="Italic"><input type="checkbox" checked={ts.italic} onChange={(e) => set({ italic: e.target.checked })} /></Fld>
         <Fld label="ALL CAPS"><input type="checkbox" checked={ts.caps} onChange={(e) => set({ caps: e.target.checked })} /></Fld>
+        <Fld label="Underline"><input type="checkbox" checked={!!ts.underline} onChange={(e) => set({ underline: e.target.checked })} /></Fld>
         <Fld label="Align">
           <select value={ts.align} onChange={(e) => set({ align: e.target.value as TextStyle["align"] })}>
-            <option value="left">Left</option><option value="center">Center</option><option value="right">Right</option>
+            <option value="left">Left</option><option value="center">Center</option>
+            <option value="right">Right</option><option value="justify">Justify</option>
           </select>
         </Fld>
         <Fld label="Color"><input type="color" value={ts.fillA}
@@ -1861,6 +1927,101 @@ export default function Editor() {
 
   return (
     <div className="app">
+      {/* ---------- menu bar ---------- */}
+      <nav className="menuBar">
+        {openMenu && <div className="ctxBackdrop" style={{ zIndex: 179 }} onClick={() => setOpenMenu(null)} />}
+        {([
+          ["File", [
+            ["New Document", () => { if (window.confirm("Start a new document?")) { docRef.current = starterDoc(); assetsRef.current = {}; reseedIds(docRef.current); histRef.current = [JSON.stringify(docRef.current)]; hIndexRef.current = 0; setCurrent(null); setSelId(null); setPageIndex(0); setThumbs({}); autosave(); force(); fitZoom(true); } }],
+            ["Open Library", () => setTab("library")],
+            ["Save", () => saveProject(false)],
+            ["Save As…", () => saveProject(true)],
+            ["Import Project File…", () => fileOpenRef.current?.click()],
+            ["Export Project File", () => exportJSON()],
+            ["—", null],
+            ["Page Setup…", () => setShowSetup(true)],
+            ["Export…", () => setShowExport(true)],
+            ["Print…", () => printPage()],
+          ]],
+          ["Edit", [
+            ["Undo", () => undo()], ["Redo", () => redo()],
+            ["—", null],
+            ["Cut", () => cutSel()], ["Copy", () => copySel()],
+            ["Paste", () => pasteClip()], ["Duplicate", () => duplicateSel()],
+            ["Delete", () => deleteSel()],
+            ["—", null],
+            ["Check Spelling & Grammar", () => { setTab("proof"); runProof(); }],
+          ]],
+          ["View", [
+            ["Zoom In", () => { setUserZoomed(true); setZoom((z) => clamp(z * 1.2, 0.05, 4)); }],
+            ["Zoom Out", () => { setUserZoomed(true); setZoom((z) => clamp(z / 1.2, 0.05, 4)); }],
+            ["Fit Page", () => { setUserZoomed(false); fitZoom(true); }],
+            ["—", null],
+            ["Panel Layouts", () => setTab("layouts")],
+            ["Inspector", () => setTab("inspector")],
+            ["Layers", () => setTab("layers")],
+            ["Photos", () => setTab("photos")],
+            ["Library", () => setTab("library")],
+          ]],
+          ["Insert", [
+            ["New Page", () => { const d = docRef.current!; d.pages.splice(pageIndex + 1, 0, newPage(page.w, page.h, page.margin)); setPageIndex(pageIndex + 1); setSelId(null); commit(); }],
+            ["—", null],
+            ["Panel", () => addFromTray("panel")],
+            ["Image…", () => fileImageRef.current?.click()],
+            ["Speech Balloon", () => addFromTray("speech")],
+            ["Thought Balloon", () => addFromTray("thought")],
+            ["Caption", () => addFromTray("caption")],
+            ["Text", () => addFromTray("text")],
+            ["Lettering", () => addFromTray("sfx")],
+            ["Stamps…", () => setStampOpen(true)],
+          ]],
+          ["Format", [
+            ["Bold", () => mutateSel<BalloonEl | TextEl>((x) => { if (x.ts) x.ts.bold = !x.ts.bold; })],
+            ["Italic", () => mutateSel<BalloonEl | TextEl>((x) => { if (x.ts) x.ts.italic = !x.ts.italic; })],
+            ["Underline", () => mutateSel<BalloonEl | TextEl>((x) => { if (x.ts) x.ts.underline = !x.ts.underline; })],
+            ["—", null],
+            ["Align Left", () => mutateSel<BalloonEl | TextEl>((x) => { if (x.ts) x.ts.align = "left"; })],
+            ["Align Center", () => mutateSel<BalloonEl | TextEl>((x) => { if (x.ts) x.ts.align = "center"; })],
+            ["Align Right", () => mutateSel<BalloonEl | TextEl>((x) => { if (x.ts) x.ts.align = "right"; })],
+            ["Justify", () => mutateSel<BalloonEl | TextEl>((x) => { if (x.ts) x.ts.align = "justify"; })],
+            ["—", null],
+            ["Bigger", () => mutateSel<BalloonEl | TextEl>((x) => { if (x.ts) x.ts.size = clamp(Math.round(x.ts.size * 1.12), 8, 800); })],
+            ["Smaller", () => mutateSel<BalloonEl | TextEl>((x) => { if (x.ts) x.ts.size = clamp(Math.round(x.ts.size / 1.12), 8, 800); })],
+          ]],
+          ["Arrange", [
+            ["Bring Forward", () => reorder(1)], ["Bring To Front", () => reorder(1e9)],
+            ["Send Backward", () => reorder(-1)], ["Send To Back", () => reorder(-1e9)],
+            ["—", null],
+            ["Center Horizontally (Ctrl+[)", () => alignSel("hcenter")],
+            ["Center Vertically (Ctrl+])", () => alignSel("vcenter")],
+            ["Flip Horizontal", () => mutateSel((x) => { x.flipH = !x.flipH; })],
+            ["Flip Vertical", () => mutateSel((x) => { x.flipV = !x.flipV; })],
+            ["—", null],
+            ["Lock", () => mutateSel((x) => { x.locked = true; })],
+            ["Unlock", () => mutateSel((x) => { x.locked = false; })],
+          ]],
+          ["Help", [
+            ["Keyboard Shortcuts", () => window.alert("B/T/L/P — add balloon/text/lettering/panel\nCtrl+Z / Ctrl+Y — undo / redo\nCtrl+C/X/V/D — copy / cut / paste / duplicate\nCtrl+S — save · Ctrl+[ / Ctrl+] — center H / V\nShift while resizing — keep proportions\nShift while rotating — snap 15° · Alt while dragging — no snapping\nDouble-click — edit text / set image · Right-click — full menu")],
+            ["FAQ & Support", () => window.open("/faq", "_blank")],
+          ]],
+        ] as [string, ([string, (() => void) | null])[]][]).map(([name, items]) => (
+          <div key={name} className="menuWrap">
+            <button className={"menuTop" + (openMenu === name ? " on" : "")}
+              onClick={() => setOpenMenu(openMenu === name ? null : name)}
+              onMouseEnter={() => { if (openMenu) setOpenMenu(name); }}>
+              {name}
+            </button>
+            {openMenu === name && (
+              <div className="menuDrop">
+                {items.map(([label, fn], i) => fn === null
+                  ? <div key={i} className="ctxSep" />
+                  : <button key={i} onClick={() => { setOpenMenu(null); fn(); }}>{label}</button>)}
+              </div>
+            )}
+          </div>
+        ))}
+      </nav>
+
       {/* ---------- toolbar ---------- */}
       <header className="toolbar">
         <a className="brand" href="/" title="lettermycomic.com">Letter<span>My</span>Comic</a>
@@ -1876,6 +2037,13 @@ export default function Editor() {
         }} />
         <ToolBtn label="Save" icon="✔" accent onClick={() => saveProject(false)} />
         <ToolBtn label="Library" icon="🗀" onClick={() => setTab("library")} />
+        <ToolBtn label="New Page" icon="🗎+" onClick={() => {
+          const d = docRef.current!;
+          d.pages.splice(pageIndex + 1, 0, newPage(page.w, page.h, page.margin));
+          setPageIndex(pageIndex + 1);
+          setSelId(null);
+          commit();
+        }} />
         <span className="tbSep" />
         <ToolBtn label="Undo" icon="↶" disabled={hIndexRef.current <= 0} onClick={undo} />
         <ToolBtn label="Redo" icon="↷" disabled={hIndexRef.current >= histRef.current.length - 1} onClick={redo} />
@@ -1891,6 +2059,9 @@ export default function Editor() {
         <ToolBtn label="Smaller" icon="A−" disabled={!selTs} onClick={() =>
           mutateSel<BalloonEl | TextEl>((x) => { x.ts.size = clamp(Math.round(x.ts.size / 1.12), 8, 800); })} />
         <span className="tbSep" />
+        <ToolBtn label="Instant Alpha" icon="🪄"
+          disabled={!selEl || (selEl.type !== "image" && selEl.type !== "panel") || !selEl.img}
+          onClick={() => { if (selEl && (selEl.type === "image" || selEl.type === "panel") && selEl.img) runInstantAlpha(selEl.id, selEl.img); }} />
         <ToolBtn label="Page Setup" icon="📐" onClick={() => setShowSetup(true)} />
         <ToolBtn label="Print" icon="🖨" onClick={printPage} />
         <ToolBtn label="Export" icon="🖼⇩" accent onClick={() => setShowExport(true)} />
@@ -1982,25 +2153,53 @@ export default function Editor() {
             onChange={(e) => mutateSel((x) => { x.shadow = e.target.checked; })} /> Shadow
         </label>
         <span className="tbSep" />
-        <select disabled={!selTs} value={selTs?.font || "comicneue"}
-          onChange={(e) => mutateSel<BalloonEl | TextEl>((x) => { x.ts.font = e.target.value; })}>
-          {FONT_GROUPS.map((gr) => (
-            <optgroup key={gr} label={gr}>
-              {Object.entries(FONTS).filter(([, f]) => f.group === gr).map(([k, f]) =>
-                <option key={k} value={k}>{f.label}</option>)}
-            </optgroup>
-          ))}
-        </select>
+        <FontMenu value={selTs?.font || "comicneue"} disabled={!selTs}
+          onPick={(k) => mutateSel<BalloonEl | TextEl>((x) => {
+            x.ts.font = k;
+            const vars = FONTS[k]?.variants || ["regular"];
+            if (!vars.includes(tsVariant(x.ts) as never)) { x.ts.bold = false; x.ts.italic = false; }
+          })} />
+        <SubtypeSelect ts={selTs}
+          onSet={(bold, italic) => mutateSel<BalloonEl | TextEl>((x) => { x.ts.bold = bold; x.ts.italic = italic; })} />
         <input type="number" min={8} max={800} disabled={!selTs} value={selTs?.size || 42} style={{ width: 56 }}
           onChange={(e) => mutateSel<BalloonEl | TextEl>((x) => { x.ts.size = clamp(+e.target.value || 8, 8, 800); })} />
+        <div style={{ position: "relative" }}>
+          <button className="fillSwatch" title="Text color" disabled={!selTs}
+            style={{ background: selTs?.fillA || "#111111", width: 28 }}
+            onClick={() => setShowTextColor((s) => !s)} />
+          {showTextColor && (
+            <div className="fillPop" style={{ width: 250 }}>
+              <div className="fillPopHead">Text color</div>
+              <div className="palGrid">
+                {COLOR_PALETTE.flat().map((c, i) => (
+                  <button key={i} style={{ background: c }} title={c}
+                    onClick={() => {
+                      mutateSel<BalloonEl | TextEl>((x) => { x.ts.fillA = c; x.ts.fillB = null; });
+                      setShowTextColor(false);
+                    }} />
+                ))}
+              </div>
+              <div className="fld" style={{ marginTop: 6 }}>
+                <label>Custom</label>
+                <input type="color" onChange={(e) => {
+                  mutateSel<BalloonEl | TextEl>((x) => { x.ts.fillA = e.target.value; x.ts.fillB = null; });
+                  setShowTextColor(false);
+                }} />
+              </div>
+            </div>
+          )}
+        </div>
         <button className={"fbTog" + (selTs?.bold ? " on" : "")} disabled={!selTs}
           onClick={() => mutateSel<BalloonEl | TextEl>((x) => { x.ts.bold = !x.ts.bold; })}><b>B</b></button>
         <button className={"fbTog" + (selTs?.italic ? " on" : "")} disabled={!selTs}
           onClick={() => mutateSel<BalloonEl | TextEl>((x) => { x.ts.italic = !x.ts.italic; })}><i>I</i></button>
-        {(["left", "center", "right"] as const).map((a) => (
+        <button className={"fbTog" + (selTs?.underline ? " on" : "")} disabled={!selTs}
+          onClick={() => mutateSel<BalloonEl | TextEl>((x) => { x.ts.underline = !x.ts.underline; })}><u>U</u></button>
+        {(["left", "center", "right", "justify"] as const).map((a) => (
           <button key={a} className={"fbTog" + (selTs?.align === a ? " on" : "")} disabled={!selTs}
+            title={a[0].toUpperCase() + a.slice(1)}
             onClick={() => mutateSel<BalloonEl | TextEl>((x) => { x.ts.align = a; })}>
-            {a === "left" ? "⯇" : a === "center" ? "≡" : "⯈"}
+            {a === "left" ? "⯇" : a === "center" ? "≡" : a === "right" ? "⯈" : "☰"}
           </button>
         ))}
       </div>
