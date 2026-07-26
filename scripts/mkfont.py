@@ -413,6 +413,24 @@ FAMILIES = {
     "LMC Vapor":    (32, 44, 4.0, 1.0, 0, 1.00, 8, "bubbles", "round", 0),
     # mixed-case casual dialogue hand — full lowercase set
     "LMC Casual":   (40, 56, 4.0, 1.0, 0, 1.00, 4, "", "round", 0, True),
+    # --- display/SFX genres: tall condensed military, battle-damaged,
+    #     slanted cartoon impact, and rough brush ---
+    #     slanted cartoon impact, and rough brush ---
+    # condensed families need SLIM strokes or the tight columns merge into blobs
+    "LMC Armory":   (38, 52, 0.8, 0.6, 0, 0.70, 0, "", "square", 6),
+    "LMC Breach":   (40, 54, 3.2, 2.4, 0, 0.72, 5, "", "square", 10),
+    "LMC Kaboom":   (94, 118, 2.0, 0.9, 13, 1.00, 5, "", "round", 0),
+    "LMC Brimstone": (60, 80, 9.0, 2.0, 6, 0.92, 10, "taper", "round", 0),
+    # heaviest of all — doubles as bolder-than-bold dialogue and beefy SFX
+    "LMC Bigbold":  (104, 128, 1.5, 0.8, 0, 1.02, 4, "", "round", 0),
+    # upright chunky impact caps
+    "LMC Slam":     (96, 120, 2.5, 1.0, 3, 0.96, 6, "", "square", 2),
+    # bubbly, bouncy, soft-round
+    "LMC Splash":   (86, 108, 3.5, 1.2, 5, 1.02, 12, "", "round", 0),
+    # hard-leaning spiky shards
+    "LMC Blitz":    (60, 78, 4.0, 1.4, 16, 0.78, 6, "", "square", 8),
+    # rough horror brush, slanted
+    "LMC Butcher":  (64, 82, 11.0, 3.0, 7, 0.88, 8, "", "square", 7),
 }
 
 def main(outdir):
