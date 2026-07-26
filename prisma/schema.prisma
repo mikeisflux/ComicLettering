@@ -20,6 +20,7 @@ model User {
   subStatus    String    @default("none") // none | active | cancelled | suspended
   subPlan      String?   // monthly | yearly
   subId        String?   // PayPal subscription id
+  subUpdatedAt DateTime? // event time of the last applied subscription-status write (webhook ordering guard)
   resetToken   String?   // sha256 of the password-reset token
   resetExpiry  DateTime? // when the reset token expires
   createdAt    DateTime    @default(now())

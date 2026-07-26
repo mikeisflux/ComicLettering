@@ -27,8 +27,16 @@ export async function GET() {
       plan = sub.plan_id && monthlyPlan && sub.plan_id === monthlyPlan ? "monthly" : "yearly";
       status = STATUS_MAP[sub.status] ?? status;
       nextBilling = sub.billing_info?.next_billing_time ?? null;
-      if (plan !== user.subPlan || status !== user.subStatus) {
-        await prisma.user.update({ where: { id: user.id }, data: { subPlan: plan, subStatus: status } });
+      if (user.subStatus === "cancelled" && status === "active") {
+        /* PayPal cancellations propagate with a delay: a stale ACTIVE read
+           must never overwrite a locally-stored cancellation (which the
+           webhook may have just written) — trust our own record. */
+        status = user.subStatus;
+      } else if (plan !== user.subPlan || status !== user.subStatus) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { subPlan: plan, subStatus: status, subUpdatedAt: new Date() },
+        });
       }
     }
   }

@@ -25,20 +25,52 @@ export function fontString(ts: TextStyle): string {
   return `${ts.italic ? "italic " : ""}${ts.bold ? "700 " : "400 "}${ts.size}px ${FONTS[ts.font]?.css || FONTS.comicneue.css}`;
 }
 
-function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
-  const out: string[] = [];
-  for (const para of String(text).split("\n")) {
-    const words = para.split(/\s+/).filter(Boolean);
-    if (!words.length) { out.push(""); continue; }
-    let line = words[0];
-    for (let i = 1; i < words.length; i++) {
-      const test = line + " " + words[i];
-      if (ctx.measureText(test).width <= maxWidth) line = test;
-      else { out.push(line); line = words[i]; }
-    }
-    out.push(line);
+/* Break a single over-wide word at grapheme-cluster boundaries so it wraps
+   like CSS `word-break: break-word` (also wraps spaceless CJK runs, which
+   arrive as one huge "word"). Returns at least one part. */
+function breakWordClusters(ctx: CanvasRenderingContext2D, word: string, maxWidth: number): string[] {
+  const clusters = word.match(/\P{M}\p{M}*/gu) || [word];
+  const parts: string[] = [];
+  let cur = "";
+  for (const cl of clusters) {
+    const test = cur + cl;
+    if (cur && ctx.measureText(test).width > maxWidth) { parts.push(cur); cur = cl; }
+    else cur = test;
   }
-  return out;
+  if (cur) parts.push(cur);
+  return parts.length ? parts : [word];
+}
+
+/* Word-wrap matching the editor's CSS (`white-space: pre-wrap` +
+   `word-break: break-word`). hard[i] is true when lines[i] ends at a forced
+   break (\n) — those lines must never be justified. */
+function wrapLines(
+  ctx: CanvasRenderingContext2D, text: string, maxWidth: number
+): { lines: string[]; hard: boolean[] } {
+  const lines: string[] = [];
+  const hard: boolean[] = [];
+  const paras = String(text).split("\n");
+  for (let pi = 0; pi < paras.length; pi++) {
+    const words = paras[pi].split(/\s+/).filter(Boolean);
+    if (!words.length) lines.push("");
+    else {
+      let line = "";
+      for (const w of words) {
+        const test = line ? line + " " + w : w;
+        if (ctx.measureText(test).width <= maxWidth) { line = test; continue; }
+        if (line) lines.push(line);
+        if (ctx.measureText(w).width <= maxWidth) { line = w; continue; }
+        // over-wide word: move to its own line, then break per cluster
+        const parts = breakWordClusters(ctx, w, maxWidth);
+        for (let k = 0; k < parts.length - 1; k++) lines.push(parts[k]);
+        line = parts[parts.length - 1];
+      }
+      lines.push(line);
+    }
+    while (hard.length < lines.length) hard.push(false);
+    if (pi < paras.length - 1) hard[lines.length - 1] = true;
+  }
+  return { lines, hard };
 }
 
 /* Rich text with inline bold/italic runs. Cluster-level layout so emphasis can
@@ -69,22 +101,42 @@ function drawRichText(
 
   type Tok = { type: "word" | "space"; clusters?: Cl[]; w: number };
   const lines: Tok[][] = [];
+  /* hardBreak[i]: lines[i] ends at a forced break (\n) — never justified */
+  const hardBreak: boolean[] = [];
   let curLine: Tok[] = [], curLineW = 0, word: Cl[] = [], wordW = 0;
+  const pushLine = (hard: boolean) => { lines.push(curLine); hardBreak.push(hard); curLine = []; curLineW = 0; };
   const flushWord = () => {
     if (!word.length) return;
     const needSpace = curLine.length > 0;
-    if (curLineW > 0 && curLineW + (needSpace ? spaceW : 0) + wordW > rw) { lines.push(curLine); curLine = []; curLineW = 0; }
-    if (curLine.length > 0) { curLine.push({ type: "space", w: spaceW }); curLineW += spaceW; }
-    curLine.push({ type: "word", clusters: word, w: wordW }); curLineW += wordW;
+    if (curLineW > 0 && curLineW + (needSpace ? spaceW : 0) + wordW > rw) pushLine(false);
+    if (wordW > rw) {
+      /* over-wide word (long word or spaceless CJK): break at grapheme-cluster
+         boundaries so it wraps like CSS word-break: break-word */
+      let part: Cl[] = [], partW = 0;
+      for (const cl of word) {
+        const cw = measure(cl);
+        if (part.length && partW + cw > rw) {
+          curLine.push({ type: "word", clusters: part, w: partW });
+          curLineW += partW;
+          pushLine(false);
+          part = []; partW = 0;
+        }
+        part.push(cl); partW += cw;
+      }
+      curLine.push({ type: "word", clusters: part, w: partW }); curLineW += partW;
+    } else {
+      if (curLine.length > 0) { curLine.push({ type: "space", w: spaceW }); curLineW += spaceW; }
+      curLine.push({ type: "word", clusters: word, w: wordW }); curLineW += wordW;
+    }
     word = []; wordW = 0;
   };
   for (const cl of clusters) {
-    if (cl.ch === "\n") { flushWord(); lines.push(curLine); curLine = []; curLineW = 0; continue; }
+    if (cl.ch === "\n") { flushWord(); pushLine(true); continue; }
     if (/^\s+$/.test(cl.ch)) { flushWord(); continue; }
     word.push(cl); wordW += measure(cl);
   }
   flushWord();
-  if (curLine.length || lines.length === 0) lines.push(curLine);
+  if (curLine.length || lines.length === 0) pushLine(false);
 
   const lineH = ts.size * (ts.lineHeight ?? 1.25);
   const blockH = lines.length * lineH;
@@ -100,11 +152,20 @@ function drawRichText(
   ctx.lineJoin = "round";
   ctx.textAlign = "left";
   let y = y0;
-  for (const line of lines) {
+  for (let li = 0; li < lines.length; li++) {
+    const line = lines[li];
     const lineW = line.reduce((s, t) => s + t.w, 0);
+    /* justify: distribute extra width into the space tokens — but never on the
+       last line of the block, nor on a line that ends at a forced break */
+    const justifyThis = ts.align === "justify" && li < lines.length - 1 && !hardBreak[li];
+    const spaceCount = line.reduce((n, t) => n + (t.type === "space" ? 1 : 0), 0);
+    const extraPerSpace = justifyThis && spaceCount > 0 ? (rw - lineW) / spaceCount : 0;
     let x = ts.align === "center" ? rx + (rw - lineW) / 2 : ts.align === "right" ? rx + rw - lineW : rx;
+    const lineX0 = x;
+    let hasWord = false;
     for (const tok of line) {
-      if (tok.type === "space") { x += tok.w; continue; }
+      if (tok.type === "space") { x += tok.w + extraPerSpace; continue; }
+      hasWord = true;
       for (const cl of tok.clusters!) {
         ctx.font = fontFor(cl.b, cl.i);
         const cw = ctx.measureText(cl.ch).width + tr;
@@ -119,6 +180,17 @@ function drawRichText(
         ctx.fillStyle = fill; ctx.fillText(cl.ch, x, y);
         x += cw;
       }
+    }
+    if (ts.underline && hasWord && x > lineX0) {
+      /* same constants as drawStyledText's underline */
+      ctx.save();
+      ctx.strokeStyle = ts.fillA;
+      ctx.lineWidth = Math.max(1, ts.size * 0.06);
+      ctx.beginPath();
+      ctx.moveTo(lineX0, y + ts.size * 0.45);
+      ctx.lineTo(x, y + ts.size * 0.45);
+      ctx.stroke();
+      ctx.restore();
     }
     y += lineH;
   }
@@ -188,7 +260,7 @@ export function drawStyledText(
   // letter-spacing (tracking) — supported in the browser canvas used for export
   try { (ctx as unknown as { letterSpacing: string }).letterSpacing = `${ts.tracking ?? 0}px`; } catch { /* older engines */ }
   const t = ts.caps ? String(preText).toUpperCase() : String(preText);
-  const lines = wrapLines(ctx, t, rw);
+  const { lines, hard } = wrapLines(ctx, t, rw);
   const lineH = ts.size * (ts.lineHeight ?? 1.25);
   const blockH = lines.length * lineH;
   const y0 = ry + rh / 2 - blockH / 2 + lineH / 2;
@@ -226,7 +298,9 @@ export function drawStyledText(
   let y = y0;
   for (let li = 0; li < lines.length; li++) {
     const line = lines[li];
-    const justifyThis = ts.align === "justify" && li < lines.length - 1 && lines[li + 1] !== "";
+    /* never justify the last line of the block or a line ending at a forced
+       break (\n) — matches CSS text-align: justify */
+    const justifyThis = ts.align === "justify" && li < lines.length - 1 && !hard[li];
     const x = xFor(ts.align);
     if (ts.shadow) {
       ctx.save();
