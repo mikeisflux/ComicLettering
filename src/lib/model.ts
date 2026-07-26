@@ -121,12 +121,44 @@ export interface TextStyle {
   align: Align;
   lineHeight?: number; // line-spacing multiplier (default 1.25)
   tracking?: number;   // letter-spacing in px (default 0)
+  crossbarI?: boolean; // draw crossbars on the pronoun "I" (comic convention)
   fillA: string;
   fillB: string | null; // gradient bottom stop; null = solid fillA
   outlineC: string;
   outlineW: number;
   shadow: boolean;
   shadowC: string;
+}
+
+/* Inline emphasis: a balloon/text's lettering can be broken into runs, each
+   optionally bold and/or italic, on top of the element's base TextStyle. When
+   `runs` is absent the plain `text` (with the base style) is used. */
+export interface TextRun { t: string; b?: boolean; i?: boolean }
+export function runsToText(runs: TextRun[]): string {
+  return runs.map((r) => r.t).join("");
+}
+/* collapse runs that carry no emphasis (or a single plain run) to nothing, so
+   we only persist `runs` when there is real inline formatting */
+export function normalizeRuns(runs: TextRun[]): TextRun[] | undefined {
+  const merged: TextRun[] = [];
+  for (const r of runs) {
+    if (!r.t) continue;
+    const last = merged[merged.length - 1];
+    if (last && !!last.b === !!r.b && !!last.i === !!r.i) last.t += r.t;
+    else merged.push({ t: r.t, ...(r.b ? { b: true } : {}), ...(r.i ? { i: true } : {}) });
+  }
+  if (merged.length === 0) return undefined;
+  if (merged.length === 1 && !merged[0].b && !merged[0].i) return undefined;
+  return merged;
+}
+
+/* Comic crossbar-I: the pronoun "I" (and I-contractions) gets a bar above and
+   below. Implemented with combining macrons so it renders identically in the
+   DOM editor and the canvas/PDF export, in any font. Never touches "I" inside
+   other words (BIG, IT'S, …). */
+const CROSSBAR_I = "Ī̱";
+export function applyCrossbarI(text: string): string {
+  return text.replace(/\bI(?=\b|['’])/g, CROSSBAR_I);
 }
 
 export interface BaseEl {
@@ -153,6 +185,7 @@ export interface BalloonEl extends BaseEl {
   kind: BalloonKind;
   text: string;
   ts: TextStyle;
+  runs?: TextRun[]; // optional inline bold/italic emphasis
   fill: FillStyle; stroke: string; strokeW: number;
   /* dx/dy: tail tip relative to the balloon centre (local, unrotated).
      bx/by: optional bend point the tail curves through.
@@ -233,6 +266,7 @@ export interface TextEl extends BaseEl {
   type: "text";
   text: string;
   ts: TextStyle;
+  runs?: TextRun[]; // optional inline bold/italic emphasis
   /* SFX arc warp: -100..100 (0/undefined = straight). +bulges up, −bulges down */
   warp?: number;
 }

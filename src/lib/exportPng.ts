@@ -1,7 +1,7 @@
 /* Full-resolution canvas renderer — used for PNG export and page thumbnails. */
 import {
-  Assets, BalloonEl, Doc, El, FILTERS, FONTS, Page, TextStyle,
-  aabbOverlap, deg2rad, lightenHex, resolveBalloon, rotVec,
+  Assets, BalloonEl, Doc, El, FILTERS, FONTS, Page, TextRun, TextStyle,
+  aabbOverlap, applyCrossbarI, deg2rad, lightenHex, resolveBalloon, rotVec,
 } from "./model";
 import { balloonGeom, arcTextLayout } from "./geometry";
 import { paintFill } from "./fills";
@@ -41,14 +41,98 @@ function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number
   return out;
 }
 
+/* Rich text with inline bold/italic runs. Cluster-level layout so emphasis can
+   fall anywhere; honours wrap, alignment, gradient, outline, shadow, caps and
+   crossbar-I — matching the DOM editor's run rendering. */
+function drawRichText(
+  ctx: CanvasRenderingContext2D, ts: TextStyle, runs: TextRun[],
+  rect: [number, number, number, number]
+) {
+  const [rx, ry, rw, rh] = rect;
+  const fam = FONTS[ts.font]?.css || FONTS.comicneue.css;
+  const fontFor = (b: boolean, i: boolean) =>
+    `${(ts.italic || i) ? "italic " : ""}${(ts.bold || b) ? "700 " : "400 "}${ts.size}px ${fam}`;
+  ctx.textBaseline = "middle";
+  const tr = ts.tracking ?? 0;
+  try { (ctx as unknown as { letterSpacing: string }).letterSpacing = "0px"; } catch { /* ignore */ }
+
+  type Cl = { ch: string; b: boolean; i: boolean };
+  const clusters: Cl[] = [];
+  for (const run of runs) {
+    const t0 = ts.caps ? run.t.toUpperCase() : run.t;
+    const t = ts.crossbarI ? applyCrossbarI(t0) : t0;
+    for (const cl of (t.match(/\P{M}\p{M}*|\n/gu) || [])) clusters.push({ ch: cl, b: !!run.b, i: !!run.i });
+  }
+  const measure = (cl: Cl) => { ctx.font = fontFor(cl.b, cl.i); return ctx.measureText(cl.ch).width + tr; };
+  ctx.font = fontFor(false, false);
+  const spaceW = ctx.measureText(" ").width + tr;
+
+  type Tok = { type: "word" | "space"; clusters?: Cl[]; w: number };
+  const lines: Tok[][] = [];
+  let curLine: Tok[] = [], curLineW = 0, word: Cl[] = [], wordW = 0;
+  const flushWord = () => {
+    if (!word.length) return;
+    const needSpace = curLine.length > 0;
+    if (curLineW > 0 && curLineW + (needSpace ? spaceW : 0) + wordW > rw) { lines.push(curLine); curLine = []; curLineW = 0; }
+    if (curLine.length > 0) { curLine.push({ type: "space", w: spaceW }); curLineW += spaceW; }
+    curLine.push({ type: "word", clusters: word, w: wordW }); curLineW += wordW;
+    word = []; wordW = 0;
+  };
+  for (const cl of clusters) {
+    if (cl.ch === "\n") { flushWord(); lines.push(curLine); curLine = []; curLineW = 0; continue; }
+    if (/^\s+$/.test(cl.ch)) { flushWord(); continue; }
+    word.push(cl); wordW += measure(cl);
+  }
+  flushWord();
+  if (curLine.length || lines.length === 0) lines.push(curLine);
+
+  const lineH = ts.size * (ts.lineHeight ?? 1.25);
+  const blockH = lines.length * lineH;
+  const y0 = ry + rh / 2 - blockH / 2 + lineH / 2;
+  let fill: string | CanvasGradient = ts.fillA;
+  if (ts.fillB) {
+    const g = ctx.createLinearGradient(0, y0 - lineH / 2, 0, y0 - lineH / 2 + blockH);
+    g.addColorStop(0, lightenHex(ts.fillA, 0.55));
+    g.addColorStop(0.38, ts.fillA);
+    g.addColorStop(1, ts.fillB);
+    fill = g;
+  }
+  ctx.lineJoin = "round";
+  ctx.textAlign = "left";
+  let y = y0;
+  for (const line of lines) {
+    const lineW = line.reduce((s, t) => s + t.w, 0);
+    let x = ts.align === "center" ? rx + (rw - lineW) / 2 : ts.align === "right" ? rx + rw - lineW : rx;
+    for (const tok of line) {
+      if (tok.type === "space") { x += tok.w; continue; }
+      for (const cl of tok.clusters!) {
+        ctx.font = fontFor(cl.b, cl.i);
+        const cw = ctx.measureText(cl.ch).width + tr;
+        if (ts.shadow) {
+          ctx.save();
+          ctx.shadowColor = ts.shadowC || "#00000088";
+          ctx.shadowOffsetX = ts.size * 0.05; ctx.shadowOffsetY = ts.size * 0.05; ctx.shadowBlur = ts.size * 0.06;
+          ctx.fillStyle = fill; ctx.fillText(cl.ch, x, y);
+          ctx.restore();
+        }
+        if (ts.outlineW > 0) { ctx.lineWidth = ts.outlineW; ctx.strokeStyle = ts.outlineC; ctx.strokeText(cl.ch, x, y); }
+        ctx.fillStyle = fill; ctx.fillText(cl.ch, x, y);
+        x += cw;
+      }
+    }
+    y += lineH;
+  }
+}
+
 /* SFX arc-warped text: lay each glyph along a circular arc. Single line. */
 function drawWarpedText(
   ctx: CanvasRenderingContext2D, ts: TextStyle, text: string,
   rect: [number, number, number, number], warp: number
 ) {
   const [rx, ry, rw, rh] = rect;
-  const t = (ts.caps ? String(text).toUpperCase() : String(text)).replace(/\s*\n\s*/g, " ");
-  const chars = [...t];
+  let t = (ts.caps ? String(text).toUpperCase() : String(text)).replace(/\s*\n\s*/g, " ");
+  if (ts.crossbarI) t = applyCrossbarI(t);
+  const chars = t.match(/\P{M}\p{M}*/gu) || []; // keep combining marks with their base glyph
   try { (ctx as unknown as { letterSpacing: string }).letterSpacing = "0px"; } catch { /* ignore */ }
   const tr = ts.tracking ?? 0;
   const widths = chars.map((c) => ctx.measureText(c).width + tr);
@@ -90,15 +174,17 @@ function drawWarpedText(
 
 export function drawStyledText(
   ctx: CanvasRenderingContext2D, ts: TextStyle, text: string,
-  rect: [number, number, number, number], warp = 0
+  rect: [number, number, number, number], warp = 0, runs?: TextRun[]
 ) {
+  if (runs && runs.length && !warp) { drawRichText(ctx, ts, runs, rect); return; }
   const [rx, ry, rw, rh] = rect;
   ctx.font = fontString(ts);
   ctx.textBaseline = "middle";
   if (warp) { drawWarpedText(ctx, ts, text, rect, warp); return; }
+  const preText = ts.crossbarI ? applyCrossbarI(ts.caps ? String(text).toUpperCase() : String(text)) : text;
   // letter-spacing (tracking) — supported in the browser canvas used for export
   try { (ctx as unknown as { letterSpacing: string }).letterSpacing = `${ts.tracking ?? 0}px`; } catch { /* older engines */ }
-  const t = ts.caps ? String(text).toUpperCase() : String(text);
+  const t = ts.caps ? String(preText).toUpperCase() : String(preText);
   const lines = wrapLines(ctx, t, rw);
   const lineH = ts.size * (ts.lineHeight ?? 1.25);
   const blockH = lines.length * lineH;
@@ -295,9 +381,9 @@ function drawEl(ctx: CanvasRenderingContext2D, el: El, assets: Assets, merge?: M
       ctx.fill(new Path2D(g.deco));
     }
     ctx.setLineDash([]);
-    drawStyledText(ctx, el.ts, el.text, g.textRect);
+    drawStyledText(ctx, el.ts, el.text, g.textRect, 0, el.runs);
   } else if (el.type === "text") {
-    drawStyledText(ctx, el.ts, el.text, [0, 0, el.w, el.h], el.warp ?? 0);
+    drawStyledText(ctx, el.ts, el.text, [0, 0, el.w, el.h], el.warp ?? 0, el.runs);
   }
   ctx.restore();
 }

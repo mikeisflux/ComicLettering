@@ -3,15 +3,15 @@
    Comic Life-style comic lettering workflow: pages, panels, balloons,
    lettering styles, fills, SQL project library and PNG export. */
 import React, {
-  CSSProperties, useCallback, useEffect, useReducer, useRef, useState,
+  CSSProperties, ReactNode, useCallback, useEffect, useReducer, useRef, useState,
 } from "react";
 import {
   Assets, BALLOON_KINDS, BalloonEl, BalloonKind, Doc, El, FILTERS, FONTS,
   FONT_GROUPS, FillStyle, GRADIENT_PRESETS, HALFTONE_VARIANTS, LAYOUT_CATEGORIES,
   LayoutRect, PAGE_SIZES, PATTERN_VARIANTS, Page, PanelEl, SPEEDLINE_VARIANTS,
   COLOR_PALETTE, DPI, GradStop, MULTI_GRADIENTS, PAPER_CATEGORIES, PageMargin,
-  TAILLESS_KINDS, TEXTURE_VARIANTS, TextEl, TextStyle, aabbOverlap, applyLayout,
-  clamp, lightenHex, makeBalloon, makeImage, makePanel, makeText, newPage,
+  TAILLESS_KINDS, TEXTURE_VARIANTS, TextEl, TextRun, TextStyle, aabbOverlap, applyCrossbarI, applyLayout,
+  clamp, lightenHex, makeBalloon, makeImage, makePanel, makeText, newPage, normalizeRuns, runsToText,
   registerFont, reseedIds, resolveBalloon, rotVec, solid, starterDoc, uid,
 } from "@/lib/model";
 import { balloonGeom, arcTextLayout } from "@/lib/geometry";
@@ -60,6 +60,60 @@ function textCss(ts: TextStyle): CSSProperties {
     st.filter = `drop-shadow(${ts.size * 0.05}px ${ts.size * 0.05}px ${ts.size * 0.06}px ${ts.shadowC || "#00000088"})`;
   }
   return st;
+}
+
+/* apply crossbar-I for static display (not while editing) */
+function displayText(text: string, ts: TextStyle, editing: boolean): string {
+  if (editing || !ts.crossbarI) return text;
+  return applyCrossbarI(ts.caps ? text.toUpperCase() : text);
+}
+
+/* ---- inline emphasis (rich text runs) ---- */
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function runsToHtml(runs: TextRun[]): string {
+  return runs.map((r) => {
+    let h = escapeHtml(r.t).replace(/\n/g, "<br>");
+    if (r.i) h = `<i>${h}</i>`;
+    if (r.b) h = `<b>${h}</b>`;
+    return h;
+  }).join("");
+}
+function domToRuns(root: HTMLElement): TextRun[] {
+  const runs: TextRun[] = [];
+  const walk = (node: Node, b: boolean, i: boolean) => {
+    node.childNodes.forEach((child) => {
+      if (child.nodeType === 3) {
+        runs.push({ t: child.textContent || "", ...(b ? { b: true } : {}), ...(i ? { i: true } : {}) });
+      } else if (child.nodeType === 1) {
+        const e = child as HTMLElement;
+        const tag = e.tagName.toLowerCase();
+        if (tag === "br") { runs.push({ t: "\n", ...(b ? { b: true } : {}), ...(i ? { i: true } : {}) }); return; }
+        let nb = b, ni = i;
+        if (tag === "b" || tag === "strong") nb = true;
+        if (tag === "i" || tag === "em") ni = true;
+        const fw = e.style?.fontWeight; if (fw === "bold" || (fw && +fw >= 600)) nb = true;
+        if (e.style?.fontStyle === "italic") ni = true;
+        if ((tag === "div" || tag === "p") && runs.length && runs[runs.length - 1].t !== "\n") runs.push({ t: "\n" });
+        walk(e, nb, ni);
+      }
+    });
+  };
+  walk(root, false, false);
+  return runs;
+}
+function renderRuns(runs: TextRun[], ts: TextStyle): ReactNode {
+  return runs.map((r, idx) => {
+    const txt = ts.crossbarI ? applyCrossbarI(ts.caps ? r.t.toUpperCase() : r.t) : r.t;
+    const parts = txt.split("\n");
+    const content: ReactNode[] = [];
+    parts.forEach((p, i) => { if (i > 0) content.push(<br key={`b${idx}-${i}`} />); content.push(p); });
+    let node: ReactNode = content;
+    if (r.i) node = <i>{node}</i>;
+    if (r.b) node = <b>{node}</b>;
+    return <span key={idx}>{node}</span>;
+  });
 }
 
 /* offscreen canvas so warped-text glyph widths match the export renderer */
@@ -565,6 +619,8 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const [replaceText, setReplaceText] = useState("");
   const [findCase, setFindCase] = useState(false);
   const [showSafe, setShowSafe] = useState(false);
+  const [showScript, setShowScript] = useState(false);
+  const [scriptText, setScriptText] = useState("");
   const [spread, setSpread] = useState(false);
   const [spreadUrl, setSpreadUrl] = useState<string | null>(null);
   const [exportFrom, setExportFrom] = useState(1);
@@ -803,8 +859,11 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       const el = p.els.find((e) => e.id === eid) as BalloonEl | TextEl | undefined;
       const dom = pageDivRef.current?.querySelector(`.el[data-id="${eid}"] .txt`) as HTMLElement | null;
       if (el && dom) {
-        const txt = dom.innerText.replace(/ /g, " ").replace(/\n$/, "");
-        if (txt !== el.text) { el.text = txt; setTimeout(commit, 0); }
+        const rawRuns = domToRuns(dom);
+        const rtxt = runsToText(rawRuns).replace(/ /g, " ").replace(/\n+$/, "");
+        const runs = normalizeRuns(rawRuns);
+        const changed = rtxt !== el.text || JSON.stringify(runs) !== JSON.stringify(el.runs);
+        if (changed) { el.text = rtxt; el.runs = runs; setTimeout(commit, 0); }
       }
       return null;
     });
@@ -814,6 +873,9 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     if (!editingId) return;
     const dom = pageDivRef.current?.querySelector(`.el[data-id="${editingId}"] .txt`) as HTMLElement | null;
     if (!dom) return;
+    /* seed the editable node with existing inline emphasis so it can be edited */
+    const eel = docRef.current?.pages[pageIndexRef.current].els.find((e) => e.id === editingId) as BalloonEl | TextEl | undefined;
+    if (eel && eel.runs && eel.runs.length) dom.innerHTML = runsToHtml(eel.runs);
     dom.focus();
     const range = document.createRange();
     range.selectNodeContents(dom);
@@ -1382,6 +1444,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
           el.text = all ? el.text.replace(rx, replaceText)
             : el.text.replace(rx, () => { if (count === 0) { count++; return replaceText; } return before.slice(0); });
           if (all) count += (before.match(rx) || []).length;
+          if (el.text !== before) el.runs = undefined; // positions changed → drop inline emphasis
           rx.lastIndex = 0;
         }
       }
@@ -1508,8 +1571,70 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       else { out.push(cur); cur = words[i]; curW = wordW[i]; }
     }
     if (cur) out.push(cur);
-    mutateSel<BalloonEl | TextEl>((x) => { x.text = out.join("\n"); });
+    mutateSel<BalloonEl | TextEl>((x) => { x.text = out.join("\n"); x.runs = undefined; });
     setStatus(`Balanced into ${out.length} even line${out.length > 1 ? "s" : ""}.`);
+  }
+
+  /* Parse a comic script (CHARACTER: dialogue, CAPTION:, SFX:, parentheticals) */
+  function parseScript(src: string): { kind: string; text: string }[] {
+    const items: { kind: string; text: string }[] = [];
+    const headerRx = /^(PAGE|PANEL|SCENE|PG|P|INT|EXT)\b/i;
+    const lineRx = /^\s*([A-Z0-9 .,'’&\-]{1,28}?)\s*(?:\(([^)]*)\))?\s*:\s*(.+)$/;
+    for (const rawLine of src.split(/\r?\n/)) {
+      const line = rawLine.trim();
+      if (!line) continue;
+      if (headerRx.test(line) && !line.includes(":")) continue;
+      const m = line.match(lineRx);
+      if (!m) { if (items.length) items[items.length - 1].text += " " + line; continue; }
+      const speaker = m[1].trim().toUpperCase();
+      const paren = (m[2] || "").toLowerCase();
+      const text = m[3].trim();
+      let kind = "speech";
+      if (/^(SFX|SOUND|FX)$/.test(speaker)) kind = "sfx";
+      else if (/^(CAPTION|CAP|NARRATION|NARR|BOX|TITLE)$/.test(speaker)) kind = "caption";
+      else if (/thought|think/.test(paren)) kind = "thought";
+      else if (/whisper|quiet/.test(paren)) kind = "whisper";
+      else if (/shout|yell|scream|loud|angry/.test(paren)) kind = "exclaim";
+      items.push({ kind, text });
+    }
+    return items;
+  }
+  function importScript() {
+    const items = parseScript(scriptText);
+    if (!items.length) { setStatus("No dialogue found — use CHARACTER: text (one per line)."); return; }
+    const d = docRef.current!;
+    const p = d.pages[pageIndexRef.current];
+    const colW = Math.round(p.w * 0.42);
+    const gap = Math.round(p.w * 0.03);
+    const m0 = Math.round(p.w * 0.06);
+    let x = m0, y = m0;
+    let count = 0;
+    for (const it of items) {
+      const lineCt = Math.max(1, Math.ceil(it.text.length / 26));
+      let el: El;
+      if (it.kind === "sfx") {
+        el = makeText(x, y, colW, Math.round(p.w * 0.16), true);
+        const st = LETTER_STYLES.find((s) => s.name === activeStyleRef.current) || LETTER_STYLES[0];
+        (el as TextEl).ts = applyLetterStyle((el as TextEl).ts, st);
+        (el as TextEl).ts.outlineW = Math.round((el as TextEl).ts.size * st.outlineF);
+        el.text = it.text;
+      } else {
+        const kind = (["caption", "thought", "whisper", "exclaim"].includes(it.kind) ? it.kind : "speech") as BalloonKind;
+        const h = clamp(Math.round(lineCt * p.w * 0.05 + p.w * 0.06), Math.round(p.w * 0.12), Math.round(p.h * 0.4));
+        el = makeBalloon(kind, x, y, colW, h);
+        el.text = it.text;
+      }
+      p.els.push(el);
+      count++;
+      y += el.h + gap;
+      if (y > p.h * 0.9) { y = m0; x += colW + gap; if (x + colW > p.w) x = m0; }
+    }
+    commit();
+    rebuildThumbs();
+    setShowScript(false);
+    setScriptText("");
+    setSelId(null);
+    setStatus(`Added ${count} item${count > 1 ? "s" : ""} from your script.`);
   }
 
   function alignSel(mode: "left" | "hcenter" | "right" | "top" | "vcenter" | "bottom") {
@@ -2139,7 +2264,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
             suppressContentEditableWarning
             spellCheck={editing}
             onBlur={() => editing && finishEditing()}
-          >{el.text}</div>
+          >{el.runs && !editing ? renderRuns(el.runs, el.ts) : displayText(el.text, el.ts, editing)}</div>
         </div>
       );
     }
@@ -2147,8 +2272,9 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     /* text / SFX */
     const editing = editingId === el.id;
     if (el.warp && !editing && el.text) {
-      const raw = (el.ts.caps ? el.text.toUpperCase() : el.text).replace(/\s*\n\s*/g, " ");
-      const chars = [...raw];
+      let raw = (el.ts.caps ? el.text.toUpperCase() : el.text).replace(/\s*\n\s*/g, " ");
+      if (el.ts.crossbarI) raw = applyCrossbarI(raw);
+      const chars = raw.match(/\P{M}\p{M}*/gu) || [];
       const widths = measureCharWidths(el.ts, chars);
       const layout = arcTextLayout(widths, el.warp);
       const cx0 = el.w / 2, cy0 = el.h / 2;
@@ -2178,7 +2304,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
           suppressContentEditableWarning
           spellCheck={editing}
           onBlur={() => editing && finishEditing()}
-        >{el.text}</div>
+        >{el.runs && !editing ? renderRuns(el.runs, el.ts) : displayText(el.text, el.ts, editing)}</div>
       </div>
     );
   }
@@ -2269,7 +2395,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   }
 
   /* small field helpers */
-  const Fld = ({ label, children }: { label: string; children: React.ReactNode }) => (
+  const Fld = ({ label, children }: { label: string; children: ReactNode }) => (
     <div className="fld"><label>{label}</label>{children}</div>
   );
 
@@ -2293,6 +2419,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
         <Fld label="Size"><input type="number" min={8} max={800} value={ts.size}
           onChange={(e) => set({ size: clamp(+e.target.value || 8, 8, 800) })} /></Fld>
         <Fld label="ALL CAPS"><input type="checkbox" checked={ts.caps} onChange={(e) => set({ caps: e.target.checked })} /></Fld>
+        <Fld label="Crossbar “I”"><input type="checkbox" checked={!!ts.crossbarI} onChange={(e) => set({ crossbarI: e.target.checked })} /></Fld>
         <Fld label="Underline"><input type="checkbox" checked={!!ts.underline} onChange={(e) => set({ underline: e.target.checked })} /></Fld>
         <Fld label="Align">
           <select value={ts.align} onChange={(e) => set({ align: e.target.value as TextStyle["align"] })}>
@@ -2820,6 +2947,8 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
             ["—", null],
             ["Import Custom Stamps…", () => fileStampRef.current?.click()],
             ["Import Custom Font…", () => fileFontRef.current?.click()],
+            ["—", null],
+            ["Import Script → Balloons…", () => setShowScript(true)],
           ]],
           ["Format", [
             ["Bold", () => mutateSel<BalloonEl | TextEl>((x) => { if (x.ts) x.ts.bold = !x.ts.bold; })],
@@ -2855,7 +2984,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
             ["Unlock", () => mutateSel((x) => { x.locked = false; })],
           ]],
           ["Help", [
-            ["Keyboard Shortcuts", () => window.alert("B/T/L/P — add balloon/text/lettering/panel\nCtrl+Z / Ctrl+Y — undo / redo\nCtrl+C/X/V/D — copy / cut / paste / duplicate\nCtrl+S — save · Ctrl+[ / Ctrl+] — center H / V\nShift while resizing — keep proportions\nShift while rotating — snap 15° · Alt while dragging — no snapping\nDouble-click — edit text / set image · Right-click — full menu")],
+            ["Keyboard Shortcuts", () => window.alert("B/T/L/P — add balloon/text/lettering/panel\nCtrl+Z / Ctrl+Y — undo / redo\nCtrl+C/X/V/D — copy / cut / paste / duplicate\nCtrl+S — save · Ctrl+[ / Ctrl+] — center H / V\nShift while resizing — keep proportions\nShift while rotating — snap 15° · Alt while dragging — no snapping\nDouble-click — edit text · while editing, Ctrl+B / Ctrl+I bold/italic the selected words\nRight-click — full menu")],
             ["FAQ & Support", () => window.open("/faq", "_blank")],
           ]],
         ] as [string, ([string, (() => void) | null])[]][]).map(([name, items]) => (
@@ -3609,6 +3738,31 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
         </div>
       )}
 
+      {/* import script dialog */}
+      {showScript && (
+        <div className="setupOverlay" onPointerDown={(e) => { if (e.target === e.currentTarget) setShowScript(false); }}>
+          <div className="setupDlg" style={{ width: 560 }}>
+            <div className="setupTitle">Import Script → Balloons</div>
+            <div className="setupBody" style={{ flexDirection: "column" }}>
+              <div className="mutedNote" style={{ fontSize: 12, opacity: .75, marginBottom: 6 }}>
+                Paste your script. One line each: <code>CHARACTER: dialogue</code>.
+                Use <code>CAPTION:</code>, <code>SFX:</code>, and parentheticals like
+                <code> JANE (thought):</code> or <code>(whisper)</code>. PAGE / PANEL headers are ignored.
+                Balloons are laid out on the current page for you to arrange.
+              </div>
+              <textarea value={scriptText} autoFocus
+                onChange={(e) => setScriptText(e.target.value)}
+                placeholder={"PAGE 1\nPANEL 1\nJANE: We shouldn't be here.\nMARK (whisper): Too late now.\nCAPTION: Later that night…\nSFX: KRAKKA-THOOM"}
+                style={{ width: "100%", height: 220, fontFamily: "ui-monospace, Menlo, monospace", fontSize: 13, resize: "vertical" }} />
+            </div>
+            <div className="setupFoot">
+              <button onClick={() => setShowScript(false)}>Cancel</button>
+              <button className="okBtn" disabled={!scriptText.trim()} onClick={() => importScript()}>Add to page</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* page setup dialog */}
       {showSetup && (
         <PageSetupDialog
@@ -3674,7 +3828,7 @@ function ToolBtn({ label, icon, onClick, disabled, accent }: {
   );
 }
 
-function TrayBtn({ children, label, onClick, active }: { children: React.ReactNode; label: string; onClick: () => void; active?: boolean }) {
+function TrayBtn({ children, label, onClick, active }: { children: ReactNode; label: string; onClick: () => void; active?: boolean }) {
   return (
     <button className={`trayBtn${active ? " on" : ""}`} onClick={onClick} title={label}>
       {children}
