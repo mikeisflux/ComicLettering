@@ -1,0 +1,143 @@
+/* Shared per-render context bag for the editor modules.
+   Editor.tsx assembles one plain `ed` object per render; extracted plain
+   functions (NOT components — reconciliation output is identical) receive
+   it as their first argument. */
+import type React from "react";
+import type { Assets, Doc, El, FillStyle, Page, TextStyle } from "@/lib/model";
+import type { ImageFormat } from "@/lib/exportPng";
+import type { BalloonPreset, ProjectMeta, ProofMatch } from "./textHelpers";
+
+type SetState<T> = React.Dispatch<React.SetStateAction<T>>;
+
+export type TabKey = "layouts" | "inspector" | "layers" | "photos" | "library" | "proof";
+export type ExportFmt = ImageFormat | "pdf" | "cbz";
+export type ExportScope = "current" | "all" | "range";
+export type StyleClip = Partial<TextStyle> & { fill?: FillStyle; stroke?: string; strokeW?: number };
+
+export interface EditorCtx {
+  demo: boolean;
+  /* current document / selection (per render) */
+  doc: Doc | null;
+  page: Page | null;
+  selId: string | null;
+  selEl: El | null;
+  editingId: string | null;
+  zoom: number;
+  status: string;
+  pageIndex: number;
+
+  /* long-lived refs */
+  docRef: React.RefObject<Doc | null>;
+  assetsRef: React.RefObject<Assets>;
+  histRef: React.RefObject<string[]>;
+  hIndexRef: React.RefObject<number>;
+  pageIndexRef: React.RefObject<number>;
+  pendingLockRef: React.RefObject<Set<string>>;
+  panelImageTarget: React.RefObject<string | null>;
+  aidRef: React.RefObject<number>;
+  activeStyleRef: React.RefObject<string>;
+  styleClipRef: React.RefObject<StyleClip | null>;
+  clipboardRef: React.RefObject<El | null>;
+  customFontIdsRef: React.RefObject<Record<string, string>>;
+  fileImageRef: React.RefObject<HTMLInputElement | null>;
+  filePanelImageRef: React.RefObject<HTMLInputElement | null>;
+  fileOpenRef: React.RefObject<HTMLInputElement | null>;
+  fileFontRef: React.RefObject<HTMLInputElement | null>;
+  fileStampRef: React.RefObject<HTMLInputElement | null>;
+
+  /* core callbacks living in Editor.tsx */
+  force: () => void;
+  commit: () => void;
+  autosave: () => void;
+  undo: () => void;
+  redo: () => void;
+  setStatus: (msg: string) => void;
+  select: (id: string | null) => void;
+  setSelId: SetState<string | null>;
+  setEditingId: SetState<string | null>;
+  finishEditing: () => void;
+  mutateSel: <T extends El>(mut: (el: T) => void, final?: boolean) => void;
+  startDrag: (
+    e: React.PointerEvent, el: El,
+    mode: "move" | "resize" | "rotate" | "tail" | "bow" | "tilt", handle?: string,
+  ) => void;
+  pagePoint: (e: { clientX: number; clientY: number }) => { x: number; y: number };
+  fitZoom: (forceFit: boolean) => void;
+  rebuildThumbs: () => void;
+  reseedAids: () => void;
+  setThumbs: SetState<Record<number, string>>;
+  setPageIndex: SetState<number>;
+  setUserZoomed: SetState<boolean>;
+  setZoom: SetState<number>;
+  bumpFonts: () => void;
+  registerRuntimeFont: (rec: { key: string; label: string; family: string; data: string }) => Promise<void>;
+  savePresets: (next: BalloonPreset[]) => void;
+
+  /* UI state + setters */
+  tab: TabKey;
+  setTab: SetState<TabKey>;
+  layoutCat: number;
+  setLayoutCat: SetState<number>;
+  autoLock: boolean;
+  setAutoLock: (v: boolean) => void;
+  projects: ProjectMeta[] | null;
+  setProjects: SetState<ProjectMeta[] | null>;
+  current: { id: string; name: string } | null;
+  setCurrent: SetState<{ id: string; name: string } | null>;
+  dbError: string | null;
+  setDbError: SetState<string | null>;
+  presets: BalloonPreset[];
+  proof: { busy: boolean; error: string | null; matches: ProofMatch[] } | null;
+  setProof: SetState<{ busy: boolean; error: string | null; matches: ProofMatch[] } | null>;
+  drawMode: boolean;
+  setDrawMode: SetState<boolean>;
+  tailAsk: string | null;
+  setTailAsk: SetState<string | null>;
+  ctxMenu: { x: number; y: number; id: string } | null;
+  setCtxMenu: SetState<{ x: number; y: number; id: string } | null>;
+  setShowSetup: SetState<boolean>;
+  showExport: boolean;
+  setShowExport: SetState<boolean>;
+  exportFmt: ExportFmt;
+  setExportFmt: SetState<ExportFmt>;
+  exportScope: ExportScope;
+  setExportScope: SetState<ExportScope>;
+  exportDpi: number;
+  setExportDpi: SetState<number>;
+  letteringOnly: boolean;
+  setLetteringOnly: SetState<boolean>;
+  exportCropMarks: boolean;
+  setExportCropMarks: SetState<boolean>;
+  exportFrom: number;
+  setExportFrom: SetState<number>;
+  exportTo: number;
+  setExportTo: SetState<number>;
+  showFind: boolean;
+  setShowFind: SetState<boolean>;
+  findText: string;
+  setFindText: SetState<string>;
+  replaceText: string;
+  setReplaceText: SetState<string>;
+  findCase: boolean;
+  setFindCase: SetState<boolean>;
+  showSafe: boolean;
+  setShowSafe: SetState<boolean>;
+  spread: boolean;
+  setSpread: SetState<boolean>;
+  showScript: boolean;
+  setShowScript: SetState<boolean>;
+  scriptText: string;
+  setScriptText: SetState<string>;
+  stampOpen: boolean;
+  setStampOpen: SetState<boolean>;
+  showFill: boolean;
+  setShowFill: SetState<boolean>;
+  showStroke: boolean;
+  setShowStroke: SetState<boolean>;
+  showTextColor: boolean;
+  setShowTextColor: SetState<boolean>;
+  openMenu: string | null;
+  setOpenMenu: SetState<string | null>;
+  customStamps: { id: string; url: string; serverId?: string }[];
+  setCustomStamps: SetState<{ id: string; url: string; serverId?: string }[]>;
+}

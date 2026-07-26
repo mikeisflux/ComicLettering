@@ -1,0 +1,380 @@
+/* Top chrome: menu bar, toolbar and format bar.
+   Plain exported render functions taking the EditorCtx bag. */
+import {
+  BalloonEl, COLOR_PALETTE, FONTS, GRADIENT_PRESETS, MULTI_GRADIENTS,
+  TextEl, clamp, newPage, reseedIds, starterDoc,
+} from "@/lib/model";
+import { fillCss } from "@/lib/fills";
+import { ToolBtn } from "./chrome";
+import { FontMenu, SubtypeSelect, tsVariant } from "./FontMenu";
+import { EditorCtx } from "./ctx";
+import {
+  addFromTray, alignSel, applyQuickFill, applyQuickStroke, balanceRag,
+  copySel, copyStyle, cutSel, deleteCustomFont, deleteSel, duplicatePage,
+  duplicateSel, exportJSON, fitBalloonToText, pasteClip, pasteStyle,
+  printPage, reorder, rotateSel, runInstantAlpha, runProof, saveProject,
+} from "./ops";
+
+
+export function renderMenuBar(ed: EditorCtx) {
+  const {
+    openMenu, setOpenMenu, docRef, assetsRef, histRef, hIndexRef, setCurrent, setSelId, setPageIndex, setThumbs, autosave, force, fitZoom, setTab, fileOpenRef, demo, setStatus, setShowSetup, setShowExport, undo, redo, setShowFind, setUserZoomed, setZoom, showSafe, setShowSafe, spread, setSpread, pageIndex, commit, fileImageRef, setStampOpen, fileStampRef, fileFontRef, setShowScript, mutateSel,
+  } = ed;
+  const page = ed.page!;
+  return (
+  <nav className="menuBar">
+    {openMenu && <div className="ctxBackdrop" style={{ zIndex: 179 }} onClick={() => setOpenMenu(null)} />}
+    {([
+      ["File", [
+        ["New Document", () => { if (window.confirm("Start a new document?")) { docRef.current = starterDoc(); assetsRef.current = {}; reseedIds(docRef.current); histRef.current = [JSON.stringify(docRef.current)]; hIndexRef.current = 0; setCurrent(null); setSelId(null); setPageIndex(0); setThumbs({}); autosave(); force(); fitZoom(true); } }],
+        ["Open Library", () => setTab("library")],
+        ["Save", () => saveProject(ed, false)],
+        ["Save As…", () => saveProject(ed, true)],
+        ["Import Project File…", () => fileOpenRef.current?.click()],
+        ["Export Project File", () => demo ? setStatus("Export is off in the demo — subscribe to unlock.") : exportJSON(ed)],
+        ["—", null],
+        ["Page Setup…", () => setShowSetup(true)],
+        ["Export…", () => demo ? setStatus("Export is off in the demo — subscribe to unlock.") : setShowExport(true)],
+        ["Print…", () => printPage(ed)],
+      ]],
+      ["Edit", [
+        ["Undo", () => undo()], ["Redo", () => redo()],
+        ["—", null],
+        ["Cut", () => cutSel(ed)], ["Copy", () => copySel(ed)],
+        ["Paste", () => pasteClip(ed)], ["Duplicate", () => duplicateSel(ed)],
+        ["Delete", () => deleteSel(ed)],
+        ["—", null],
+        ["Copy Style", () => copyStyle(ed)],
+        ["Paste Style to Selection", () => pasteStyle(ed)],
+        ["Find & Replace…", () => setShowFind(true)],
+        ["—", null],
+        ["Check Spelling & Grammar", () => { setTab("proof"); runProof(ed); }],
+      ]],
+      ["View", [
+        ["Zoom In", () => { setUserZoomed(true); setZoom((z) => clamp(z * 1.2, 0.05, 4)); }],
+        ["Zoom Out", () => { setUserZoomed(true); setZoom((z) => clamp(z / 1.2, 0.05, 4)); }],
+        ["Fit Page", () => { setUserZoomed(false); fitZoom(true); }],
+        ["—", null],
+        [showSafe ? "Hide Safe Area" : "Show Safe Area", () => setShowSafe((s) => !s)],
+        [spread ? "Single Page View" : "Two-Page Spread View", () => setSpread((s) => !s)],
+        ["—", null],
+        ["Panel Layouts", () => setTab("layouts")],
+        ["Inspector", () => setTab("inspector")],
+        ["Layers", () => setTab("layers")],
+        ["Photos", () => setTab("photos")],
+        ["Library", () => setTab("library")],
+      ]],
+      ["Insert", [
+        ["New Page", () => { const d = docRef.current!; d.pages.splice(pageIndex + 1, 0, newPage(page.w, page.h, page.margin)); setPageIndex(pageIndex + 1); setSelId(null); commit(); }],
+        ["Duplicate Page", () => duplicatePage(ed)],
+        ["—", null],
+        ["Panel", () => addFromTray(ed, "panel")],
+        ["Image…", () => fileImageRef.current?.click()],
+        ["Speech Balloon", () => addFromTray(ed, "speech")],
+        ["Thought Balloon", () => addFromTray(ed, "thought")],
+        ["Caption", () => addFromTray(ed, "caption")],
+        ["Text", () => addFromTray(ed, "text")],
+        ["Lettering", () => addFromTray(ed, "sfx")],
+        ["Stamps…", () => setStampOpen(true)],
+        ["—", null],
+        ["Import Custom Stamps…", () => fileStampRef.current?.click()],
+        ["Import Custom Font…", () => fileFontRef.current?.click()],
+        ["—", null],
+        ["Import Script → Balloons…", () => setShowScript(true)],
+      ]],
+      ["Format", [
+        ["Bold", () => mutateSel<BalloonEl | TextEl>((x) => { if (x.ts) x.ts.bold = !x.ts.bold; })],
+        ["Italic", () => mutateSel<BalloonEl | TextEl>((x) => { if (x.ts) x.ts.italic = !x.ts.italic; })],
+        ["Underline", () => mutateSel<BalloonEl | TextEl>((x) => { if (x.ts) x.ts.underline = !x.ts.underline; })],
+        ["—", null],
+        ["Align Left", () => mutateSel<BalloonEl | TextEl>((x) => { if (x.ts) x.ts.align = "left"; })],
+        ["Align Center", () => mutateSel<BalloonEl | TextEl>((x) => { if (x.ts) x.ts.align = "center"; })],
+        ["Align Right", () => mutateSel<BalloonEl | TextEl>((x) => { if (x.ts) x.ts.align = "right"; })],
+        ["Justify", () => mutateSel<BalloonEl | TextEl>((x) => { if (x.ts) x.ts.align = "justify"; })],
+        ["—", null],
+        ["Bigger", () => mutateSel<BalloonEl | TextEl>((x) => { if (x.ts) x.ts.size = clamp(Math.round(x.ts.size * 1.12), 8, 800); })],
+        ["Smaller", () => mutateSel<BalloonEl | TextEl>((x) => { if (x.ts) x.ts.size = clamp(Math.round(x.ts.size / 1.12), 8, 800); })],
+      ]],
+      ["Arrange", [
+        ["Bring Forward", () => reorder(ed, 1)], ["Bring To Front", () => reorder(ed, 1e9)],
+        ["Send Backward", () => reorder(ed, -1)], ["Send To Back", () => reorder(ed, -1e9)],
+        ["—", null],
+        ["Rotate 90° Clockwise", () => rotateSel(ed, 90)],
+        ["Rotate 90° Counter-clockwise", () => rotateSel(ed, -90)],
+        ["Rotate 15° Clockwise", () => rotateSel(ed, 15)],
+        ["Rotate 15° Counter-clockwise", () => rotateSel(ed, -15)],
+        ["Reset Rotation", () => mutateSel((x) => { x.rot = 0; })],
+        ["—", null],
+        ["Fit Balloon to Text", () => fitBalloonToText(ed)],
+        ["Balance Line Breaks", () => balanceRag(ed)],
+        ["Center Horizontally (Ctrl+[)", () => alignSel(ed, "hcenter")],
+        ["Center Vertically (Ctrl+])", () => alignSel(ed, "vcenter")],
+        ["Flip Horizontal", () => mutateSel((x) => { x.flipH = !x.flipH; })],
+        ["Flip Vertical", () => mutateSel((x) => { x.flipV = !x.flipV; })],
+        ["—", null],
+        ["Lock", () => mutateSel((x) => { x.locked = true; })],
+        ["Unlock", () => mutateSel((x) => { x.locked = false; })],
+      ]],
+      ["Help", [
+        ["Keyboard Shortcuts", () => window.alert("B/T/L/P — add balloon/text/lettering/panel\nCtrl+Z / Ctrl+Y — undo / redo\nCtrl+C/X/V/D — copy / cut / paste / duplicate\nCtrl+S — save · Ctrl+[ / Ctrl+] — center H / V\nShift while resizing — keep proportions\nShift while rotating — snap 15° · Alt while dragging — no snapping\nDouble-click — edit text · while editing, Ctrl+B / Ctrl+I bold/italic the selected words\nRight-click — full menu")],
+        ["FAQ & Support", () => window.open("/faq", "_blank")],
+      ]],
+    ] as [string, ([string, (() => void) | null])[]][]).map(([name, items]) => (
+      <div key={name} className="menuWrap">
+        <button className={"menuTop" + (openMenu === name ? " on" : "")}
+          onClick={() => setOpenMenu(openMenu === name ? null : name)}
+          onMouseEnter={() => { if (openMenu) setOpenMenu(name); }}>
+          {name}
+        </button>
+        {openMenu === name && (
+          <div className="menuDrop">
+            {items.map(([label, fn], i) => fn === null
+              ? <div key={i} className="ctxSep" />
+              : <button key={i} onClick={() => { setOpenMenu(null); fn(); }}>{label}</button>)}
+          </div>
+        )}
+      </div>
+    ))}
+  </nav>
+  );
+}
+
+export function renderToolbar(ed: EditorCtx) {
+  const {
+    setTab, undo, redo, histRef, hIndexRef, setUserZoomed, setZoom, fitZoom, selEl, mutateSel, setShowSetup, setShowExport, demo, setStatus, docRef, assetsRef, setCurrent, setSelId, setPageIndex, setThumbs, autosave, force, commit, pageIndex,
+  } = ed;
+  const page = ed.page!;
+  const selTs = selEl && (selEl.type === "balloon" || selEl.type === "text") ? selEl.ts : null;
+  return (
+  <header className="toolbar">
+    <a className="brand" href="/" title="lettermycomic.com">Letter<span>My</span>Comic</a>
+    <ToolBtn label="New" icon="🗋" onClick={() => {
+      if (!window.confirm("Start a new document?")) return;
+      docRef.current = starterDoc();
+      assetsRef.current = {};
+      reseedIds(docRef.current);
+      histRef.current = [JSON.stringify(docRef.current)];
+      hIndexRef.current = 0;
+      setCurrent(null); setSelId(null); setPageIndex(0); setThumbs({});
+      autosave(); force(); fitZoom(true);
+    }} />
+    <ToolBtn label="Save" icon="✔" accent onClick={() => saveProject(ed, false)} />
+    <ToolBtn label="Library" icon="🗀" onClick={() => setTab("library")} />
+    <ToolBtn label="New Page" icon="🗎+" onClick={() => {
+      const d = docRef.current!;
+      d.pages.splice(pageIndex + 1, 0, newPage(page.w, page.h, page.margin));
+      setPageIndex(pageIndex + 1);
+      setSelId(null);
+      commit();
+    }} />
+    <span className="tbSep" />
+    <ToolBtn label="Undo" icon="↶" disabled={hIndexRef.current <= 0} onClick={undo} />
+    <ToolBtn label="Redo" icon="↷" disabled={hIndexRef.current >= histRef.current.length - 1} onClick={redo} />
+    <span className="tbSep" />
+    <ToolBtn label="Zoom In" icon="🔍+" onClick={() => { setUserZoomed(true); setZoom((z) => clamp(z * 1.2, 0.05, 4)); }} />
+    <ToolBtn label="Zoom Out" icon="🔍−" onClick={() => { setUserZoomed(true); setZoom((z) => clamp(z / 1.2, 0.05, 4)); }} />
+    <ToolBtn label="Fit" icon="⛶" onClick={() => { setUserZoomed(false); fitZoom(true); }} />
+    <span className="tbSep" />
+    <ToolBtn label="Front" icon="⬆" disabled={!selEl} onClick={() => reorder(ed, 1e9)} />
+    <ToolBtn label="Back" icon="⬇" disabled={!selEl} onClick={() => reorder(ed, -1e9)} />
+    <ToolBtn label="Rotate ⟲" icon="↺" disabled={!selEl} onClick={() => rotateSel(ed, -15)} />
+    <ToolBtn label="Rotate ⟳" icon="↻" disabled={!selEl} onClick={() => rotateSel(ed, 15)} />
+    <ToolBtn label="Bigger" icon="A+" disabled={!selTs} onClick={() =>
+      mutateSel<BalloonEl | TextEl>((x) => { x.ts.size = clamp(Math.round(x.ts.size * 1.12), 8, 800); })} />
+    <ToolBtn label="Smaller" icon="A−" disabled={!selTs} onClick={() =>
+      mutateSel<BalloonEl | TextEl>((x) => { x.ts.size = clamp(Math.round(x.ts.size / 1.12), 8, 800); })} />
+    <span className="tbSep" />
+    <ToolBtn label="Instant Alpha" icon="🪄"
+      disabled={!selEl || (selEl.type !== "image" && selEl.type !== "panel") || !selEl.img}
+      onClick={() => { if (selEl && (selEl.type === "image" || selEl.type === "panel") && selEl.img) runInstantAlpha(ed, selEl.id, selEl.img); }} />
+    <ToolBtn label="Page Setup" icon="📐" onClick={() => setShowSetup(true)} />
+    <ToolBtn label="Print" icon="🖨" onClick={() => printPage(ed)} />
+    <ToolBtn label="Export" icon="🖼⇩" accent onClick={() => demo ? setStatus("Export is off in the demo — subscribe to unlock.") : setShowExport(true)} />
+    <ToolBtn label="Inspector" icon="ⓘ" onClick={() => setTab("inspector")} />
+    <div className="tbSpacer" />
+    <div className="tbHint">Runs entirely in your browser — nothing is uploaded.</div>
+  </header>
+  );
+}
+
+export function renderFormatBar(ed: EditorCtx) {
+  const {
+    selEl, mutateSel, showStroke, setShowStroke, showFill, setShowFill, showTextColor, setShowTextColor, fileFontRef,
+  } = ed;
+  const selTs = selEl && (selEl.type === "balloon" || selEl.type === "text") ? selEl.ts : null;
+  return (
+  <div className="formatBar">
+    <span className="fbLabel">Stroke:</span>
+    <input type="number" min={0} max={80} disabled={!selEl}
+      value={selEl?.type === "balloon" ? selEl.strokeW
+        : selEl?.type === "panel" || selEl?.type === "image" ? selEl.borderW
+        : selEl?.type === "text" ? selEl.ts.outlineW : 0}
+      onChange={(e) => mutateSel((x) => {
+        const v = clamp(+e.target.value || 0, 0, 80);
+        if (x.type === "balloon") x.strokeW = v;
+        else if (x.type === "panel" || x.type === "image") x.borderW = v;
+        else if (x.type === "text") x.ts.outlineW = v;
+      })} style={{ width: 48 }} />
+    <div style={{ position: "relative" }}>
+      <button className="fillSwatch" title="Stroke / outline color"
+        style={{
+          background: selEl?.type === "balloon" ? selEl.stroke
+            : selEl?.type === "panel" || selEl?.type === "image" ? selEl.borderC
+            : selEl?.type === "text" ? selEl.ts.outlineC : "#111111",
+        }}
+        onClick={() => setShowStroke((s) => !s)} />
+      {showStroke && (
+        <div className="fillPop">
+          <div className="fillPopHead">Stroke color</div>
+          <div className="palGrid">
+            {COLOR_PALETTE.flat().map((c, i) => (
+              <button key={i} style={{ background: c }} title={c}
+                onClick={() => applyQuickStroke(ed, c)} />
+            ))}
+          </div>
+          <div className="fld" style={{ marginTop: 6 }}>
+            <label>Custom</label>
+            <input type="color" onChange={(e) => applyQuickStroke(ed, e.target.value)} />
+          </div>
+        </div>
+      )}
+    </div>
+    <span className="fbLabel">Fill:</span>
+    <div style={{ position: "relative" }}>
+      <button className="fillSwatch" title="Fill with a color or gradient"
+        style={(selEl?.type === "balloon" || selEl?.type === "panel")
+          ? fillCss(selEl.fill)
+          : (selEl?.type === "text" && selEl.ts.fillB)
+            ? { background: `linear-gradient(180deg, ${selEl.ts.fillA}, ${selEl.ts.fillB})` }
+            : { background: selEl?.type === "text" ? selEl.ts.fillA : "#ffffff" }}
+        onClick={() => setShowFill((s) => !s)} />
+      {showFill && (
+        <div className="fillPop" onPointerLeave={() => { /* stay open until click */ }}>
+          <div className="fillPopCols">
+            <div>
+              <div className="fillPopHead">Colors</div>
+              <div className="palGrid">
+                {COLOR_PALETTE.flat().map((c, i) => (
+                  <button key={i} style={{ background: c }} title={c}
+                    onClick={() => { applyQuickFill(ed, { solidColor: c }); }} />
+                ))}
+              </div>
+              <div className="fld" style={{ marginTop: 6 }}>
+                <label>Custom</label>
+                <input type="color" onChange={(e) => applyQuickFill(ed, { solidColor: e.target.value })} />
+              </div>
+            </div>
+            <div>
+              <div className="fillPopHead">Gradients</div>
+              <div className="palGrid grads">
+                {GRADIENT_PRESETS.map(([a, b], i) => (
+                  <button key={i} style={{ background: `linear-gradient(180deg, ${a}, ${b})` }}
+                    onClick={() => { applyQuickFill(ed, { gradient: [a, b] }); }} />
+                ))}
+              </div>
+              <div className="fillPopHead" style={{ marginTop: 8 }}>Multi-tier</div>
+              <div className="palGrid grads">
+                {MULTI_GRADIENTS.map((m) => (
+                  <button key={m.name} title={m.name}
+                    style={{ background: `linear-gradient(180deg, ${m.stops.map(([c, p]) => `${c} ${Math.round(p * 100)}%`).join(", ")})` }}
+                    onClick={() => { applyQuickFill(ed, { stops: m.stops }); }} />
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="tips" style={{ margin: "6px 2px 0" }}>
+            Applies to the selected balloon, panel or lettering — or the page background when nothing is selected.
+          </div>
+        </div>
+      )}
+    </div>
+    <label className="fbCheck">
+      <input type="checkbox" disabled={!selEl} checked={!!selEl?.shadow}
+        onChange={(e) => mutateSel((x) => { x.shadow = e.target.checked; })} /> Shadow
+    </label>
+    <span className="tbSep" />
+    <FontMenu value={selTs?.font || "comicneue"} disabled={!selTs}
+      onImport={() => fileFontRef.current?.click()}
+      onDeleteFont={(k) => deleteCustomFont(ed, k)}
+      onPick={(k) => mutateSel<BalloonEl | TextEl>((x) => {
+        x.ts.font = k;
+        const vars = FONTS[k]?.variants || ["regular"];
+        if (!vars.includes(tsVariant(x.ts) as never)) { x.ts.bold = false; x.ts.italic = false; }
+      })} />
+    <SubtypeSelect ts={selTs}
+      onSet={(bold, italic) => mutateSel<BalloonEl | TextEl>((x) => { x.ts.bold = bold; x.ts.italic = italic; })} />
+    <input type="number" min={8} max={800} disabled={!selTs} value={selTs?.size || 42} style={{ width: 56 }}
+      onChange={(e) => mutateSel<BalloonEl | TextEl>((x) => { x.ts.size = clamp(+e.target.value || 8, 8, 800); })} />
+    <div style={{ position: "relative" }}>
+      <button className="fillSwatch" title="Text color" disabled={!selTs}
+        style={{ background: selTs?.fillA || "#111111", width: 28 }}
+        onClick={() => setShowTextColor((s) => !s)} />
+      {showTextColor && (
+        <div className="fillPop" style={{ width: 250 }}>
+          <div className="fillPopHead">Text color</div>
+          <div className="palGrid">
+            {COLOR_PALETTE.flat().map((c, i) => (
+              <button key={i} style={{ background: c }} title={c}
+                onClick={() => {
+                  mutateSel<BalloonEl | TextEl>((x) => { x.ts.fillA = c; x.ts.fillB = null; });
+                  setShowTextColor(false);
+                }} />
+            ))}
+          </div>
+          <div className="fld" style={{ marginTop: 6 }}>
+            <label>Custom</label>
+            <input type="color" onChange={(e) => {
+              mutateSel<BalloonEl | TextEl>((x) => { x.ts.fillA = e.target.value; x.ts.fillB = null; });
+              setShowTextColor(false);
+            }} />
+          </div>
+        </div>
+      )}
+    </div>
+    <button className={"fbTog" + (selTs?.bold ? " on" : "")} disabled={!selTs}
+      onClick={() => mutateSel<BalloonEl | TextEl>((x) => { x.ts.bold = !x.ts.bold; })}><b>B</b></button>
+    <button className={"fbTog" + (selTs?.italic ? " on" : "")} disabled={!selTs}
+      onClick={() => mutateSel<BalloonEl | TextEl>((x) => { x.ts.italic = !x.ts.italic; })}><i>I</i></button>
+    <button className={"fbTog" + (selTs?.underline ? " on" : "")} disabled={!selTs}
+      onClick={() => mutateSel<BalloonEl | TextEl>((x) => { x.ts.underline = !x.ts.underline; })}><u>U</u></button>
+    {(["left", "center", "right", "justify"] as const).map((a) => (
+      <button key={a} className={"fbTog" + (selTs?.align === a ? " on" : "")} disabled={!selTs}
+        title={a[0].toUpperCase() + a.slice(1)}
+        onClick={() => mutateSel<BalloonEl | TextEl>((x) => { x.ts.align = a; })}>
+        {a === "left" ? "⯇" : a === "center" ? "≡" : a === "right" ? "⯈" : "☰"}
+      </button>
+    ))}
+    <span className="fbSep" />
+    <span className="fbLead" title="Line spacing (leading)">
+      <span className="fbLeadIcon" aria-hidden>≣</span>
+      <select className="fbLeadSel" disabled={!selTs}
+        value={String(selTs?.lineHeight ?? 1.25)}
+        onChange={(e) => mutateSel<BalloonEl | TextEl>((x) => { x.ts.lineHeight = parseFloat(e.target.value); })}>
+        <option value="0.9">0.9×</option>
+        <option value="1">1.0×</option>
+        <option value="1.1">1.1×</option>
+        <option value="1.25">1.25×</option>
+        <option value="1.4">1.4×</option>
+        <option value="1.6">1.6×</option>
+        <option value="1.8">1.8×</option>
+        <option value="2">2.0×</option>
+      </select>
+    </span>
+    <span className="fbLead" title="Letter spacing (tracking)">
+      <span className="fbLeadIcon" aria-hidden>A↔A</span>
+      <select className="fbLeadSel" disabled={!selTs}
+        value={String(selTs?.tracking ?? 0)}
+        onChange={(e) => mutateSel<BalloonEl | TextEl>((x) => { x.ts.tracking = parseFloat(e.target.value); })}>
+        <option value="-2">Tight −2</option>
+        <option value="-1">−1</option>
+        <option value="0">Normal</option>
+        <option value="1">+1</option>
+        <option value="2">+2</option>
+        <option value="4">Wide +4</option>
+        <option value="6">+6</option>
+        <option value="10">+10</option>
+      </select>
+    </span>
+  </div>
+  );
+}
