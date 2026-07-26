@@ -4,7 +4,7 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "Features — Hand-Drawn Balloons, Pro Lettering Tools, 150+ Comic Fonts",
   description:
-    "Every LetterMyComic feature: draw-your-own word balloons with auto-smoothing, joined balloons with band connectors, 150+ comic fonts, line spacing & tracking, rotation, format painter, find & replace, lettering-only transparent export, halftones, speedlines and print-ready PDF/PNG/TIFF/CBZ export.",
+    "Every LetterMyComic feature: draw-your-own word balloons, inline bold/italic, crossbar-I, SFX arc warping, comic-script import, fit-to-text, rag balancing, 150+ comic fonts, format painter, presets, two-page spread view and print-ready PDF/PNG/TIFF/CBZ export with crop marks.",
   alternates: { canonical: "/features" },
 };
 
@@ -22,13 +22,23 @@ const GROUPS: { h: string; items: [string, string][] }[] = [
   {
     h: "Pro Lettering Tools",
     items: [
+      ["Inline bold & italic", "Emphasize a single word inside a balloon without changing the rest — press Ctrl+B or Ctrl+I while you type, just like a word processor. It exports pixel-perfect."],
+      ["Crossbar “I”", "Turn on the classic comic crossbar-I with one click. It's applied only to the pronoun “I” and its contractions — never to the I inside BIG or IT'S — exactly the way real letterers do it."],
       ["Fit balloon to text", "One click resizes any balloon to hug its lettering — respecting your line breaks — so bubbles are never too baggy or too tight."],
       ["Balance the rag", "Auto-rebalance line breaks so every line in a balloon is close to the same length. Even 'rag' is the detail that reads as professional lettering."],
       ["Line spacing & tracking", "Dial in leading (line height) and letter tracking right from the format bar — the tight, even spacing that separates pro lettering from default type."],
       ["Rotate anything", "Rotate balloons, SFX and artwork clockwise or counter-clockwise in 90° or 15° steps, or reset to level in one click."],
-      ["Format painter", "Copy a style off one balloon and paint it onto others — font, size, fill, outline and shadow — so a whole page matches in seconds."],
+      ["Format painter & presets", "Copy a style off one balloon and paint it onto others, or save a balloon look as a named preset you reuse across every project."],
       ["Find & replace", "Fix a name or a typo across every page and every balloon at once, with optional case matching. Locked items stay untouched."],
-      ["Safe-area guide", "Toggle a print safe-area overlay so nothing important lands where the trim could cut it."],
+    ],
+  },
+  {
+    h: "SFX, Scripts & Proofing",
+    items: [
+      ["Warp your SFX", "Bend sound-effect lettering along an arc — curve KABOOM up into a shockwave or dip it down — with a live, WYSIWYG preview that exports exactly as you see it."],
+      ["Import your script", "Paste a comic script — CHARACTER: dialogue, CAPTION:, SFX:, parentheticals — and get speech, thought, whisper and caption balloons laid out on the page automatically."],
+      ["Two-page spread view", "See facing pages side by side with correct left/right pairing, so your lettering reads right across the gutter."],
+      ["Print-ready proofing", "Toggle a safe-area guide and add printer crop marks with a bleed margin on PDF export — everything a printer needs to trim your book."],
     ],
   },
   {
