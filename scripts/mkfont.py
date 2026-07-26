@@ -463,7 +463,7 @@ FAMILIES = {
     # condensed families need SLIM strokes or the tight columns merge into blobs
     "LMC Armory":   (38, 52, 0.8, 0.6, 0, 0.70, 0, "", "square", 6),
     "LMC Breach":   (40, 54, 3.2, 2.4, 0, 0.72, 5, "", "square", 10),
-    "LMC Kaboom":   (94, 118, 2.0, 0.9, 13, 1.00, 5, "", "round", 0),
+    "LMC Kaboom":   (112, 138, 2.0, 0.9, 15, 0.94, 26, "", "round", 0, False, -70, 3.0),
     "LMC Brimstone": (60, 80, 9.0, 2.0, 6, 0.92, 10, "taper", "round", 0),
     # heaviest of all — doubles as bolder-than-bold dialogue and beefy SFX
     "LMC Bigbold":  (104, 128, 1.5, 0.8, 0, 1.02, 4, "", "round", 0),
@@ -495,6 +495,16 @@ FAMILIES = {
     "LMC Screech":  (98, 124, 1.0, 0.7, 20, 0.90, 0, "", "round", 0, False, -60),
     # rough marker horror
     "LMC Gutspill": (64, 84, 13.0, 3.6, 4, 0.88, 44, "taper", "round", 3, False, 0, 5.5),
+    # buzzing/vibrating electric edge — very high wobble frequency
+    "LMC Feedback": (50, 66, 15.0, 11.0, 4, 0.86, 30, "", "square", 1, False, 0, 4.0),
+    # chunky rounded marker
+    "LMC Fullbleed":(86, 108, 4.0, 1.1, 4, 0.94, 42, "", "round", 0, False, 0, 5.0),
+    # compact slanted brush
+    "LMC Gamma":    (66, 86, 6.0, 1.6, 10, 0.92, 46, "taper", "round", 0, False, 0, 5.0),
+    # fat clean block caps
+    "LMC Glassjaw": (100, 124, 1.5, 0.8, 2, 0.98, 30, "", "round", 2, False, -20, 3.0),
+    # jagged spiky shards
+    "LMC Skrunch":  (58, 76, 10.0, 3.2, 3, 0.86, 36, "", "square", 5, False, 0, 5.5),
 }
 
 def main(outdir):

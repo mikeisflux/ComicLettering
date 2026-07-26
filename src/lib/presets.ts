@@ -20,6 +20,11 @@ export interface LetterStyle {
 export const LETTER_STYLES: LetterStyle[] = [
   /* --- SFX colourways: each pairs one of the LMC display faces with the
      punchy fill/outline/shadow treatment that genre is normally inked in --- */
+  { name: "Buzz Yellow",   font: "lmcfeedback", fillA: "#f5e838", fillB: "#e0c800", outlineC: "#000000", outlineF: 0.038, shadow: true },
+  { name: "Bleed Red",     font: "lmcfullbleed",fillA: "#e83030", fillB: "#b81010", outlineC: "#1a0808", outlineF: 0.04,  shadow: true },
+  { name: "Gamma Green",   font: "lmcgamma",    fillA: "#e8f5a0", fillB: "#4fa83c", outlineC: "#0f2a14", outlineF: 0.035, shadow: true },
+  { name: "Jawbreaker",    font: "lmcglassjaw", fillA: "#f8c58a", fillB: "#e8a060", outlineC: "#000000", outlineF: 0.035, shadow: true },
+  { name: "Skrunch White", font: "lmcskrunch",  fillA: "#ffffff", fillB: "#e8e8e8", outlineC: "#d01818", outlineF: 0.04,  shadow: true },
   { name: "Crash Cream",   font: "lmccrashland",fillA: "#fff2c4", fillB: "#f0c020", outlineC: "#5b1a6b", outlineF: 0.03,  shadow: true },
   { name: "Rowdy Orange",  font: "lmcrowdy",    fillA: "#f5a03c", fillB: "#e07818", outlineC: "#000000", outlineF: 0.04,  shadow: true },
   { name: "Deco Gold",     font: "lmcdeco",     fillA: "#f5c542", fillB: "#e0a820", outlineC: "#12385c", outlineF: 0.014, shadow: true },
