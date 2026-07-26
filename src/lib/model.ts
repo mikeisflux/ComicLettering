@@ -391,6 +391,11 @@ export const FONTS: Record<string, FontDef> = {
   /* Display / SFX */
   lmcshout:  { label: "LMC Shout",  css: '"LMC Shout",cursive',  group: "Display", variants: ALL },
   lmcbrawl:  { label: "LMC Brawl",  css: '"LMC Brawl",cursive',  group: "Display", variants: ALL },
+  lmckillcrazy: { label: "LMC Killcrazy (Tag)", css: '"LMC Killcrazy",cursive', group: "Display", variants: ALL },
+  lmckrakhead: { label: "LMC Krakhead (Block)", css: '"LMC Krakhead",cursive', group: "Display", variants: ALL },
+  lmcpunch: { label: "LMC Punch", css: '"LMC Punch",cursive', group: "Display", variants: ALL },
+  lmcpalooka: { label: "LMC Palooka", css: '"LMC Palooka",cursive', group: "Display", variants: ALL },
+  lmcslick: { label: "LMC Slick (Italic Display)", css: '"LMC Slick",cursive', group: "Display", variants: ALL },
   lmcfeedback: { label: "LMC Feedback (Buzz)", css: '"LMC Feedback",cursive', group: "Display", variants: ALL },
   lmcfullbleed: { label: "LMC Fullbleed", css: '"LMC Fullbleed",cursive', group: "Display", variants: ALL },
   lmcgamma: { label: "LMC Gamma (Brush)", css: '"LMC Gamma",cursive', group: "Display", variants: ALL },

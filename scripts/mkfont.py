@@ -505,6 +505,16 @@ FAMILIES = {
     "LMC Glassjaw": (100, 124, 1.5, 0.8, 2, 0.98, 30, "", "round", 2, False, -20, 3.0),
     # jagged spiky shards
     "LMC Skrunch":  (58, 76, 10.0, 3.2, 3, 0.86, 36, "", "square", 5, False, 0, 5.5),
+    # angular graffiti tag, tall and jammed together
+    "LMC Killcrazy":(50, 68, 8.0, 2.2, 6, 0.80, 42, "", "square", 6, False, -55, 6.0),
+    # solid chiselled block caps, letters butting each other
+    "LMC Krakhead": (104, 128, 0.3, 0.4, 0, 1.00, 0, "", "square", 3, False, -110, 0),
+    # compact punchy impact caps
+    "LMC Punch":    (96, 120, 2.0, 1.0, 4, 0.90, 28, "", "round", 1, False, -45, 3.0),
+    # bold cartoon caps with a lively bounce
+    "LMC Palooka":  (88, 110, 3.0, 1.2, 3, 0.98, 56, "", "round", 0, False, -25, 6.0),
+    # smooth clean italic display with a full lowercase
+    "LMC Slick":    (56, 74, 0.8, 0.6, 12, 0.94, 0, "", "round", 0, True, -20, 0),
 }
 
 def main(outdir):
