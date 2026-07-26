@@ -5,9 +5,18 @@ import { renderPageToCanvas } from "./exportPng";
 
 const enc = new TextEncoder();
 
+/* printer's crop marks at the four trim corners, drawn in the bleed margin.
+   x,y = a trim corner in points; sx,sy = outward direction (±1). */
+function cornerMarks(x: number, y: number, sx: number, sy: number): string {
+  const g = 3, len = 12;
+  const h = `${(x + sx * g).toFixed(2)} ${y.toFixed(2)} m ${(x + sx * (g + len)).toFixed(2)} ${y.toFixed(2)} l\n`;
+  const v = `${x.toFixed(2)} ${(y + sy * g).toFixed(2)} m ${x.toFixed(2)} ${(y + sy * (g + len)).toFixed(2)} l\n`;
+  return h + v;
+}
+
 export async function exportPdf(
   doc: Doc, assets: Assets, filename: string,
-  onProgress?: (i: number, n: number) => void, dpi = 225
+  onProgress?: (i: number, n: number) => void, dpi = 225, cropMarks = false
 ) {
   const images: { bytes: Uint8Array; w: number; h: number }[] = [];
   for (let i = 0; i < doc.pages.length; i++) {
@@ -41,12 +50,22 @@ export async function exportPdf(
   beginObj(2);
   push(`<< /Type /Pages /Count ${n} /Kids [${images.map((_, i) => `${pageObj(i)} 0 R`).join(" ")}] >>\nendobj\n`);
 
+  const M = cropMarks ? 18 : 0; // 0.25in bleed margin in points
   images.forEach((img, i) => {
     const W = (img.w * 72) / outDpi;
     const H = (img.h * 72) / outDpi;
+    const MW = W + 2 * M, MH = H + 2 * M;
     beginObj(pageObj(i));
-    push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W.toFixed(2)} ${H.toFixed(2)}] /Contents ${contObj(i)} 0 R /Resources << /XObject << /Im0 ${imgObj(i)} 0 R >> >> >>\nendobj\n`);
-    const content = `q ${W.toFixed(2)} 0 0 ${H.toFixed(2)} 0 0 cm /Im0 Do Q`;
+    push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${MW.toFixed(2)} ${MH.toFixed(2)}] /Contents ${contObj(i)} 0 R /Resources << /XObject << /Im0 ${imgObj(i)} 0 R >> >> >>\nendobj\n`);
+    let content = `q ${W.toFixed(2)} 0 0 ${H.toFixed(2)} ${M} ${M} cm /Im0 Do Q`;
+    if (cropMarks) {
+      const marks =
+        cornerMarks(M, M, -1, -1) +          // bottom-left
+        cornerMarks(M + W, M, 1, -1) +       // bottom-right
+        cornerMarks(M, M + H, -1, 1) +       // top-left
+        cornerMarks(M + W, M + H, 1, 1);     // top-right
+      content += `\n0 0 0 RG 0.5 w\n${marks}S`;
+    }
     beginObj(contObj(i));
     push(`<< /Length ${content.length} >>\nstream\n${content}\nendstream\nendobj\n`);
     beginObj(imgObj(i));

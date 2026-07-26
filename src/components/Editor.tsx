@@ -23,6 +23,12 @@ const AUTOSAVE_KEY = "comiclettering.autosave.v2";
 const MIN_SIZE = 24;
 const HINT = "Double-click a balloon to type · orange dot aims the tail · drop images onto the page · Del removes";
 
+type BalloonPreset = {
+  name: string; kind: BalloonKind; fill: FillStyle;
+  stroke: string; strokeW: number; shadow: boolean; ts: TextStyle;
+};
+const PRESET_KEY = "lmc.balloonPresets";
+
 /* ---------------- small shared helpers ---------------- */
 
 function textCss(ts: TextStyle): CSSProperties {
@@ -539,7 +545,9 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const [exportScope, setExportScope] = useState<"current" | "all" | "range">("all");
   const [exportDpi, setExportDpi] = useState(225);
   const [letteringOnly, setLetteringOnly] = useState(false);
+  const [exportCropMarks, setExportCropMarks] = useState(false);
   const styleClipRef = useRef<Partial<TextStyle> & { fill?: FillStyle; stroke?: string; strokeW?: number } | null>(null);
+  const [presets, setPresets] = useState<BalloonPreset[]>([]);
   const [showFind, setShowFind] = useState(false);
   const [findText, setFindText] = useState("");
   const [replaceText, setReplaceText] = useState("");
@@ -578,6 +586,13 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     setAutoLockState(v);
     try { localStorage.setItem("lmc.autolock", v ? "1" : "0"); } catch { /* ignore */ }
   };
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(PRESET_KEY);
+      if (raw) { const arr = JSON.parse(raw); if (Array.isArray(arr)) setPresets(arr); }
+    } catch { /* ignore */ }
+  }, []);
 
   /* auto-lock: newly placed items lock themselves once you click away */
   const settlePendingLock = useCallback((exceptId: string | null) => {
@@ -1257,6 +1272,42 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
 
   /* format painter: copy the look of the selected balloon/lettering and stamp
      it onto other elements */
+  const savePresets = useCallback((next: BalloonPreset[]) => {
+    setPresets(next);
+    try { localStorage.setItem(PRESET_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+  }, []);
+  function saveBalloonPreset() {
+    if (!selEl || selEl.type !== "balloon") { setStatus("Select a balloon to save as a preset."); return; }
+    const name = (window.prompt("Name this balloon preset:", "My balloon") || "").trim();
+    if (!name) return;
+    const s = selEl;
+    const preset: BalloonPreset = {
+      name, kind: s.kind, fill: JSON.parse(JSON.stringify(s.fill)),
+      stroke: s.stroke, strokeW: s.strokeW, shadow: s.shadow,
+      ts: JSON.parse(JSON.stringify(s.ts)),
+    };
+    savePresets([...presets.filter((p) => p.name !== name), preset]);
+    setStatus(`Saved balloon preset “${name}”.`);
+  }
+  function applyBalloonPreset(name: string) {
+    const p = presets.find((x) => x.name === name);
+    if (!p) return;
+    if (!selEl || selEl.type !== "balloon") { setStatus("Select a balloon to apply the preset to."); return; }
+    mutateSel<BalloonEl>((b) => {
+      b.kind = p.kind;
+      if (TAILLESS_KINDS.includes(b.kind)) b.tail = null;
+      else if (!b.tail) b.tail = { dx: -b.w * 0.25, dy: b.h * 0.85 };
+      b.fill = JSON.parse(JSON.stringify(p.fill));
+      b.stroke = p.stroke; b.strokeW = p.strokeW; b.shadow = p.shadow;
+      b.ts = JSON.parse(JSON.stringify(p.ts));
+    });
+    setStatus(`Applied preset “${name}”.`);
+  }
+  function deleteBalloonPreset(name: string) {
+    savePresets(presets.filter((p) => p.name !== name));
+    setStatus(`Deleted preset “${name}”.`);
+  }
+
   function copyStyle() {
     if (!selEl || (selEl.type !== "text" && selEl.type !== "balloon")) {
       setStatus("Select a balloon or lettering first, then Copy Style.");
@@ -1952,7 +2003,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       if (format === "pdf") {
         const sub = { ...d, pages: idxs.map((i) => d.pages[i]) };
         const { exportPdf } = await import("@/lib/pdfExport");
-        await exportPdf(sub, assetsRef.current, `${nameBase}.pdf`, (i, n) => setStatus(`Rendering PDF page ${i}/${n}…`), dpi);
+        await exportPdf(sub, assetsRef.current, `${nameBase}.pdf`, (i, n) => setStatus(`Rendering PDF page ${i}/${n}…`), dpi, exportCropMarks);
       } else if (format === "cbz") {
         const { exportCbz } = await import("@/lib/cbz");
         await exportCbz(d, assetsRef.current, `${nameBase}.cbz`, dpi, idxs, (i, n) => setStatus(`Packing CBZ page ${i}/${n}…`));
@@ -2292,6 +2343,26 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
                 {el.img ? "Replace inner image…" : "Place image inside…"}
               </button>
               {el.img && <button onClick={() => mutateSel<BalloonEl>((b) => { b.img = null; })}>Remove image</button>}
+            </div>
+            <Fld label="Presets">
+              <span className="pair">
+                <select value="" onChange={(e) => { if (e.target.value) applyBalloonPreset(e.target.value); }}
+                  style={{ maxWidth: 120 }} disabled={presets.length === 0}
+                  title={presets.length ? "Apply a saved preset" : "No presets saved yet"}>
+                  <option value="">{presets.length ? "Apply…" : "None saved"}</option>
+                  {presets.map((p) => <option key={p.name} value={p.name}>{p.name}</option>)}
+                </select>
+              </span>
+            </Fld>
+            <div className="btnRow">
+              <button onClick={() => saveBalloonPreset()} title="Save this balloon's style as a reusable preset">Save preset…</button>
+              {presets.length > 0 && (
+                <select value="" onChange={(e) => { if (e.target.value) deleteBalloonPreset(e.target.value); }}
+                  title="Delete a saved preset">
+                  <option value="">Delete…</option>
+                  {presets.map((p) => <option key={p.name} value={p.name}>{p.name}</option>)}
+                </select>
+              )}
             </div>
           </div>
         )}
@@ -3398,6 +3469,11 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
                 <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <input type="checkbox" checked={letteringOnly} onChange={(e) => setLetteringOnly(e.target.checked)} />
                   Lettering only — transparent PNG (balloons &amp; text, no artwork)
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6, opacity: exportFmt === "pdf" ? 1 : 0.5 }}>
+                  <input type="checkbox" checked={exportCropMarks} disabled={exportFmt !== "pdf"}
+                    onChange={(e) => setExportCropMarks(e.target.checked)} />
+                  Printer crop marks (PDF only — adds a bleed margin &amp; trim marks)
                 </label>
               </fieldset>
             </div>
