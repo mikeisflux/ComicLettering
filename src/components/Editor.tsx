@@ -183,7 +183,11 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   };
   /* balloons and caption boxes carry their own colourway lists, and the
      STYLES panel shows whichever set matches the selection */
-  const [styleTab, setStyleTabState] = useState<StyleTab>("letter");
+  /* Which swatch set the STYLES panel shows. Derived from the selection
+     rather than pushed by an effect, so it can never lag a click: a manual
+     tab pick is remembered against the element it was made on, and stops
+     applying as soon as something else is selected. */
+  const [pinnedTab, setPinnedTab] = useState<{ id: string | null; tab: StyleTab } | null>(null);
   const [activeShape, setActiveShapeState] = useState({ balloon: BALLOON_STYLES[0].name, box: BOX_STYLES[0].name });
   const activeShapeRef = useRef(activeShape);
   useEffect(() => {
@@ -204,7 +208,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     setActiveShapeState(next);
     try { localStorage.setItem(tab === "box" ? "lmc.boxStyle" : "lmc.balloonStyle", name); } catch { /* ignore */ }
   };
-  const setStyleTab = (t: StyleTab) => setStyleTabState(t);
+
 
   const [stampQuery, setStampQuery] = useState("");
   const [proof, setProof] = useState<{ busy: boolean; error: string | null; matches: ProofMatch[] } | null>(null);
@@ -270,16 +274,11 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const page: Page | null = doc ? doc.pages[Math.min(pageIndex, doc.pages.length - 1)] : null;
   const selEl: El | null = page?.els.find((e) => e.id === selId) || null;
 
-  /* the STYLES panel follows the selection: picking up a balloon shows the
-     balloon colourways, a caption shows the box ones. A manual tab choice
-     holds until a different element is selected. */
-  const styleTabSelRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (selId === styleTabSelRef.current) return;
-    styleTabSelRef.current = selId;
-    const t = tabForSelection(selEl as { type: string; kind?: string } | null);
-    if (t) setStyleTabState(t);
-  }, [selId, selEl]);
+  const styleTab: StyleTab =
+    pinnedTab && pinnedTab.id === selId
+      ? pinnedTab.tab
+      : tabForSelection(selEl as { type: string; kind?: string } | null) ?? pinnedTab?.tab ?? "letter";
+  const setStyleTab = (t: StyleTab) => setPinnedTab({ id: selId, tab: t });
 
   /* surface the first unseen tip whose situation matches what the user is
      doing right now */

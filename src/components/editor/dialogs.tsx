@@ -200,14 +200,25 @@ export function renderContextMenu(ed: EditorCtx) {
     return (
       <>
         <div className="ctxBackdrop" onClick={close} onContextMenu={(e) => { e.preventDefault(); close(); }} />
-        <div className="ctxMenu" style={{ left: Math.min(ctxMenu.x, window.innerWidth - 230), top: Math.min(ctxMenu.y, window.innerHeight - 430) }}>
+        {/* Anchored at the cursor and never taller than the room it has. Low
+            on the screen it opens upward instead, and if even that is not
+            enough it scrolls — so no item is ever stranded off-screen. */}
+        <div className="ctxMenu" style={(() => {
+          const M = 8;
+          const left = Math.max(M, Math.min(ctxMenu.x, window.innerWidth - 190));
+          const below = window.innerHeight - ctxMenu.y - M;
+          const above = ctxMenu.y - M;
+          return above > below
+            ? { left, bottom: window.innerHeight - ctxMenu.y, maxHeight: above }
+            : { left, top: Math.max(M, ctxMenu.y), maxHeight: below };
+        })()}>
           <button disabled={el.locked} onClick={() => { reorder(ed, 1); close(); }}>Bring Forward</button>
           <button disabled={el.locked} onClick={() => { reorder(ed, 1e9); close(); }}>Bring To Front</button>
           <button disabled={el.locked} onClick={() => { reorder(ed, -1); close(); }}>Send Backward</button>
           <button disabled={el.locked} onClick={() => { reorder(ed, -1e9); close(); }}>Send To Back</button>
           <div className="ctxSep" />
           <div className="ctxSub">
-            <button disabled={el.locked}>Align Object ▸</button>
+            <button disabled={el.locked} className="ctxSubHead">Align Object ▸</button>
             <div className="ctxSubMenu">
               <button disabled={el.locked} onClick={() => { alignSel(ed, "left"); close(); }}>Left</button>
               <button disabled={el.locked} onClick={() => { alignSel(ed, "hcenter"); close(); }}>Center</button>

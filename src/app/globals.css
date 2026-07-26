@@ -394,26 +394,29 @@ input[type="range"] { width: 110px; }
 /* context menu */
 .ctxBackdrop { position: fixed; inset: 0; z-index: 200; }
 .ctxMenu {
-  position: fixed; z-index: 201; min-width: 180px;
+  position: fixed; z-index: 201; min-width: 168px;
   background: #fff; border: 1px solid #9aa1ac; border-radius: 7px;
-  box-shadow: 0 8px 24px #0004; padding: 4px; display: flex; flex-direction: column;
+  box-shadow: 0 8px 24px #0004; padding: 3px; display: flex; flex-direction: column;
+  /* max-height is set inline from the cursor position */
+  overflow-y: auto; overscroll-behavior: contain;
 }
 .ctxMenu button {
   text-align: left; background: transparent; border: none; border-radius: 4px;
-  padding: 7px 12px; font: inherit; cursor: pointer;
+  padding: 4px 10px; font: inherit; font-size: 13px; line-height: 1.35;
+  white-space: nowrap; cursor: pointer;
 }
 .ctxMenu button:hover { background: #e8f0fa; }
 .ctxMenu button:disabled { opacity: .4; cursor: default; }
 .ctxMenu button.danger:hover { background: #fde3e3; }
-.ctxSep { height: 1px; background: #d8dde4; margin: 4px 6px; }
-.ctxSub { position: relative; }
+.ctxSep { height: 1px; background: #d8dde4; margin: 3px 6px; }
+.ctxSub { display: flex; flex-direction: column; }
 .ctxSub > button { width: 100%; }
-.ctxSubMenu {
-  display: none; position: absolute; left: calc(100% - 6px); top: -4px;
-  min-width: 120px; background: #fff; border: 1px solid #9aa1ac; border-radius: 7px;
-  box-shadow: 0 8px 24px #0004; padding: 4px; flex-direction: column; z-index: 202;
-}
-.ctxSub:hover .ctxSubMenu { display: flex; }
+/* the align group opens in place: a flyout would be clipped by the menu's
+   own scroll container once the menu is tall enough to need one */
+.ctxSubMenu { display: none; flex-direction: column; }
+.ctxSub:hover .ctxSubMenu, .ctxSub:focus-within .ctxSubMenu { display: flex; }
+.ctxSubMenu button { padding-left: 26px; color: #333; }
+.ctxSubHead { color: #555; }
 
 /* stamps */
 .stampPop {
