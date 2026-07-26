@@ -216,7 +216,19 @@ function bandToward(from: BalloonEl, to: BalloonEl, keep?: BalloonEl["tail"]): B
     to.y + to.h / 2 - (from.y + from.h / 2),
     -from.rot);
   const t: NonNullable<BalloonEl["tail"]> = { dx: Math.round(dx), dy: Math.round(dy) };
-  if (keep && keep.bx != null && keep.by != null) { t.bx = keep.bx; t.by = keep.by; t.tx = keep.tx; t.ty = keep.ty; }
+  if (keep && keep.bx != null && keep.by != null) {
+    /* keep a user-set bend only while it still lies between the balloons —
+       a stale bend (after dragging the pair around) would fling the band the
+       wrong way or collapse it entirely */
+    const len = Math.hypot(dx, dy) || 1;
+    const along = (keep.bx * dx + keep.by * dy) / len;      // projection on the axis
+    const perp = Math.abs(keep.bx * dy - keep.by * dx) / len; // sideways deviation
+    if (along > 8 && along < len && perp <= len * 0.75) {
+      t.bx = keep.bx; t.by = keep.by; t.tx = keep.tx; t.ty = keep.ty;
+    } else {
+      t.bx = Math.round(dx / 2); t.by = Math.round(dy / 2);   // reset to midpoint
+    }
+  }
   return t;
 }
 
@@ -224,18 +236,9 @@ function bandToward(from: BalloonEl, to: BalloonEl, keep?: BalloonEl["tail"]): B
    with a wide band that opens into BOTH balloons; once they overlap they melt
    into one shape and the connector vanishes entirely. */
 export function resolveBalloon(page: Page, el: BalloonEl): { el: BalloonEl; base: BalloonEl | null } {
-  /* is this balloon the parent of a joined child? */
-  const child = page.els.find(
-    (e) => e.type === "balloon" && (e as BalloonEl).attachTo === el.id) as BalloonEl | undefined;
-
-  if (!el.attachTo) {
-    /* a parent opens a band toward its child while they're apart, so the
-       connector flows in instead of butting against a closed outline */
-    if (child && !aabbOverlap(el, child)) {
-      return { el: { ...el, band: true, tail: bandToward(el, child, el.tail) }, base: null };
-    }
-    return { el, base: null };
-  }
+  /* a parent always keeps its own speaker tail — the joined child owns and
+     draws the connector band */
+  if (!el.attachTo) return { el, base: null };
 
   const base = page.els.find((e) => e.id === el.attachTo && e.type === "balloon") as BalloonEl | undefined;
   if (!base) return { el: { ...el, attachTo: null }, base: null };

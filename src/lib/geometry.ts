@@ -152,7 +152,8 @@ function polygonWithTail(
     const ex = Q[0] - P[0], ey = Q[1] - P[1];
     const den = D[0] * ey - D[1] * ex;
     if (Math.abs(den) < 1e-9) continue;
-    const u = (D[0] * (cy - P[1]) - D[1] * (cx - P[0])) / -den;
+    /* solve P + u·edge = centre + s·D for u (fraction along the edge) */
+    const u = (D[0] * (cy - P[1]) - D[1] * (cx - P[0])) / den;
     const s = Math.abs(D[0]) > Math.abs(D[1])
       ? (P[0] + u * ex - cx) / D[0]
       : (P[1] + u * ey - cy) / D[1];
@@ -331,11 +332,19 @@ export function balloonGeom(el: BalloonEl): BalloonGeom {
   switch (el.kind) {
     case "caption": {
       const p = Math.max(8, Math.min(w, h) * 0.12);
-      return { d: `M 0 0 H ${fmt(w)} V ${fmt(h)} H 0 Z`, textRect: [p, p, w - 2 * p, h - 2 * p], dash: null };
+      /* joined captions still need the connector band spliced in */
+      const d = el.band && tail
+        ? polygonWithTail([[0, 0], [w, 0], [w, h], [0, h]], w, h, tail, false, true)
+        : `M 0 0 H ${fmt(w)} V ${fmt(h)} H 0 Z`;
+      return { d, textRect: [p, p, w - 2 * p, h - 2 * p], dash: null };
     }
     case "rounded": {
       const r = Math.min(w, h) * 0.18;
-      return { d: linePath(roundRectPts(w, h, r, 6)), textRect: padRect(0.12, 0.14), dash: null };
+      const rPts = roundRectPts(w, h, r, 6);
+      const d = el.band && tail
+        ? polygonWithTail(rPts, w, h, tail, false, true)
+        : linePath(rPts);
+      return { d, textRect: padRect(0.12, 0.14), dash: null };
     }
     case "square":
       return {

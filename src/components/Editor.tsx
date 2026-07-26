@@ -959,6 +959,20 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
         }
         cur.x = nx;
         cur.y = ny;
+        /* joined balloons that melt together drop their connector bend, so
+           separating again starts with a clean straight band */
+        if (cur.type === "balloon") {
+          const partner = (cur.attachTo
+            ? p.els.find((o) => o.id === cur.attachTo)
+            : p.els.find((o) => o.type === "balloon" && (o as BalloonEl).attachTo === cur.id)) as BalloonEl | undefined;
+          if (partner && aabbOverlap(cur, partner)) {
+            const owner = cur.attachTo ? (cur as BalloonEl) : partner; // the child owns the connector
+            if (owner.tail) {
+              delete owner.tail.bx; delete owner.tail.by;
+              delete owner.tail.tx; delete owner.tail.ty;
+            }
+          }
+        }
       } else if (mode === "resize") {
         const [ldx, ldy] = rotVec(dx, dy, -orig.rot);
         if (handle.includes("e")) cur.w = Math.max(MIN_SIZE, Math.round(orig.w + ldx));
@@ -1072,7 +1086,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
         tip.live = false;
         setTimeout(() => {
           if (dragTipRef.current === tip) { dragTipRef.current = null; force(); }
-        }, 1400);
+        }, 900);
       }
       if (moved) commit();
     };
@@ -3356,12 +3370,12 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
               )}
               {dragTipRef.current && (
                 <div className="dragTip" style={{
-                  left: (dragTipRef.current.x + dragTipRef.current.w / 2) * zoom,
-                  top: (dragTipRef.current.y + dragTipRef.current.h / 2) * zoom,
+                  left: (dragTipRef.current.x + dragTipRef.current.w) * zoom + 6,
+                  top: dragTipRef.current.y * zoom - 4,
                 }}>
                   {dragTipRef.current.mode === "resize"
-                    ? `w: ${(dragTipRef.current.w / DPI).toFixed(3)} in  h: ${(dragTipRef.current.h / DPI).toFixed(3)} in`
-                    : `x: ${(dragTipRef.current.x / DPI).toFixed(3)} in  y: ${(dragTipRef.current.y / DPI).toFixed(3)} in`}
+                    ? `${(dragTipRef.current.w / DPI).toFixed(2)}×${(dragTipRef.current.h / DPI).toFixed(2)}"`
+                    : `${(dragTipRef.current.x / DPI).toFixed(2)}, ${(dragTipRef.current.y / DPI).toFixed(2)}"`}
                 </div>
               )}
             </div>
