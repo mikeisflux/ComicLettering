@@ -1373,6 +1373,61 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     setStatus("Balloon fitted to its lettering.");
   }
 
+  function balanceRag() {
+    const el = page?.els.find((x) => x.id === selId);
+    if (!el || (el.type !== "balloon" && el.type !== "text")) { setStatus("Select a balloon or text to balance."); return; }
+    if (el.locked) { setStatus("That item is locked — unlock it first."); return; }
+    const raw = el.text.replace(/\s+/g, " ").trim();
+    const words = raw.split(" ").filter(Boolean);
+    if (words.length < 2) { setStatus("Nothing to balance."); return; }
+    const availW = el.type === "balloon" ? balloonGeom(el).textRect[2] : el.w;
+    const ts = el.ts;
+    const meas = document.createElement("div");
+    Object.assign(meas.style, {
+      position: "absolute", left: "-9999px", top: "0", visibility: "hidden",
+      whiteSpace: "pre",
+      fontFamily: (FONTS[ts.font]?.css || FONTS.comicneue.css),
+      fontSize: `${ts.size}px`,
+      fontWeight: ts.bold ? "700" : "400",
+      fontStyle: ts.italic ? "italic" : "normal",
+      letterSpacing: ts.tracking ? `${ts.tracking}px` : "normal",
+      textTransform: ts.caps ? "uppercase" : "none",
+    } as CSSStyleDeclaration);
+    document.body.appendChild(meas);
+    const measure = (s: string) => { meas.textContent = s; return meas.scrollWidth; };
+    const wordW = words.map(measure);
+    const spaceW = measure("x x") - measure("xx");
+    document.body.removeChild(meas);
+    const linesAt = (maxW: number) => {
+      let lines = 1, cur = 0;
+      for (const w of wordW) {
+        if (cur === 0) cur = w;
+        else if (cur + spaceW + w <= maxW) cur += spaceW + w;
+        else { lines++; cur = w; }
+      }
+      return lines;
+    };
+    const targetLines = linesAt(availW);
+    if (targetLines <= 1) { setStatus("Text already fits on one line."); return; }
+    /* smallest max-width that still yields the same number of lines → even rag */
+    let lo = Math.max(...wordW), hi = availW;
+    for (let it = 0; it < 40 && hi - lo > 0.5; it++) {
+      const mid = (lo + hi) / 2;
+      if (linesAt(mid) <= targetLines) hi = mid; else lo = mid;
+    }
+    const W = hi;
+    const out: string[] = [];
+    let cur = "", curW = 0;
+    for (let i = 0; i < words.length; i++) {
+      if (cur === "") { cur = words[i]; curW = wordW[i]; }
+      else if (curW + spaceW + wordW[i] <= W) { cur += " " + words[i]; curW += spaceW + wordW[i]; }
+      else { out.push(cur); cur = words[i]; curW = wordW[i]; }
+    }
+    if (cur) out.push(cur);
+    mutateSel<BalloonEl | TextEl>((x) => { x.text = out.join("\n"); });
+    setStatus(`Balanced into ${out.length} even line${out.length > 1 ? "s" : ""}.`);
+  }
+
   function alignSel(mode: "left" | "hcenter" | "right" | "top" | "vcenter" | "bottom") {
     const el = page?.els.find((x) => x.id === selId);
     if (!el || !page) return;
@@ -2645,6 +2700,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
             ["Reset Rotation", () => mutateSel((x) => { x.rot = 0; })],
             ["—", null],
             ["Fit Balloon to Text", () => fitBalloonToText()],
+            ["Balance Line Breaks", () => balanceRag()],
             ["Center Horizontally (Ctrl+[)", () => alignSel("hcenter")],
             ["Center Vertically (Ctrl+])", () => alignSel("vcenter")],
             ["Flip Horizontal", () => mutateSel((x) => { x.flipH = !x.flipH; })],

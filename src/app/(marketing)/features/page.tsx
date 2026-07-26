@@ -22,6 +22,8 @@ const GROUPS: { h: string; items: [string, string][] }[] = [
   {
     h: "Pro Lettering Tools",
     items: [
+      ["Fit balloon to text", "One click resizes any balloon to hug its lettering — respecting your line breaks — so bubbles are never too baggy or too tight."],
+      ["Balance the rag", "Auto-rebalance line breaks so every line in a balloon is close to the same length. Even 'rag' is the detail that reads as professional lettering."],
       ["Line spacing & tracking", "Dial in leading (line height) and letter tracking right from the format bar — the tight, even spacing that separates pro lettering from default type."],
       ["Rotate anything", "Rotate balloons, SFX and artwork clockwise or counter-clockwise in 90° or 15° steps, or reset to level in one click."],
       ["Format painter", "Copy a style off one balloon and paint it onto others — font, size, fill, outline and shadow — so a whole page matches in seconds."],
