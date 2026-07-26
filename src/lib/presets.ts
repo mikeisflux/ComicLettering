@@ -18,6 +18,19 @@ export interface LetterStyle {
 }
 
 export const LETTER_STYLES: LetterStyle[] = [
+  /* --- SFX colourways: each pairs one of the LMC display faces with the
+     punchy fill/outline/shadow treatment that genre is normally inked in --- */
+  { name: "Gold Ordnance", font: "lmcarmory",   fillA: "#ffd21f", fillB: "#e0a400", outlineC: "#000000", outlineF: 0.022, shadow: true },
+  { name: "Breach Gold",   font: "lmcbreach",   fillA: "#ffc91a", fillB: "#d99400", outlineC: "#000000", outlineF: 0.024, shadow: true },
+  { name: "Boom Yellow",   font: "lmckaboom",   fillA: "#ffec5e", fillB: "#ffd21f", outlineC: "#000000", outlineF: 0.05,  shadow: true },
+  { name: "Brawl Teal",    font: "lmcbrawl",    fillA: "#6fdcdc", fillB: "#35b0b0", outlineC: "#000000", outlineF: 0.055, shadow: true },
+  { name: "Brimstone Red", font: "lmcbrimstone",fillA: "#ef3b2c", fillB: "#a5150c", outlineC: "#12080a", outlineF: 0.03,  shadow: true },
+  { name: "Sky Bold",      font: "lmcbigbold",  fillA: "#eaf3ff", fillB: "#7ba7d8", outlineC: "#14335c", outlineF: 0.06,  shadow: true },
+  { name: "Blitz Orange",  font: "lmcblitz",    fillA: "#ff5a2e", fillB: "#e02a00", outlineC: "#000000", outlineF: 0.03,  shadow: true },
+  { name: "Impact Red",    font: "lmcslam",     fillA: "#f5432a", fillB: "#c01c08", outlineC: "#000000", outlineF: 0.055, shadow: true },
+  { name: "Butcher Pink",  font: "lmcbutcher",  fillA: "#d9548c", fillB: "#a32c5e", outlineC: "#000000", outlineF: 0.032, shadow: true },
+  { name: "Splash Blue",   font: "lmcsplash",   fillA: "#ddeeff", fillB: "#7ec4ee", outlineC: "#0d2b45", outlineF: 0.06,  shadow: true },
+
   /* hot & glossy */
   { name: "Sunburst",     font: "luckiest",    fillA: "#ffd21f", fillB: "#ff7a00", outlineC: "#7a3400", outlineF: 0.035, shadow: true },
   { name: "Tango",        font: "chango",      fillA: "#ff9d3c", fillB: "#e8540a", outlineC: "#7a2600", outlineF: 0.03,  shadow: true },
