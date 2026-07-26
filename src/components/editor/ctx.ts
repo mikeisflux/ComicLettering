@@ -36,6 +36,8 @@ export interface EditorCtx {
   panelImageTarget: React.RefObject<string | null>;
   aidRef: React.RefObject<number>;
   activeStyleRef: React.RefObject<string>;
+  /* balloon / caption-box colourway names for newly created shapes */
+  activeShapeRef: React.RefObject<{ balloon: string; box: string }>;
   styleClipRef: React.RefObject<StyleClip | null>;
   clipboardRef: React.RefObject<El | null>;
   customFontIdsRef: React.RefObject<Record<string, string>>;
@@ -52,6 +54,13 @@ export interface EditorCtx {
   undo: () => void;
   redo: () => void;
   setStatus: (msg: string) => void;
+  /* STYLES sidebar */
+  styleTab: "letter" | "balloon" | "box";
+  setStyleTab: (t: "letter" | "balloon" | "box") => void;
+  activeStyle: string;
+  setActiveStyle: (name: string) => void;
+  activeShape: { balloon: string; box: string };
+  setActiveShape: (tab: "balloon" | "box", name: string) => void;
   select: (id: string | null) => void;
   setSelId: SetState<string | null>;
   setEditingId: SetState<string | null>;

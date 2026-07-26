@@ -13,7 +13,9 @@ import {
   TextStyle, aabbOverlap, clamp, makeBalloon, makeImage, newPage, normalizeRuns,
   registerFont, reseedIds, rotVec, runsToText, starterDoc,
 } from "@/lib/model";
-import { LETTER_STYLES, applyLetterStyle } from "@/lib/presets";
+import { LETTER_STYLES } from "@/lib/presets";
+import { BALLOON_STYLES, BOX_STYLES } from "@/lib/balloonStyles";
+import { StylesPanel, StyleTab, tabForSelection } from "./editor/stylesPanel";
 import { fillCss } from "@/lib/fills";
 import { ImageFormat, loadImage, pageThumbnail } from "@/lib/exportPng";
 import {
@@ -176,6 +178,31 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     setActiveStyleState(name);
     try { localStorage.setItem("lmc.style", name); } catch { /* ignore */ }
   };
+  /* balloons and caption boxes carry their own colourway lists, and the
+     STYLES panel shows whichever set matches the selection */
+  const [styleTab, setStyleTabState] = useState<StyleTab>("letter");
+  const [activeShape, setActiveShapeState] = useState({ balloon: BALLOON_STYLES[0].name, box: BOX_STYLES[0].name });
+  const activeShapeRef = useRef(activeShape);
+  useEffect(() => {
+    try {
+      const b = localStorage.getItem("lmc.balloonStyle");
+      const x = localStorage.getItem("lmc.boxStyle");
+      const next = {
+        balloon: b && BALLOON_STYLES.some((s) => s.name === b) ? b : activeShapeRef.current.balloon,
+        box: x && BOX_STYLES.some((s) => s.name === x) ? x : activeShapeRef.current.box,
+      };
+      activeShapeRef.current = next;
+      setActiveShapeState(next);
+    } catch { /* ignore */ }
+  }, []);
+  const setActiveShape = (tab: "balloon" | "box", name: string) => {
+    const next = { ...activeShapeRef.current, [tab]: name };
+    activeShapeRef.current = next;
+    setActiveShapeState(next);
+    try { localStorage.setItem(tab === "box" ? "lmc.boxStyle" : "lmc.balloonStyle", name); } catch { /* ignore */ }
+  };
+  const setStyleTab = (t: StyleTab) => setStyleTabState(t);
+
   const [proof, setProof] = useState<{ busy: boolean; error: string | null; matches: ProofMatch[] } | null>(null);
 
   useEffect(() => {
@@ -238,6 +265,17 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const doc = docRef.current;
   const page: Page | null = doc ? doc.pages[Math.min(pageIndex, doc.pages.length - 1)] : null;
   const selEl: El | null = page?.els.find((e) => e.id === selId) || null;
+
+  /* the STYLES panel follows the selection: picking up a balloon shows the
+     balloon colourways, a caption shows the box ones. A manual tab choice
+     holds until a different element is selected. */
+  const styleTabSelRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (selId === styleTabSelRef.current) return;
+    styleTabSelRef.current = selId;
+    const t = tabForSelection(selEl as { type: string; kind?: string } | null);
+    if (t) setStyleTabState(t);
+  }, [selId, selEl]);
 
   /* surface the first unseen tip whose situation matches what the user is
      doing right now */
@@ -1009,6 +1047,8 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     presets, proof, setProof, drawMode, setDrawMode, tailAsk, setTailAsk,
     ctxMenu, setCtxMenu, setShowSetup, showExport, setShowExport,
     exportFmt, setExportFmt, exportScope, setExportScope, exportDpi,
+    styleTab, setStyleTab, activeStyle, setActiveStyle, activeShape,
+    setActiveShape, activeShapeRef,
     setExportDpi, letteringOnly, setLetteringOnly, exportCropMarks,
     setExportCropMarks, exportFrom, setExportFrom, exportTo, setExportTo,
     showFind, setShowFind, findText, setFindText, replaceText,
@@ -1094,26 +1134,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
             <button onClick={() => movePage(ed, -1)} disabled={pageIndex === 0} title="Move page up">↑</button>
             <button onClick={() => movePage(ed, 1)} disabled={pageIndex >= doc.pages.length - 1} title="Move page down">↓</button>
           </div>
-          <div className="sideTitle">Styles</div>
-          <div className="stylesGrid">
-            {LETTER_STYLES.map((s) => (
-              <button key={s.name} className={"styleBtn" + (activeStyle === s.name ? " on" : "")} title={s.name}
-                onClick={() => {
-                  setActiveStyle(s.name);
-                  if (selEl && (selEl.type === "text" || selEl.type === "balloon")) {
-                    if (selEl.locked) { setStatus("That item is locked — unlock it to restyle."); return; }
-                    mutateSel<BalloonEl | TextEl>((x) => {
-                      x.ts = applyLetterStyle(x.ts, s);
-                      x.ts.outlineW = Math.round(x.ts.size * s.outlineF);
-                    });
-                  } else {
-                    setStatus(`Style “${s.name}” selected — new lettering will use it.`);
-                  }
-                }}>
-                <span style={letterStyleCss(s, 21)}>ABC</span>
-              </button>
-            ))}
-          </div>
+          <StylesPanel ed={ed} />
         </aside>
 
         <div className="canvasArea" ref={areaRef}

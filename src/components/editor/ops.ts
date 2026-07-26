@@ -9,6 +9,7 @@ import {
 } from "@/lib/model";
 import { balloonGeom } from "@/lib/geometry";
 import { LETTER_STYLES, applyLetterStyle } from "@/lib/presets";
+import { BALLOON_STYLES, BOX_STYLES, applyShapeStyle } from "@/lib/balloonStyles";
 import {
   ImageFormat, docThumbnail, exportPageImage, exportPagePNG, loadImage,
 } from "@/lib/exportPng";
@@ -491,10 +492,31 @@ export function reorder(ed: EditorCtx, delta: number) {
   commit();
 }
 
+const TRAY_NON_BALLOON = ["panel", "image", "sfx", "text"];
+
 export function addFromTray(ed: EditorCtx, kind: string) {
-  const { docRef, pageIndexRef, fileImageRef, activeStyleRef, pendingLockRef, commit, setSelId } = ed;
+  const { docRef, pageIndexRef, fileImageRef, activeStyleRef, activeShapeRef,
+    pendingLockRef, commit, setSelId, selId, setStatus } = ed;
   const d = docRef.current!;
   const p = d.pages[pageIndexRef.current];
+
+  /* a balloon is selected and the user picked another balloon shape: swap the
+     selection over to it rather than dropping a second balloon on the page */
+  if (!TRAY_NON_BALLOON.includes(kind)) {
+    const sel = p.els.find((x) => x.id === selId);
+    if (sel && sel.type === "balloon") {
+      if (sel.locked) { setStatus("That balloon is locked — unlock it to change its shape."); return; }
+      const b = sel as BalloonEl;
+      const wasCaption = TAILLESS_KINDS.includes(b.kind);
+      const nowCaption = TAILLESS_KINDS.includes(kind as BalloonKind);
+      b.kind = kind as BalloonKind;
+      /* captions have no tail; give one back when leaving caption shapes */
+      if (nowCaption) b.tail = null;
+      else if (wasCaption && !b.tail) b.tail = { dx: Math.round(b.w * 0.2), dy: Math.round(b.h * 0.75) };
+      commit();
+      return;
+    }
+  }
   const n = p.els.length % 5;
   const spawn = (w: number, h: number) =>
     ({ x: Math.round(p.w / 2 - w / 2 + n * 40), y: Math.round(p.h * 0.3 + n * 40), w, h });
@@ -521,7 +543,13 @@ export function addFromTray(ed: EditorCtx, kind: string) {
     const w = Math.round(p.w * (caption ? 0.36 : 0.34));
     const h = caption ? Math.round(w * 0.32) : Math.round(w * 0.62);
     const s = spawn(w, h);
-    el = makeBalloon(kind as BalloonKind, s.x, s.y, w, h);
+    const b = makeBalloon(kind as BalloonKind, s.x, s.y, w, h);
+    /* new balloons use the colourway picked in the STYLES panel */
+    const list = caption ? BOX_STYLES : BALLOON_STYLES;
+    const want = caption ? activeShapeRef.current.box : activeShapeRef.current.balloon;
+    const st = list.find((x) => x.name === want);
+    if (st) applyShapeStyle(b, st);
+    el = b;
   }
   if (el) {
     p.els.push(el);

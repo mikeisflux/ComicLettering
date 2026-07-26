@@ -209,6 +209,27 @@ input[type="range"] { width: 110px; }
 .styleBtn.on { border-color: var(--sel); background: #fff; box-shadow: 0 0 0 1px var(--sel); }
 .styleBtn span { display: block; pointer-events: none; }
 
+/* STYLES panel tabs — Text / Balloon / Box swatch sets */
+.styleTabs { display: flex; gap: 2px; padding: 4px 6px 0; background: #d9dde4; }
+.styleTabs button {
+  flex: 1; font-size: 10px; letter-spacing: .04em; padding: 3px 0;
+  border: 1px solid #9aa2ae; border-bottom: none; border-radius: 4px 4px 0 0;
+  background: #c6ccd6; color: #333;
+}
+.styleTabs button:hover { background: #e2e6ec; }
+.styleTabs button.on { background: #fff; color: #000; font-weight: 600; }
+
+/* balloon / caption swatches: a filled shape with the ink colour on it */
+.styleBtn.shapeBtn { padding: 3px 2px; }
+.shapeSw {
+  display: flex !important; align-items: center; justify-content: center;
+  height: 34px; border-style: solid; border-radius: 50% / 42%;
+  box-shadow: 0 1px 2px #0004;
+}
+.shapeSw.box { border-radius: 3px; }
+.shapeSw.none { box-shadow: none; border-style: dashed; border-color: #9aa2ae !important; }
+.shapeSw i { font: 700 10px/1 var(--ui, sans-serif); font-style: normal; letter-spacing: .04em; }
+
 /* ---------------- canvas area ---------------- */
 .canvasArea {
   flex: 1; min-width: 0; overflow: auto; position: relative;
