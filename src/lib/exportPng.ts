@@ -3,7 +3,7 @@ import {
   Assets, BalloonEl, Doc, El, FILTERS, FONTS, Page, TextStyle,
   aabbOverlap, deg2rad, lightenHex, resolveBalloon, rotVec,
 } from "./model";
-import { balloonGeom } from "./geometry";
+import { balloonGeom, arcTextLayout } from "./geometry";
 import { paintFill } from "./fills";
 
 interface MergeInfo { d: string; color: string; cx: number; cy: number; rot: number; bw: number; bh: number; stroke?: string; strokeW?: number }
@@ -41,13 +41,61 @@ function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number
   return out;
 }
 
+/* SFX arc-warped text: lay each glyph along a circular arc. Single line. */
+function drawWarpedText(
+  ctx: CanvasRenderingContext2D, ts: TextStyle, text: string,
+  rect: [number, number, number, number], warp: number
+) {
+  const [rx, ry, rw, rh] = rect;
+  const t = (ts.caps ? String(text).toUpperCase() : String(text)).replace(/\s*\n\s*/g, " ");
+  const chars = [...t];
+  try { (ctx as unknown as { letterSpacing: string }).letterSpacing = "0px"; } catch { /* ignore */ }
+  const tr = ts.tracking ?? 0;
+  const widths = chars.map((c) => ctx.measureText(c).width + tr);
+  const layout = arcTextLayout(widths, warp);
+  const cx0 = rx + rw / 2, cy0 = ry + rh / 2;
+  let fill: string | CanvasGradient = ts.fillA;
+  if (ts.fillB) {
+    const g = ctx.createLinearGradient(0, cy0 - ts.size / 2, 0, cy0 + ts.size / 2);
+    g.addColorStop(0, lightenHex(ts.fillA, 0.55));
+    g.addColorStop(0.38, ts.fillA);
+    g.addColorStop(1, ts.fillB);
+    fill = g;
+  }
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.lineJoin = "round";
+  chars.forEach((ch, i) => {
+    if (ch === " ") return;
+    const p = layout[i];
+    ctx.save();
+    ctx.translate(cx0 + p.x, cy0 + p.y);
+    ctx.rotate(p.rot);
+    if (ts.shadow) {
+      ctx.save();
+      ctx.shadowColor = ts.shadowC || "#00000088";
+      ctx.shadowOffsetX = ts.size * 0.05; ctx.shadowOffsetY = ts.size * 0.05; ctx.shadowBlur = ts.size * 0.06;
+      ctx.fillStyle = fill; ctx.fillText(ch, 0, 0);
+      ctx.restore();
+    }
+    if (ts.outlineW > 0) {
+      ctx.lineWidth = ts.outlineW; ctx.strokeStyle = ts.outlineC;
+      ctx.strokeText(ch, 0, 0);
+    }
+    ctx.fillStyle = fill;
+    ctx.fillText(ch, 0, 0);
+    ctx.restore();
+  });
+}
+
 export function drawStyledText(
   ctx: CanvasRenderingContext2D, ts: TextStyle, text: string,
-  rect: [number, number, number, number]
+  rect: [number, number, number, number], warp = 0
 ) {
   const [rx, ry, rw, rh] = rect;
   ctx.font = fontString(ts);
   ctx.textBaseline = "middle";
+  if (warp) { drawWarpedText(ctx, ts, text, rect, warp); return; }
   // letter-spacing (tracking) — supported in the browser canvas used for export
   try { (ctx as unknown as { letterSpacing: string }).letterSpacing = `${ts.tracking ?? 0}px`; } catch { /* older engines */ }
   const t = ts.caps ? String(text).toUpperCase() : String(text);
@@ -249,7 +297,7 @@ function drawEl(ctx: CanvasRenderingContext2D, el: El, assets: Assets, merge?: M
     ctx.setLineDash([]);
     drawStyledText(ctx, el.ts, el.text, g.textRect);
   } else if (el.type === "text") {
-    drawStyledText(ctx, el.ts, el.text, [0, 0, el.w, el.h]);
+    drawStyledText(ctx, el.ts, el.text, [0, 0, el.w, el.h], el.warp ?? 0);
   }
   ctx.restore();
 }

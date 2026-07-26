@@ -233,6 +233,8 @@ export interface TextEl extends BaseEl {
   type: "text";
   text: string;
   ts: TextStyle;
+  /* SFX arc warp: -100..100 (0/undefined = straight). +bulges up, −bulges down */
+  warp?: number;
 }
 export type El = PanelEl | ImageEl | BalloonEl | TextEl;
 

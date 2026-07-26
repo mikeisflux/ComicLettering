@@ -14,10 +14,10 @@ import {
   clamp, lightenHex, makeBalloon, makeImage, makePanel, makeText, newPage,
   registerFont, reseedIds, resolveBalloon, rotVec, solid, starterDoc, uid,
 } from "@/lib/model";
-import { balloonGeom } from "@/lib/geometry";
+import { balloonGeom, arcTextLayout } from "@/lib/geometry";
 import { LETTER_STYLES, LetterStyle, applyLetterStyle } from "@/lib/presets";
 import { defaultFillFor, fillCss, fillOverlayTile, fillOverlayURL, isRepeating } from "@/lib/fills";
-import { ImageFormat, docThumbnail, exportPageImage, exportPagePNG, loadImage, pageThumbnail } from "@/lib/exportPng";
+import { ImageFormat, docThumbnail, exportPageImage, exportPagePNG, fontString, loadImage, pageThumbnail } from "@/lib/exportPng";
 
 const AUTOSAVE_KEY = "comiclettering.autosave.v2";
 const MIN_SIZE = 24;
@@ -60,6 +60,18 @@ function textCss(ts: TextStyle): CSSProperties {
     st.filter = `drop-shadow(${ts.size * 0.05}px ${ts.size * 0.05}px ${ts.size * 0.06}px ${ts.shadowC || "#00000088"})`;
   }
   return st;
+}
+
+/* offscreen canvas so warped-text glyph widths match the export renderer */
+let _measCanvas: HTMLCanvasElement | null = null;
+function measureCharWidths(ts: TextStyle, chars: string[]): number[] {
+  if (typeof document === "undefined") return chars.map(() => ts.size * 0.6);
+  if (!_measCanvas) _measCanvas = document.createElement("canvas");
+  const ctx = _measCanvas.getContext("2d");
+  if (!ctx) return chars.map(() => ts.size * 0.6);
+  ctx.font = fontString(ts);
+  const tr = ts.tracking ?? 0;
+  return chars.map((c) => ctx.measureText(c).width + tr);
 }
 
 function letterStyleCss(s: LetterStyle, size: number): CSSProperties {
@@ -553,6 +565,8 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const [replaceText, setReplaceText] = useState("");
   const [findCase, setFindCase] = useState(false);
   const [showSafe, setShowSafe] = useState(false);
+  const [spread, setSpread] = useState(false);
+  const [spreadUrl, setSpreadUrl] = useState<string | null>(null);
   const [exportFrom, setExportFrom] = useState(1);
   const [exportTo, setExportTo] = useState(1);
   const [stampOpen, setStampOpen] = useState(false);
@@ -593,6 +607,25 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       if (raw) { const arr = JSON.parse(raw); if (Array.isArray(arr)) setPresets(arr); }
     } catch { /* ignore */ }
   }, []);
+
+  /* facing-page preview for spread view */
+  const facingIndex = (() => {
+    const d = docRef.current;
+    if (!spread || !d) return -1;
+    const pn = pageIndex + 1;
+    const fi = pn === 1 ? -1 : (pn % 2 === 0 ? pageIndex + 1 : pageIndex - 1);
+    return fi >= 0 && fi < d.pages.length ? fi : -1;
+  })();
+  const currentOnLeft = spread && (pageIndex + 1) % 2 === 0;
+  useEffect(() => {
+    let alive = true;
+    const d = docRef.current;
+    if (!spread || facingIndex < 0 || !d) { setSpreadUrl(null); return; }
+    const fp = d.pages[facingIndex];
+    pageThumbnail(fp, assetsRef.current, Math.min(fp.w, 800))
+      .then((u) => { if (alive) setSpreadUrl(u); }).catch(() => { });
+    return () => { alive = false; };
+  }, [spread, facingIndex, thumbs]);
 
   /* auto-lock: newly placed items lock themselves once you click away */
   const settlePendingLock = useCallback((exceptId: string | null) => {
@@ -2113,6 +2146,28 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
 
     /* text / SFX */
     const editing = editingId === el.id;
+    if (el.warp && !editing && el.text) {
+      const raw = (el.ts.caps ? el.text.toUpperCase() : el.text).replace(/\s*\n\s*/g, " ");
+      const chars = [...raw];
+      const widths = measureCharWidths(el.ts, chars);
+      const layout = arcTextLayout(widths, el.warp);
+      const cx0 = el.w / 2, cy0 = el.h / 2;
+      const gcss = textCss(el.ts);
+      return (
+        <div {...common} className="el text" style={style}>
+          <div className="txt warp" style={{ position: "absolute", left: 0, top: 0, width: el.w, height: el.h }}>
+            {chars.map((ch, i) => ch === " " ? null : (
+              <span key={i} style={{
+                ...gcss, position: "absolute",
+                left: cx0 + layout[i].x, top: cy0 + layout[i].y,
+                transform: `translate(-50%, -50%) rotate(${layout[i].rot}rad)`,
+                whiteSpace: "pre", lineHeight: 1,
+              }}>{ch}</span>
+            ))}
+          </div>
+        </div>
+      );
+    }
     return (
       <div {...common} className="el text" style={style}>
         <div
@@ -2373,6 +2428,24 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
           </div>
         )}
         {(el.type === "balloon" || el.type === "text") && tsControls(el)}
+        {el.type === "text" && (
+          <div className="inspSection">
+            <div className="inspHead">SFX warp</div>
+            <Fld label="Arc">
+              <span className="pair">
+                <input type="range" min={-100} max={100} step={1} value={el.warp ?? 0}
+                  onChange={(e) => mutateSel<TextEl>((x) => { x.warp = +e.target.value; }, false)}
+                  onPointerUp={() => commit()} style={{ width: 120 }} />
+                <input type="number" min={-100} max={100} value={el.warp ?? 0} style={{ width: 54 }}
+                  onChange={(e) => mutateSel<TextEl>((x) => { x.warp = clamp(+e.target.value || 0, -100, 100); })} />
+              </span>
+            </Fld>
+            <div className="btnRow">
+              <button onClick={() => mutateSel<TextEl>((x) => { x.warp = 0; })}>Straighten</button>
+            </div>
+            <div className="tips" style={{ fontSize: 11 }}>Bend SFX text along an arc — positive curves up, negative curves down. Double-click to edit, then release for the warped look.</div>
+          </div>
+        )}
         {(el.type === "panel" || el.type === "image") && (
           <>
             <div className="inspSection">
@@ -2724,6 +2797,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
             ["Fit Page", () => { setUserZoomed(false); fitZoom(true); }],
             ["—", null],
             [showSafe ? "Hide Safe Area" : "Show Safe Area", () => setShowSafe((s) => !s)],
+            [spread ? "Single Page View" : "Two-Page Spread View", () => setSpread((s) => !s)],
             ["—", null],
             ["Panel Layouts", () => setTab("layouts")],
             ["Inspector", () => setTab("inspector")],
@@ -3099,6 +3173,14 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
           <div className="canvasRow">
             <Ruler length={page.h} zoom={zoom} vertical offset={STAGE_MY}
               hi={dragTipRef.current?.live ? [dragTipRef.current.y, dragTipRef.current.y + dragTipRef.current.h] : null} />
+            {spread && facingIndex >= 0 && !currentOnLeft && (
+              <div className="facingPage" title={`Facing page ${facingIndex + 1}`}
+                style={{ width: doc.pages[facingIndex].w * zoom, height: doc.pages[facingIndex].h * zoom }}
+                onClick={() => { setPageIndex(facingIndex); setSelId(null); }}>
+                {spreadUrl && <img src={spreadUrl} alt="" />}
+                <span className="facingNum">{facingIndex + 1}</span>
+              </div>
+            )}
             <div className="stage" style={{ width: page.w * zoom, height: page.h * zoom }}>
               <div
                 ref={pageDivRef}
@@ -3154,6 +3236,14 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
                 </div>
               )}
             </div>
+            {spread && facingIndex >= 0 && currentOnLeft && (
+              <div className="facingPage" title={`Facing page ${facingIndex + 1}`}
+                style={{ width: doc.pages[facingIndex].w * zoom, height: doc.pages[facingIndex].h * zoom }}
+                onClick={() => { setPageIndex(facingIndex); setSelId(null); }}>
+                {spreadUrl && <img src={spreadUrl} alt="" />}
+                <span className="facingNum">{facingIndex + 1}</span>
+              </div>
+            )}
           </div>
           <div className="zoomCtl">
             <select value={String(Math.round(zoom * 100))} onChange={(e) => {

@@ -8,6 +8,27 @@ const lerpPt = (p: number[], q: number[], t: number) => [lerp(p[0], q[0], t), le
 const ellipsePt = (cx: number, cy: number, rx: number, ry: number, th: number) =>
   [cx + rx * Math.cos(th), cy + ry * Math.sin(th)];
 
+/* Arc-warp layout for SFX text. Given each glyph's advance width and a warp
+   amount (-100..100), returns each glyph's centre offset (x,y from the arc
+   midpoint) and tangent rotation in radians. Used identically by the on-canvas
+   editor preview and the export renderer so warped text is WYSIWYG. */
+export function arcTextLayout(widths: number[], amount: number): { x: number; y: number; rot: number }[] {
+  const total = widths.reduce((a, b) => a + b, 0) || 1;
+  const cum: number[] = [];
+  let acc = 0;
+  for (const w of widths) { cum.push(acc + w / 2); acc += w; }
+  if (!amount) return widths.map((_, i) => ({ x: cum[i] - total / 2, y: 0, rot: 0 }));
+  const dir = amount < 0 ? -1 : 1;
+  const s = Math.min(Math.abs(amount) / 100, 1) * Math.PI * 0.9;
+  const R = total / s;
+  return cum.map((sMid) => {
+    const theta = -s / 2 + sMid / R;
+    const x = R * Math.sin(theta);
+    const yUp = R - R * Math.cos(theta);
+    return { x, y: dir > 0 ? yUp : -yUp, rot: dir > 0 ? theta : -theta };
+  });
+}
+
 /* tiny deterministic prng for hand-drawn jitter */
 function prng(seed: number) {
   let a = seed >>> 0;
