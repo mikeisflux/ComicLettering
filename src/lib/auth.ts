@@ -1,6 +1,6 @@
 /* Session auth: scrypt password hashing + HMAC-signed cookie tokens.
    Uses only node:crypto — no extra dependencies. */
-import { createHmac, randomBytes, scrypt as scryptCb, timingSafeEqual } from "crypto";
+import { createHash, createHmac, randomBytes, scrypt as scryptCb, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { cookies } from "next/headers";
 import { prisma } from "./db";
@@ -22,6 +22,16 @@ export async function verifyPassword(password: string, stored: string): Promise<
   const buf = await scrypt(password, salt, 64);
   const other = Buffer.from(hash, "hex");
   return buf.length === other.length && timingSafeEqual(buf, other);
+}
+
+/* Password-reset tokens: a random token is emailed to the user; only its
+   sha256 hash is stored, so a database leak can't be used to reset accounts. */
+export function newResetToken(): { token: string; hash: string } {
+  const token = randomBytes(32).toString("hex");
+  return { token, hash: createHash("sha256").update(token).digest("hex") };
+}
+export function hashResetToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
 }
 
 let cachedSecret: string | null = null;

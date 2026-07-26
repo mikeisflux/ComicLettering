@@ -17,6 +17,7 @@ export default async function MarketingLayout({ children }: { children: React.Re
         {user ? (
           <>
             {user.isAdmin && <Link href="/admin" className="ghost">Admin</Link>}
+            <Link href="/account" className="ghost">Account</Link>
             <Link href="/app" className="cta">Open Studio</Link>
           </>
         ) : (
@@ -50,6 +51,7 @@ export default async function MarketingLayout({ children }: { children: React.Re
           <div>
             <Link href="/login">Sign in</Link>
             <Link href="/signup">Create account</Link>
+            <Link href="/account">My account</Link>
             <Link href="/app">Open the studio</Link>
           </div>
         </div>

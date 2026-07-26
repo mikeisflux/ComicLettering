@@ -55,6 +55,7 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
       <input id="a-password" name="password" type="password" required minLength={mode === "signup" ? 8 : 1}
         autoComplete={mode === "signup" ? "new-password" : "current-password"} />
       <button disabled={busy}>{busy ? "One moment…" : mode === "signup" ? "Create Account" : "Sign In"}</button>
+      {mode === "login" && <p className="alt" style={{ marginTop: 10 }}><a href="/forgot">Forgot your password?</a></p>}
       {err && <p className="formErr">{err}</p>}
       <p className="alt">
         {mode === "signup"

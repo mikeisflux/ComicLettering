@@ -41,11 +41,33 @@ async function pp(path: string, init: RequestInit = {}): Promise<Response> {
 }
 
 export async function getSubscription(id: string): Promise<{
-  status: string; plan_id: string; subscriber?: { email_address?: string };
+  status: string; plan_id: string;
+  subscriber?: { email_address?: string };
+  billing_info?: { next_billing_time?: string };
 } | null> {
   const res = await pp(`/v1/billing/subscriptions/${encodeURIComponent(id)}`);
   if (!res.ok) return null;
   return res.json();
+}
+
+/* Switch an existing subscription to a different plan (monthly ⇄ yearly).
+   PayPal usually requires the subscriber to approve the change: returns the
+   approval URL to redirect them to, or null if the change applied directly. */
+export async function reviseSubscription(
+  id: string, newPlanId: string, returnUrl: string, cancelUrl: string
+): Promise<{ ok: boolean; approveUrl: string | null; error?: string }> {
+  const res = await pp(`/v1/billing/subscriptions/${encodeURIComponent(id)}/revise`, {
+    method: "POST",
+    body: JSON.stringify({
+      plan_id: newPlanId,
+      application_context: { return_url: returnUrl, cancel_url: cancelUrl },
+    }),
+  });
+  if (!res.ok) return { ok: false, approveUrl: null, error: (await res.text()).slice(0, 300) };
+  const data = await res.json().catch(() => ({} as Record<string, unknown>));
+  const links = (data.links || []) as { rel: string; href: string }[];
+  const approve = links.find((l) => l.rel === "approve");
+  return { ok: true, approveUrl: approve?.href || null };
 }
 
 export async function cancelSubscription(id: string, reason = "Cancelled by site"): Promise<boolean> {
