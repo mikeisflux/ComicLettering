@@ -321,6 +321,21 @@ def decimate(pts, k):
         out.append(pts[-1])
     return out
 
+
+def relower(strokes, xh, asc, desc, xs):
+    """Re-proportion the shared lowercase skeletons for a family that wants a
+    big x-height. The default set is drawn on x-height 480 / ascender 700 /
+    descender -190; casual marker hands sit much closer to x-height 570 with
+    only a short ascender overshoot, so remap each band separately instead of
+    scaling the whole glyph (which would stretch the ascenders too)."""
+    def ry(y):
+        if y < 0:
+            return y * (desc / 190.0)
+        if y <= 480:
+            return y * (xh / 480.0)
+        return xh + (y - 480) * (asc - xh) / 220.0
+    return [[(x * xs, ry(y)) for (x, y) in st] for st in strokes]
+
 def build_glyph(name, strokes, r, amp, freq, shear, narrow, bounce, drips, cap="round", decim=0, rotd=0, rough=0):
     stroke_list = [(s, 1.0) for s in strokes]
     if drips == "drips":
@@ -403,7 +418,7 @@ def build_glyph(name, strokes, r, amp, freq, shear, narrow, bounce, drips, cap="
     union(paths, out.getPen())
     return out
 
-def make_font(family, style, r, amp, freq, shear, narrow, bounce, drips, out_ttf, cap="round", decim=0, mixed=False, track=0, rotd=0, rough=0):
+def make_font(family, style, r, amp, freq, shear, narrow, bounce, drips, out_ttf, cap="round", decim=0, mixed=False, track=0, rotd=0, rough=0, lcase=None):
     glyph_src = dict(GLYPHS)
     if mixed:
         glyph_src.update(LOWER_GLYPHS)
@@ -427,6 +442,9 @@ def make_font(family, style, r, amp, freq, shear, narrow, bounce, drips, out_ttf
     glyphs[".notdef"] = pen.glyph()
     adv[".notdef"] = 600
     for name, (w, strokes) in glyph_src.items():
+        if lcase and name in LOWER_GLYPHS:
+            strokes = relower(strokes, *lcase)
+            w = w * lcase[3]
         if drips == "scribble" and name != "space":
             strokes = scribble_strokes(name, w)
         elif drips == "alien" and name != "space":
@@ -496,7 +514,10 @@ FAMILIES = {
     "LMC Alien":    (42, 58, 3.0, 1.0, 0, 1.00, 12, "alien", "round", 0),
     "LMC Vapor":    (32, 44, 4.0, 1.0, 0, 1.00, 8, "bubbles", "round", 0),
     # mixed-case casual dialogue hand — full lowercase set
-    "LMC Casual":   (40, 56, 4.0, 1.0, 0, 1.00, 4, "", "round", 0, True),
+    # friendly round marker hand — the app's default dialogue face. Big
+    # x-height, short ascender overshoot, generous round bowls.
+    "LMC Casual":   (62, 92, 2.0, 0.7, 0, 1.00, 7, "", "round", 0, True, -30, 1.2, 0,
+                     (545, 715, 200, 1.20)),
     # --- display/SFX genres: tall condensed military, battle-damaged,
     #     slanted cartoon impact, and rough brush ---
     #     slanted cartoon impact, and rough brush ---
@@ -577,13 +598,14 @@ def main(outdir):
         track = cfg[11] if len(cfg) > 11 else 0
         rotd = cfg[12] if len(cfg) > 12 else 0
         rough = cfg[13] if len(cfg) > 13 else 0
+        lcase = cfg[14] if len(cfg) > 14 else None
         base = family.replace(" ", "")
         lean_sh = math.tan(math.radians(lean))
         ital_sh = math.tan(math.radians(9 + lean))
         for style, rr, sh in [("Regular", r, lean_sh), ("Bold", rb, lean_sh),
                               ("Italic", r, ital_sh), ("Bold Italic", rb, ital_sh)]:
             fn = os.path.join(outdir, f"{base}-{style.replace(' ', '')}.ttf")
-            make_font(family, style, rr, amp, freq, sh, narrow, bounce, drips, fn, cap, decim, mixed, track, rotd, rough)
+            make_font(family, style, rr, amp, freq, sh, narrow, bounce, drips, fn, cap, decim, mixed, track, rotd, rough, lcase)
 
 if __name__ == "__main__":
     main(sys.argv[1] if len(sys.argv) > 1 else ".")

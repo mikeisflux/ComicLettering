@@ -353,7 +353,7 @@ export function renderFormatBar(ed: EditorCtx) {
     <span className="fbLead" title="Line spacing (leading)">
       <span className="fbLeadIcon" aria-hidden>≣</span>
       <select className="fbLeadSel" disabled={!selTs}
-        value={String(selTs?.lineHeight ?? 1.25)}
+        value={String(selTs?.lineHeight ?? 1.05)}
         onChange={(e) => mutateSel<BalloonEl | TextEl>((x) => { x.ts.lineHeight = parseFloat(e.target.value); })}>
         <option value="0.9">0.9×</option>
         <option value="1">1.0×</option>

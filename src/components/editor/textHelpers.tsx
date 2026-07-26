@@ -27,7 +27,7 @@ export function textCss(ts: TextStyle): CSSProperties {
     textAlign: ts.align,
     textDecoration: ts.underline ? "underline" : "none",
     textTransform: ts.caps ? "uppercase" : "none",
-    lineHeight: ts.lineHeight ?? 1.25,
+    lineHeight: ts.lineHeight ?? 1.05,
     letterSpacing: ts.tracking ? `${ts.tracking}px` : "normal",
   };
   if (ts.fillB) {
@@ -120,6 +120,69 @@ export function measureCharWidths(ts: TextStyle, chars: string[]): number[] {
   ctx.font = fontString(ts);
   const tr = ts.tracking ?? 0;
   return chars.map((c) => ctx.measureText(c).width + tr);
+}
+
+
+/* Lay the lettering out exactly the way the canvas will: a hidden node that
+   mirrors the on-canvas text box, so wrap points and block height match what
+   the reader actually sees. Used to size a balloon to its text and to spot
+   text that no longer fits the one it is in. */
+let _measDiv: HTMLDivElement | null = null;
+
+function measNode(ts: TextStyle): HTMLDivElement {
+  if (!_measDiv) {
+    _measDiv = document.createElement("div");
+    _measDiv.setAttribute("aria-hidden", "true");
+    Object.assign(_measDiv.style, {
+      position: "absolute", left: "-99999px", top: "0", visibility: "hidden",
+      padding: "0", margin: "0", border: "0",
+    } as Partial<CSSStyleDeclaration>);
+    document.body.appendChild(_measDiv);
+  }
+  const d = _measDiv;
+  d.style.fontFamily = FONTS[ts.font]?.css || FONTS.comicneue.css;
+  d.style.fontSize = `${ts.size}px`;
+  d.style.fontWeight = ts.bold ? "700" : "400";
+  d.style.fontStyle = ts.italic ? "italic" : "normal";
+  d.style.lineHeight = `${ts.lineHeight ?? 1.05}`;
+  d.style.letterSpacing = ts.tracking ? `${ts.tracking}px` : "normal";
+  d.style.textTransform = ts.caps ? "uppercase" : "none";
+  d.style.wordBreak = "normal";
+  return d;
+}
+
+export function measureBlock(ts: TextStyle, text: string, maxW: number): { w: number; h: number } {
+  if (typeof document === "undefined" || !text) {
+    const lineH = ts.size * (ts.lineHeight ?? 1.05);
+    return { w: Math.min(maxW, text.length * ts.size * 0.5), h: lineH };
+  }
+  const d = measNode(ts);
+  d.textContent = text;
+  if (maxW >= 1e6) {
+    d.style.whiteSpace = "pre";
+    d.style.width = "auto";
+  } else {
+    d.style.whiteSpace = "pre-wrap";
+    d.style.width = `${Math.max(1, Math.round(maxW))}px`;
+  }
+  return { w: Math.ceil(d.scrollWidth), h: Math.ceil(d.scrollHeight) };
+}
+
+/* The badge is consulted on every render, so remember the last answer for a
+   given box + lettering rather than re-measuring each time. */
+const _ovfCache = new Map<string, boolean>();
+
+/** does this lettering overflow the box it has been given? */
+export function textOverflows(ts: TextStyle, text: string, w: number, h: number): boolean {
+  if (!text.trim() || w <= 0 || h <= 0) return false;
+  const key = `${text}\u0000${w}x${h}\u0000${ts.font}|${ts.size}|${ts.bold}|${ts.italic}|${ts.caps}|${ts.lineHeight}|${ts.tracking}`;
+  const hit = _ovfCache.get(key);
+  if (hit !== undefined) return hit;
+  const m = measureBlock(ts, text, w);
+  const out = m.h > h + 1 || m.w > w + 1;
+  if (_ovfCache.size > 400) _ovfCache.clear();
+  _ovfCache.set(key, out);
+  return out;
 }
 
 export function letterStyleCss(s: LetterStyle, size: number): CSSProperties {

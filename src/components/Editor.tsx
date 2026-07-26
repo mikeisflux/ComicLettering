@@ -29,7 +29,7 @@ import { PageSetupDialog, Ruler, STAGE_MX, STAGE_MY } from "./editor/chrome";
 import { EditorCtx } from "./editor/ctx";
 import {
   addFromTray, alignSel, assignImageToPanel, copySel, cutSel, deleteSel,
-  duplicatePage, duplicateSel, importFontFiles, importImageFile, importJSON,
+  duplicatePage, duplicateSel, growBalloonToFit, importFontFiles, importImageFile, importJSON,
   importStampFiles, movePage, onDrop, pasteClip, readAsDataURL,
   refreshProjects, saveProject,
 } from "./editor/ops";
@@ -474,10 +474,16 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       const dom = pageDivRef.current?.querySelector(`.el[data-id="${eid}"] .txt`) as HTMLElement | null;
       if (el && dom) {
         const rawRuns = domToRuns(dom);
-        const rtxt = runsToText(rawRuns).replace(/ /g, " ").replace(/\n+$/, "");
+        /* contentEditable leaves a trailing <div><br></div> behind, which
+           became a phantom blank line that padded the balloon out */
+        const rtxt = runsToText(rawRuns).replace(/ /g, " ").replace(/\s+$/, "");
         const runs = normalizeRuns(rawRuns);
         const changed = rtxt !== el.text || JSON.stringify(runs) !== JSON.stringify(el.runs);
-        if (changed) { el.text = rtxt; el.runs = runs; setTimeout(commit, 0); }
+        if (changed) {
+          el.text = rtxt; el.runs = runs;
+          if (el.type === "balloon") growBalloonToFit(p, el as BalloonEl);
+          setTimeout(commit, 0);
+        }
       }
       return null;
     });
@@ -487,9 +493,12 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     if (!editingId) return;
     const dom = pageDivRef.current?.querySelector(`.el[data-id="${editingId}"] .txt`) as HTMLElement | null;
     if (!dom) return;
-    /* seed the editable node with existing inline emphasis so it can be edited */
+    /* Seed the editable node. React renders no children while editing so that
+       re-renders (balloon auto-grow) can never disturb the caret — which means
+       the initial content has to be put here, emphasis and all. */
     const eel = docRef.current?.pages[pageIndexRef.current].els.find((e) => e.id === editingId) as BalloonEl | TextEl | undefined;
     if (eel && eel.runs && eel.runs.length) dom.innerHTML = runsToHtml(eel.runs);
+    else if (eel) dom.textContent = eel.text;
     dom.focus();
     const range = document.createRange();
     range.selectNodeContents(dom);

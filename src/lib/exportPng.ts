@@ -138,7 +138,7 @@ function drawRichText(
   flushWord();
   if (curLine.length || lines.length === 0) pushLine(false);
 
-  const lineH = ts.size * (ts.lineHeight ?? 1.25);
+  const lineH = ts.size * (ts.lineHeight ?? 1.05);
   const blockH = lines.length * lineH;
   const y0 = ry + rh / 2 - blockH / 2 + lineH / 2;
   let fill: string | CanvasGradient = ts.fillA;
@@ -261,7 +261,7 @@ export function drawStyledText(
   try { (ctx as unknown as { letterSpacing: string }).letterSpacing = `${ts.tracking ?? 0}px`; } catch { /* older engines */ }
   const t = ts.caps ? String(preText).toUpperCase() : String(preText);
   const { lines, hard } = wrapLines(ctx, t, rw);
-  const lineH = ts.size * (ts.lineHeight ?? 1.25);
+  const lineH = ts.size * (ts.lineHeight ?? 1.05);
   const blockH = lines.length * lineH;
   const y0 = ry + rh / 2 - blockH / 2 + lineH / 2;
 

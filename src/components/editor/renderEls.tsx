@@ -8,13 +8,14 @@ import {
 } from "@/lib/model";
 import { arcTextLayout, balloonGeom } from "@/lib/geometry";
 import { fillCss } from "@/lib/fills";
-import { displayText, measureCharWidths, renderRuns, textCss } from "./textHelpers";
+import { displayText, measureCharWidths, renderRuns, textCss, textOverflows } from "./textHelpers";
 import { BalloonShape, MergeBaseInfo } from "./BalloonShape";
 import { EditorCtx } from "./ctx";
+import { growWhileTyping } from "./ops";
 
 
 export function renderEl(ed: EditorCtx, el: El) {
-  const { editingId, select, startDrag, setStatus, setEditingId, panelImageTarget, filePanelImageRef, setCtxMenu, assetsRef, page, finishEditing } = ed;
+  const { editingId, select, startDrag, setStatus, setEditingId, panelImageTarget, filePanelImageRef, setCtxMenu, assetsRef, page, zoom, finishEditing } = ed;
   const tf = [
     el.rot ? `rotate(${el.rot}deg)` : "",
     el.flipH ? "scaleX(-1)" : "",
@@ -96,7 +97,13 @@ export function renderEl(ed: EditorCtx, el: El) {
           suppressContentEditableWarning
           spellCheck={editing}
           onBlur={() => editing && finishEditing()}
-        >{el.runs && !editing ? renderRuns(el.runs, el.ts) : displayText(el.text, el.ts, editing)}</div>
+          onInput={editing ? (e) => growWhileTyping(ed, el.id, e.currentTarget) : undefined}
+        >{editing ? null : el.runs ? renderRuns(el.runs, el.ts) : displayText(el.text, el.ts, false)}</div>
+        {!editing && textOverflows(el.ts, el.text, tw, th) && (
+          /* chrome, not artwork: counter-scale so it stays legible at any zoom */
+          <div className="ovfBadge" style={{ transform: `translateX(-50%) scale(${1 / zoom})` }}
+            title="More text than this balloon can hold — resize it or shorten the line">+</div>
+        )}
       </div>
     );
   }
@@ -136,7 +143,7 @@ export function renderEl(ed: EditorCtx, el: El) {
         suppressContentEditableWarning
         spellCheck={editing}
         onBlur={() => editing && finishEditing()}
-      >{el.runs && !editing ? renderRuns(el.runs, el.ts) : displayText(el.text, el.ts, editing)}</div>
+      >{editing ? null : el.runs ? renderRuns(el.runs, el.ts) : displayText(el.text, el.ts, false)}</div>
     </div>
   );
 }

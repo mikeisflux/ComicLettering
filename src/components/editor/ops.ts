@@ -13,7 +13,7 @@ import { BALLOON_STYLES, BOX_STYLES, applyShapeStyle } from "@/lib/balloonStyles
 import {
   ImageFormat, docThumbnail, exportPageImage, exportPagePNG, loadImage,
 } from "@/lib/exportPng";
-import { BalloonPreset, LT_URL, ProofMatch, parseScript } from "./textHelpers";
+import { BalloonPreset, LT_URL, ProofMatch, measureBlock, parseScript } from "./textHelpers";
 import { EditorCtx } from "./ctx";
 
 
@@ -311,6 +311,76 @@ export function movePage(ed: EditorCtx, dir: -1 | 1) {
   rebuildThumbs();
 }
 
+
+/* Grow a balloon so its lettering fits. Balloons expand as you type rather
+   than silently clipping; returns true if the size actually changed. */
+
+/* Live balloon growth while the caret is in it. React deliberately does not
+   own the editable node during editing (see renderEls), so re-rendering here
+   resizes the balloon without disturbing the caret. */
+export function growWhileTyping(ed: EditorCtx, id: string, dom: HTMLElement) {
+  const { docRef, pageIndexRef, force } = ed;
+  const d = docRef.current;
+  if (!d) return;
+  const p = d.pages[pageIndexRef.current];
+  const el = p.els.find((x) => x.id === id);
+  if (!el || el.type !== "balloon") return;
+  const txt = (dom.innerText || "").replace(/\u00a0/g, " ").replace(/\n+$/, "");
+  if (growBalloonToFit(p, el as BalloonEl, txt)) force();
+}
+
+export function growBalloonToFit(page: Page, el: BalloonEl, textOverride?: string): boolean {
+  const text = textOverride ?? el.text;
+  if (el.locked || !text.trim()) return false;
+  const before = { w: el.w, h: el.h };
+  const fitted = fitSize(page, el, text, true);
+  if (fitted.w <= el.w && fitted.h <= el.h) return false;
+  resizeAround(page, el, Math.max(el.w, fitted.w), Math.max(el.h, fitted.h));
+  return el.w !== before.w || el.h !== before.h;
+}
+
+/** size a freshly created balloon so it just contains its placeholder text */
+export function sizeBalloonToText(page: Page, el: BalloonEl) {
+  const fitted = fitSize(page, el, el.text, false, 7);
+  el.w = fitted.w;
+  el.h = fitted.h;
+}
+
+/* The usable text area is a fraction of the balloon that changes with the
+   balloon's own size, so solving for it takes a couple of passes: measure the
+   lettering, resize, re-read the new text rect, measure again. */
+function fitSize(page: Page, el: BalloonEl, text: string, growOnly: boolean, wrapEm = 11): { w: number; h: number } {
+  const probe = { ...el } as BalloonEl;
+  let w = el.w, h = el.h;
+  for (let pass = 0; pass < 4; pass++) {
+    probe.w = w; probe.h = h;
+    const [, , tw, th] = balloonGeom(probe).textRect;
+    const fracW = tw / w, fracH = th / h;
+    if (!(fracW > 0) || !(fracH > 0)) return { w, h };
+    /* wrap at a comfortable measure — a couple of short lines reads better
+       than one very long one, and it is what hand lettering does */
+    const natural = measureBlock(el.ts, text, 1e6).w;
+    const wrapAt = Math.max(el.ts.size * 4, Math.min(natural, el.ts.size * wrapEm));
+    const m = measureBlock(el.ts, text, wrapAt);
+    const needTW = m.w + el.ts.size * 0.7;
+    const needTH = m.h + el.ts.size * 0.5;
+    const nextW = clamp(Math.round(needTW / fracW), 70, page.w);
+    const nextH = clamp(Math.round(needTH / fracH), 50, page.h);
+    const w2 = growOnly ? Math.max(w, nextW) : nextW;
+    const h2 = growOnly ? Math.max(h, nextH) : nextH;
+    if (Math.abs(w2 - w) < 2 && Math.abs(h2 - h) < 2) { w = w2; h = h2; break; }
+    w = w2; h = h2;
+  }
+  return { w, h };
+}
+
+function resizeAround(page: Page, el: BalloonEl, w: number, h: number) {
+  const cx = el.x + el.w / 2, cy = el.y + el.h / 2;
+  el.w = w; el.h = h;
+  el.x = Math.round(clamp(cx - w / 2, 0, Math.max(0, page.w - w)));
+  el.y = Math.round(clamp(cy - h / 2, 0, Math.max(0, page.h - h)));
+}
+
 export function fitBalloonToText(ed: EditorCtx) {
   const { page, selId, setStatus, mutateSel } = ed;
   const el = page?.els.find((x) => x.id === selId);
@@ -331,7 +401,7 @@ export function fitBalloonToText(ed: EditorCtx) {
     fontSize: `${ts.size}px`,
     fontWeight: ts.bold ? "700" : "400",
     fontStyle: ts.italic ? "italic" : "normal",
-    lineHeight: `${ts.lineHeight ?? 1.25}`,
+    lineHeight: `${ts.lineHeight ?? 1.05}`,
     letterSpacing: ts.tracking ? `${ts.tracking}px` : "normal",
     textTransform: ts.caps ? "uppercase" : "none",
   } as CSSStyleDeclaration);
@@ -544,6 +614,10 @@ export function addFromTray(ed: EditorCtx, kind: string) {
     const h = caption ? Math.round(w * 0.32) : Math.round(w * 0.62);
     const s = spawn(w, h);
     const b = makeBalloon(kind as BalloonKind, s.x, s.y, w, h);
+    /* a new balloon should hug its placeholder, not sprawl across the page */
+    sizeBalloonToText(p, b);
+    b.x = Math.round(s.x + (w - b.w) / 2);
+    b.y = Math.round(s.y + (h - b.h) / 2);
     /* new balloons use the colourway picked in the STYLES panel */
     const list = caption ? BOX_STYLES : BALLOON_STYLES;
     const want = caption ? activeShapeRef.current.box : activeShapeRef.current.balloon;

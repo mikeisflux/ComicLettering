@@ -119,7 +119,7 @@ export interface TextStyle {
   underline?: boolean;
   caps: boolean;
   align: Align;
-  lineHeight?: number; // line-spacing multiplier (default 1.25)
+  lineHeight?: number; // line-spacing multiplier (default 1.05 — comic leading is tight)
   tracking?: number;   // letter-spacing in px (default 0)
   crossbarI?: boolean; // draw crossbars on the pronoun "I" (comic convention)
   fillA: string;
@@ -146,6 +146,14 @@ export function normalizeRuns(runs: TextRun[]): TextRun[] | undefined {
     const last = merged[merged.length - 1];
     if (last && !!last.b === !!r.b && !!last.i === !!r.i) last.t += r.t;
     else merged.push({ t: r.t, ...(r.b ? { b: true } : {}), ...(r.i ? { i: true } : {}) });
+  }
+  /* drop the trailing blank the browser leaves behind, so the runs and the
+     plain text agree on where the lettering ends */
+  while (merged.length) {
+    const last = merged[merged.length - 1];
+    last.t = last.t.replace(/\s+$/, "");
+    if (last.t) break;
+    merged.pop();
   }
   if (merged.length === 0) return undefined;
   if (merged.length === 1 && !merged[0].b && !merged[0].i) return undefined;
@@ -735,7 +743,8 @@ export function reseedIds(doc: Doc) {
 }
 
 export const defaultTextStyle = (over: Partial<TextStyle> = {}): TextStyle => ({
-  font: "comicneue", size: 42, bold: false, italic: false, caps: true,
+  font: "lmccasual", size: 42, bold: false, italic: false, caps: false,
+  lineHeight: 1.05,
   align: "center", fillA: "#111111", fillB: null,
   outlineC: "#111111", outlineW: 0, shadow: false, shadowC: "#00000088",
   ...over,
@@ -758,8 +767,8 @@ export function makeBalloon(kind: BalloonKind, x: number, y: number, w: number, 
     ...base(x, y, w, h), type: "balloon", kind,
     text: caption ? "Meanwhile..." : "Your words here...",
     ts: defaultTextStyle({
-      font: caption ? "serif" : kind === "tv" || kind === "double" ? "audiowide" : "comicneue",
-      italic: caption, caps: !caption, bold: kind === "shout" || kind === "burst2",
+      font: kind === "tv" || kind === "double" ? "audiowide" : "lmccasual",
+      italic: caption, bold: kind === "shout" || kind === "burst2",
     }),
     fill: solid(caption ? "#fff7c9" : "#ffffff"),
     stroke: "#111111",
@@ -782,7 +791,7 @@ export function makeText(x: number, y: number, w: number, h: number, sfx: boolea
     text: sfx ? "POW!" : "Abc",
     ts: sfx
       ? defaultTextStyle({ font: "bangers", size: 140, fillA: "#ffd21f", fillB: "#ff7a00", outlineC: "#111111", outlineW: 16, shadow: true })
-      : defaultTextStyle({ font: "comicneue", size: 60, caps: false }),
+      : defaultTextStyle({ font: "lmccasual", size: 60 }),
   };
 }
 

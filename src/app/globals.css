@@ -230,6 +230,17 @@ input[type="range"] { width: 110px; }
 .shapeSw.none { box-shadow: none; border-style: dashed; border-color: #9aa2ae !important; }
 .shapeSw i { font: 700 10px/1 var(--ui, sans-serif); font-style: normal; letter-spacing: .04em; }
 
+
+/* overflow marker: more lettering than the balloon can hold */
+.ovfBadge {
+  position: absolute; left: 50%; bottom: -7px; transform: translateX(-50%);
+  width: 15px; height: 15px; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center;
+  background: #e01b1b; border: 1px solid #7a0000; border-radius: 2px;
+  color: #fff; font: 700 12px/1 var(--ui, sans-serif); pointer-events: auto;
+  cursor: help; z-index: 6;
+}
+
 /* ---------------- canvas area ---------------- */
 .canvasArea {
   flex: 1; min-width: 0; overflow: auto; position: relative;
