@@ -50,7 +50,7 @@ export function drawStyledText(
   ctx.textBaseline = "middle";
   const t = ts.caps ? String(text).toUpperCase() : String(text);
   const lines = wrapLines(ctx, t, rw);
-  const lineH = ts.size * 1.25;
+  const lineH = ts.size * (ts.lineHeight ?? 1.25);
   const blockH = lines.length * lineH;
   const y0 = ry + rh / 2 - blockH / 2 + lineH / 2;
 

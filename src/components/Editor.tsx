@@ -34,7 +34,7 @@ function textCss(ts: TextStyle): CSSProperties {
     textAlign: ts.align,
     textDecoration: ts.underline ? "underline" : "none",
     textTransform: ts.caps ? "uppercase" : "none",
-    lineHeight: 1.25,
+    lineHeight: ts.lineHeight ?? 1.25,
   };
   if (ts.fillB) {
     /* glossy 3-stop gradient: highlight → colour → depth */
@@ -2696,6 +2696,22 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
             {a === "left" ? "⯇" : a === "center" ? "≡" : a === "right" ? "⯈" : "☰"}
           </button>
         ))}
+        <span className="fbSep" />
+        <span className="fbLead" title="Line spacing (leading)">
+          <span className="fbLeadIcon" aria-hidden>≣</span>
+          <select className="fbLeadSel" disabled={!selTs}
+            value={String(selTs?.lineHeight ?? 1.25)}
+            onChange={(e) => mutateSel<BalloonEl | TextEl>((x) => { x.ts.lineHeight = parseFloat(e.target.value); })}>
+            <option value="0.9">0.9×</option>
+            <option value="1">1.0×</option>
+            <option value="1.1">1.1×</option>
+            <option value="1.25">1.25×</option>
+            <option value="1.4">1.4×</option>
+            <option value="1.6">1.6×</option>
+            <option value="1.8">1.8×</option>
+            <option value="2">2.0×</option>
+          </select>
+        </span>
       </div>
 
       {/* ---------- main ---------- */}

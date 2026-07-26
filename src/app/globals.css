@@ -144,6 +144,14 @@ input[type="range"] { width: 110px; }
 .palGrid.grads button { width: 20px; height: 20px; }
 .fbTog.on { background: #cfe0f5; border-color: var(--sel); }
 .fbTog:disabled { opacity: .4; }
+.fbSep { width: 1px; align-self: stretch; background: var(--edge2); margin: 2px 4px; }
+.fbLead { display: inline-flex; align-items: center; gap: 3px; }
+.fbLeadIcon { font-size: 16px; color: #5a616c; line-height: 1; }
+.fbLeadSel {
+  background: #fff; border: 1px solid var(--edge2); border-radius: 4px;
+  padding: 3px 4px; font-size: 13px; cursor: pointer;
+}
+.fbLeadSel:disabled { opacity: .4; cursor: default; }
 
 /* ---------------- main layout ---------------- */
 .main { display: flex; flex: 1 1 auto; min-height: 0; }
