@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Features — Balloons, Lettering Styles, Layouts, Halftones",
+  title: "Features — Hand-Drawn Balloons, Pro Lettering Tools, 150+ Comic Fonts",
   description:
-    "Every LetterMyComic feature: 13 word balloon types with draggable tails, 28 SFX lettering style presets, 19 comic fonts, 60+ panel layouts, halftone, speedline, tile and texture fills, photo filters and print-ready PNG export.",
+    "Every LetterMyComic feature: draw-your-own word balloons with auto-smoothing, joined balloons with band connectors, 150+ comic fonts, line spacing & tracking, rotation, format painter, find & replace, lettering-only transparent export, halftones, speedlines and print-ready PDF/PNG/TIFF/CBZ export.",
   alternates: { canonical: "/features" },
 };
 
@@ -12,16 +12,28 @@ const GROUPS: { h: string; items: [string, string][] }[] = [
   {
     h: "Word Balloons",
     items: [
-      ["13 balloon types", "Speech, rough (hand-drawn), buzz, radio, thought, exclaim, dense exclaim, whisper, square, TV, pill, rounded box and caption."],
-      ["Draggable tails", "Grab the orange handle and aim the tail at your speaker — the balloon reshapes itself smoothly, including zigzag TV tails and thought-bubble trails."],
-      ["Full styling", "Any fill (solid, gradient, halftone, pattern, texture), outline color and weight, dashed whisper strokes and drop shadows."],
+      ["Draw your own balloons", "Sketch a balloon by hand and it auto-smooths into a clean, closed shape — rounding your line into the most balanced bubble it can while keeping your composition."],
+      ["Pick your tail", "Draw a tail and it's used automatically, or pick speech, thought or none from a popup. Tails start full-width where they meet the balloon, just like a pro letterer draws them."],
+      ["Join balloons together", "Add a linked bubble with one button. Drag two balloons close and they merge into a single shape with a smooth connector band; drag apart and they split again — the joined bubble inherits the first one's style."],
+      ["Three-point connector control", "The band joining two balloons has a middle handle for position and side handles for tilt, so you can bend and angle the join around the shape exactly how you want it."],
+      ["Every classic type too", "Speech, rough, buzz, radio, thought, exclaim, whisper, square, TV, pill, rounded box and caption — any fill, outline weight, dashed strokes and shadows."],
     ],
   },
   {
-    h: "Lettering",
+    h: "Pro Lettering Tools",
     items: [
+      ["Line spacing & tracking", "Dial in leading (line height) and letter tracking right from the format bar — the tight, even spacing that separates pro lettering from default type."],
+      ["Rotate anything", "Rotate balloons, SFX and artwork clockwise or counter-clockwise in 90° or 15° steps, or reset to level in one click."],
+      ["Format painter", "Copy a style off one balloon and paint it onto others — font, size, fill, outline and shadow — so a whole page matches in seconds."],
+      ["Find & replace", "Fix a name or a typo across every page and every balloon at once, with optional case matching. Locked items stay untouched."],
+      ["Safe-area guide", "Toggle a print safe-area overlay so nothing important lands where the trim could cut it."],
+    ],
+  },
+  {
+    h: "Lettering & Fonts",
+    items: [
+      ["150+ comic fonts", "A huge bundled library of open-licensed dialogue, display, horror, sci-fi and marker faces — plus original LetterMyComic faces made in-house — all load instantly and export perfectly."],
       ["28 style presets", "Sunburst, Chrome, Gold, Blood, Ice, Toxic and more — gradient fills, chunky outlines and shadows applied with one click."],
-      ["19 comic fonts", "Bundled open-licensed dialogue, display, horror, sci-fi and marker faces — they load instantly and export perfectly."],
       ["Pro text control", "Size, bold, italic, ALL-CAPS, alignment, gradient fills, outline width and color, shadows — for balloons, captions and standalone SFX."],
     ],
   },
@@ -29,8 +41,8 @@ const GROUPS: { h: string; items: [string, string][] }[] = [
     h: "Pages & Panels",
     items: [
       ["60+ panel layouts", "Eleven categories: Basic, Strips, 40's, 60's and 80's comics, Modern widescreen, Euro album, Manga, Graphic Novel, Picture-in-Picture and tilted Conceptual layouts."],
-      ["Any page size", "US comic, manga B5, A4, square and web-strip presets, or exact custom pixel sizes, with print-style rulers."],
-      ["Multi-page books", "Add pages, reorder your story, and see live thumbnails in the pages sidebar."],
+      ["Duplicate & reorder", "Duplicate a page complete with its lettering, then move pages up or down to reorder your book — with live thumbnails in the sidebar."],
+      ["Any page size", "US comic, manga B5, A4, square and web-strip presets, or exact custom pixel sizes, with print-style rulers, ruler guides and coordinate tooltips."],
     ],
   },
   {
@@ -44,9 +56,9 @@ const GROUPS: { h: string; items: [string, string][] }[] = [
   {
     h: "Artwork & Export",
     items: [
-      ["Drop-in artwork", "Drag images straight onto the page or double-click a panel to fill it. Reuse photos from the Photos tab."],
-      ["Photo filters", "Black & white, sepia, vivid, faded and noir looks applied per panel."],
-      ["Print-ready export", "Full-resolution PNG pages, cloud project library with thumbnails, JSON backup files and autosave."],
+      ["Drop-in artwork", "Drag images straight onto the page or double-click a panel to fill it. Images resize proportionally and snap to the border for a perfect fit."],
+      ["Lettering-only export", "Export just your balloons and text as a transparent PNG — drop your lettering straight onto artwork in any other tool."],
+      ["Print-ready formats", "Full-resolution PNG, JPG, print TIFF, PDF and CBZ, at up to 450 dpi — plus a cloud project library, JSON backups and autosave."],
     ],
   },
 ];

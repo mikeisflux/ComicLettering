@@ -48,6 +48,8 @@ export function drawStyledText(
   const [rx, ry, rw, rh] = rect;
   ctx.font = fontString(ts);
   ctx.textBaseline = "middle";
+  // letter-spacing (tracking) — supported in the browser canvas used for export
+  try { (ctx as unknown as { letterSpacing: string }).letterSpacing = `${ts.tracking ?? 0}px`; } catch { /* older engines */ }
   const t = ts.caps ? String(text).toUpperCase() : String(text);
   const lines = wrapLines(ctx, t, rw);
   const lineH = ts.size * (ts.lineHeight ?? 1.25);
@@ -253,7 +255,7 @@ function drawEl(ctx: CanvasRenderingContext2D, el: El, assets: Assets, merge?: M
 }
 
 export async function renderPageToCanvas(
-  page: Page, assets: Assets, scale = 1
+  page: Page, assets: Assets, scale = 1, letteringOnly = false
 ): Promise<HTMLCanvasElement> {
   const srcs: string[] = [];
   for (const el of page.els) {
@@ -269,8 +271,11 @@ export async function renderPageToCanvas(
   canvas.height = Math.max(1, Math.round(page.h * scale));
   const ctx = canvas.getContext("2d")!;
   ctx.scale(scale, scale);
-  paintFill(ctx, page.bg, page.w, page.h);
+  // lettering-only export: transparent background, no panels/artwork —
+  // just balloons and lettering, for handing back to the artist/production
+  if (!letteringOnly) paintFill(ctx, page.bg, page.w, page.h);
   for (const el of page.els) {
+    if (letteringOnly && (el.type === "panel" || el.type === "image")) continue;
     if (el.type === "balloon") {
       const { el: bEl, base } = resolveBalloon(page, el);
       let merge: MergeInfo | null = null;
@@ -361,8 +366,8 @@ function encodeTiff(img: ImageData, dpi: number): Uint8Array {
 export type ImageFormat = "png" | "jpg" | "tiff";
 
 /* dpi controls output resolution: scale = dpi / 225 (the native page dpi). */
-export async function exportPageImage(page: Page, assets: Assets, filename: string, format: ImageFormat, dpi = 225) {
-  const canvas = await renderPageToCanvas(page, assets, dpi / 225);
+export async function exportPageImage(page: Page, assets: Assets, filename: string, format: ImageFormat, dpi = 225, letteringOnly = false) {
+  const canvas = await renderPageToCanvas(page, assets, dpi / 225, letteringOnly);
   if (format === "tiff") {
     const ctx = canvas.getContext("2d")!;
     const tiff = encodeTiff(ctx.getImageData(0, 0, canvas.width, canvas.height), dpi);

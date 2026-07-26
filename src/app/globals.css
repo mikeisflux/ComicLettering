@@ -334,6 +334,10 @@ input[type="range"] { width: 110px; }
   position: absolute; pointer-events: none;
   border: 2px dashed #1e88e5; opacity: .9;
 }
+.safeGuide {
+  position: absolute; pointer-events: none; z-index: 5;
+  border: 2px dashed #16a34a; opacity: .85;
+}
 /* snap guides */
 .snapLineV { position: absolute; top: 0; bottom: 0; width: 0; border-left: 1px solid #e91e63; z-index: 60; pointer-events: none; }
 .snapLineH { position: absolute; left: 0; right: 0; height: 0; border-top: 1px solid #e91e63; z-index: 60; pointer-events: none; }

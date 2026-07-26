@@ -120,6 +120,7 @@ export interface TextStyle {
   caps: boolean;
   align: Align;
   lineHeight?: number; // line-spacing multiplier (default 1.25)
+  tracking?: number;   // letter-spacing in px (default 0)
   fillA: string;
   fillB: string | null; // gradient bottom stop; null = solid fillA
   outlineC: string;

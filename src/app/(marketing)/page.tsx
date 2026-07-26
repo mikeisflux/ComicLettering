@@ -41,12 +41,13 @@ const jsonLd = {
 };
 
 const FEATURES = [
-  { e: "💬", t: "19 word balloon types", d: "Speech, thought, whisper, shout, radio, TV, rough, dotted and more — every balloon has a draggable tail you aim at the speaker, or draw your own by hand." },
-  { e: "🅰️", t: "One-click lettering styles", d: "56 pro SFX presets with gradient fills, outlines and drop shadows, plus 150+ built-in comic fonts — including original typefaces you won't find anywhere else." },
-  { e: "🗒️", t: "60+ panel layouts", d: "Golden-age grids to modern widescreen, manga, Euro album and tilted action layouts — applied in one click." },
+  { e: "💬", t: "Draw-your-own balloons", d: "Sketch a balloon by hand and it auto-smooths into a clean, closed bubble. Add linked balloons that merge with a smooth connector band when you drag them together — or pick from every classic type, each with a draggable tail." },
+  { e: "🅰️", t: "Pro lettering tools", d: "Line spacing and tracking, rotate anything, a format painter to match styles instantly, and find & replace across your whole book — the touches that make lettering look professional." },
+  { e: "🔤", t: "150+ comic fonts & styles", d: "56 pro SFX presets with gradient fills, outlines and drop shadows, plus 150+ built-in comic fonts — including original typefaces you won't find anywhere else." },
+  { e: "🗒️", t: "60+ panel layouts", d: "Golden-age grids to modern widescreen, manga, Euro album and tilted action layouts — applied in one click. Duplicate and reorder pages as your story grows." },
   { e: "🎯", t: "Halftones & speedlines", d: "Classic print halftones, motion lines, bursts, tile screens and textures — generated sharp at any size." },
-  { e: "🖼️", t: "Your art, your pages", d: "Drop artwork straight onto panels, apply photo filters, and letter over it. Nothing is ever uploaded." },
-  { e: "🖨️", t: "Print-ready export", d: "Full-resolution PNG pages, plus a cloud project library so your books are saved and versioned." },
+  { e: "🖼️", t: "Your art, your pages", d: "Drop artwork straight onto panels — it resizes proportionally and snaps to the border — apply photo filters, and letter over it. Nothing is ever uploaded." },
+  { e: "🖨️", t: "Print-ready export", d: "PNG, JPG, TIFF, PDF and CBZ at up to 450 dpi — plus lettering-only transparent PNGs and a cloud project library so your books are saved and versioned." },
   { e: "⚡", t: "No installs, no crashes", d: "Runs in any modern browser on Windows, Mac, Linux and Chromebooks. Your work autosaves as you go." },
   { e: "🔒", t: "Private by design", d: "Your artwork renders locally in your browser. Only projects you choose to save touch our servers." },
 ];

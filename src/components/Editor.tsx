@@ -35,6 +35,7 @@ function textCss(ts: TextStyle): CSSProperties {
     textDecoration: ts.underline ? "underline" : "none",
     textTransform: ts.caps ? "uppercase" : "none",
     lineHeight: ts.lineHeight ?? 1.25,
+    letterSpacing: ts.tracking ? `${ts.tracking}px` : "normal",
   };
   if (ts.fillB) {
     /* glossy 3-stop gradient: highlight → colour → depth */
@@ -537,6 +538,13 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const [exportFmt, setExportFmt] = useState<ImageFormat | "pdf" | "cbz">("png");
   const [exportScope, setExportScope] = useState<"current" | "all" | "range">("all");
   const [exportDpi, setExportDpi] = useState(225);
+  const [letteringOnly, setLetteringOnly] = useState(false);
+  const styleClipRef = useRef<Partial<TextStyle> & { fill?: FillStyle; stroke?: string; strokeW?: number } | null>(null);
+  const [showFind, setShowFind] = useState(false);
+  const [findText, setFindText] = useState("");
+  const [replaceText, setReplaceText] = useState("");
+  const [findCase, setFindCase] = useState(false);
+  const [showSafe, setShowSafe] = useState(false);
   const [exportFrom, setExportFrom] = useState(1);
   const [exportTo, setExportTo] = useState(1);
   const [stampOpen, setStampOpen] = useState(false);
@@ -614,6 +622,20 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
         setThumbs((t) => ({ ...t, [pi]: url }));
       } catch { /* ignore */ }
     }, 700);
+  }, []);
+
+  /* refresh every page thumbnail (after multi-page edits: find/replace,
+     duplicate, reorder) */
+  const rebuildThumbs = useCallback(() => {
+    const d = docRef.current;
+    if (!d) return;
+    (async () => {
+      const next: Record<number, string> = {};
+      for (let i = 0; i < d.pages.length; i++) {
+        try { next[i] = await pageThumbnail(d.pages[i], assetsRef.current, 140); } catch { /* ignore */ }
+      }
+      setThumbs(next);
+    })();
   }, []);
 
   const autosave = useCallback(() => {
@@ -890,6 +912,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
           const ratio = Math.min(cur.w / orig.w, cur.h / orig.h);
           cur.ts.size = clamp(Math.round(orig.ts.size * ratio), 8, 800);
           cur.ts.outlineW = Math.max(0, Math.round(orig.ts.outlineW * ratio));
+          if (orig.ts.tracking) cur.ts.tracking = Math.round(orig.ts.tracking * ratio * 10) / 10;
         }
       } else if (mode === "rotate") {
         const cx = orig.x + orig.w / 2, cy = orig.y + orig.h / 2;
@@ -1222,6 +1245,87 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     pendingLockRef.current.add(copy.id);
     commit();
     setSelId(copy.id);
+  }
+  function rotateSel(delta: number) {
+    mutateSel((x) => {
+      let r = (x.rot || 0) + delta;
+      r = ((r % 360) + 360) % 360;   // 0..360
+      if (r > 180) r -= 360;          // keep in -180..180
+      x.rot = Math.round(r * 10) / 10;
+    });
+  }
+
+  /* format painter: copy the look of the selected balloon/lettering and stamp
+     it onto other elements */
+  function copyStyle() {
+    if (!selEl || (selEl.type !== "text" && selEl.type !== "balloon")) {
+      setStatus("Select a balloon or lettering first, then Copy Style.");
+      return;
+    }
+    const s = selEl;
+    const clip: Partial<TextStyle> & { fill?: FillStyle; stroke?: string; strokeW?: number } = { ...s.ts };
+    if (s.type === "balloon") { clip.fill = JSON.parse(JSON.stringify(s.fill)); clip.stroke = s.stroke; clip.strokeW = s.strokeW; }
+    styleClipRef.current = clip;
+    setStatus("Style copied — select another balloon or lettering and choose Paste Style.");
+  }
+  function pasteStyle() {
+    const clip = styleClipRef.current;
+    if (!clip) { setStatus("Copy a style first (Edit → Copy Style)."); return; }
+    mutateSel<BalloonEl | TextEl>((x) => {
+      const { fill, stroke, strokeW, ...ts } = clip;
+      x.ts = { ...x.ts, ...ts };
+      if (x.type === "balloon") {
+        if (fill) x.fill = JSON.parse(JSON.stringify(fill));
+        if (stroke !== undefined) x.stroke = stroke;
+        if (strokeW !== undefined) x.strokeW = strokeW;
+      }
+    });
+    setStatus("Style pasted.");
+  }
+
+  /* find & replace across every page (respects locks) */
+  function doFindReplace(all: boolean) {
+    const needle = findText;
+    if (!needle) { setStatus("Enter text to find."); return; }
+    const d = docRef.current!;
+    const flags = findCase ? "g" : "gi";
+    const rx = new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), flags);
+    let count = 0;
+    for (const p of d.pages) {
+      for (const el of p.els) {
+        if ((el.type === "text" || el.type === "balloon") && !el.locked && rx.test(el.text)) {
+          const before = el.text;
+          el.text = all ? el.text.replace(rx, replaceText)
+            : el.text.replace(rx, () => { if (count === 0) { count++; return replaceText; } return before.slice(0); });
+          if (all) count += (before.match(rx) || []).length;
+          rx.lastIndex = 0;
+        }
+      }
+    }
+    if (count) { commit(); rebuildThumbs(); setStatus(`Replaced ${count} occurrence${count > 1 ? "s" : ""} across the document.`); }
+    else setStatus(`No matches for “${needle}”.`);
+  }
+
+  function duplicatePage() {
+    const d = docRef.current!;
+    const src = d.pages[pageIndexRef.current];
+    const copy = JSON.parse(JSON.stringify(src)) as Page;
+    for (const el of copy.els) el.id = uid(); // fresh ids so elements are independent
+    d.pages.splice(pageIndexRef.current + 1, 0, copy);
+    setPageIndex(pageIndexRef.current + 1);
+    setSelId(null);
+    commit();
+    rebuildThumbs();
+    setStatus("Page duplicated.");
+  }
+  function movePage(dir: -1 | 1) {
+    const d = docRef.current!;
+    const i = pageIndexRef.current, j = i + dir;
+    if (j < 0 || j >= d.pages.length) return;
+    [d.pages[i], d.pages[j]] = [d.pages[j], d.pages[i]];
+    setPageIndex(j);
+    commit();
+    rebuildThumbs();
   }
   function alignSel(mode: "left" | "hcenter" | "right" | "top" | "vcenter" | "bottom") {
     const el = page?.els.find((x) => x.id === selId);
@@ -1752,9 +1856,11 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
         const { exportCbz } = await import("@/lib/cbz");
         await exportCbz(d, assetsRef.current, `${nameBase}.cbz`, dpi, idxs, (i, n) => setStatus(`Packing CBZ page ${i}/${n}…`));
       } else {
+        const fmt = letteringOnly ? "png" : format; // transparency needs PNG
         for (const pi of idxs) {
-          setStatus(`Exporting page ${pi + 1} (${format.toUpperCase()} @ ${dpi} dpi)…`);
-          await exportPageImage(d.pages[pi], assetsRef.current, `${nameBase}-page-${pi + 1}.${format}`, format, dpi);
+          setStatus(`Exporting page ${pi + 1} (${fmt.toUpperCase()} @ ${dpi} dpi${letteringOnly ? ", lettering only" : ""})…`);
+          const suffix = letteringOnly ? "-lettering" : "";
+          await exportPageImage(d.pages[pi], assetsRef.current, `${nameBase}-page-${pi + 1}${suffix}.${fmt}`, fmt, dpi, letteringOnly);
         }
       }
       setStatus("Export complete.");
@@ -2431,12 +2537,18 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
             ["Paste", () => pasteClip()], ["Duplicate", () => duplicateSel()],
             ["Delete", () => deleteSel()],
             ["—", null],
+            ["Copy Style", () => copyStyle()],
+            ["Paste Style to Selection", () => pasteStyle()],
+            ["Find & Replace…", () => setShowFind(true)],
+            ["—", null],
             ["Check Spelling & Grammar", () => { setTab("proof"); runProof(); }],
           ]],
           ["View", [
             ["Zoom In", () => { setUserZoomed(true); setZoom((z) => clamp(z * 1.2, 0.05, 4)); }],
             ["Zoom Out", () => { setUserZoomed(true); setZoom((z) => clamp(z / 1.2, 0.05, 4)); }],
             ["Fit Page", () => { setUserZoomed(false); fitZoom(true); }],
+            ["—", null],
+            [showSafe ? "Hide Safe Area" : "Show Safe Area", () => setShowSafe((s) => !s)],
             ["—", null],
             ["Panel Layouts", () => setTab("layouts")],
             ["Inspector", () => setTab("inspector")],
@@ -2446,6 +2558,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
           ]],
           ["Insert", [
             ["New Page", () => { const d = docRef.current!; d.pages.splice(pageIndex + 1, 0, newPage(page.w, page.h, page.margin)); setPageIndex(pageIndex + 1); setSelId(null); commit(); }],
+            ["Duplicate Page", () => duplicatePage()],
             ["—", null],
             ["Panel", () => addFromTray("panel")],
             ["Image…", () => fileImageRef.current?.click()],
@@ -2475,6 +2588,12 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
           ["Arrange", [
             ["Bring Forward", () => reorder(1)], ["Bring To Front", () => reorder(1e9)],
             ["Send Backward", () => reorder(-1)], ["Send To Back", () => reorder(-1e9)],
+            ["—", null],
+            ["Rotate 90° Clockwise", () => rotateSel(90)],
+            ["Rotate 90° Counter-clockwise", () => rotateSel(-90)],
+            ["Rotate 15° Clockwise", () => rotateSel(15)],
+            ["Rotate 15° Counter-clockwise", () => rotateSel(-15)],
+            ["Reset Rotation", () => mutateSel((x) => { x.rot = 0; })],
             ["—", null],
             ["Center Horizontally (Ctrl+[)", () => alignSel("hcenter")],
             ["Center Vertically (Ctrl+])", () => alignSel("vcenter")],
@@ -2538,6 +2657,8 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
         <span className="tbSep" />
         <ToolBtn label="Front" icon="⬆" disabled={!selEl} onClick={() => reorder(1e9)} />
         <ToolBtn label="Back" icon="⬇" disabled={!selEl} onClick={() => reorder(-1e9)} />
+        <ToolBtn label="Rotate ⟲" icon="↺" disabled={!selEl} onClick={() => rotateSel(-15)} />
+        <ToolBtn label="Rotate ⟳" icon="↻" disabled={!selEl} onClick={() => rotateSel(15)} />
         <ToolBtn label="Bigger" icon="A+" disabled={!selTs} onClick={() =>
           mutateSel<BalloonEl | TextEl>((x) => { x.ts.size = clamp(Math.round(x.ts.size * 1.12), 8, 800); })} />
         <ToolBtn label="Smaller" icon="A−" disabled={!selTs} onClick={() =>
@@ -2712,6 +2833,21 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
             <option value="2">2.0×</option>
           </select>
         </span>
+        <span className="fbLead" title="Letter spacing (tracking)">
+          <span className="fbLeadIcon" aria-hidden>A↔A</span>
+          <select className="fbLeadSel" disabled={!selTs}
+            value={String(selTs?.tracking ?? 0)}
+            onChange={(e) => mutateSel<BalloonEl | TextEl>((x) => { x.ts.tracking = parseFloat(e.target.value); })}>
+            <option value="-2">Tight −2</option>
+            <option value="-1">−1</option>
+            <option value="0">Normal</option>
+            <option value="1">+1</option>
+            <option value="2">+2</option>
+            <option value="4">Wide +4</option>
+            <option value="6">+6</option>
+            <option value="10">+10</option>
+          </select>
+        </span>
       </div>
 
       {/* ---------- main ---------- */}
@@ -2748,6 +2884,11 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
               d.pages.forEach((pg, i) =>
                 pageThumbnail(pg, assetsRef.current, 140).then((u) => setThumbs((t) => ({ ...t, [i]: u }))).catch(() => { }));
             }}>Delete</button>
+          </div>
+          <div className="pageActs">
+            <button onClick={() => duplicatePage()} title="Duplicate this page">Duplicate</button>
+            <button onClick={() => movePage(-1)} disabled={pageIndex === 0} title="Move page up">↑</button>
+            <button onClick={() => movePage(1)} disabled={pageIndex >= doc.pages.length - 1} title="Move page down">↓</button>
           </div>
           <div className="sideTitle">Styles</div>
           <div className="stylesGrid">
@@ -2801,6 +2942,16 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
                     borderWidth: Math.max(2, 1.5 / zoom),
                   }} />
                 )}
+                {showSafe && (() => {
+                  const inset = Math.round(Math.min(page.w, page.h) * 0.06);
+                  return (
+                    <div className="safeGuide" style={{
+                      left: inset, top: inset,
+                      width: page.w - inset * 2, height: page.h - inset * 2,
+                      borderWidth: Math.max(2, 1.5 / zoom),
+                    }} />
+                  );
+                })()}
                 {demo && <div className="demoWatermark" aria-hidden style={{ width: page.w, height: page.h }} />}
               </div>
               {renderOverlay()}
@@ -3136,10 +3287,51 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
                     onChange={(e) => setExportTo(clamp(+e.target.value || 1, 1, doc.pages.length))} />
                 </div>
               </fieldset>
+              <fieldset className="setupGroup">
+                <legend>Options</legend>
+                <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <input type="checkbox" checked={letteringOnly} onChange={(e) => setLetteringOnly(e.target.checked)} />
+                  Lettering only — transparent PNG (balloons &amp; text, no artwork)
+                </label>
+              </fieldset>
             </div>
             <div className="setupFoot">
               <button onClick={() => setShowExport(false)}>Cancel</button>
               <button className="okBtn" onClick={() => runExport(exportFmt, exportScope, exportDpi)}>Export</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* find & replace dialog */}
+      {showFind && (
+        <div className="setupOverlay" onPointerDown={(e) => { if (e.target === e.currentTarget) setShowFind(false); }}>
+          <div className="setupDlg" style={{ width: 420 }}>
+            <div className="setupTitle">Find &amp; Replace</div>
+            <div className="setupBody" style={{ flexDirection: "column" }}>
+              <fieldset className="setupGroup">
+                <legend>Find</legend>
+                <input type="text" value={findText} autoFocus placeholder="Text to find…"
+                  style={{ width: "100%" }}
+                  onChange={(e) => setFindText(e.target.value)} />
+              </fieldset>
+              <fieldset className="setupGroup">
+                <legend>Replace with</legend>
+                <input type="text" value={replaceText} placeholder="Replacement text…"
+                  style={{ width: "100%" }}
+                  onChange={(e) => setReplaceText(e.target.value)} />
+              </fieldset>
+              <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input type="checkbox" checked={findCase} onChange={(e) => setFindCase(e.target.checked)} />
+                Match case
+              </label>
+              <div className="mutedNote" style={{ fontSize: 12, opacity: .7 }}>
+                Searches all text and balloon lettering across every page. Locked items are skipped.
+              </div>
+            </div>
+            <div className="setupFoot">
+              <button onClick={() => setShowFind(false)}>Close</button>
+              <button className="okBtn" disabled={!findText} onClick={() => doFindReplace(true)}>Replace All</button>
             </div>
           </div>
         </div>
