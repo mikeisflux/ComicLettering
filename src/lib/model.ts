@@ -215,7 +215,15 @@ function bandToward(from: BalloonEl, to: BalloonEl, keep?: BalloonEl["tail"]): B
     to.x + to.w / 2 - (from.x + from.w / 2),
     to.y + to.h / 2 - (from.y + from.h / 2),
     -from.rot);
-  const t: NonNullable<BalloonEl["tail"]> = { dx: Math.round(dx), dy: Math.round(dy) };
+  /* edge-to-edge: the band ends just INSIDE the partner's near edge — never
+     at its centre — so the open band spans balloon edge to balloon edge and
+     its inked sides can't run across the partner's body */
+  const dist = Math.hypot(dx, dy) || 1;
+  const ux = dx / dist, uy = dy / dist;
+  const prx = to.w / 2, pry = to.h / 2;
+  const rr = (prx * pry) / (Math.hypot(pry * ux, prx * uy) || 1);
+  const tipDist = Math.max(dist * 0.3, dist - rr + Math.max(8, to.strokeW * 2.5));
+  const t: NonNullable<BalloonEl["tail"]> = { dx: Math.round(ux * tipDist), dy: Math.round(uy * tipDist) };
   if (keep && keep.bx != null && keep.by != null) {
     /* keep a user-set bend only while it still lies between the balloons —
        a stale bend (after dragging the pair around) would fling the band the

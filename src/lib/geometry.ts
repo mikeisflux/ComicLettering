@@ -82,7 +82,9 @@ function bendGeom(
   let T = tail.tx != null && tail.ty != null
     ? [tail.tx, tail.ty]
     : [tip[0] - E[0], tip[1] - E[1]];
-  const L = Math.hypot(T[0], T[1]) || 1;
+  let L = Math.hypot(T[0], T[1]);
+  /* degenerate tilt (zero vector / tip on the edge) → fall back to the axis */
+  if (L < 0.01) { T = [tip[0] - E[0], tip[1] - E[1]]; L = Math.hypot(T[0], T[1]) || 1; }
   T = [T[0] / L, T[1] / L];
   if (T[0] * (tip[0] - E[0]) + T[1] * (tip[1] - E[1]) < 0) T = [-T[0], -T[1]];
   const nrm = [-T[1], T[0]];
@@ -93,10 +95,12 @@ function bendGeom(
   const av = [tip[0] - M[0], tip[1] - M[1]];
   const al = Math.hypot(av[0], av[1]) || 1;
   const ap = [-av[1] / al, av[0] / al];
-  const t1 = [tip[0] + ap[0] * bandHalf, tip[1] + ap[1] * bandHalf];
-  const t2 = [tip[0] - ap[0] * bandHalf, tip[1] - ap[1] * bandHalf];
-  const near1 = Math.hypot(t1[0] - M_B[0], t1[1] - M_B[1]) <= Math.hypot(t2[0] - M_B[0], t2[1] - M_B[1]);
-  const tipB = near1 ? t1 : t2, tipA = near1 ? t2 : t1;
+  /* assign tip corners by SIDE (projection on the band normal), never by
+     nearest-distance — a distance heuristic can swap them and cross the two
+     edges into a twisted band */
+  const apSide = (ap[0] * nrm[0] + ap[1] * nrm[1]) * side >= 0 ? 1 : -1;
+  const tipB = [tip[0] + ap[0] * apSide * bandHalf, tip[1] + ap[1] * apSide * bandHalf];
+  const tipA = [tip[0] - ap[0] * apSide * bandHalf, tip[1] - ap[1] * apSide * bandHalf];
   return { M_B, M_A, tipB, tipA, T };
 }
 
@@ -263,7 +267,7 @@ function ellipseTailPath(
   /* joined balloons: the connector is a near-parallel band, wide at both
      ends, curving through the bend point with the tilt axis as tangent */
   if (el.band) {
-    const bandHalf = Math.hypot(A[0] - B[0], A[1] - B[1]) * 0.42;
+    const bandHalf = Math.hypot(A[0] - B[0], A[1] - B[1]) * 0.5;
     const g = bendGeom(tail, cx, cy, tip, E, B, bandHalf);
     const sideB = bentSide(B, g.M_B, g.tipB, g.T);
     const sideA = [...bentSide(A, g.M_A, g.tipA, g.T)].reverse();
@@ -349,7 +353,9 @@ function connectorBase(el: BalloonEl): { A: number[]; B: number[]; E: number[] }
   if (!pts) {
     const rx = w / 2, ry = h / 2;
     const t = Math.atan2(aim[1] - cy, aim[0] - cx);
-    const delta = 0.11;
+    /* wide connector base — the band should read about a third of the
+       balloon's width, like hand-inked joined balloons */
+    const delta = 0.38;
     return {
       A: ellipsePt(cx, cy, rx, ry, t + delta),
       B: ellipsePt(cx, cy, rx, ry, t - delta),
@@ -385,7 +391,7 @@ function connectorBase(el: BalloonEl): { A: number[]; B: number[]; E: number[] }
   if (per < 8) return null;
   const segLen = (i: number) => (i + 1 < n ? cum[i + 1] : per) - cum[i];
   const exitS = cum[bestI] + bestU * segLen(bestI);
-  const half = Math.min(per * 0.18, Math.max(6, (w + h) * 0.0275));
+  const half = Math.min(per * 0.16, Math.max(10, (w + h) * 0.085));
   const pointAt = (s: number): number[] => {
     s = ((s % per) + per) % per;
     for (let k = 0; k < n; k++) {
