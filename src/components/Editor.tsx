@@ -20,7 +20,7 @@ import { fillCss } from "@/lib/fills";
 import { ImageFormat, loadImage, pageThumbnail } from "@/lib/exportPng";
 import {
   BalloonPreset, HINT, PRESET_KEY, ProjectMeta, ProofMatch, domToRuns,
-  letterStyleCss, runsToHtml,
+  letterStyleCss, runsToHtml, toggleEmphasis,
 } from "./editor/textHelpers";
 import { closeSketchLoop, detectSketchTail, resampleRing, smoothSketchRing } from "./editor/sketch";
 import { SmartTip, pickTip } from "./editor/smartTips";
@@ -894,6 +894,14 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
         setTuckAsk(null);
         if (editingId) finishEditing();
         else setSelId(null);
+        return;
+      }
+      /* take Ctrl+B / Ctrl+I over from the browser while lettering is being
+         edited — its own handling strands the caret inside the run it just
+         closed (see toggleEmphasis) */
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && t.isContentEditable &&
+          (e.key.toLowerCase() === "b" || e.key.toLowerCase() === "i")) {
+        if (toggleEmphasis(t, e.key.toLowerCase() === "b" ? "bold" : "italic")) e.preventDefault();
         return;
       }
       if (inField) return;

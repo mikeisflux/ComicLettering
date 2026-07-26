@@ -325,7 +325,9 @@ export function growWhileTyping(ed: EditorCtx, id: string, dom: HTMLElement) {
   const p = d.pages[pageIndexRef.current];
   const el = p.els.find((x) => x.id === id);
   if (!el || el.type !== "balloon") return;
-  const txt = (dom.innerText || "").replace(/\u00a0/g, " ").replace(/\n+$/, "");
+  const txt = (dom.innerText || "")
+    .replace(/\u200b/g, "")            // emphasis caret anchors are not content
+    .replace(/\u00a0/g, " ").replace(/\s+$/, "");
   if (growBalloonToFit(p, el as BalloonEl, txt)) force();
 }
 

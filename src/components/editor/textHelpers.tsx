@@ -66,6 +66,67 @@ export function displayText(text: string, ts: TextStyle, editing: boolean): stri
 function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
+
+/* ---- inline emphasis toggling ----
+
+   Chromium handles Ctrl+B/I on a contentEditable itself, and when the style
+   is switched OFF at a collapsed caret it leaves the caret INSIDE the <b> it
+   just closed. The next character therefore lands back inside the bold run
+   while the space that preceded it stays outside, so "Plain **bold** tail"
+   commits as "Plain **boldtail**". We take the shortcut over and park the
+   caret in a zero-width anchor in the correct context, so whatever is typed
+   next lands where the user is looking. */
+export const ZWSP = "\u200b";
+
+function emphasisAncestor(node: Node | null, kind: "bold" | "italic", root: HTMLElement): HTMLElement | null {
+  let found: HTMLElement | null = null;
+  let n: Node | null = node;
+  while (n && n !== root) {
+    if (n.nodeType === 1) {
+      const e = n as HTMLElement;
+      const tag = e.tagName.toLowerCase();
+      const fw = e.style?.fontWeight;
+      const isBold = tag === "b" || tag === "strong" || fw === "bold" || (!!fw && +fw >= 600);
+      const isItal = tag === "i" || tag === "em" || e.style?.fontStyle === "italic";
+      if (kind === "bold" ? isBold : isItal) found = e;   // keep going: take the outermost
+    }
+    n = n.parentNode;
+  }
+  return found;
+}
+
+/** Toggle bold/italic on the editable node. Returns false if it could not. */
+export function toggleEmphasis(root: HTMLElement, kind: "bold" | "italic"): boolean {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0 || !root.contains(sel.anchorNode)) return false;
+  const wasOn = document.queryCommandState(kind);
+  document.execCommand(kind);
+  if (!sel.isCollapsed) return true;
+
+  const range = sel.getRangeAt(0);
+  const anchor = document.createTextNode(ZWSP);
+  if (wasOn) {
+    /* just switched OFF — step out of the formatting element so the next
+       keystroke is plain, instead of landing back inside it */
+    const host = emphasisAncestor(range.startContainer, kind, root);
+    if (!host || !host.parentNode) return true;
+    host.parentNode.insertBefore(anchor, host.nextSibling);
+  } else {
+    /* just switched ON — make sure there is a formatting element to type into */
+    const host = emphasisAncestor(range.startContainer, kind, root);
+    if (host) return true;
+    const wrap = document.createElement(kind === "bold" ? "b" : "i");
+    wrap.appendChild(anchor);
+    range.insertNode(wrap);
+  }
+  const after = document.createRange();
+  after.setStart(anchor, anchor.length);
+  after.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(after);
+  return true;
+}
+
 export function runsToHtml(runs: TextRun[]): string {
   return runs.map((r) => {
     let h = escapeHtml(r.t).replace(/\n/g, "<br>");
@@ -79,7 +140,8 @@ export function domToRuns(root: HTMLElement): TextRun[] {
   const walk = (node: Node, b: boolean, i: boolean) => {
     node.childNodes.forEach((child) => {
       if (child.nodeType === 3) {
-        runs.push({ t: child.textContent || "", ...(b ? { b: true } : {}), ...(i ? { i: true } : {}) });
+        const txt = (child.textContent || "").replace(/\u200b/g, "");
+        if (txt) runs.push({ t: txt, ...(b ? { b: true } : {}), ...(i ? { i: true } : {}) });
       } else if (child.nodeType === 1) {
         const e = child as HTMLElement;
         const tag = e.tagName.toLowerCase();
