@@ -352,16 +352,15 @@ function connectorBase(el: BalloonEl): { A: number[]; B: number[]; E: number[] }
     default: pts = null; // ellipse family
   }
   if (!pts) {
+    /* exact geometric ray-edge intersection — parametric angles skew off the
+       true direction on non-circular balloons and angle the band */
     const rx = w / 2, ry = h / 2;
-    const t = Math.atan2(aim[1] - cy, aim[0] - cx);
-    /* connector base ≈ the pointed tail's base width where it leaves the
-       balloon (same delta as ellipseTailPath's tail base) */
-    const delta = 0.13;
-    return {
-      A: ellipsePt(cx, cy, rx, ry, t + delta),
-      B: ellipsePt(cx, cy, rx, ry, t - delta),
-      E: ellipsePt(cx, cy, rx, ry, t),
-    };
+    const adx = aim[0] - cx, ady = aim[1] - cy;
+    const aL = Math.hypot(adx, ady) || 1;
+    const ux = adx / aL, uy = ady / aL;
+    const rGeom = (rx * ry) / (Math.hypot(ry * ux, rx * uy) || 1);
+    const E = [cx + ux * rGeom, cy + uy * rGeom];
+    return { A: E, B: E, E };
   }
   /* polygon: ray exit + arc-length base (same maths as polygonWithTail) */
   const dx = aim[0] - cx, dy = aim[1] - cy;
@@ -401,7 +400,8 @@ function connectorBase(el: BalloonEl): { A: number[]; B: number[]; E: number[] }
     }
     return pts[0];
   };
-  return { A: pointAt(exitS + half), B: pointAt(exitS - half), E: pointAt(exitS) };
+  const Epoly = pointAt(exitS);
+  return { A: Epoly, B: Epoly, E: Epoly };
 }
 
 /* The open connector band between joined balloons. Drawn AFTER both bodies:
@@ -413,13 +413,31 @@ function connectorBand(el: BalloonEl): { fill: string; edges: string } | null {
   if (!tail) return null;
   const base = connectorBase(el);
   if (!base) return null;
-  const { A, B, E } = base;
+  const { E } = base;
   const cx = el.w / 2, cy = el.h / 2;
   const tip = [cx + tail.dx, cy + tail.dy];
-  const bandHalf = Math.hypot(A[0] - B[0], A[1] - B[1]) * 0.42;
-  const g = bendGeom(tail, cx, cy, tip, E, B, bandHalf);
-  const sideB = bentSide(B, g.M_B, g.tipB, g.T);
-  const sideA = bentSide(A, g.M_A, g.tipA, g.T);
+  const dLen = Math.hypot(tail.dx, tail.dy);
+  if (dLen < 6) return null;
+  const u = [tail.dx / dLen, tail.dy / dLen];
+  const perp = [-u[1], u[0]];
+  /* base width ≈ a pointed tail's base; the MAIN-bubble end (this band's tip)
+     opens slightly wider for a gentle taper */
+  const rr = Math.hypot(E[0] - cx, E[1] - cy) || 1;
+  const halfW = Math.max(5, rr * 0.115);
+  const tipHalf = halfW * 1.3;
+  const A = [E[0] + perp[0] * halfW, E[1] + perp[1] * halfW];
+  const B = [E[0] - perp[0] * halfW, E[1] - perp[1] * halfW];
+  let sideA: number[][], sideB: number[][];
+  if (tail.bx != null && tail.by != null) {
+    /* user-bent band: curve through the bend point */
+    const g = bendGeom(tail, cx, cy, tip, E, B, halfW * 1.12, tipHalf);
+    sideB = bentSide(B, g.M_B, g.tipB, g.T);
+    sideA = bentSide(A, g.M_A, g.tipA, g.T);
+  } else {
+    /* DEAD STRAIGHT by default — no midpoint routing, no curve */
+    sideA = [[tip[0] + perp[0] * tipHalf, tip[1] + perp[1] * tipHalf]];
+    sideB = [[tip[0] - perp[0] * tipHalf, tip[1] - perp[1] * tipHalf]];
+  }
   const inset = Math.max(6, el.strokeW * 2);
   const inw = (P: number[]) => {
     const vx = cx - P[0], vy = cy - P[1];

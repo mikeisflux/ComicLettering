@@ -40,9 +40,10 @@ export function addAttachedBubble(ed: EditorCtx) {
   el.ts = { ...b.ts };
   if (b.kind === "custom") { el.pts = b.pts; el.tailStyle = b.tailStyle; }
   el.attachTo = b.id;
-  /* seed the connector's bend point midway between the two bubbles */
+  /* straight connector by default — NO seeded bend; the band only curves
+     when the user drags the middle handle */
   const pcx = b.x + b.w / 2 - (x + w / 2), pcy = b.y + b.h / 2 - (y + h / 2);
-  el.tail = { dx: Math.round(pcx), dy: Math.round(pcy), bx: Math.round(pcx / 2), by: Math.round(pcy / 2) };
+  el.tail = { dx: Math.round(pcx), dy: Math.round(pcy) };
   p.els.push(el);
   pendingLockRef.current.add(el.id);
   commit();
