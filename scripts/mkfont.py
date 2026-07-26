@@ -297,7 +297,7 @@ def decimate(pts, k):
         out.append(pts[-1])
     return out
 
-def build_glyph(name, strokes, r, amp, freq, shear, narrow, bounce, drips, cap="round", decim=0):
+def build_glyph(name, strokes, r, amp, freq, shear, narrow, bounce, drips, cap="round", decim=0, rotd=0):
     stroke_list = [(s, 1.0) for s in strokes]
     if drips == "drips":
         stroke_list += drip_strokes(name, strokes)
@@ -307,6 +307,12 @@ def build_glyph(name, strokes, r, amp, freq, shear, narrow, bounce, drips, cap="
         stroke_list += flame_strokes(name, strokes)
     taper = drips == "taper"
     dy0 = (((ghash(name + "b") % 100) / 100) - 0.5) * 2 * bounce
+    # per-glyph tilt about the glyph's own centre — hand-lettered words never
+    # sit perfectly level; each letter leans a little differently
+    rot0 = (((ghash(name + "r") % 100) / 100) - 0.5) * 2 * math.radians(rotd)
+    _all = [p for st in strokes for p in st]
+    gcx = sum(p[0] for p in _all) / len(_all) if _all else 0
+    gcy = sum(p[1] for p in _all) / len(_all) if _all else 0
     paths = []
     for stroke, rmul in stroke_list:
         pts = decimate(list(stroke), decim)
@@ -320,6 +326,10 @@ def build_glyph(name, strokes, r, amp, freq, shear, narrow, bounce, drips, cap="
                                   pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t))
             pts = dense
         pts = wobble(name, pts, amp, freq)
+        if rot0:
+            ca, sa = math.cos(rot0), math.sin(rot0)
+            pts = [((x - gcx) * ca - (y - gcy) * sa + gcx,
+                    (x - gcx) * sa + (y - gcy) * ca + gcy) for (x, y) in pts]
         pts = [(x * narrow, y + dy0) for (x, y) in pts]
         if shear:
             pts = [(x + y * shear, y) for (x, y) in pts]
@@ -354,7 +364,7 @@ def build_glyph(name, strokes, r, amp, freq, shear, narrow, bounce, drips, cap="
     union(paths, out.getPen())
     return out
 
-def make_font(family, style, r, amp, freq, shear, narrow, bounce, drips, out_ttf, cap="round", decim=0, mixed=False, track=0):
+def make_font(family, style, r, amp, freq, shear, narrow, bounce, drips, out_ttf, cap="round", decim=0, mixed=False, track=0, rotd=0):
     glyph_src = dict(GLYPHS)
     if mixed:
         glyph_src.update(LOWER_GLYPHS)
@@ -382,7 +392,7 @@ def make_font(family, style, r, amp, freq, shear, narrow, bounce, drips, out_ttf
             strokes = scribble_strokes(name, w)
         elif drips == "alien" and name != "space":
             strokes = alien_strokes(name, w)
-        path = build_glyph(name, strokes, r, amp, freq, shear, narrow, bounce, drips, cap, decim)
+        path = build_glyph(name, strokes, r, amp, freq, shear, narrow, bounce, drips, cap, decim, rotd)
         pen = TTGlyphPen(None)
         if path is not None:
             path.draw(pen)
@@ -390,7 +400,7 @@ def make_font(family, style, r, amp, freq, shear, narrow, bounce, drips, out_ttf
         letter_h = CAP if name in GLYPHS else 480
         adv[name] = int(max(w * narrow * 0.55,
                         w * narrow + 60 + max(0, r - 55) * 1.25 + track)
-                        + (letter_h * shear if shear else 0))
+                        + (letter_h * shear * 0.45 if shear else 0))
     fb.setupGlyf(glyphs)
     hmtx = {}
     for name in names:
@@ -437,10 +447,10 @@ FAMILIES = {
     "LMC Whisper":  (26, 40, 9.0, 1.6, 0, 1.02, 14, "", "round", 0),
     "LMC Shout":    (88, 108, 6.0, 1.3, 4, 0.84, 10, "", "round", 0),
     "LMC Horror":   (50, 68, 13.0, 2.6, 0, 0.95, 16, "drips", "round", 0),
-    "LMC Brawl":    (80, 100, 3.0, 1.0, 2, 0.92, 8, "", "square", 5),
+    "LMC Brawl":    (80, 100, 3.0, 1.0, 2, 0.92, 38, "", "square", 5, False, 0, 4.5),
     "LMC Cosmos":   (42, 62, 1.2, 0.8, 0, 1.14, 0, "", "square", 4),
-    "LMC Slasher":  (64, 84, 8.0, 2.2, 3, 0.90, 12, "", "square", 4),
-    "LMC Sneeze":   (82, 102, 5.0, 1.0, 2, 1.02, 8, "droplets", "round", 0),
+    "LMC Slasher":  (64, 84, 8.0, 2.2, 3, 0.90, 40, "", "square", 4, False, 0, 5.0),
+    "LMC Sneeze":   (82, 102, 5.0, 1.0, 2, 1.02, 34, "droplets", "round", 0, False, 0, 4.0),
     "LMC Mumble":   (24, 36, 6.0, 1.3, 0, 1.00, 26, "scribble", "round", 0),
     "LMC Dragon":   (58, 76, 6.0, 1.1, 4, 0.98, 10, "taper", "round", 0),
     "LMC Alien":    (42, 58, 3.0, 1.0, 0, 1.00, 12, "alien", "round", 0),
@@ -460,31 +470,31 @@ FAMILIES = {
     # upright chunky impact caps
     "LMC Slam":     (96, 120, 2.5, 1.0, 3, 0.96, 6, "", "square", 2),
     # bubbly, bouncy, soft-round
-    "LMC Splash":   (86, 108, 3.5, 1.2, 5, 1.02, 12, "", "round", 0),
+    "LMC Splash":   (86, 108, 3.5, 1.2, 5, 1.02, 68, "", "round", 0, False, -30, 7.0),
     # hard-leaning spiky shards
     "LMC Blitz":    (60, 78, 4.0, 1.4, 16, 0.78, 6, "", "square", 8),
     # rough horror brush, slanted
     "LMC Butcher":  (64, 82, 11.0, 3.0, 7, 0.88, 8, "", "square", 7),
     # fat rounded bubble/graffiti caps
-    "LMC Blob":     (104, 126, 2.5, 0.9, 4, 1.22, 5, "", "round", 0, False, -95),
+    "LMC Blob":     (104, 126, 2.5, 0.9, 4, 1.22, 52, "", "round", 0, False, -95, 6.0),
     # tall condensed brush
     "LMC Frost":    (46, 62, 6.0, 1.6, 2, 0.72, 6, "taper", "round", 0),
     # heavy slanted brush
-    "LMC Berserk":  (72, 92, 7.0, 1.5, 14, 0.94, 8, "taper", "round", 0),
+    "LMC Berserk":  (72, 92, 7.0, 1.5, 14, 0.94, 36, "taper", "round", 0, False, 0, 3.5),
     # serrated sawtooth horror
     "LMC Sawtooth": (58, 76, 9.0, 4.6, 3, 0.88, 5, "", "square", 7),
     # flame tongues licking off the caps
-    "LMC Charflame":(58, 74, 11.0, 2.8, 3, 0.92, 5, "flames", "round", 4),
+    "LMC Charflame":(58, 74, 11.0, 2.8, 3, 0.92, 30, "flames", "round", 4, False, 0, 3.5),
     # heavy leaning cartoon with knocked-about edges
-    "LMC Crashland":(80, 100, 5.0, 1.3, 12, 0.96, 8, "", "round", 3),
+    "LMC Crashland":(80, 100, 5.0, 1.3, 12, 0.96, 40, "", "round", 3, False, 0, 4.0),
     # chunky angular street-shout caps
-    "LMC Rowdy":    (88, 110, 3.5, 1.2, 2, 0.94, 7, "", "square", 6),
+    "LMC Rowdy":    (88, 110, 3.5, 1.2, 2, 0.94, 46, "", "square", 6, False, 0, 5.0),
     # monoline geometric — thin, even, circular
     "LMC Deco":     (24, 34, 0.4, 0.5, 0, 1.12, 0, "", "round", 0),
     # smooth heavy italic scream
-    "LMC Screech":  (90, 114, 1.0, 0.7, 18, 0.92, 0, "", "round", 0),
+    "LMC Screech":  (98, 124, 1.0, 0.7, 20, 0.90, 0, "", "round", 0, False, -60),
     # rough marker horror
-    "LMC Gutspill": (66, 86, 12.0, 3.2, 3, 0.90, 9, "", "round", 5),
+    "LMC Gutspill": (64, 84, 13.0, 3.6, 4, 0.88, 44, "taper", "round", 3, False, 0, 5.5),
 }
 
 def main(outdir):
@@ -493,13 +503,14 @@ def main(outdir):
         (r, rb, amp, freq, lean, narrow, bounce, drips, cap, decim) = cfg[:10]
         mixed = cfg[10] if len(cfg) > 10 else False
         track = cfg[11] if len(cfg) > 11 else 0
+        rotd = cfg[12] if len(cfg) > 12 else 0
         base = family.replace(" ", "")
         lean_sh = math.tan(math.radians(lean))
         ital_sh = math.tan(math.radians(9 + lean))
         for style, rr, sh in [("Regular", r, lean_sh), ("Bold", rb, lean_sh),
                               ("Italic", r, ital_sh), ("Bold Italic", rb, ital_sh)]:
             fn = os.path.join(outdir, f"{base}-{style.replace(' ', '')}.ttf")
-            make_font(family, style, rr, amp, freq, sh, narrow, bounce, drips, fn, cap, decim, mixed, track)
+            make_font(family, style, rr, amp, freq, sh, narrow, bounce, drips, fn, cap, decim, mixed, track, rotd)
 
 if __name__ == "__main__":
     main(sys.argv[1] if len(sys.argv) > 1 else ".")
