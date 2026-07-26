@@ -259,7 +259,31 @@ def alien_strokes(name, w):
     return out
 
 def capsule_path(p, q, r, cap="round", n=12):
-    if cap == "square":
+    if cap == "chamfer":
+        # blocky stroke whose four corners are sliced off at 45° — chiselled
+        # slab letterforms rather than round or dead-square ones
+        a = math.atan2(q[1] - p[1], q[0] - p[0])
+        ux, uy = math.cos(a), math.sin(a)
+        px, py = -uy, ux
+        corners = [
+            (q[0] + ux * r + px * r, q[1] + uy * r + py * r),
+            (q[0] + ux * r - px * r, q[1] + uy * r - py * r),
+            (p[0] - ux * r - px * r, p[1] - uy * r - py * r),
+            (p[0] - ux * r + px * r, p[1] - uy * r + py * r),
+        ]
+        c = r * 0.42
+        pts = []
+        for i, C in enumerate(corners):
+            prev = corners[i - 1]
+            nxt = corners[(i + 1) % 4]
+            din = (C[0] - prev[0], C[1] - prev[1])
+            dout = (nxt[0] - C[0], nxt[1] - C[1])
+            ln = math.hypot(*din) or 1
+            lo = math.hypot(*dout) or 1
+            ci, co = min(c, ln / 2), min(c, lo / 2)
+            pts.append((C[0] - din[0] / ln * ci, C[1] - din[1] / ln * ci))
+            pts.append((C[0] + dout[0] / lo * co, C[1] + dout[1] / lo * co))
+    elif cap == "square":
         # rectangle extended r beyond both endpoints — blocky chopped stroke
         a = math.atan2(q[1] - p[1], q[0] - p[0])
         ux, uy = math.cos(a), math.sin(a)
@@ -297,7 +321,7 @@ def decimate(pts, k):
         out.append(pts[-1])
     return out
 
-def build_glyph(name, strokes, r, amp, freq, shear, narrow, bounce, drips, cap="round", decim=0, rotd=0):
+def build_glyph(name, strokes, r, amp, freq, shear, narrow, bounce, drips, cap="round", decim=0, rotd=0, rough=0):
     stroke_list = [(s, 1.0) for s in strokes]
     if drips == "drips":
         stroke_list += drip_strokes(name, strokes)
@@ -316,6 +340,18 @@ def build_glyph(name, strokes, r, amp, freq, shear, narrow, bounce, drips, cap="
     paths = []
     for stroke, rmul in stroke_list:
         pts = decimate(list(stroke), decim)
+        if rough and len(pts) > 1:
+            # chop the skeleton into short spans so each one can carry its own
+            # width — that is what tears the outline instead of just bending it
+            dense = [pts[0]]
+            for i in range(len(pts) - 1):
+                seg = math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1])
+                steps = max(1, int(seg / 46))
+                for k in range(1, steps + 1):
+                    t = k / steps
+                    dense.append((pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t,
+                                  pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t))
+            pts = dense
         if taper and len(pts) > 1:
             # densify so the brush profile has room to swell and thin out
             dense = [pts[0]]
@@ -353,6 +389,9 @@ def build_glyph(name, strokes, r, amp, freq, shear, narrow, bounce, drips, cap="
         n_seg = len(pts) - 1
         for i in range(n_seg):
             rr = r * rmul
+            if rough:
+                hh = ghash(f"{name}rgh{i}")
+                rr *= 1 + rough * (((hh % 200) / 100) - 1)
             if taper and n_seg > 1:
                 # brush stroke: pointed entry/exit, full belly mid-stroke
                 t = (i + 0.5) / n_seg
@@ -364,7 +403,7 @@ def build_glyph(name, strokes, r, amp, freq, shear, narrow, bounce, drips, cap="
     union(paths, out.getPen())
     return out
 
-def make_font(family, style, r, amp, freq, shear, narrow, bounce, drips, out_ttf, cap="round", decim=0, mixed=False, track=0, rotd=0):
+def make_font(family, style, r, amp, freq, shear, narrow, bounce, drips, out_ttf, cap="round", decim=0, mixed=False, track=0, rotd=0, rough=0):
     glyph_src = dict(GLYPHS)
     if mixed:
         glyph_src.update(LOWER_GLYPHS)
@@ -392,7 +431,7 @@ def make_font(family, style, r, amp, freq, shear, narrow, bounce, drips, out_ttf
             strokes = scribble_strokes(name, w)
         elif drips == "alien" and name != "space":
             strokes = alien_strokes(name, w)
-        path = build_glyph(name, strokes, r, amp, freq, shear, narrow, bounce, drips, cap, decim, rotd)
+        path = build_glyph(name, strokes, r, amp, freq, shear, narrow, bounce, drips, cap, decim, rotd, rough)
         pen = TTGlyphPen(None)
         if path is not None:
             path.draw(pen)
@@ -438,7 +477,8 @@ def make_font(family, style, r, amp, freq, shear, narrow, bounce, drips, out_ttf
         f.write(outbuf.getvalue())
     print(f"{family} {style}: {os.path.basename(out_ttf)} {os.path.getsize(out_ttf)}B  woff2 {os.path.getsize(out_woff2)}B")
 
-# family: (regular_r, bold_r, amp, freq, lean_deg, narrow, bounce, drips, cap, decim)
+# family: (regular_r, bold_r, amp, freq, lean_deg, narrow, bounce, drips, cap,
+#          decim, mixed, track, rotd, rough)
 FAMILIES = {
     "LMC Dialogue": (46, 64, 5.0, 1.0, 0, 1.00, 0, "", "round", 0),
     "LMC Agent":    (52, 70, 2.5, 0.8, 0, 0.94, 0, "", "round", 0),
@@ -500,15 +540,27 @@ FAMILIES = {
     # chunky rounded marker
     "LMC Fullbleed":(86, 108, 4.0, 1.1, 4, 0.94, 42, "", "round", 0, False, 0, 5.0),
     # compact slanted brush
-    "LMC Gamma":    (66, 86, 6.0, 1.6, 10, 0.92, 46, "taper", "round", 0, False, 0, 5.0),
+    "LMC Gamma":    (86, 108, 9.0, 2.2, 4, 0.98, 22, "", "chamfer", 0, False, -40, 3.0, 0.32),
     # fat clean block caps
     "LMC Glassjaw": (100, 124, 1.5, 0.8, 2, 0.98, 30, "", "round", 2, False, -20, 3.0),
     # jagged spiky shards
     "LMC Skrunch":  (58, 76, 10.0, 3.2, 3, 0.86, 36, "", "square", 5, False, 0, 5.5),
     # angular graffiti tag, tall and jammed together
     "LMC Killcrazy":(50, 68, 8.0, 2.2, 6, 0.80, 42, "", "square", 6, False, -55, 6.0),
-    # solid chiselled block caps, letters butting each other
-    "LMC Krakhead": (104, 128, 0.3, 0.4, 0, 1.00, 0, "", "square", 3, False, -110, 0),
+    # solid chiselled block caps with 45-degree cut corners and slit counters
+    "LMC Krakhead": (122, 146, 0.2, 0.4, 0, 1.06, 0, "", "chamfer", 3, False, -108, 0),
+    # heavy chopped-edge cartoon impact caps
+    "LMC Onetwo":   (94, 116, 4.5, 0.9, 0, 0.94, 16, "", "chamfer", 4, False, -62, 2.2),
+    # chisel-marker SFX hand, three widths
+    "LMC Efex":     (72, 92, 5.0, 1.3, 0, 0.98, 34, "", "chamfer", 3, False, -30, 4.0),
+    "LMC Efex Cond":(56, 74, 5.5, 1.4, 0, 0.70, 34, "", "chamfer", 3, False, -38, 4.0),
+    "LMC Efex Thin":(26, 38, 5.0, 1.3, 0, 0.96, 30, "", "chamfer", 3, False, -8, 4.0),
+    # torn/ragged slanted brush SFX, three widths
+    "LMC Efex Rough":(74, 94, 9.0, 2.4, 10, 0.96, 30, "", "chamfer", 0, False, -22, 3.5, 0.30),
+    "LMC Efex Roughthin":(54, 70, 8.0, 2.2, 10, 1.00, 28, "", "chamfer", 0, False, -8, 3.5, 0.34),
+    "LMC Efex Brush":(80, 100, 7.0, 2.0, 10, 0.96, 26, "taper", "chamfer", 0, False, -26, 3.0, 0.26),
+    # tall condensed dry-brush scrawl
+    "LMC Rawbones": (44, 58, 10.0, 2.4, 2, 0.74, 26, "taper", "round", 0, False, -16, 4.5, 0.36),
     # compact punchy impact caps
     "LMC Punch":    (96, 120, 2.0, 1.0, 4, 0.90, 28, "", "round", 1, False, -45, 3.0),
     # bold cartoon caps with a lively bounce
@@ -524,13 +576,14 @@ def main(outdir):
         mixed = cfg[10] if len(cfg) > 10 else False
         track = cfg[11] if len(cfg) > 11 else 0
         rotd = cfg[12] if len(cfg) > 12 else 0
+        rough = cfg[13] if len(cfg) > 13 else 0
         base = family.replace(" ", "")
         lean_sh = math.tan(math.radians(lean))
         ital_sh = math.tan(math.radians(9 + lean))
         for style, rr, sh in [("Regular", r, lean_sh), ("Bold", rb, lean_sh),
                               ("Italic", r, ital_sh), ("Bold Italic", rb, ital_sh)]:
             fn = os.path.join(outdir, f"{base}-{style.replace(' ', '')}.ttf")
-            make_font(family, style, rr, amp, freq, sh, narrow, bounce, drips, fn, cap, decim, mixed, track, rotd)
+            make_font(family, style, rr, amp, freq, sh, narrow, bounce, drips, fn, cap, decim, mixed, track, rotd, rough)
 
 if __name__ == "__main__":
     main(sys.argv[1] if len(sys.argv) > 1 else ".")

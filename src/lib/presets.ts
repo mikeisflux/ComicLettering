@@ -20,6 +20,16 @@ export interface LetterStyle {
 export const LETTER_STYLES: LetterStyle[] = [
   /* --- SFX colourways: each pairs one of the LMC display faces with the
      punchy fill/outline/shadow treatment that genre is normally inked in --- */
+  { name: "One-Two Punch",  font: "lmconetwo",   fillA: "#ffc41c", fillB: "#ef6a00", outlineC: "#000000", outlineF: 0.055, shadow: true },
+  { name: "FX Ivory",       font: "lmcefex",     fillA: "#fffce6", fillB: "#efe3ad", outlineC: "#000000", outlineF: 0.042, shadow: true },
+  { name: "FX Cond Ivory",  font: "lmcefexcond", fillA: "#fffce6", fillB: "#e8dba0", outlineC: "#000000", outlineF: 0.042, shadow: true },
+  { name: "FX Thin Violet", font: "lmcefexthin", fillA: "#f6f0ff", fillB: "#cdb6ee", outlineC: "#3d1c63", outlineF: 0.022, shadow: true },
+  { name: "Rough Blush",    font: "lmcefexrough",     fillA: "#ffffff", fillB: "#f6d3e2", outlineC: "#14060c", outlineF: 0.042, shadow: true },
+  { name: "Rough Ink",      font: "lmcefexroughthin", fillA: "#fdf6ef", fillB: "#e6d2c4", outlineC: "#000000", outlineF: 0.03,  shadow: true },
+  { name: "Brush Black",    font: "lmcefexbrush",     fillA: "#ffffff", fillB: "#dcdcdc", outlineC: "#000000", outlineF: 0.045, shadow: true },
+  { name: "Raw Bone",       font: "lmcrawbones", fillA: "#f6eed2", fillB: "#e2d3a6", outlineC: "#7d1723", outlineF: 0.028, shadow: true },
+  { name: "Raw Coral",      font: "lmcrawbones", fillA: "#f79274", fillB: "#d8553f", outlineC: "#5e1f22", outlineF: 0.028, shadow: true },
+  { name: "Krak Solid",     font: "lmckrakhead", fillA: "#141414", fillB: "#000000", outlineC: "#ffffff", outlineF: 0.02,  shadow: true },
   { name: "Tag Red",       font: "lmckillcrazy",fillA: "#f04a18", fillB: "#c02800", outlineC: "#000000", outlineF: 0.04,  shadow: true },
   { name: "Krak Blue",     font: "lmckrakhead", fillA: "#3ab8ee", fillB: "#1f9ad0", outlineC: "#000000", outlineF: 0.03,  shadow: true },
   { name: "Punch Orange",  font: "lmcpunch",    fillA: "#f5b028", fillB: "#e07818", outlineC: "#1a1a3a", outlineF: 0.035, shadow: true },
@@ -27,7 +37,7 @@ export const LETTER_STYLES: LetterStyle[] = [
   { name: "Slick Cream",   font: "lmcslick",    fillA: "#fffbe0", fillB: "#f0e8b0", outlineC: "#6a3a9a", outlineF: 0.035, shadow: true },
   { name: "Buzz Yellow",   font: "lmcfeedback", fillA: "#f5e838", fillB: "#e0c800", outlineC: "#000000", outlineF: 0.038, shadow: true },
   { name: "Bleed Red",     font: "lmcfullbleed",fillA: "#e83030", fillB: "#b81010", outlineC: "#1a0808", outlineF: 0.04,  shadow: true },
-  { name: "Gamma Green",   font: "lmcgamma",    fillA: "#e8f5a0", fillB: "#4fa83c", outlineC: "#0f2a14", outlineF: 0.035, shadow: true },
+  { name: "Gamma Green",   font: "lmcgamma",    fillA: "#f7f6a2", fillB: "#9ecb22", outlineC: "#0d2410", outlineF: 0.035, shadow: true },
   { name: "Jawbreaker",    font: "lmcglassjaw", fillA: "#f8c58a", fillB: "#e8a060", outlineC: "#000000", outlineF: 0.035, shadow: true },
   { name: "Skrunch White", font: "lmcskrunch",  fillA: "#ffffff", fillB: "#e8e8e8", outlineC: "#d01818", outlineF: 0.04,  shadow: true },
   { name: "Crash Cream",   font: "lmccrashland",fillA: "#fff2c4", fillB: "#f0c020", outlineC: "#5b1a6b", outlineF: 0.03,  shadow: true },

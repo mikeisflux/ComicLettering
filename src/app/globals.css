@@ -429,6 +429,38 @@ input[type="range"] { width: 110px; }
 @font-face { font-family: "LMC Krakhead"; font-style: normal; font-weight: 700; font-display: swap; src: url(/fonts/LMCKrakhead-Bold.woff2) format("woff2"); }
 @font-face { font-family: "LMC Krakhead"; font-style: italic; font-weight: 400; font-display: swap; src: url(/fonts/LMCKrakhead-Italic.woff2) format("woff2"); }
 @font-face { font-family: "LMC Krakhead"; font-style: italic; font-weight: 700; font-display: swap; src: url(/fonts/LMCKrakhead-BoldItalic.woff2) format("woff2"); }
+@font-face { font-family: "LMC Onetwo"; font-style: normal; font-weight: 400; font-display: swap; src: url(/fonts/LMCOnetwo-Regular.woff2) format("woff2"); }
+@font-face { font-family: "LMC Onetwo"; font-style: normal; font-weight: 700; font-display: swap; src: url(/fonts/LMCOnetwo-Bold.woff2) format("woff2"); }
+@font-face { font-family: "LMC Onetwo"; font-style: italic; font-weight: 400; font-display: swap; src: url(/fonts/LMCOnetwo-Italic.woff2) format("woff2"); }
+@font-face { font-family: "LMC Onetwo"; font-style: italic; font-weight: 700; font-display: swap; src: url(/fonts/LMCOnetwo-BoldItalic.woff2) format("woff2"); }
+@font-face { font-family: "LMC Efex"; font-style: normal; font-weight: 400; font-display: swap; src: url(/fonts/LMCEfex-Regular.woff2) format("woff2"); }
+@font-face { font-family: "LMC Efex"; font-style: normal; font-weight: 700; font-display: swap; src: url(/fonts/LMCEfex-Bold.woff2) format("woff2"); }
+@font-face { font-family: "LMC Efex"; font-style: italic; font-weight: 400; font-display: swap; src: url(/fonts/LMCEfex-Italic.woff2) format("woff2"); }
+@font-face { font-family: "LMC Efex"; font-style: italic; font-weight: 700; font-display: swap; src: url(/fonts/LMCEfex-BoldItalic.woff2) format("woff2"); }
+@font-face { font-family: "LMC Efex Cond"; font-style: normal; font-weight: 400; font-display: swap; src: url(/fonts/LMCEfexCond-Regular.woff2) format("woff2"); }
+@font-face { font-family: "LMC Efex Cond"; font-style: normal; font-weight: 700; font-display: swap; src: url(/fonts/LMCEfexCond-Bold.woff2) format("woff2"); }
+@font-face { font-family: "LMC Efex Cond"; font-style: italic; font-weight: 400; font-display: swap; src: url(/fonts/LMCEfexCond-Italic.woff2) format("woff2"); }
+@font-face { font-family: "LMC Efex Cond"; font-style: italic; font-weight: 700; font-display: swap; src: url(/fonts/LMCEfexCond-BoldItalic.woff2) format("woff2"); }
+@font-face { font-family: "LMC Efex Thin"; font-style: normal; font-weight: 400; font-display: swap; src: url(/fonts/LMCEfexThin-Regular.woff2) format("woff2"); }
+@font-face { font-family: "LMC Efex Thin"; font-style: normal; font-weight: 700; font-display: swap; src: url(/fonts/LMCEfexThin-Bold.woff2) format("woff2"); }
+@font-face { font-family: "LMC Efex Thin"; font-style: italic; font-weight: 400; font-display: swap; src: url(/fonts/LMCEfexThin-Italic.woff2) format("woff2"); }
+@font-face { font-family: "LMC Efex Thin"; font-style: italic; font-weight: 700; font-display: swap; src: url(/fonts/LMCEfexThin-BoldItalic.woff2) format("woff2"); }
+@font-face { font-family: "LMC Efex Rough"; font-style: normal; font-weight: 400; font-display: swap; src: url(/fonts/LMCEfexRough-Regular.woff2) format("woff2"); }
+@font-face { font-family: "LMC Efex Rough"; font-style: normal; font-weight: 700; font-display: swap; src: url(/fonts/LMCEfexRough-Bold.woff2) format("woff2"); }
+@font-face { font-family: "LMC Efex Rough"; font-style: italic; font-weight: 400; font-display: swap; src: url(/fonts/LMCEfexRough-Italic.woff2) format("woff2"); }
+@font-face { font-family: "LMC Efex Rough"; font-style: italic; font-weight: 700; font-display: swap; src: url(/fonts/LMCEfexRough-BoldItalic.woff2) format("woff2"); }
+@font-face { font-family: "LMC Efex Roughthin"; font-style: normal; font-weight: 400; font-display: swap; src: url(/fonts/LMCEfexRoughthin-Regular.woff2) format("woff2"); }
+@font-face { font-family: "LMC Efex Roughthin"; font-style: normal; font-weight: 700; font-display: swap; src: url(/fonts/LMCEfexRoughthin-Bold.woff2) format("woff2"); }
+@font-face { font-family: "LMC Efex Roughthin"; font-style: italic; font-weight: 400; font-display: swap; src: url(/fonts/LMCEfexRoughthin-Italic.woff2) format("woff2"); }
+@font-face { font-family: "LMC Efex Roughthin"; font-style: italic; font-weight: 700; font-display: swap; src: url(/fonts/LMCEfexRoughthin-BoldItalic.woff2) format("woff2"); }
+@font-face { font-family: "LMC Efex Brush"; font-style: normal; font-weight: 400; font-display: swap; src: url(/fonts/LMCEfexBrush-Regular.woff2) format("woff2"); }
+@font-face { font-family: "LMC Efex Brush"; font-style: normal; font-weight: 700; font-display: swap; src: url(/fonts/LMCEfexBrush-Bold.woff2) format("woff2"); }
+@font-face { font-family: "LMC Efex Brush"; font-style: italic; font-weight: 400; font-display: swap; src: url(/fonts/LMCEfexBrush-Italic.woff2) format("woff2"); }
+@font-face { font-family: "LMC Efex Brush"; font-style: italic; font-weight: 700; font-display: swap; src: url(/fonts/LMCEfexBrush-BoldItalic.woff2) format("woff2"); }
+@font-face { font-family: "LMC Rawbones"; font-style: normal; font-weight: 400; font-display: swap; src: url(/fonts/LMCRawbones-Regular.woff2) format("woff2"); }
+@font-face { font-family: "LMC Rawbones"; font-style: normal; font-weight: 700; font-display: swap; src: url(/fonts/LMCRawbones-Bold.woff2) format("woff2"); }
+@font-face { font-family: "LMC Rawbones"; font-style: italic; font-weight: 400; font-display: swap; src: url(/fonts/LMCRawbones-Italic.woff2) format("woff2"); }
+@font-face { font-family: "LMC Rawbones"; font-style: italic; font-weight: 700; font-display: swap; src: url(/fonts/LMCRawbones-BoldItalic.woff2) format("woff2"); }
 @font-face { font-family: "LMC Punch"; font-style: normal; font-weight: 400; font-display: swap; src: url(/fonts/LMCPunch-Regular.woff2) format("woff2"); }
 @font-face { font-family: "LMC Punch"; font-style: normal; font-weight: 700; font-display: swap; src: url(/fonts/LMCPunch-Bold.woff2) format("woff2"); }
 @font-face { font-family: "LMC Punch"; font-style: italic; font-weight: 400; font-display: swap; src: url(/fonts/LMCPunch-Italic.woff2) format("woff2"); }
