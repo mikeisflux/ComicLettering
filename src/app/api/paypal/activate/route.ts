@@ -17,6 +17,18 @@ export async function POST(req: Request) {
     if (sub.status !== "ACTIVE" && sub.status !== "APPROVED") {
       return NextResponse.json({ error: `Subscription is ${sub.status}, not active.` }, { status: 402 });
     }
+    /* one PayPal subscription unlocks exactly ONE account — otherwise a
+       single paying customer could activate unlimited accounts by replaying
+       the same subscriptionId */
+    const taken = await prisma.user.findFirst({
+      where: { subId: String(subscriptionId), NOT: { id: user.id } },
+      select: { id: true },
+    });
+    if (taken) {
+      return NextResponse.json(
+        { error: "This subscription is already linked to another account." },
+        { status: 409 });
+    }
     const monthly = await getSetting("PAYPAL_PLAN_MONTHLY");
     const plan = sub.plan_id === monthly ? "monthly" : "yearly";
     await prisma.user.update({
@@ -24,7 +36,7 @@ export async function POST(req: Request) {
       data: { subStatus: "active", subPlan: plan, subId: String(subscriptionId) },
     });
     return NextResponse.json({ ok: true });
-  } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: "Could not verify the subscription." }, { status: 500 });
   }
 }

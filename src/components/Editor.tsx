@@ -62,6 +62,13 @@ function textCss(ts: TextStyle): CSSProperties {
   return st;
 }
 
+/* small field helper — MODULE level: defining it inside Editor would make it
+   a new component type each render, unmounting inspector inputs on every
+   keystroke (focus loss after one character) */
+const Fld = ({ label, children }: { label: string; children: ReactNode }) => (
+  <div className="fld"><label>{label}</label>{children}</div>
+);
+
 /* apply crossbar-I for static display (not while editing) */
 function displayText(text: string, ts: TextStyle, editing: boolean): string {
   if (editing || !ts.crossbarI) return text;
@@ -533,6 +540,13 @@ function BalloonShape({ el, mergeBase, imgSrc }: { el: BalloonEl; mergeBase?: Me
           ) : null}
         </g>
       )}
+      {/* open connector band: fill covers both outlines at the junctions,
+          only the two sides get inked — both openings stay clear */}
+      {g.bandFill && <path d={g.bandFill} fill={fillRef} stroke="none" />}
+      {g.bandEdges && el.strokeW > 0 && (
+        <path d={g.bandEdges} fill="none" stroke={el.stroke} strokeWidth={el.strokeW}
+          strokeLinejoin="round" strokeLinecap="round" />
+      )}
       {!mergeBase && el.strokeW > 0 && !g.noStroke && (
         <path d={g.d} fill="none" stroke={el.stroke} strokeWidth={el.strokeW}
           strokeLinejoin="round" strokeDasharray={g.dash ? g.dash.join(" ") : undefined} />
@@ -576,6 +590,25 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const pageDivRef = useRef<HTMLDivElement>(null);
   const areaRef = useRef<HTMLDivElement>(null);
   const aidRef = useRef(1);
+  /* latest keyboard-shortcut handlers — refreshed every render so the
+     long-lived keydown listener never runs a stale closure */
+  const keyFnsRef = useRef<{
+    duplicateSel: () => void; saveProject: (b: boolean) => void;
+    copySel: () => void; cutSel: () => void; pasteClip: () => void;
+    alignSel: (m: "left" | "hcenter" | "right" | "top" | "vcenter" | "bottom") => void;
+    addFromTray: (k: string) => void; deleteSel: () => void;
+  }>(null as never);
+  /* re-seed the asset id counter from whatever assets are loaded — MUST run
+     after any wholesale assets replacement (boot, project load, JSON import)
+     or new images silently overwrite existing artwork ids */
+  const reseedAids = useCallback(() => {
+    let maxA = 0;
+    for (const k of Object.keys(assetsRef.current)) {
+      const n = parseInt(k.replace(/\D/g, ""), 10);
+      if (!isNaN(n)) maxA = Math.max(maxA, n);
+    }
+    aidRef.current = maxA + 1;
+  }, []);
 
   const [mounted, setMounted] = useState(false);
   const [pageIndex, setPageIndex] = useState(0);
@@ -801,12 +834,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     } catch { /* ignore corrupt autosave */ }
     if (!docRef.current) docRef.current = starterDoc();
     reseedIds(docRef.current);
-    let maxA = 0;
-    for (const k of Object.keys(assetsRef.current)) {
-      const n = parseInt(k.replace(/\D/g, ""), 10);
-      if (!isNaN(n)) maxA = Math.max(maxA, n);
-    }
-    aidRef.current = maxA + 1;
+    reseedAids();
     histRef.current = [JSON.stringify(docRef.current)];
     hIndexRef.current = 0;
     setMounted(true);
@@ -823,16 +851,20 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* fit zoom */
+  /* fit zoom — read userZoomed through a ref so fitZoom's identity is stable;
+     otherwise the page-change effect below re-fires on every zoom toggle and
+     silently reverts the user's first Zoom In/Out click */
+  const userZoomedRef = useRef(false);
+  useEffect(() => { userZoomedRef.current = userZoomed; }, [userZoomed]);
   const fitZoom = useCallback((forceFit: boolean) => {
     const d = docRef.current;
     const area = areaRef.current;
     if (!d || !area) return;
-    if (userZoomed && !forceFit) return;
+    if (userZoomedRef.current && !forceFit) return;
     const p = d.pages[Math.min(pageIndexRef.current, d.pages.length - 1)];
     const z = Math.min((area.clientWidth - 110) / p.w, (area.clientHeight - 90) / p.h);
     setZoom(clamp(z, 0.05, 2));
-  }, [userZoomed]);
+  }, []);
 
   useEffect(() => { if (mounted) fitZoom(true); }, [mounted, pageIndex, fitZoom]);
   useEffect(() => {
@@ -1219,29 +1251,34 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
         return;
       }
       if (inField) return;
+      /* call through keyFnsRef so shortcuts always see the CURRENT render's
+         closures — the effect deliberately doesn't resubscribe every render,
+         and stale closures here caused Ctrl+S to re-create projects and
+         Ctrl+V to paste onto a previously viewed page */
+      const fns = keyFnsRef.current;
       const mod = e.ctrlKey || e.metaKey;
       if (mod && e.key.toLowerCase() === "z" && !e.shiftKey) { e.preventDefault(); undo(); return; }
       if (mod && (e.key.toLowerCase() === "y" || (e.key.toLowerCase() === "z" && e.shiftKey))) { e.preventDefault(); redo(); return; }
-      if (mod && e.key.toLowerCase() === "d") { e.preventDefault(); duplicateSel(); return; }
-      if (mod && e.key.toLowerCase() === "s") { e.preventDefault(); saveProject(false); return; }
-      if (mod && e.key.toLowerCase() === "c") { e.preventDefault(); copySel(); return; }
-      if (mod && e.key.toLowerCase() === "x") { e.preventDefault(); cutSel(); return; }
-      if (mod && e.key.toLowerCase() === "v") { e.preventDefault(); pasteClip(); return; }
-      if (mod && e.key === "[") { e.preventDefault(); alignSel("hcenter"); return; }
-      if (mod && e.key === "]") { e.preventDefault(); alignSel("vcenter"); return; }
+      if (mod && e.key.toLowerCase() === "d") { e.preventDefault(); fns.duplicateSel(); return; }
+      if (mod && e.key.toLowerCase() === "s") { e.preventDefault(); fns.saveProject(false); return; }
+      if (mod && e.key.toLowerCase() === "c") { e.preventDefault(); fns.copySel(); return; }
+      if (mod && e.key.toLowerCase() === "x") { e.preventDefault(); fns.cutSel(); return; }
+      if (mod && e.key.toLowerCase() === "v") { e.preventDefault(); fns.pasteClip(); return; }
+      if (mod && e.key === "[") { e.preventDefault(); fns.alignSel("hcenter"); return; }
+      if (mod && e.key === "]") { e.preventDefault(); fns.alignSel("vcenter"); return; }
       /* letterer hotkeys: B balloon, T text, L lettering, P panel */
       if (!mod && !e.altKey) {
         const k = e.key.toLowerCase();
-        if (k === "b") { e.preventDefault(); addFromTray("speech"); return; }
-        if (k === "t") { e.preventDefault(); addFromTray("text"); return; }
-        if (k === "l") { e.preventDefault(); addFromTray("sfx"); return; }
-        if (k === "p") { e.preventDefault(); addFromTray("panel"); return; }
+        if (k === "b") { e.preventDefault(); fns.addFromTray("speech"); return; }
+        if (k === "t") { e.preventDefault(); fns.addFromTray("text"); return; }
+        if (k === "l") { e.preventDefault(); fns.addFromTray("sfx"); return; }
+        if (k === "p") { e.preventDefault(); fns.addFromTray("panel"); return; }
       }
       const d = docRef.current!;
       const p = d.pages[pageIndexRef.current];
       const el = p.els.find((x) => x.id === selId);
       if (!el) return;
-      if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); deleteSel(); return; }
+      if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); fns.deleteSel(); return; }
       if (el.locked) return;
       const step = e.shiftKey ? 10 : 2;
       const dxy: Record<string, [number, number]> = {
@@ -1259,6 +1296,9 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selId, editingId, undo, redo, finishEditing]);
+
+  /* keep the shortcut handlers fresh (see keyFnsRef above) */
+  keyFnsRef.current = { duplicateSel, saveProject, copySel, cutSel, pasteClip, alignSel, addFromTray, deleteSel };
 
   /* ---------------- element ops ---------------- */
 
@@ -1471,7 +1511,12 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     const d = docRef.current!;
     const src = d.pages[pageIndexRef.current];
     const copy = JSON.parse(JSON.stringify(src)) as Page;
-    for (const el of copy.els) el.id = uid(); // fresh ids so elements are independent
+    /* fresh ids — and remap attachTo so joined balloons stay joined on the copy */
+    const idMap = new Map<string, string>();
+    for (const el of copy.els) { const nid = uid(); idMap.set(el.id, nid); el.id = nid; }
+    for (const el of copy.els) {
+      if (el.type === "balloon" && el.attachTo) el.attachTo = idMap.get(el.attachTo) ?? null;
+    }
     d.pages.splice(pageIndexRef.current + 1, 0, copy);
     setPageIndex(pageIndexRef.current + 1);
     setSelId(null);
@@ -2078,6 +2123,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       docRef.current = payload.doc;
       assetsRef.current = payload.assets || {};
       reseedIds(docRef.current!);
+      reseedAids();
       histRef.current = [JSON.stringify(docRef.current)];
       hIndexRef.current = 0;
       setCurrent({ id: p.id, name: p.name });
@@ -2118,15 +2164,16 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     try {
       const payload = JSON.parse(await f.text());
       const d: Doc = payload.doc ?? payload;
-      if (d?.app !== "comiclettering" || !Array.isArray(d.pages)) throw new Error("not a ComicLettering project");
+      if (d?.app !== "comiclettering" || !Array.isArray(d.pages) || d.pages.length === 0) throw new Error("not a ComicLettering project");
       if ((d as { version?: number }).version !== 2) throw new Error("this file is from an old version");
       docRef.current = d;
       assetsRef.current = payload.assets || {};
       reseedIds(d);
+      reseedAids();
       histRef.current = [JSON.stringify(d)];
       hIndexRef.current = 0;
       setCurrent(null);
-      setSelId(null); setPageIndex(0); setThumbs({});
+      setSelId(null); setEditingId(null); setPageIndex(0); setThumbs({});
       autosave(); force(); fitZoom(true);
       setStatus("Project imported.");
     } catch (err) {
@@ -2407,11 +2454,6 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       </div>
     );
   }
-
-  /* small field helpers */
-  const Fld = ({ label, children }: { label: string; children: ReactNode }) => (
-    <div className="fld"><label>{label}</label>{children}</div>
-  );
 
   function tsControls(el: BalloonEl | TextEl) {
     const ts = el.ts;
@@ -2855,6 +2897,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
         <div className="btnRow">
           <button onClick={exportAllPages}>Export all pages (PNG)</button>
           <button onClick={async () => {
+            if (demo) { setStatus("Export is off in the demo — subscribe to export print-ready pages."); return; }
             try {
               const { exportPdf } = await import("@/lib/pdfExport");
               await exportPdf(docRef.current!, assetsRef.current, (current?.name || "comic") + ".pdf",

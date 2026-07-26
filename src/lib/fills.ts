@@ -345,6 +345,9 @@ export function paintFill(
 ) {
   ctx.save();
   if (clip) ctx.clip(clip);
+  /* the clip path can extend well beyond the 0..w/h box (balloon tails,
+     connector bands) — paint an expanded rect so those regions fill too */
+  const X = -w, Y = -h, W = w * 3, H = h * 3;
   if (f.kind === "gradient") {
     const rad = ((f.angle - 90) * Math.PI) / 180;
     const cx = w / 2, cy = h / 2;
@@ -360,15 +363,15 @@ export function paintFill(
       g.addColorStop(1, f.b);
     }
     ctx.fillStyle = g;
-    ctx.fillRect(0, 0, w, h);
+    ctx.fillRect(X, Y, W, H);
   } else {
     ctx.fillStyle = f.a;
-    ctx.fillRect(0, 0, w, h);
+    ctx.fillRect(X, Y, W, H);
     const tile = fillOverlayTile(f);
     if (tile) {
       if (isRepeating(f)) {
         const pat = ctx.createPattern(tile, "repeat");
-        if (pat) { ctx.fillStyle = pat; ctx.fillRect(0, 0, w, h); }
+        if (pat) { ctx.fillStyle = pat; ctx.fillRect(X, Y, W, H); }
       } else {
         ctx.drawImage(tile, 0, 0, w, h);
       }

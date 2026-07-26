@@ -107,6 +107,12 @@ export interface BalloonGeom {
   deco?: string;
   /* suppress stroking the main path (border drawn by deco instead) */
   noStroke?: boolean;
+  /* joined-balloon connector, drawn as a separate OPEN band on top of both
+     bodies: `bandFill` is the closed quad (filled, no stroke — it covers the
+     outline segments it crosses so both junctions stay open), `bandEdges` are
+     the two side curves (stroked only). */
+  bandFill?: string;
+  bandEdges?: string;
   textRect: [number, number, number, number];
   dash: number[] | null;
 }
@@ -319,9 +325,116 @@ function jitterRing(
   return d + " Z";
 }
 
+/* ---------------- open connector band (joined balloons) ---------------- */
+
+/* Points where the connector meets the outline, for any balloon shape. */
+function connectorBase(el: BalloonEl): { A: number[]; B: number[]; E: number[] } | null {
+  const w = el.w, h = el.h, cx = w / 2, cy = h / 2;
+  const tail = el.tail;
+  if (!tail) return null;
+  const aim = tail.bx != null && tail.by != null ? [cx + tail.bx, cy + tail.by] : [cx + tail.dx, cy + tail.dy];
+  let pts: number[][] | null = null;
+  switch (el.kind) {
+    case "caption": case "square": pts = [[0, 0], [w, 0], [w, h], [0, h]]; break;
+    case "rounded": pts = roundRectPts(w, h, Math.min(w, h) * 0.18, 6); break;
+    case "extend": pts = roundRectPts(w, h, Math.min(w, h) / 2, 8); break;
+    case "tv": pts = roundRectPts(w, h, Math.min(w, h) * 0.12, 4); break;
+    case "custom": {
+      const p2 = (el.pts || []).map(([nx, ny]) => [nx * w, ny * h]);
+      if (p2.length >= 3) pts = p2;
+      break;
+    }
+    default: pts = null; // ellipse family
+  }
+  if (!pts) {
+    const rx = w / 2, ry = h / 2;
+    const t = Math.atan2(aim[1] - cy, aim[0] - cx);
+    const delta = 0.11;
+    return {
+      A: ellipsePt(cx, cy, rx, ry, t + delta),
+      B: ellipsePt(cx, cy, rx, ry, t - delta),
+      E: ellipsePt(cx, cy, rx, ry, t),
+    };
+  }
+  /* polygon: ray exit + arc-length base (same maths as polygonWithTail) */
+  const dx = aim[0] - cx, dy = aim[1] - cy;
+  const dLen = Math.hypot(dx, dy);
+  if (dLen < 4) return null;
+  const D = [dx / dLen, dy / dLen];
+  let bestI = -1, bestS = Infinity, bestU = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const P = pts[i], Q = pts[(i + 1) % pts.length];
+    const ex = Q[0] - P[0], ey = Q[1] - P[1];
+    const den = D[0] * ey - D[1] * ex;
+    if (Math.abs(den) < 1e-9) continue;
+    const u = (D[0] * (cy - P[1]) - D[1] * (cx - P[0])) / den;
+    const s = Math.abs(D[0]) > Math.abs(D[1])
+      ? (P[0] + u * ex - cx) / D[0]
+      : (P[1] + u * ey - cy) / D[1];
+    if (u >= 0 && u <= 1 && s > 0 && s < bestS) { bestS = s; bestI = i; bestU = u; }
+  }
+  if (bestI < 0) return null;
+  const n = pts.length;
+  const cum: number[] = new Array(n);
+  let per = 0;
+  for (let i = 0; i < n; i++) {
+    cum[i] = per;
+    const q = pts[(i + 1) % n];
+    per += Math.hypot(q[0] - pts[i][0], q[1] - pts[i][1]);
+  }
+  if (per < 8) return null;
+  const segLen = (i: number) => (i + 1 < n ? cum[i + 1] : per) - cum[i];
+  const exitS = cum[bestI] + bestU * segLen(bestI);
+  const half = Math.min(per * 0.18, Math.max(6, (w + h) * 0.0275));
+  const pointAt = (s: number): number[] => {
+    s = ((s % per) + per) % per;
+    for (let k = 0; k < n; k++) {
+      const end = k + 1 < n ? cum[k + 1] : per;
+      if (s >= cum[k] && s <= end) return lerpPt(pts[k], pts[(k + 1) % n], (s - cum[k]) / (segLen(k) || 1));
+    }
+    return pts[0];
+  };
+  return { A: pointAt(exitS + half), B: pointAt(exitS - half), E: pointAt(exitS) };
+}
+
+/* The open connector band between joined balloons. Drawn AFTER both bodies:
+   the fill quad reaches a little inside this balloon and deep into the
+   partner, covering both outline strokes where it crosses them, so each
+   junction stays open — only the two (relatively parallel) sides get inked. */
+function connectorBand(el: BalloonEl): { fill: string; edges: string } | null {
+  const tail = el.tail;
+  if (!tail) return null;
+  const base = connectorBase(el);
+  if (!base) return null;
+  const { A, B, E } = base;
+  const cx = el.w / 2, cy = el.h / 2;
+  const tip = [cx + tail.dx, cy + tail.dy];
+  const bandHalf = Math.hypot(A[0] - B[0], A[1] - B[1]) * 0.42;
+  const g = bendGeom(tail, cx, cy, tip, E, B, bandHalf);
+  const sideB = bentSide(B, g.M_B, g.tipB, g.T);
+  const sideA = bentSide(A, g.M_A, g.tipA, g.T);
+  const inset = Math.max(6, el.strokeW * 2);
+  const inw = (P: number[]) => {
+    const vx = cx - P[0], vy = cy - P[1];
+    const L = Math.hypot(vx, vy) || 1;
+    return [P[0] + (vx / L) * inset, P[1] + (vy / L) * inset];
+  };
+  const fillPts = [inw(B), B, ...sideB, ...[...sideA].reverse(), A, inw(A)];
+  const seg = (P: number[], samples: number[][]) =>
+    `M ${fmt(P[0])} ${fmt(P[1])}` + samples.map((p) => ` L ${fmt(p[0])} ${fmt(p[1])}`).join("");
+  return { fill: linePath(fillPts), edges: seg(B, sideB) + " " + seg(A, sideA) };
+}
+
 /* ---------------- main entry ---------------- */
 
 export function balloonGeom(el: BalloonEl): BalloonGeom {
+  /* joined balloons: the outline stays a plain closed shape — the connector
+     is returned separately as an OPEN band drawn over both bodies */
+  if (el.band && el.tail) {
+    const plain = balloonGeom({ ...el, band: false, tail: null });
+    const band = connectorBand(el);
+    return band ? { ...plain, bandFill: band.fill, bandEdges: band.edges } : plain;
+  }
   const w = el.w, h = el.h, cx = w / 2, cy = h / 2, rx = w / 2, ry = h / 2;
   const tail = el.tail;
   const tip = tail ? [cx + tail.dx, cy + tail.dy] : null;
@@ -332,19 +445,11 @@ export function balloonGeom(el: BalloonEl): BalloonGeom {
   switch (el.kind) {
     case "caption": {
       const p = Math.max(8, Math.min(w, h) * 0.12);
-      /* joined captions still need the connector band spliced in */
-      const d = el.band && tail
-        ? polygonWithTail([[0, 0], [w, 0], [w, h], [0, h]], w, h, tail, false, true)
-        : `M 0 0 H ${fmt(w)} V ${fmt(h)} H 0 Z`;
-      return { d, textRect: [p, p, w - 2 * p, h - 2 * p], dash: null };
+      return { d: `M 0 0 H ${fmt(w)} V ${fmt(h)} H 0 Z`, textRect: [p, p, w - 2 * p, h - 2 * p], dash: null };
     }
     case "rounded": {
       const r = Math.min(w, h) * 0.18;
-      const rPts = roundRectPts(w, h, r, 6);
-      const d = el.band && tail
-        ? polygonWithTail(rPts, w, h, tail, false, true)
-        : linePath(rPts);
-      return { d, textRect: padRect(0.12, 0.14), dash: null };
+      return { d: linePath(roundRectPts(w, h, r, 6)), textRect: padRect(0.12, 0.14), dash: null };
     }
     case "square":
       return {

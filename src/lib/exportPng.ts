@@ -140,7 +140,10 @@ function drawWarpedText(
   const cx0 = rx + rw / 2, cy0 = ry + rh / 2;
   let fill: string | CanvasGradient = ts.fillA;
   if (ts.fillB) {
-    const g = ctx.createLinearGradient(0, cy0 - ts.size / 2, 0, cy0 + ts.size / 2);
+    /* glyph-LOCAL coordinates: gradients resolve against the CTM at paint
+       time, and each glyph is painted inside its own translate/rotate — so a
+       ramp spanning (0,±size/2) reproduces the editor's per-glyph gradient */
+    const g = ctx.createLinearGradient(0, -ts.size / 2, 0, ts.size / 2);
     g.addColorStop(0, lightenHex(ts.fillA, 0.55));
     g.addColorStop(0.38, ts.fillA);
     g.addColorStop(1, ts.fillB);
@@ -379,6 +382,20 @@ function drawEl(ctx: CanvasRenderingContext2D, el: El, assets: Assets, merge?: M
     if (g.deco && el.strokeW > 0) {
       ctx.fillStyle = el.stroke;
       ctx.fill(new Path2D(g.deco));
+    }
+    /* open connector band over both bodies: fill hides the outline crossings,
+       only the two sides get inked — both junctions stay open */
+    if (g.bandFill) {
+      ctx.setLineDash([]);
+      ctx.fillStyle = el.fill.a;
+      ctx.fill(new Path2D(g.bandFill));
+      if (g.bandEdges && el.strokeW > 0) {
+        ctx.strokeStyle = el.stroke;
+        ctx.lineWidth = el.strokeW;
+        ctx.lineJoin = "round";
+        ctx.lineCap = "round";
+        ctx.stroke(new Path2D(g.bandEdges));
+      }
     }
     ctx.setLineDash([]);
     drawStyledText(ctx, el.ts, el.text, g.textRect, 0, el.runs);

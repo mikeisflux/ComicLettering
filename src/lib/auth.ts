@@ -46,8 +46,13 @@ async function authSecret(): Promise<string> {
     update: {},
     create: { key: "AUTH_SECRET", value: secret },
   });
-  cachedSecret = secret;
-  return secret;
+  /* cluster-safe: two workers can race this bootstrap — the upsert's
+     `update: {}` keeps the first writer's value, so ALWAYS re-read and cache
+     the row that actually won. Caching our own candidate would leave the
+     losing worker signing cookies the winner rejects (random logouts). */
+  const winner = await prisma.setting.findUnique({ where: { key: "AUTH_SECRET" } });
+  cachedSecret = winner?.value || secret;
+  return cachedSecret;
 }
 
 const b64u = (s: string) => Buffer.from(s).toString("base64url");

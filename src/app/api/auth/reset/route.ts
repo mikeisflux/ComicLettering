@@ -11,18 +11,17 @@ export async function POST(req: Request) {
     if (!t) return NextResponse.json({ error: "Missing reset token." }, { status: 400 });
     if (pw.length < 8) return NextResponse.json({ error: "Password must be at least 8 characters." }, { status: 400 });
 
-    const user = await prisma.user.findFirst({
+    /* atomic consume: the token match is part of the UPDATE itself, so two
+       concurrent requests can never both redeem the same token */
+    const res = await prisma.user.updateMany({
       where: { resetToken: hashResetToken(t), resetExpiry: { gt: new Date() } },
-    });
-    if (!user) {
-      return NextResponse.json({ error: "This reset link is invalid or has expired. Request a new one." }, { status: 400 });
-    }
-    await prisma.user.update({
-      where: { id: user.id },
       data: { passwordHash: await hashPassword(pw), resetToken: null, resetExpiry: null },
     });
+    if (res.count !== 1) {
+      return NextResponse.json({ error: "This reset link is invalid or has expired. Request a new one." }, { status: 400 });
+    }
     return NextResponse.json({ ok: true });
-  } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: "Could not reset the password." }, { status: 500 });
   }
 }
