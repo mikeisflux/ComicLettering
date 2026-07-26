@@ -425,8 +425,17 @@ function connectorBand(el: BalloonEl): { fill: string; edges: string } | null {
   const rr = Math.hypot(E[0] - cx, E[1] - cy) || 1;
   const halfW = Math.max(5, rr * 0.115);
   const tipHalf = halfW * 1.3;
-  const A = [E[0] + perp[0] * halfW, E[1] + perp[1] * halfW];
-  const B = [E[0] - perp[0] * halfW, E[1] - perp[1] * halfW];
+  /* tuck the base points slightly INSIDE the outline — they sit on the
+     tangent line, which floats just outside a curved edge and leaves a
+     sliver gap between the side lines and the balloon outline */
+  const tuck = el.strokeW * 1.5 + 2;
+  const seat = (P: number[]) => {
+    const vx = cx - P[0], vy = cy - P[1];
+    const L = Math.hypot(vx, vy) || 1;
+    return [P[0] + (vx / L) * tuck, P[1] + (vy / L) * tuck];
+  };
+  const A = seat([E[0] + perp[0] * halfW, E[1] + perp[1] * halfW]);
+  const B = seat([E[0] - perp[0] * halfW, E[1] - perp[1] * halfW]);
   let sideA: number[][], sideB: number[][];
   if (tail.bx != null && tail.by != null) {
     /* user-bent band: curve through the bend point */
