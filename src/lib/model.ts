@@ -236,9 +236,25 @@ function bandToward(from: BalloonEl, to: BalloonEl, keep?: BalloonEl["tail"]): B
    with a wide band that opens into BOTH balloons; once they overlap they melt
    into one shape and the connector vanishes entirely. */
 export function resolveBalloon(page: Page, el: BalloonEl): { el: BalloonEl; base: BalloonEl | null } {
-  /* a parent always keeps its own speaker tail — the joined child owns and
-     draws the connector band */
-  if (!el.attachTo) return { el, base: null };
+  if (!el.attachTo) {
+    /* a parent keeps its speaker tail for pointing at the character — but if
+       that tail aims into a joined child, hide it so the pointed wedge never
+       stacks on top of the connector band */
+    if (el.tail) {
+      for (const o of page.els) {
+        if (o.type !== "balloon" || (o as BalloonEl).attachTo !== el.id) continue;
+        const [cdx, cdy] = rotVec(
+          o.x + o.w / 2 - (el.x + el.w / 2),
+          o.y + o.h / 2 - (el.y + el.h / 2), -el.rot);
+        const toChild = Math.atan2(cdy, cdx);
+        const toTail = Math.atan2(el.tail.dy, el.tail.dx);
+        let diff = Math.abs(toChild - toTail);
+        if (diff > Math.PI) diff = 2 * Math.PI - diff;
+        if (diff < 0.7) return { el: { ...el, tail: null }, base: null }; // ~40°
+      }
+    }
+    return { el, base: null };
+  }
 
   const base = page.els.find((e) => e.id === el.attachTo && e.type === "balloon") as BalloonEl | undefined;
   if (!base) return { el: { ...el, attachTo: null }, base: null };
