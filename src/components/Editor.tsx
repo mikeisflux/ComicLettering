@@ -21,6 +21,7 @@ import {
   letterStyleCss, runsToHtml,
 } from "./editor/textHelpers";
 import { closeSketchLoop, detectSketchTail, resampleRing, smoothSketchRing } from "./editor/sketch";
+import { SmartTip, pickTip } from "./editor/smartTips";
 import { PageSetupDialog, Ruler, STAGE_MX, STAGE_MY } from "./editor/chrome";
 import { EditorCtx } from "./editor/ctx";
 import {
@@ -99,6 +100,30 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const drawPtsRef = useRef<number[][] | null>(null);
   /* id of a freshly sketched balloon awaiting a tail choice */
   const [tailAsk, setTailAsk] = useState<string | null>(null);
+  /* smart contextual tips: one at a time, each shows once (localStorage) */
+  const [tip, setTip] = useState<SmartTip | null>(null);
+  const tipsSeenRef = useRef<Set<string>>(new Set());
+  const tipsOnRef = useRef(true);
+  useEffect(() => {
+    try {
+      tipsSeenRef.current = new Set(JSON.parse(localStorage.getItem("lmc.tips.seen") || "[]"));
+      tipsOnRef.current = localStorage.getItem("lmc.tips.on") !== "0";
+    } catch { /* ignore */ }
+  }, []);
+  const dismissTip = useCallback(() => {
+    setTip((t) => {
+      if (t) {
+        tipsSeenRef.current.add(t.id);
+        try { localStorage.setItem("lmc.tips.seen", JSON.stringify([...tipsSeenRef.current])); } catch { /* ignore */ }
+      }
+      return null;
+    });
+  }, []);
+  const disableTips = useCallback(() => {
+    tipsOnRef.current = false;
+    try { localStorage.setItem("lmc.tips.on", "0"); } catch { /* ignore */ }
+    setTip(null);
+  }, []);
   const autoLockRef = useRef(false);
   const [autoLock, setAutoLockState] = useState(false);
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; id: string } | null>(null);
@@ -204,6 +229,28 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const doc = docRef.current;
   const page: Page | null = doc ? doc.pages[Math.min(pageIndex, doc.pages.length - 1)] : null;
   const selEl: El | null = page?.els.find((e) => e.id === selId) || null;
+
+  /* surface the first unseen tip whose situation matches what the user is
+     doing right now */
+  useEffect(() => {
+    if (!mounted || !tipsOnRef.current || tip) return;
+    const s = selEl;
+    const joined = !!(s && s.type === "balloon" &&
+      ((s as BalloonEl).attachTo ||
+        page?.els.some((e) => e.type === "balloon" && (e as BalloonEl).attachTo === s.id)));
+    const next = pickTip({
+      selType: s ? (s.type as "balloon" | "text" | "panel" | "image") : null,
+      selHasTail: !!(s && s.type === "balloon" && (s as BalloonEl).tail),
+      selJoined: joined,
+      selIsSfx: !!(s && s.type === "text" && s.ts.outlineW >= 4),
+      selHasText: !!(s && (s.type === "balloon" || s.type === "text") && s.text.trim()),
+      editing: !!editingId,
+      exportOpen: showExport,
+      balloonCount: page ? page.els.filter((e) => e.type === "balloon").length : 0,
+    }, tipsSeenRef.current);
+    if (next) setTip(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mounted, selId, editingId, showExport, pageIndex]);
 
   const setStatus = useCallback((msg: string) => {
     setStatusRaw(msg);
@@ -1122,6 +1169,18 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
           e.target.value = "";
           if (f) importJSON(ed, f);
         }} />
+
+      {/* smart contextual tip — one at a time, each shows once */}
+      {tip && (
+        <div className="smartTip" role="status">
+          <div className="smartTipTitle">💡 {tip.title}</div>
+          <div className="smartTipText">{tip.text}</div>
+          <div className="smartTipActs">
+            <button className="smartTipOk" onClick={dismissTip}>Got it</button>
+            <button className="smartTipOff" onClick={disableTips}>Turn off tips</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

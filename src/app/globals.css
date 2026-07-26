@@ -607,3 +607,23 @@ input[type="range"] { width: 110px; }
   font-style: normal; display: none;
 }
 .fontRow:hover .fontDel { display: block; }
+
+/* smart contextual tips */
+.smartTip {
+  position: fixed; right: 18px; bottom: 46px; width: 300px; z-index: 200;
+  background: #fffdf2; border: 1px solid #e3d9a8; border-radius: 10px;
+  padding: 12px 14px; box-shadow: 0 6px 24px #00000033;
+  animation: tipIn .25s ease-out;
+}
+@keyframes tipIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.smartTipTitle { font-weight: 700; font-size: 13px; margin-bottom: 5px; color: #4a4020; }
+.smartTipText { font-size: 12.5px; line-height: 1.45; color: #3d3d3d; }
+.smartTipActs { display: flex; gap: 10px; margin-top: 9px; align-items: center; }
+.smartTipOk {
+  background: #2f6feb; color: #fff; border: none; border-radius: 6px;
+  padding: 4px 12px; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.smartTipOff {
+  background: none; border: none; color: #8a8a8a; font-size: 11.5px;
+  cursor: pointer; text-decoration: underline;
+}
