@@ -51,6 +51,7 @@ export interface EditorCtx {
   force: () => void;
   commit: () => void;
   autosave: () => void;
+  autosaveSoon: () => void;
   undo: () => void;
   redo: () => void;
   setStatus: (msg: string) => void;

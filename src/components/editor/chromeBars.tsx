@@ -7,6 +7,7 @@ import {
 import { fillCss } from "@/lib/fills";
 import { ToolBtn } from "./chrome";
 import { FontMenu, SubtypeSelect, tsVariant } from "./FontMenu";
+import { clearArt, releaseAllArt } from "@/lib/assetStore";
 import { EditorCtx } from "./ctx";
 import {
   addFromTray, alignSel, applyQuickFill, applyQuickStroke, balanceRag,
@@ -26,7 +27,7 @@ export function renderMenuBar(ed: EditorCtx) {
     {openMenu && <div className="ctxBackdrop" style={{ zIndex: 179 }} onClick={() => setOpenMenu(null)} />}
     {([
       ["File", [
-        ["New Document", () => { if (window.confirm("Start a new document?")) { docRef.current = starterDoc(); assetsRef.current = {}; reseedIds(docRef.current); histRef.current = [JSON.stringify(docRef.current)]; hIndexRef.current = 0; setCurrent(null); setSelId(null); setPageIndex(0); setThumbs({}); autosave(); force(); fitZoom(true); } }],
+        ["New Document", () => { if (window.confirm("Start a new document?")) { docRef.current = starterDoc(); assetsRef.current = {}; releaseAllArt(); clearArt(); reseedIds(docRef.current); histRef.current = [JSON.stringify(docRef.current)]; hIndexRef.current = 0; setCurrent(null); setSelId(null); setPageIndex(0); setThumbs({}); autosave(); force(); fitZoom(true); } }],
         ["Open Library", () => setTab("library")],
         ["Save", () => saveProject(ed, false)],
         ["Save As…", () => saveProject(ed, true)],
@@ -153,6 +154,7 @@ export function renderToolbar(ed: EditorCtx) {
       if (!window.confirm("Start a new document?")) return;
       docRef.current = starterDoc();
       assetsRef.current = {};
+      releaseAllArt(); clearArt();
       reseedIds(docRef.current);
       histRef.current = [JSON.stringify(docRef.current)];
       hIndexRef.current = 0;

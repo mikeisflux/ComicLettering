@@ -3,11 +3,15 @@
    EditorCtx bag (plain function calls, not components). */
 import React from "react";
 import {
-  BalloonEl, BalloonKind, Doc, El, FONTS, FillStyle, GradStop, Page,
+  Assets, BalloonEl, BalloonKind, Doc, El, FONTS, FillStyle, GradStop, Page,
   TAILLESS_KINDS, TextEl, TextStyle, clamp, makeBalloon, makeImage,
   makePanel, makeText, reseedIds, solid, uid,
 } from "@/lib/model";
 import { balloonGeom } from "@/lib/geometry";
+import {
+  artUrl, clearArt, ensureArt, fmtBytes, holdArt, putArt, releaseAllArt,
+  requestPersistence, storageEstimate,
+} from "@/lib/assetStore";
 import { LETTER_STYLES, applyLetterStyle } from "@/lib/presets";
 import { BALLOON_STYLES, BOX_STYLES, applyShapeStyle } from "@/lib/balloonStyles";
 import {
@@ -315,11 +319,13 @@ export function movePage(ed: EditorCtx, dir: -1 | 1) {
 /* Grow a balloon so its lettering fits. Balloons expand as you type rather
    than silently clipping; returns true if the size actually changed. */
 
-/* Live balloon growth while the caret is in it. React deliberately does not
-   own the editable node during editing (see renderEls), so re-rendering here
-   resizes the balloon without disturbing the caret. */
-export function growWhileTyping(ed: EditorCtx, id: string, dom: HTMLElement) {
-  const { docRef, pageIndexRef, force } = ed;
+/* Every keystroke in a balloon or caption: grow the shape to fit, and put the
+   in-progress line into the autosave. React deliberately does not own the
+   editable node during editing (see renderEls), so re-rendering here resizes
+   the balloon without disturbing the caret. */
+export function onLetteringInput(ed: EditorCtx, id: string, dom: HTMLElement) {
+  const { docRef, pageIndexRef, force, autosaveSoon } = ed;
+  autosaveSoon();
   const d = docRef.current;
   if (!d) return;
   const p = d.pages[pageIndexRef.current];
@@ -747,9 +753,10 @@ export async function importPdfFile(ed: EditorCtx, f: File, x?: number, y?: numb
     const c = document.createElement("canvas");
     c.width = Math.round(vp.width); c.height = Math.round(vp.height);
     await pg.render({ canvas: c, canvasContext: c.getContext("2d")!, viewport: vp }).promise;
-    const url = c.toDataURL("image/png");
     const aid = "a" + aidRef.current++;
-    assetsRef.current[aid] = url;
+    const blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/png"));
+    const url = blob ? await stashArt(ed, aid, blob) : c.toDataURL("image/png");
+    if (!blob) assetsRef.current[aid] = url;
     await loadImage(url);
     if (!first) first = { aid, w: c.width, h: c.height };
   }
@@ -763,12 +770,57 @@ export async function importImageFile(ed: EditorCtx, f: File, x?: number, y?: nu
     await importPdfFile(ed, f, x, y);
     return;
   }
-  const url = await readAsDataURL(f);
-  const img = await loadImage(url);
   const aid = "a" + aidRef.current++;
-  assetsRef.current[aid] = url;
+  const url = await stashArt(ed, aid, f);
+  const img = await loadImage(url);
   placeAsset(ed, aid, img.naturalWidth, img.naturalHeight, x, y);
 }
+
+/* Put artwork in the local store as a Blob and hand back a URL the canvas and
+   <img> can use. Never base64: a 40MB scan becomes a 53MB string on the JS
+   heap, and a book's worth of those will take the tab down. */
+/* Export walks every page, but pages only materialise their artwork as they
+   are visited — so bring the whole book in first or the unvisited pages render
+   blank. */
+export async function ensureAllArt(ed: EditorCtx) {
+  const { docRef, assetsRef } = ed;
+  const d = docRef.current;
+  if (!d) return;
+  const want: string[] = [];
+  for (const pg of d.pages) {
+    for (const e of pg.els) {
+      const id = "img" in e ? (e.img as string | null) : null;
+      if (id && !assetsRef.current[id]) want.push(id);
+    }
+  }
+  if (!want.length) return;
+  for (const id of await ensureArt(want)) assetsRef.current[id] = artUrl(id)!;
+}
+
+export async function stashArt(ed: EditorCtx, aid: string, blob: Blob): Promise<string> {
+  const { assetsRef, setStatus } = ed;
+  /* first artwork of the session: ask the browser to stop treating this
+     origin as evictable, so a big book is not cleared out when disk gets tight */
+  if (!askedToPersist) { askedToPersist = true; requestPersistence(); }
+  const ok = await putArt(aid, blob);
+  const url = holdArt(aid, blob);
+  assetsRef.current[aid] = url;
+  if (!ok) {
+    const est = await storageEstimate();
+    setStatus(est && est.quota
+      ? `Could not store this artwork on this computer — ${fmtBytes(est.usage)} of ${fmtBytes(est.quota)} used. Free some disk space, or it will not survive a refresh.`
+      : "Could not store this artwork on this computer — it will not survive a refresh. Check your browser's storage settings.");
+    return url;
+  }
+  /* warn while there is still room to do something about it */
+  const est = await storageEstimate();
+  if (est && est.quota && est.usage / est.quota > 0.8) {
+    setStatus(`Artwork stored — ${fmtBytes(est.usage)} of ${fmtBytes(est.quota)} of local storage used. Export or free disk space before adding many more pages.`);
+  }
+  return url;
+}
+
+let askedToPersist = false;
 
 /* Instant Alpha: flood-remove the background color from the image edges. */
 export async function runInstantAlpha(ed: EditorCtx, elId: string, aid: string) {
@@ -886,6 +938,20 @@ export async function refreshProjects(ed: EditorCtx) {
   }
 }
 
+/* Full-size page scans stay on this computer: they are held as local blobs,
+   and a 140-page book of them is gigabytes — not something to push through a
+   project save. Small generated artwork (tuck cutouts, stamps) is still a data
+   URL and travels with the document as before. */
+export function portableAssets(assets: Assets): { assets: Assets; local: number } {
+  const out: Assets = {};
+  let local = 0;
+  for (const [id, url] of Object.entries(assets)) {
+    if (typeof url === "string" && url.startsWith("blob:")) local++;
+    else out[id] = url;
+  }
+  return { assets: out, local };
+}
+
 export async function saveProject(ed: EditorCtx, saveAs: boolean) {
   const { demo, setStatus, current, setCurrent, docRef, assetsRef } = ed;
   if (demo) { setStatus("Saving is off in the demo — subscribe to save your comics to your library."); return; }
@@ -902,14 +968,17 @@ export async function saveProject(ed: EditorCtx, saveAs: boolean) {
   try {
     let thumbnail = "";
     try { thumbnail = await docThumbnail(d, assetsRef.current); } catch { /* optional */ }
-    const payload = { name, data: { doc: d, assets: assetsRef.current }, thumbnail };
+    const { assets: portable, local } = portableAssets(assetsRef.current);
+    const payload = { name, data: { doc: d, assets: portable }, thumbnail };
     const res = target
       ? await fetch(`/api/projects/${target.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) })
       : await fetch("/api/projects", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     if (!res.ok) throw new Error((await res.json())?.error || res.statusText);
     const meta = await res.json();
     setCurrent({ id: meta.id, name: meta.name });
-    setStatus(`Saved “${meta.name}” to the library.`);
+    setStatus(local
+      ? `Saved “${meta.name}” to the library. ${local} page image${local > 1 ? "s stay" : " stays"} on this computer — they are too large to upload.`
+      : `Saved “${meta.name}” to the library.`);
     refreshProjects(ed);
   } catch (err) {
     setStatus("Save failed: " + String(err).slice(0, 120));
@@ -926,6 +995,9 @@ export async function loadProject(ed: EditorCtx, id: string) {
     const payload = p.data;
     if (!payload?.doc?.pages) throw new Error("bad project data");
     docRef.current = payload.doc;
+    /* a loaded document owns the artwork slate — drop the previous book's
+       local blobs so the store does not accumulate orphans */
+    releaseAllArt(); await clearArt();
     assetsRef.current = payload.assets || {};
     reseedIds(docRef.current!);
     reseedAids();
@@ -955,7 +1027,7 @@ export async function deleteProject(ed: EditorCtx, id: string) {
 export function exportJSON(ed: EditorCtx) {
   const { demo, setStatus, docRef, assetsRef, current } = ed;
   if (demo) { setStatus("Export is off in the demo — subscribe to unlock."); return; }
-  const blob = new Blob([JSON.stringify({ doc: docRef.current, assets: assetsRef.current })], { type: "application/json" });
+  const blob = new Blob([JSON.stringify({ doc: docRef.current, assets: portableAssets(assetsRef.current).assets })], { type: "application/json" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = (current?.name || "comic-project") + ".json";
@@ -971,6 +1043,9 @@ export async function importJSON(ed: EditorCtx, f: File) {
     if (d?.app !== "comiclettering" || !Array.isArray(d.pages) || d.pages.length === 0) throw new Error("not a ComicLettering project");
     if ((d as { version?: number }).version !== 2) throw new Error("this file is from an old version");
     docRef.current = d;
+    /* a loaded document owns the artwork slate — drop the previous book's
+       local blobs so the store does not accumulate orphans */
+    releaseAllArt(); await clearArt();
     assetsRef.current = payload.assets || {};
     reseedIds(d);
     reseedAids();
@@ -1005,6 +1080,8 @@ export async function exportAllPages(ed: EditorCtx) {
   const { demo, setStatus, docRef, assetsRef } = ed;
   if (demo) { setStatus("Export is off in the demo — subscribe to unlock."); return; }
   const d = docRef.current!;
+  setStatus("Loading artwork…");
+  await ensureAllArt(ed);
   for (let i = 0; i < d.pages.length; i++) {
     setStatus(`Exporting page ${i + 1}/${d.pages.length}…`);
     await exportPagePNG(d.pages[i], assetsRef.current, `comic-page-${i + 1}.png`);
@@ -1020,6 +1097,8 @@ export async function runExport(
   const { demo, setStatus, setShowExport, docRef, current, pageIndexRef,
     exportFrom, exportTo, letteringOnly, exportCropMarks, assetsRef } = ed;
   if (demo) { setStatus("Export is off in the demo — subscribe to export print-ready pages."); setShowExport(false); return; }
+  setStatus("Loading artwork…");
+  await ensureAllArt(ed);
   const d = docRef.current!;
   const nameBase = (current?.name || "comic").replace(/[^\w\- ]+/g, "");
   const idxs =

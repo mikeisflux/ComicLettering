@@ -18,6 +18,7 @@ import { BALLOON_STYLES, BOX_STYLES } from "@/lib/balloonStyles";
 import { StylesPanel, StyleTab, tabForSelection } from "./editor/stylesPanel";
 import { fillCss } from "@/lib/fills";
 import { ImageFormat, loadImage, pageThumbnail } from "@/lib/exportPng";
+import { artUrl, ensureArt, listArtIds, requestPersistence } from "@/lib/assetStore";
 import {
   BalloonPreset, HINT, PRESET_KEY, ProjectMeta, ProofMatch, domToRuns,
   letterStyleCss, runsToHtml, toggleEmphasis,
@@ -82,6 +83,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const [pageIndex, setPageIndex] = useState(0);
   const [selId, setSelId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const editingIdRef = useRef<string | null>(null);
   const [zoom, setZoom] = useState(0.35);
   const [userZoomed, setUserZoomed] = useState(false);
   const [tab, setTab] = useState<"layouts" | "inspector" | "layers" | "photos" | "library" | "proof">("layouts");
@@ -90,6 +92,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const [thumbs, setThumbs] = useState<Record<number, string>>({});
   const [projects, setProjects] = useState<ProjectMeta[] | null>(null);
   const [current, setCurrent] = useState<{ id: string; name: string } | null>(null);
+  const currentRef = useRef<{ id: string; name: string } | null>(null);
   const [dbError, setDbError] = useState<string | null>(null);
   const statusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const thumbTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -344,20 +347,21 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     })();
   }, []);
 
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const autosave = useCallback(() => {
-    const full = JSON.stringify({ doc: docRef.current, assets: assetsRef.current });
+    if (autosaveTimer.current) { clearTimeout(autosaveTimer.current); autosaveTimer.current = null; }
+    /* Only the document goes here — it is small, and it is the one thing that
+       has to be written synchronously while the tab is closing. Artwork went
+       into the local art store as a Blob when it was imported; a book of
+       full-size scans is gigabytes and has no business anywhere near the ~5MB
+       localStorage budget. */
     try {
-      /* localStorage quota is ~5MB; past it setItem throws and (before this
-         guard) the autosave silently stopped working entirely. Over budget,
-         store the document WITHOUT assets — lettering survives a reload even
-         when the artwork is too big to cache locally. */
-      if (full.length > 4_500_000) throw new Error("too large");
-      localStorage.setItem(AUTOSAVE_KEY, full);
-    } catch {
-      try {
-        localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({ doc: docRef.current, assets: {} }));
-      } catch { /* even doc alone won't fit — library/save still works */ }
-    }
+      localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({
+        doc: docRef.current,
+        at: { page: pageIndexRef.current, project: currentRef.current },
+      }));
+    } catch { /* even the document alone will not fit — library/save still works */ }
   }, []);
 
   const commit = useCallback(() => {
@@ -375,6 +379,8 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const pageIndexRef = useRef(0);
   useEffect(() => { pageIndexRef.current = pageIndex; }, [pageIndex]);
   useEffect(() => { commitRef.current = commit; }, [commit]);
+  useEffect(() => { editingIdRef.current = editingId; }, [editingId]);
+  useEffect(() => { currentRef.current = current; }, [current]);
 
   const undo = useCallback(() => {
     if (hIndexRef.current <= 0) return;
@@ -396,6 +402,29 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     autosave(); force();
   }, [autosave]);
 
+  /* ---------------- local artwork ---------------- */
+
+  const artIdsOnPage = useCallback((pi: number): string[] => {
+    const pg = docRef.current?.pages[pi];
+    if (!pg) return [];
+    const ids: string[] = [];
+    for (const e of pg.els) if ("img" in e && e.img) ids.push(e.img as string);
+    return ids;
+  }, []);
+
+  /* Bring in the artwork this page needs, and only this page's. Called on boot
+     and on every page change, so memory tracks what is being looked at rather
+     than the size of the whole book. */
+  const loadPageArt = useCallback(async (pi: number) => {
+    const want = artIdsOnPage(pi).filter((id) => !assetsRef.current[id]);
+    if (!want.length) return;
+    const got = await ensureArt(want);
+    if (!got.length) return;
+    for (const id of got) assetsRef.current[id] = artUrl(id)!;
+    force();
+    scheduleThumb(pi);
+  }, [artIdsOnPage, scheduleThumb]);
+
   /* ---------------- boot ---------------- */
 
   useEffect(() => {
@@ -407,6 +436,17 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
         if (payload?.doc?.app === "comiclettering" && Array.isArray(payload.doc.pages)) {
           docRef.current = payload.doc;
           assetsRef.current = payload.assets || {};
+          /* come back to the page the user was looking at, and to the project
+             they had open — not to page one of an untitled document */
+          const at = payload.at;
+          if (at) {
+            if (typeof at.page === "number") {
+              const pi = Math.max(0, Math.min(at.page, payload.doc.pages.length - 1));
+              setPageIndex(pi);
+              pageIndexRef.current = pi;
+            }
+            if (at.project?.id) setCurrent(at.project);
+          }
           restored = true;
         }
       }
@@ -419,6 +459,19 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     setMounted(true);
     if (restored) setStatus("Restored your last session from this browser.");
     (async () => {
+      /* Artwork is NOT read wholesale: a full book is gigabytes. Boot learns
+         which ids exist, then each page materialises its own as the reader
+         arrives at it. */
+      if (restored) {
+        try {
+          const ids = await listArtIds();
+          if (ids.length) {
+            requestPersistence();
+            reseedAids();
+            await loadPageArt(pageIndexRef.current);
+          }
+        } catch { /* no artwork store — the lettering still came back */ }
+      }
       const d = docRef.current!;
       const gen = thumbGenRef.current;
       for (let i = 0; i < d.pages.length; i++) {
@@ -432,6 +485,8 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => { if (mounted) loadPageArt(pageIndex); }, [pageIndex, mounted, loadPageArt]);
 
   /* fit zoom — read userZoomed through a ref so fitZoom's identity is stable;
      otherwise the page-change effect below re-fires on every zoom toggle and
@@ -465,29 +520,68 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingId, settlePendingLock]);
 
+  /* Pull whatever is currently in the editable node into the model. Shared by
+     the blur/Escape commit and by the as-you-type autosave, so an unfinished
+     line is never the thing a refresh loses. */
+  const captureEditing = useCallback((eid: string): boolean => {
+    const d = docRef.current;
+    if (!d) return false;
+    const p = d.pages[pageIndexRef.current];
+    const el = p.els.find((e) => e.id === eid) as BalloonEl | TextEl | undefined;
+    const dom = pageDivRef.current?.querySelector(`.el[data-id="${eid}"] .txt`) as HTMLElement | null;
+    if (!el || !dom) return false;
+    const rawRuns = domToRuns(dom);
+    /* contentEditable leaves a trailing <div><br></div> behind, which
+       became a phantom blank line that padded the balloon out */
+    const rtxt = runsToText(rawRuns).replace(/ /g, " ").replace(/\s+$/, "");
+    const runs = normalizeRuns(rawRuns);
+    if (rtxt === el.text && JSON.stringify(runs) === JSON.stringify(el.runs)) return false;
+    el.text = rtxt; el.runs = runs;
+    if (el.type === "balloon") growBalloonToFit(p, el as BalloonEl);
+    return true;
+  }, []);
+
   const finishEditing = useCallback(() => {
     setEditingId((eid) => {
       if (!eid) return null;
-      const d = docRef.current!;
-      const p = d.pages[pageIndexRef.current];
-      const el = p.els.find((e) => e.id === eid) as BalloonEl | TextEl | undefined;
-      const dom = pageDivRef.current?.querySelector(`.el[data-id="${eid}"] .txt`) as HTMLElement | null;
-      if (el && dom) {
-        const rawRuns = domToRuns(dom);
-        /* contentEditable leaves a trailing <div><br></div> behind, which
-           became a phantom blank line that padded the balloon out */
-        const rtxt = runsToText(rawRuns).replace(/ /g, " ").replace(/\s+$/, "");
-        const runs = normalizeRuns(rawRuns);
-        const changed = rtxt !== el.text || JSON.stringify(runs) !== JSON.stringify(el.runs);
-        if (changed) {
-          el.text = rtxt; el.runs = runs;
-          if (el.type === "balloon") growBalloonToFit(p, el as BalloonEl);
-          setTimeout(commit, 0);
-        }
-      }
+      if (captureEditing(eid)) setTimeout(commit, 0);
       return null;
     });
-  }, [commit]);
+  }, [commit, captureEditing]);
+
+  /* Write through now, taking any half-typed line with it. Saving the model
+     alone is not enough: while a balloon is being edited its text lives in the
+     DOM and does not reach the model until the caret leaves, so an unflushed
+     save would store the previous wording. */
+  const flushAutosave = useCallback(() => {
+    const eid = editingIdRef.current;
+    if (eid) captureEditing(eid);
+    autosave();
+  }, [autosave, captureEditing]);
+
+  /* As-you-type saving: cheap enough to run often, but debounced so a burst of
+     keystrokes is one write rather than one per character. */
+  const autosaveSoon = useCallback(() => {
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    autosaveTimer.current = setTimeout(() => { autosaveTimer.current = null; flushAutosave(); }, 500);
+  }, [flushAutosave]);
+
+  /* A refresh, a closed tab or a backgrounded tab must not lose the last few
+     characters: write through immediately instead of waiting on the debounce.
+     pagehide and visibilitychange cover the mobile cases where beforeunload
+     never fires. */
+  useEffect(() => {
+    const onOut = () => flushAutosave();
+    const onHide = () => { if (document.visibilityState === "hidden") flushAutosave(); };
+    window.addEventListener("beforeunload", onOut);
+    window.addEventListener("pagehide", onOut);
+    document.addEventListener("visibilitychange", onHide);
+    return () => {
+      window.removeEventListener("beforeunload", onOut);
+      window.removeEventListener("pagehide", onOut);
+      document.removeEventListener("visibilitychange", onHide);
+    };
+  }, [flushAutosave]);
 
   useEffect(() => {
     if (!editingId) return;
@@ -1057,6 +1151,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     fileFontRef, fileStampRef,
     force, commit, autosave, undo, redo, setStatus, select, setSelId,
     setEditingId, finishEditing, mutateSel, startDrag, pagePoint, fitZoom, startTuck,
+    autosaveSoon,
     rebuildThumbs, reseedAids, setThumbs, setPageIndex, setUserZoomed,
     setZoom, bumpFonts, registerRuntimeFont, savePresets,
     tab, setTab, layoutCat, setLayoutCat, autoLock, setAutoLock,

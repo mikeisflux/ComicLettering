@@ -11,7 +11,7 @@ import { fillCss } from "@/lib/fills";
 import { displayText, measureCharWidths, renderRuns, textCss, textOverflows } from "./textHelpers";
 import { BalloonShape, MergeBaseInfo } from "./BalloonShape";
 import { EditorCtx } from "./ctx";
-import { growWhileTyping } from "./ops";
+import { onLetteringInput } from "./ops";
 
 
 export function renderEl(ed: EditorCtx, el: El) {
@@ -97,7 +97,7 @@ export function renderEl(ed: EditorCtx, el: El) {
           suppressContentEditableWarning
           spellCheck={editing}
           onBlur={() => editing && finishEditing()}
-          onInput={editing ? (e) => growWhileTyping(ed, el.id, e.currentTarget) : undefined}
+          onInput={editing ? (e) => onLetteringInput(ed, el.id, e.currentTarget) : undefined}
         >{editing ? null : el.runs ? renderRuns(el.runs, el.ts) : displayText(el.text, el.ts, false)}</div>
         {!editing && textOverflows(el.ts, el.text, tw, th) && (
           /* chrome, not artwork: counter-scale so it stays legible at any zoom */
@@ -143,6 +143,7 @@ export function renderEl(ed: EditorCtx, el: El) {
         suppressContentEditableWarning
         spellCheck={editing}
         onBlur={() => editing && finishEditing()}
+        onInput={editing ? (e) => onLetteringInput(ed, el.id, e.currentTarget) : undefined}
       >{editing ? null : el.runs ? renderRuns(el.runs, el.ts) : displayText(el.text, el.ts, false)}</div>
     </div>
   );
