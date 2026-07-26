@@ -445,9 +445,30 @@ function connectorBand(el: BalloonEl): { fill: string; edges: string } | null {
     return [P[0] + (vx / L) * inset, P[1] + (vy / L) * inset];
   };
   const fillPts = [inw(B), B, ...sideB, ...[...sideA].reverse(), A, inw(A)];
+  /* the FILL overlaps into the partner to cover its outline stroke, but the
+     inked SIDE LINES must stop at the partner's outline — otherwise they
+     poke into its interior as little protruding stubs */
+  const pull = Math.max(8, el.strokeW * 2.5) + el.strokeW;
+  const cut = (P: number[], samples: number[][]): number[][] => {
+    const pts = [P, ...samples];
+    let rem = pull;
+    let i = pts.length - 1;
+    while (i > 0 && rem > 0) {
+      const a = pts[i - 1], b = pts[i];
+      const segL = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      if (segL > rem) {
+        const t = (segL - rem) / segL;
+        pts[i] = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+        pts.length = i + 1;
+        rem = 0;
+      } else { rem -= segL; pts.length = i; i--; }
+    }
+    return pts.slice(1);
+  };
+  const edgeB = cut(B, sideB), edgeA = cut(A, sideA);
   const seg = (P: number[], samples: number[][]) =>
     `M ${fmt(P[0])} ${fmt(P[1])}` + samples.map((p) => ` L ${fmt(p[0])} ${fmt(p[1])}`).join("");
-  return { fill: linePath(fillPts), edges: seg(B, sideB) + " " + seg(A, sideA) };
+  return { fill: linePath(fillPts), edges: seg(B, edgeB) + " " + seg(A, edgeA) };
 }
 
 /* ---------------- main entry ---------------- */
