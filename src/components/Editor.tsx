@@ -206,6 +206,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   };
   const setStyleTab = (t: StyleTab) => setStyleTabState(t);
 
+  const [stampQuery, setStampQuery] = useState("");
   const [proof, setProof] = useState<{ busy: boolean; error: string | null; matches: ProofMatch[] } | null>(null);
 
   useEffect(() => {
@@ -1166,7 +1167,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     showFind, setShowFind, findText, setFindText, replaceText,
     setReplaceText, findCase, setFindCase, showSafe, setShowSafe, spread,
     setSpread, showScript, setShowScript, scriptText, setScriptText,
-    stampOpen, setStampOpen, showFill, setShowFill, showStroke,
+    stampOpen, setStampOpen, stampQuery, setStampQuery, showFill, setShowFill, showStroke,
     setShowStroke, showTextColor, setShowTextColor, openMenu, setOpenMenu,
     customStamps, setCustomStamps,
   };

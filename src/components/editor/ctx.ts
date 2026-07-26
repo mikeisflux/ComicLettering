@@ -52,6 +52,8 @@ export interface EditorCtx {
   commit: () => void;
   autosave: () => void;
   autosaveSoon: () => void;
+  stampQuery: string;
+  setStampQuery: SetState<string>;
   undo: () => void;
   redo: () => void;
   setStatus: (msg: string) => void;

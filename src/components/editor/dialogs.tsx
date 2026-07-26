@@ -7,16 +7,20 @@ import { TrayBtn } from "./chrome";
 import { EditorCtx } from "./ctx";
 import {
   addAttachedBubble, addFromTray, alignSel, copySel, cutSel, deleteSel,
-  doFindReplace, duplicateSel, importScript, insertCustomStamp, pasteClip,
-  removeCustomStamp, reorder, resizeToActual, resolveTailAsk, runExport,
+  doFindReplace, duplicateSel, importScript, insertCustomStamp, insertSfxStamp,
+  pasteClip, removeCustomStamp, reorder, resizeToActual, resolveTailAsk, runExport,
 } from "./ops";
+import { SFX_STAMPS } from "@/lib/sfxStamps";
 
 
 export function renderTray(ed: EditorCtx) {
   const {
     drawMode, setDrawMode, setStatus, stampOpen, setStampOpen, pendingLockRef, commit, setSelId, customStamps, fileStampRef, status,
+    stampQuery, setStampQuery,
   } = ed;
   const page = ed.page!;
+  const q = stampQuery.trim().toLowerCase();
+  const sfxMatches = q ? SFX_STAMPS.filter((st) => st.l.toLowerCase().includes(q)) : SFX_STAMPS;
   return (
   <footer className="tray">
     <TrayBtn onClick={() => addFromTray(ed, "text")} label="Text">
@@ -128,6 +132,20 @@ export function renderTray(ed: EditorCtx) {
                 </button>
               );
             })}
+          </div>
+          <div className="stampSearch">
+            <input value={stampQuery} placeholder={`Search ${SFX_STAMPS.length} sound effects…`}
+              onChange={(e) => setStampQuery(e.target.value)} />
+            {stampQuery && <button onClick={() => setStampQuery("")} title="Clear">✕</button>}
+          </div>
+          <div className="stampSfx">
+            {sfxMatches.length === 0 && <p className="stampNone">No sound effect matches “{stampQuery}”.</p>}
+            {sfxMatches.map((st) => (
+              <button key={st.s} title={st.l} className="sfxStamp"
+                onClick={() => insertSfxStamp(ed, st.s, st.l)}>
+                <img src={`/stamps/${st.s}.png`} alt={st.l} loading="lazy" />
+              </button>
+            ))}
           </div>
           <div className="stampCustom">
             {customStamps.map((s) => (

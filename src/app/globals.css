@@ -417,7 +417,8 @@ input[type="range"] { width: 110px; }
 
 /* stamps */
 .stampPop {
-  position: absolute; bottom: 44px; left: -60px; z-index: 120; width: 300px;
+  position: absolute; bottom: 44px; left: -60px; z-index: 120; width: 340px;
+  max-height: 70vh; overflow-y: auto;
   background: #fff; border: 1px solid var(--edge); border-radius: 8px;
   box-shadow: 0 6px 18px #0003; padding: 8px;
 }
@@ -425,6 +426,25 @@ input[type="range"] { width: 110px; }
 .stampPop button:hover { border-color: var(--sel); background: #eef5fd; }
 .stampWords { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; border-bottom: 1px solid var(--edge2); padding-bottom: 6px; margin-bottom: 6px; }
 .stampWords button { overflow: hidden; white-space: nowrap; }
+/* built-in sound-effect artwork: enough of them that the picker needs a
+   search box and its own scroll area */
+.stampSearch { display: flex; gap: 4px; margin-bottom: 6px; }
+.stampSearch input {
+  flex: 1; min-width: 0; font-size: 12px; padding: 4px 7px;
+  border: 1px solid var(--edge2); border-radius: 6px;
+}
+.stampSearch button { flex: 0 0 auto; font-size: 11px; color: #777; }
+.stampSfx {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); gap: 3px;
+  max-height: 230px; overflow-y: auto; overscroll-behavior: contain;
+  border-bottom: 1px solid var(--edge2); padding-bottom: 6px; margin-bottom: 6px;
+}
+.stampSfx .sfxStamp {
+  height: 42px; padding: 2px; display: flex; align-items: center; justify-content: center;
+  background: #f4f6f9; border: 1px solid var(--edge2);
+}
+.stampSfx .sfxStamp img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.stampNone { grid-column: 1 / -1; margin: 6px 2px; font-size: 12px; color: #777; }
 .stampEmoji { display: grid; grid-template-columns: repeat(auto-fill, minmax(32px, 1fr)); gap: 2px; }
 .stampEmoji button { font-size: 20px; padding: 2px 0; min-width: 0; text-align: center; }
 

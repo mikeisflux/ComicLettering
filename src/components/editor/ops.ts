@@ -699,6 +699,25 @@ export async function importStampFiles(ed: EditorCtx, files: File[]) {
   setStatus("Stamps added — saved to your account library.");
 }
 
+/* Drop a built-in SFX stamp on the page. It is fetched once and then kept in
+   the local artwork store like any other image, so the page still renders it
+   after a refresh without going back to the network. */
+export async function insertSfxStamp(ed: EditorCtx, slug: string, label: string) {
+  const { aidRef, setStampOpen, setStatus } = ed;
+  setStampOpen(false);
+  try {
+    const res = await fetch(`/stamps/${slug}.png`);
+    if (!res.ok) throw new Error(res.statusText);
+    const blob = await res.blob();
+    const aid = "a" + aidRef.current++;
+    const url = await stashArt(ed, aid, blob);
+    const img = await loadImage(url);
+    placeAsset(ed, aid, img.naturalWidth, img.naturalHeight);
+  } catch {
+    setStatus(`Could not load the “${label}” stamp.`);
+  }
+}
+
 export async function insertCustomStamp(ed: EditorCtx, url: string) {
   const { aidRef, assetsRef, setStampOpen } = ed;
   const img = await loadImage(url);
