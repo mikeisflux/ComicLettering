@@ -10,7 +10,7 @@ import React, {
 } from "react";
 import {
   Assets, BalloonEl, DPI, Doc, El, FONTS, FillStyle, Page, TextEl,
-  TextStyle, aabbOverlap, clamp, makeBalloon, newPage, normalizeRuns,
+  TextStyle, aabbOverlap, clamp, makeBalloon, makeImage, newPage, normalizeRuns,
   registerFont, reseedIds, rotVec, runsToText, starterDoc,
 } from "@/lib/model";
 import { LETTER_STYLES, applyLetterStyle } from "@/lib/presets";
@@ -22,6 +22,7 @@ import {
 } from "./editor/textHelpers";
 import { closeSketchLoop, detectSketchTail, resampleRing, smoothSketchRing } from "./editor/sketch";
 import { SmartTip, pickTip } from "./editor/smartTips";
+import { TuckSource, makeCutout } from "./editor/tuck";
 import { PageSetupDialog, Ruler, STAGE_MX, STAGE_MY } from "./editor/chrome";
 import { EditorCtx } from "./editor/ctx";
 import {
@@ -100,6 +101,14 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const drawPtsRef = useRef<number[][] | null>(null);
   /* id of a freshly sketched balloon awaiting a tail choice */
   const [tailAsk, setTailAsk] = useState<string | null>(null);
+  /* "tuck behind art": drag a region over a panel, extract its foreground as
+     a transparent cutout placed above the selected SFX */
+  const [tuckMode, setTuckMode] = useState(false);
+  const tuckRectRef = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [tuckAsk, setTuckAsk] = useState<{
+    src: TuckSource; pageX: number; pageY: number; pageW: number; pageH: number;
+    threshold: number; invert: boolean; preview: string | null;
+  } | null>(null);
   /* smart contextual tips: one at a time, each shows once (localStorage) */
   const [tip, setTip] = useState<SmartTip | null>(null);
   const tipsSeenRef = useRef<Set<string>>(new Set());
@@ -729,6 +738,103 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
 
   /* ---------------- keyboard ---------------- */
 
+  /* ---------------- tuck-behind-art (magic-wand style) ---------------- */
+
+  const startTuck = useCallback(() => {
+    const s = docRef.current?.pages[pageIndexRef.current].els.find((x) => x.id === selId);
+    if (!s || s.type !== "text") {
+      setStatus("Select your SFX lettering first, then Tuck Behind Art.");
+      return;
+    }
+    setTuckMode(true);
+    setStatus("Drag a box over the artwork the SFX should hide behind — Esc cancels.");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selId, setStatus]);
+
+  const startTuckDrag = useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const p0 = pagePoint(e);
+    tuckRectRef.current = { x: p0.x, y: p0.y, w: 0, h: 0 };
+    force();
+    const onMove = (ev: PointerEvent) => {
+      const p = pagePoint(ev);
+      const r = tuckRectRef.current;
+      if (!r) return;
+      r.w = p.x - p0.x; r.h = p.y - p0.y;
+      force();
+    };
+    const onUp = async () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      const r = tuckRectRef.current;
+      tuckRectRef.current = null;
+      setTuckMode(false);
+      if (!r) return;
+      const rect = {
+        x: Math.min(r.x, r.x + r.w), y: Math.min(r.y, r.y + r.h),
+        w: Math.abs(r.w), h: Math.abs(r.h),
+      };
+      if (rect.w < 20 || rect.h < 20) { setStatus("Drag a bigger region over the artwork."); force(); return; }
+      /* topmost unrotated panel/image with artwork under the region */
+      const pg = docRef.current!.pages[pageIndexRef.current];
+      const target = [...pg.els].reverse().find((el) =>
+        (el.type === "panel" || el.type === "image") && el.img && !el.rot &&
+        rect.x < el.x + el.w && rect.x + rect.w > el.x &&
+        rect.y < el.y + el.h && rect.y + rect.h > el.y);
+      if (!target || target.type === "balloon" || target.type === "text" || !target.img) {
+        setStatus("No artwork there — drag the box over a panel or image (unrotated).");
+        force(); return;
+      }
+      const url = assetsRef.current[target.img];
+      if (!url) { setStatus("That panel's artwork isn't loaded."); force(); return; }
+      const img = await loadImage(url);
+      /* clamp the region to the artwork element */
+      const x0 = Math.max(rect.x, target.x), y0 = Math.max(rect.y, target.y);
+      const x1 = Math.min(rect.x + rect.w, target.x + target.w);
+      const y1 = Math.min(rect.y + rect.h, target.y + target.h);
+      if (x1 - x0 < 10 || y1 - y0 < 10) { setStatus("The region barely touches the artwork — try again."); force(); return; }
+      const src: TuckSource = {
+        img, elW: target.w, elH: target.h,
+        regionX: x0 - target.x, regionY: y0 - target.y,
+        regionW: x1 - x0, regionH: y1 - y0,
+      };
+      const cut = makeCutout(src, 45);
+      setTuckAsk({
+        src, pageX: x0, pageY: y0, pageW: x1 - x0, pageH: y1 - y0,
+        threshold: 45, invert: false, preview: cut?.url ?? null,
+      });
+      force();
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+  }, [pagePoint]);
+
+  const retuneTuck = useCallback((threshold: number, invert: boolean) => {
+    setTuckAsk((t) => {
+      if (!t) return t;
+      const cut = makeCutout(t.src, threshold, invert);
+      return { ...t, threshold, invert, preview: cut?.url ?? t.preview };
+    });
+  }, []);
+
+  /* side effects OUTSIDE the state updater — React StrictMode double-invokes
+     updaters, which would place the cutout twice */
+  const applyTuck = useCallback((t: typeof tuckAsk) => {
+    setTuckAsk(null);
+    if (!t || !t.preview) return;
+    const aid = "a" + aidRef.current++;
+    assetsRef.current[aid] = t.preview;
+    const el = makeImage(t.pageX, t.pageY, t.pageW, t.pageH, aid);
+    el.borderW = 0;
+    docRef.current!.pages[pageIndexRef.current].els.push(el); // topmost → art in front
+    commit();
+    setStatus("Foreground cutout placed — your SFX now sits behind the art. Delete the cutout to undo.");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [commit, setStatus]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
@@ -736,6 +842,9 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       if (e.key === "Escape") {
         setDrawMode(false);
         drawPtsRef.current = null;
+        setTuckMode(false);
+        tuckRectRef.current = null;
+        setTuckAsk(null);
         if (editingId) finishEditing();
         else setSelId(null);
         return;
@@ -892,7 +1001,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     customFontIdsRef, fileImageRef, filePanelImageRef, fileOpenRef,
     fileFontRef, fileStampRef,
     force, commit, autosave, undo, redo, setStatus, select, setSelId,
-    setEditingId, finishEditing, mutateSel, startDrag, pagePoint, fitZoom,
+    setEditingId, finishEditing, mutateSel, startDrag, pagePoint, fitZoom, startTuck,
     rebuildThumbs, reseedAids, setThumbs, setPageIndex, setUserZoomed,
     setZoom, bumpFonts, registerRuntimeFont, savePresets,
     tab, setTab, layoutCat, setLayoutCat, autoLock, setAutoLock,
@@ -1057,9 +1166,21 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
                 })()}
                 {demo && <div className="demoWatermark" aria-hidden style={{ width: page.w, height: page.h }} />}
               </div>
-              {renderOverlay(ed)}
+              {!tuckMode && renderOverlay(ed)}
               {snapRef.current.x != null && <div className="snapLineV" style={{ left: snapRef.current.x * zoom }} />}
               {snapRef.current.y != null && <div className="snapLineH" style={{ top: snapRef.current.y * zoom }} />}
+              {tuckMode && (
+                <div className="drawLayer tuckLayer" onPointerDown={startTuckDrag}>
+                  {tuckRectRef.current && (
+                    <div className="tuckRect" style={{
+                      left: Math.min(tuckRectRef.current.x, tuckRectRef.current.x + tuckRectRef.current.w) * zoom,
+                      top: Math.min(tuckRectRef.current.y, tuckRectRef.current.y + tuckRectRef.current.h) * zoom,
+                      width: Math.abs(tuckRectRef.current.w) * zoom,
+                      height: Math.abs(tuckRectRef.current.h) * zoom,
+                    }} />
+                  )}
+                </div>
+              )}
               {drawMode && (
                 <div className="drawLayer" onPointerDown={startSketch}>
                   {drawPtsRef.current && drawPtsRef.current.length > 1 && (
@@ -1169,6 +1290,44 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
           e.target.value = "";
           if (f) importJSON(ed, f);
         }} />
+
+      {/* tuck-behind-art: threshold dialog with live cutout preview */}
+      {tuckAsk && (
+        <div className="setupOverlay" onPointerDown={(e) => { if (e.target === e.currentTarget) setTuckAsk(null); }}>
+          <div className="setupDlg" style={{ width: 460 }}>
+            <div className="setupTitle">Tuck Behind Art</div>
+            <div className="setupBody" style={{ flexDirection: "column" }}>
+              <div className="tuckPreview">
+                {tuckAsk.preview
+                  ? <img src={tuckAsk.preview} alt="Foreground cutout preview" />
+                  : <span>Could not read this artwork's pixels.</span>}
+              </div>
+              <fieldset className="setupGroup">
+                <legend>Selection strength</legend>
+                <div className="setupRow">
+                  <input type="range" min={5} max={95} step={1} value={tuckAsk.threshold}
+                    style={{ width: 220 }}
+                    onChange={(e) => retuneTuck(+e.target.value, tuckAsk.invert)} />
+                  <span style={{ width: 34, textAlign: "right" }}>{tuckAsk.threshold}</span>
+                  <label style={{ marginLeft: 12 }}>
+                    <input type="checkbox" checked={tuckAsk.invert}
+                      onChange={(e) => retuneTuck(tuckAsk.threshold, e.target.checked)} /> Light foreground
+                  </label>
+                </div>
+              </fieldset>
+              <div className="tips" style={{ fontSize: 12 }}>
+                Like a magic wand: the preview shows what will sit IN FRONT of your
+                lettering. Raise the strength to grab more of the art; check “Light
+                foreground” when the art is light shapes on a dark background.
+              </div>
+            </div>
+            <div className="setupFoot">
+              <button onClick={() => setTuckAsk(null)}>Cancel</button>
+              <button className="okBtn" disabled={!tuckAsk.preview} onClick={() => applyTuck(tuckAsk)}>Place cutout</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* smart contextual tip — one at a time, each shows once */}
       {tip && (

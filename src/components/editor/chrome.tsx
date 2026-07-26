@@ -63,11 +63,11 @@ export const STAGE_MY = 26;
 
 /* ---------------- toolbar / tray buttons ---------------- */
 
-export function ToolBtn({ label, icon, onClick, disabled, accent }: {
-  label: string; icon: string; onClick: () => void; disabled?: boolean; accent?: boolean;
+export function ToolBtn({ label, icon, onClick, disabled, accent, title }: {
+  label: string; icon: string; onClick: () => void; disabled?: boolean; accent?: boolean; title?: string;
 }) {
   return (
-    <button className={"toolBtn" + (accent ? " accent" : "")} onClick={onClick} disabled={disabled} title={label}>
+    <button className={"toolBtn" + (accent ? " accent" : "")} onClick={onClick} disabled={disabled} title={title || label}>
       <span className="tIcon">{icon}</span>
       <span className="tLabel">{label}</span>
     </button>

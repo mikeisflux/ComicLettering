@@ -107,6 +107,7 @@ export function renderMenuBar(ed: EditorCtx) {
         ["—", null],
         ["Fit Balloon to Text", () => fitBalloonToText(ed)],
         ["Balance Line Breaks", () => balanceRag(ed)],
+        ["Tuck SFX Behind Art…", () => ed.startTuck()],
         ["Center Horizontally (Ctrl+[)", () => alignSel(ed, "hcenter")],
         ["Center Vertically (Ctrl+])", () => alignSel(ed, "vcenter")],
         ["Flip Horizontal", () => mutateSel((x) => { x.flipH = !x.flipH; })],
@@ -187,6 +188,10 @@ export function renderToolbar(ed: EditorCtx) {
     <ToolBtn label="Instant Alpha" icon="🪄"
       disabled={!selEl || (selEl.type !== "image" && selEl.type !== "panel") || !selEl.img}
       onClick={() => { if (selEl && (selEl.type === "image" || selEl.type === "panel") && selEl.img) runInstantAlpha(ed, selEl.id, selEl.img); }} />
+    <ToolBtn label="Behind Art" icon="🖼️⃰" accent
+      title="Tuck SFX behind the art: select your sound-effect lettering, then drag a box over the artwork — the art's foreground is cut out and placed in front, so the word sits behind it like hand-traced masking."
+      disabled={!selEl || selEl.type !== "text"}
+      onClick={() => ed.startTuck()} />
     <ToolBtn label="Page Setup" icon="📐" onClick={() => setShowSetup(true)} />
     <ToolBtn label="Print" icon="🖨" onClick={() => printPage(ed)} />
     <ToolBtn label="Export" icon="🖼⇩" accent onClick={() => demo ? setStatus("Export is off in the demo — subscribe to unlock.") : setShowExport(true)} />

@@ -63,6 +63,8 @@ export interface EditorCtx {
   ) => void;
   pagePoint: (e: { clientX: number; clientY: number }) => { x: number; y: number };
   fitZoom: (forceFit: boolean) => void;
+  /* enter tuck-behind-art region-drag mode (requires SFX selected) */
+  startTuck: () => void;
   rebuildThumbs: () => void;
   reseedAids: () => void;
   setThumbs: SetState<Record<number, string>>;
