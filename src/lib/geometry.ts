@@ -76,7 +76,8 @@ function bentSide(P: number[], Mside: number[], Tp: number[], T: number[]): numb
    points, and the two offset bend points for the band edges. */
 function bendGeom(
   tail: { dx: number; dy: number; bx?: number; by?: number; tx?: number; ty?: number },
-  cx: number, cy: number, tip: number[], E: number[], B: number[], bandHalf: number
+  cx: number, cy: number, tip: number[], E: number[], B: number[], bandHalf: number,
+  tipHalf = bandHalf
 ) {
   const M = [cx + (tail.bx ?? tail.dx / 2), cy + (tail.by ?? tail.dy / 2)];
   let T = tail.tx != null && tail.ty != null
@@ -99,8 +100,8 @@ function bendGeom(
      nearest-distance — a distance heuristic can swap them and cross the two
      edges into a twisted band */
   const apSide = (ap[0] * nrm[0] + ap[1] * nrm[1]) * side >= 0 ? 1 : -1;
-  const tipB = [tip[0] + ap[0] * apSide * bandHalf, tip[1] + ap[1] * apSide * bandHalf];
-  const tipA = [tip[0] - ap[0] * apSide * bandHalf, tip[1] - ap[1] * apSide * bandHalf];
+  const tipB = [tip[0] + ap[0] * apSide * tipHalf, tip[1] + ap[1] * apSide * tipHalf];
+  const tipA = [tip[0] - ap[0] * apSide * tipHalf, tip[1] - ap[1] * apSide * tipHalf];
   return { M_B, M_A, tipB, tipA, T };
 }
 
@@ -353,9 +354,9 @@ function connectorBase(el: BalloonEl): { A: number[]; B: number[]; E: number[] }
   if (!pts) {
     const rx = w / 2, ry = h / 2;
     const t = Math.atan2(aim[1] - cy, aim[0] - cx);
-    /* wide connector base — the band should read about a third of the
-       balloon's width, like hand-inked joined balloons */
-    const delta = 0.38;
+    /* connector base ≈ the pointed tail's base width where it leaves the
+       balloon (same delta as ellipseTailPath's tail base) */
+    const delta = 0.13;
     return {
       A: ellipsePt(cx, cy, rx, ry, t + delta),
       B: ellipsePt(cx, cy, rx, ry, t - delta),
@@ -391,7 +392,7 @@ function connectorBase(el: BalloonEl): { A: number[]; B: number[]; E: number[] }
   if (per < 8) return null;
   const segLen = (i: number) => (i + 1 < n ? cum[i + 1] : per) - cum[i];
   const exitS = cum[bestI] + bestU * segLen(bestI);
-  const half = Math.min(per * 0.16, Math.max(10, (w + h) * 0.085));
+  const half = Math.min(per * 0.18, Math.max(6, (w + h) * 0.0275));
   const pointAt = (s: number): number[] => {
     s = ((s % per) + per) % per;
     for (let k = 0; k < n; k++) {

@@ -29,8 +29,8 @@ export function addAttachedBubble(ed: EditorCtx) {
   }
   const b = src as BalloonEl;
   const w = Math.round(b.w * 0.8), h = Math.round(b.h * 0.8);
-  let x = b.x + Math.round(b.w * 0.72);
-  const y = Math.max(0, Math.min(p.h - h, b.y + Math.round(b.h * 0.45)));
+  let x = b.x + Math.round(b.w * 0.55);
+  const y = Math.max(0, Math.min(p.h - h, b.y + Math.round(b.h * 1.06)));
   if (x + w > p.w) x = Math.max(0, b.x - Math.round(w * 0.9));
   const el = makeBalloon(b.kind, x, y, w, h);
   el.fill = JSON.parse(JSON.stringify(b.fill));
