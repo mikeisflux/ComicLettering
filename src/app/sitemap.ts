@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { BLOG_POSTS } from "@/lib/blogPosts";
 
 const BASE = "https://lettermycomic.com";
 
@@ -13,6 +14,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${BASE}/comic-book-fonts`, lastModified: now, changeFrequency: "weekly", priority: 0.95 },
     { url: `${BASE}/features`, lastModified: now, changeFrequency: "monthly", priority: 0.9 },
     { url: `${BASE}/pricing`, lastModified: now, changeFrequency: "monthly", priority: 0.9 },
+    { url: `${BASE}/blog`, lastModified: now, changeFrequency: "weekly", priority: 0.8 },
+    ...BLOG_POSTS.map((post) => ({
+      url: `${BASE}/blog/${post.slug}`,
+      lastModified: new Date(post.date),
+      changeFrequency: "monthly" as const,
+      priority: 0.7,
+    })),
     { url: `${BASE}/faq`, lastModified: now, changeFrequency: "monthly", priority: 0.7 },
     { url: `${BASE}/contact`, lastModified: now, changeFrequency: "yearly", priority: 0.5 },
     { url: `${BASE}/signup`, lastModified: now, changeFrequency: "yearly", priority: 0.6 },

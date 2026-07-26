@@ -220,6 +220,20 @@
 .prose h2 { font-size: 20px; margin-top: 28px; }
 .prose p, .prose li { color: #333a44; font-size: 15.5px; }
 
+/* blog */
+.blogGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 22px; }
+.blogCard { display: flex; flex-direction: column; gap: 8px; text-decoration: none !important; color: inherit; }
+.blogCard:hover { transform: translateY(-2px); }
+.blogCard h3 { color: var(--navy); }
+.blogCard p { flex: 1; }
+.blogMeta { color: var(--mute); font-size: 13px; }
+.blogPost h1 { font-size: clamp(30px, 4.5vw, 44px); line-height: 1.1; margin: 0 0 6px; }
+.blogPost > .blogMeta { display: block; margin: 0 0 26px; }
+.blogPost h2 { font-size: 21px; margin-top: 30px; color: var(--navy); }
+.blogPost p, .blogPost li { color: #333a44; font-size: 16px; line-height: 1.75; }
+.blogPost ul { padding-left: 22px; margin: 0 0 14px; }
+.blogPost li { margin-bottom: 6px; }
+
 /* footer */
 .mktFooter {
   margin-top: auto; background: var(--navy); color: #93a1b3;
