@@ -1327,6 +1327,52 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     commit();
     rebuildThumbs();
   }
+  function fitBalloonToText() {
+    const el = page?.els.find((x) => x.id === selId);
+    if (!el || el.type !== "balloon") { setStatus("Select a balloon to fit."); return; }
+    if (el.locked) { setStatus("That balloon is locked — unlock it to resize."); return; }
+    if (!el.text.trim()) { setStatus("Type some text first, then fit the balloon to it."); return; }
+    const g = balloonGeom(el);
+    const [, , tw, th] = g.textRect;
+    const fracW = tw / el.w, fracH = th / el.h;
+    if (!(fracW > 0) || !(fracH > 0)) return;
+    /* measure the lettering in a hidden node that mirrors on-canvas layout */
+    const meas = document.createElement("div");
+    const ts = el.ts;
+    Object.assign(meas.style, {
+      position: "absolute", left: "-9999px", top: "0",
+      visibility: "hidden", whiteSpace: "pre",
+      fontFamily: (FONTS[ts.font]?.css || FONTS.comicneue.css),
+      fontSize: `${ts.size}px`,
+      fontWeight: ts.bold ? "700" : "400",
+      fontStyle: ts.italic ? "italic" : "normal",
+      lineHeight: `${ts.lineHeight ?? 1.25}`,
+      letterSpacing: ts.tracking ? `${ts.tracking}px` : "normal",
+      textTransform: ts.caps ? "uppercase" : "none",
+    } as CSSStyleDeclaration);
+    meas.textContent = el.text;
+    document.body.appendChild(meas);
+    const lineW = meas.scrollWidth;          // longest line (respects manual breaks)
+    /* height at that width, allowing wrapping */
+    meas.style.whiteSpace = "pre-wrap";
+    meas.style.width = `${lineW + 2}px`;
+    const lineH = meas.scrollHeight;
+    document.body.removeChild(meas);
+    const maxTextW = page!.w * 0.9;
+    const targetTW = clamp(lineW + ts.size * 0.5, 24, maxTextW);
+    const targetTH = lineH + ts.size * 0.35;
+    const newW = clamp(Math.round(targetTW / fracW), 60, page!.w);
+    const newH = clamp(Math.round(targetTH / fracH), 44, page!.h);
+    /* keep the balloon centred while it resizes */
+    const cx = el.x + el.w / 2, cy = el.y + el.h / 2;
+    mutateSel<BalloonEl>((b) => {
+      b.w = newW; b.h = newH;
+      b.x = Math.round(cx - newW / 2);
+      b.y = Math.round(cy - newH / 2);
+    });
+    setStatus("Balloon fitted to its lettering.");
+  }
+
   function alignSel(mode: "left" | "hcenter" | "right" | "top" | "vcenter" | "bottom") {
     const el = page?.els.find((x) => x.id === selId);
     if (!el || !page) return;
@@ -2184,6 +2230,9 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
             <Fld label="Shadow"><input type="checkbox" checked={el.shadow}
               onChange={(e) => mutateSel((b) => { b.shadow = e.target.checked; })} /></Fld>
             <div className="btnRow">
+              <button onClick={() => fitBalloonToText()} title="Resize the balloon to hug its lettering">Fit to text</button>
+            </div>
+            <div className="btnRow">
               <button onClick={() => { panelImageTarget.current = el.id; filePanelImageRef.current?.click(); }}>
                 {el.img ? "Replace inner image…" : "Place image inside…"}
               </button>
@@ -2595,6 +2644,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
             ["Rotate 15° Counter-clockwise", () => rotateSel(-15)],
             ["Reset Rotation", () => mutateSel((x) => { x.rot = 0; })],
             ["—", null],
+            ["Fit Balloon to Text", () => fitBalloonToText()],
             ["Center Horizontally (Ctrl+[)", () => alignSel("hcenter")],
             ["Center Vertically (Ctrl+])", () => alignSel("vcenter")],
             ["Flip Horizontal", () => mutateSel((x) => { x.flipH = !x.flipH; })],
