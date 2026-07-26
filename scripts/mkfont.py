@@ -174,6 +174,33 @@ def drip_strokes(name, strokes):
         out.append(([(x, 25), (x + sway * 0.4, -ln * 0.55), (x + sway, -ln)], 0.45))
     return out
 
+def flame_strokes(name, strokes):
+    """Flame tongues licking up off the letter. Each tongue is a chain of
+    segments whose stroke radius shrinks toward the tip, so it tapers to a
+    point and curls sideways instead of reading as a fat sausage."""
+    highs = sorted({round(p[0]) for s in strokes for p in s if p[1] > CAP - 70})
+    if not highs:
+        return []
+    ph = ghash(name + "flame")
+    span = (highs[-1] - highs[0]) or 1
+    n = max(3, min(6, 2 + span // 90))          # more tongues on wider letters
+    picks = sorted({highs[(ph >> (i * 4)) % len(highs)] for i in range(n)})
+    out = []
+    SEG = 7
+    for i, x in enumerate(picks):
+        ln = 300 + ((ph >> (i * 7)) % 260)      # tongue height
+        sway = ((ph >> (i * 3)) % 85) - 42      # lateral lick
+        curl = 1 if ((ph >> (i * 11)) & 1) else -1
+        prev = (x, CAP - 55)
+        for k in range(1, SEG + 1):
+            t = k / SEG
+            px = x + sway * (t ** 1.6) + curl * 30 * math.sin(t * 3.1)
+            py = CAP - 55 + ln * t
+            rmul = 0.85 * (1 - t) ** 0.8 + 0.05  # taper to a point
+            out.append(([prev, (px, py)], rmul))
+            prev = (px, py)
+    return out
+
 def droplet_strokes(name, strokes):
     """little sneeze droplets scattered just off the letterforms"""
     pts = [p for s in strokes for p in s]
@@ -276,6 +303,8 @@ def build_glyph(name, strokes, r, amp, freq, shear, narrow, bounce, drips, cap="
         stroke_list += drip_strokes(name, strokes)
     elif drips == "droplets":
         stroke_list += droplet_strokes(name, strokes)
+    elif drips == "flames":
+        stroke_list += flame_strokes(name, strokes)
     taper = drips == "taper"
     dy0 = (((ghash(name + "b") % 100) / 100) - 0.5) * 2 * bounce
     paths = []
@@ -325,7 +354,7 @@ def build_glyph(name, strokes, r, amp, freq, shear, narrow, bounce, drips, cap="
     union(paths, out.getPen())
     return out
 
-def make_font(family, style, r, amp, freq, shear, narrow, bounce, drips, out_ttf, cap="round", decim=0, mixed=False):
+def make_font(family, style, r, amp, freq, shear, narrow, bounce, drips, out_ttf, cap="round", decim=0, mixed=False, track=0):
     glyph_src = dict(GLYPHS)
     if mixed:
         glyph_src.update(LOWER_GLYPHS)
@@ -359,7 +388,9 @@ def make_font(family, style, r, amp, freq, shear, narrow, bounce, drips, out_ttf
             path.draw(pen)
         glyphs[name] = pen.glyph()
         letter_h = CAP if name in GLYPHS else 480
-        adv[name] = int(w * narrow + 60 + (letter_h * shear if shear else 0))
+        adv[name] = int(max(w * narrow * 0.55,
+                        w * narrow + 60 + max(0, r - 55) * 1.25 + track)
+                        + (letter_h * shear if shear else 0))
     fb.setupGlyf(glyphs)
     hmtx = {}
     for name in names:
@@ -367,8 +398,11 @@ def make_font(family, style, r, amp, freq, shear, narrow, bounce, drips, out_ttf
         lsb = g.xMin if hasattr(g, "xMin") and g.numberOfContours else 0
         hmtx[name] = (adv.get(name, 600), lsb)
     fb.setupHorizontalMetrics(hmtx)
-    fb.setupHorizontalHeader(ascent=800, descent=-260)
-    fb.setupOS2(sTypoAscender=800, sTypoDescender=-260, sTypoLineGap=90,
+    # flame tongues rise well above the cap line — give those families the
+    # headroom or the tips get clipped by the line box
+    asc = 1400 if drips == "flames" else 800
+    fb.setupHorizontalHeader(ascent=asc, descent=-260)
+    fb.setupOS2(sTypoAscender=asc, sTypoDescender=-260, sTypoLineGap=90,
                 usWinAscent=880, usWinDescent=320,
                 sxHeight=490, sCapHeight=CAP, achVendID="LMC ",
                 fsSelection=0x40 if style == "Regular" else (0x20 if style == "Bold" else 0x01),
@@ -431,6 +465,26 @@ FAMILIES = {
     "LMC Blitz":    (60, 78, 4.0, 1.4, 16, 0.78, 6, "", "square", 8),
     # rough horror brush, slanted
     "LMC Butcher":  (64, 82, 11.0, 3.0, 7, 0.88, 8, "", "square", 7),
+    # fat rounded bubble/graffiti caps
+    "LMC Blob":     (104, 126, 2.5, 0.9, 4, 1.22, 5, "", "round", 0, False, -95),
+    # tall condensed brush
+    "LMC Frost":    (46, 62, 6.0, 1.6, 2, 0.72, 6, "taper", "round", 0),
+    # heavy slanted brush
+    "LMC Berserk":  (72, 92, 7.0, 1.5, 14, 0.94, 8, "taper", "round", 0),
+    # serrated sawtooth horror
+    "LMC Sawtooth": (58, 76, 9.0, 4.6, 3, 0.88, 5, "", "square", 7),
+    # flame tongues licking off the caps
+    "LMC Charflame":(58, 74, 11.0, 2.8, 3, 0.92, 5, "flames", "round", 4),
+    # heavy leaning cartoon with knocked-about edges
+    "LMC Crashland":(80, 100, 5.0, 1.3, 12, 0.96, 8, "", "round", 3),
+    # chunky angular street-shout caps
+    "LMC Rowdy":    (88, 110, 3.5, 1.2, 2, 0.94, 7, "", "square", 6),
+    # monoline geometric — thin, even, circular
+    "LMC Deco":     (24, 34, 0.4, 0.5, 0, 1.12, 0, "", "round", 0),
+    # smooth heavy italic scream
+    "LMC Screech":  (90, 114, 1.0, 0.7, 18, 0.92, 0, "", "round", 0),
+    # rough marker horror
+    "LMC Gutspill": (66, 86, 12.0, 3.2, 3, 0.90, 9, "", "round", 5),
 }
 
 def main(outdir):
@@ -438,13 +492,14 @@ def main(outdir):
     for family, cfg in FAMILIES.items():
         (r, rb, amp, freq, lean, narrow, bounce, drips, cap, decim) = cfg[:10]
         mixed = cfg[10] if len(cfg) > 10 else False
+        track = cfg[11] if len(cfg) > 11 else 0
         base = family.replace(" ", "")
         lean_sh = math.tan(math.radians(lean))
         ital_sh = math.tan(math.radians(9 + lean))
         for style, rr, sh in [("Regular", r, lean_sh), ("Bold", rb, lean_sh),
                               ("Italic", r, ital_sh), ("Bold Italic", rb, ital_sh)]:
             fn = os.path.join(outdir, f"{base}-{style.replace(' ', '')}.ttf")
-            make_font(family, style, rr, amp, freq, sh, narrow, bounce, drips, fn, cap, decim, mixed)
+            make_font(family, style, rr, amp, freq, sh, narrow, bounce, drips, fn, cap, decim, mixed, track)
 
 if __name__ == "__main__":
     main(sys.argv[1] if len(sys.argv) > 1 else ".")

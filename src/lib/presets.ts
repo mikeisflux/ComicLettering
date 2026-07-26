@@ -20,6 +20,16 @@ export interface LetterStyle {
 export const LETTER_STYLES: LetterStyle[] = [
   /* --- SFX colourways: each pairs one of the LMC display faces with the
      punchy fill/outline/shadow treatment that genre is normally inked in --- */
+  { name: "Crash Cream",   font: "lmccrashland",fillA: "#fff2c4", fillB: "#f0c020", outlineC: "#5b1a6b", outlineF: 0.03,  shadow: true },
+  { name: "Rowdy Orange",  font: "lmcrowdy",    fillA: "#f5a03c", fillB: "#e07818", outlineC: "#000000", outlineF: 0.04,  shadow: true },
+  { name: "Deco Gold",     font: "lmcdeco",     fillA: "#f5c542", fillB: "#e0a820", outlineC: "#12385c", outlineF: 0.014, shadow: true },
+  { name: "Screech Amber", font: "lmcscreech",  fillA: "#fff0b8", fillB: "#f5a623", outlineC: "#000000", outlineF: 0.038, shadow: true },
+  { name: "Gut Flesh",     font: "lmcgutspill", fillA: "#f8b89c", fillB: "#e08060", outlineC: "#000000", outlineF: 0.04,  shadow: true },
+  { name: "Booger Green",  font: "lmcblob",     fillA: "#9cec2e", fillB: "#5aab08", outlineC: "#000000", outlineF: 0.035, shadow: true },
+  { name: "Deep Freeze",   font: "lmcfrost",    fillA: "#5a7cbc", fillB: "#2d4676", outlineC: "#dce5f2", outlineF: 0.018, shadow: true },
+  { name: "Brush Venom",   font: "lmcberserk",  fillA: "#d6f5a0", fillB: "#3f9c46", outlineC: "#0f2a14", outlineF: 0.03,  shadow: true },
+  { name: "Rust Saw",      font: "lmcsawtooth", fillA: "#e8d8c8", fillB: "#6b4a38", outlineC: "#3a1e14", outlineF: 0.028, shadow: true },
+  { name: "Scorched",      font: "lmccharflame",fillA: "#f8541e", fillB: "#c01800", outlineC: "#000000", outlineF: 0.035, shadow: true },
   { name: "Gold Ordnance", font: "lmcarmory",   fillA: "#ffd21f", fillB: "#e0a400", outlineC: "#000000", outlineF: 0.022, shadow: true },
   { name: "Breach Gold",   font: "lmcbreach",   fillA: "#ffc91a", fillB: "#d99400", outlineC: "#000000", outlineF: 0.024, shadow: true },
   { name: "Boom Yellow",   font: "lmckaboom",   fillA: "#ffec5e", fillB: "#ffd21f", outlineC: "#000000", outlineF: 0.05,  shadow: true },
