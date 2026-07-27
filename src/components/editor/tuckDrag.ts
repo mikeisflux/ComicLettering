@@ -87,10 +87,15 @@ async function buildTuckAsk(d: TuckDragDeps, raw: number[][]): Promise<TuckAsk |
     return null;
   }
 
-  /* topmost unrotated panel/image with artwork under the traced area */
+  /* Topmost unrotated panel/image with artwork under the traced area —
+     skipping cutouts already placed by this tool. A word usually needs one
+     pass per letter, and every pass has to read the ORIGINAL art: without
+     this, the second trace lands on the first cutout (which is on top and
+     mostly transparent) and comes back with nothing. */
   const pg = d.docRef.current!.pages[d.pageIndexRef.current];
   const target = [...pg.els].reverse().find((el) =>
     (el.type === "panel" || el.type === "image") && el.img && !el.rot &&
+    !(el.type === "image" && el.cut) &&
     b.x < el.x + el.w && b.x + b.w > el.x &&
     b.y < el.y + el.h && b.y + b.h > el.y);
   if (!target || !("img" in target) || !target.img) {

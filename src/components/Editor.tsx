@@ -988,9 +988,14 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     keepGenerated(aid, t.preview);
     const el = makeImage(t.pageX, t.pageY, t.pageW, t.pageH, aid);
     el.borderW = 0;
+    el.cut = true;              // so the next pass traces the art, not this
     docRef.current!.pages[pageIndexRef.current].els.push(el); // topmost → art in front
     commit();
-    setStatus("Foreground cutout placed — your SFX now sits behind the art. Delete the cutout to undo.");
+    /* A word is normally tucked a letter at a time, so stay armed: the reader
+       traces the next letter straight away instead of going back to the
+       toolbar between every one. */
+    setTuckMode(true);
+    setStatus("Cutout placed — draw around the next letter, or press Esc when the word is done.");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [commit, setStatus]);
 

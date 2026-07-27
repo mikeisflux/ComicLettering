@@ -945,10 +945,12 @@ export async function onDrop(ed: EditorCtx, e: React.DragEvent) {
     const target = !isPdf && off === 0 ? hitElAt(ed, pt.x, pt.y) : null;
     if (target && (target.type === "balloon" || target.type === "panel" || target.type === "image") && !target.locked) {
       const url = await readAsDataURL(f);
-      await loadImage(url);
+      const img = await loadImage(url);
       const aid = "a" + aidRef.current++;
       assetsRef.current[aid] = url;
       target.img = aid;
+      /* a bare image element is the picture, not a frame — see fitBoxToArt */
+      if (target.type === "image") fitBoxToArt(target, img);
       commit();
       setSelId(target.id);
       setStatus(target.type === "balloon" ? "Image placed inside the balloon." : "Image placed in the panel.");
@@ -959,6 +961,25 @@ export async function onDrop(ed: EditorCtx, e: React.DragEvent) {
   }
 }
 
+/* Artwork is drawn object-fit: cover, so anything whose box is not the
+   artwork's shape gets silently cropped.
+
+   For a PANEL or a BALLOON that is the point — the frame is the frame, and
+   the art fills it. But an IMAGE element has no frame of its own: the box IS
+   the picture, so keeping a stale box just eats the edges of the art with
+   nothing on screen to say so. Reshape it around its centre instead. */
+export function fitBoxToArt(el: { x: number; y: number; w: number; h: number }, img: HTMLImageElement) {
+  if (!img.naturalWidth || !img.naturalHeight) return;
+  const cx = el.x + el.w / 2, cy = el.y + el.h / 2;
+  /* keep the area it already occupies, so it does not jump in size */
+  const area = el.w * el.h;
+  const ar = img.naturalWidth / img.naturalHeight;
+  const w = Math.max(1, Math.round(Math.sqrt(area * ar)));
+  const h = Math.max(1, Math.round(w / ar));
+  el.x = Math.round(cx - w / 2); el.y = Math.round(cy - h / 2);
+  el.w = w; el.h = h;
+}
+
 export async function assignImageToPanel(ed: EditorCtx, elId: string, aid: string) {
   const { docRef, pageIndexRef, assetsRef, commit } = ed;
   const d = docRef.current!;
@@ -966,8 +987,23 @@ export async function assignImageToPanel(ed: EditorCtx, elId: string, aid: strin
   const el = p.els.find((x) => x.id === elId);
   if (!el || (el.type !== "panel" && el.type !== "image" && el.type !== "balloon")) return;
   el.img = aid;
-  await loadImage(assetsRef.current[aid]);
+  const img = await loadImage(assetsRef.current[aid]);
+  if (el.type === "image") fitBoxToArt(el, img);
   commit();
+}
+
+/* Un-crop: give a panel the artwork's shape without changing how much room it
+   takes on the page. The one-click answer to "why is my art cut off". */
+export async function fitToArtwork(ed: EditorCtx) {
+  const { page, selId, assetsRef, setStatus, commit } = ed;
+  const el = page?.els.find((x) => x.id === selId);
+  if (!el || (el.type !== "image" && el.type !== "panel") || !el.img) return;
+  if (el.locked) { setStatus("This item is locked."); return; }
+  const src = assetsRef.current[el.img];
+  if (!src) return;
+  fitBoxToArt(el, await loadImage(src));
+  commit();
+  setStatus("Frame reshaped to the artwork — nothing is cropped now.");
 }
 
 /* ---------------- project library (SQL) ---------------- */

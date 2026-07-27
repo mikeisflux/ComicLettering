@@ -8,7 +8,8 @@ import { EditorCtx } from "./ctx";
 import {
   addAttachedBubble, addFromTray, alignSel, copySel, cutSel, deleteSel,
   doFindReplace, duplicateSel, importScript, insertCustomStamp, insertSfxStamp,
-  pasteClip, removeCustomStamp, reorder, resizeToActual, resolveTailAsk, runExport,
+  fitToArtwork, pasteClip, removeCustomStamp, reorder, resizeToActual, resolveTailAsk,
+  runExport,
 } from "./ops";
 import { SFX_STAMPS } from "@/lib/sfxStamps";
 import type { TuckMode } from "./tuck";
@@ -256,6 +257,7 @@ export function renderContextMenu(ed: EditorCtx) {
               <button disabled={el.locked} onClick={() => { panelImageTarget.current = el.id; filePanelImageRef.current?.click(); close(); }}>
                 {el.img ? "Replace Image…" : "Set Image…"}
               </button>
+              {el.img && <button disabled={el.locked} onClick={() => { fitToArtwork(ed); close(); }}>Fit Frame to Artwork (un-crop)</button>}
               {el.img && <button disabled={el.locked} onClick={() => { resizeToActual(ed); close(); }}>Resize Image to Actual Size</button>}
             </>
           )}
