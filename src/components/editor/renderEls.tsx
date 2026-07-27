@@ -12,7 +12,7 @@ import { displayText, measureCharWidths, renderRuns, textCss, textOverflows } fr
 import { BalloonShape, MergeBaseInfo } from "./BalloonShape";
 import { EditorCtx } from "./ctx";
 import { WarpedText } from "./WarpedText";
-import { FLAT, Warp, isWarped } from "@/lib/warp";
+import { FLAT, Warp, isWarped, warpBounds } from "@/lib/warp";
 import { onLetteringInput } from "./ops";
 
 
@@ -178,11 +178,23 @@ export function renderOverlay(ed: EditorCtx) {
     ["nw", 0, 0], ["n", 0.5, 0], ["ne", 1, 0], ["e", 1, 0.5],
     ["se", 1, 1], ["s", 0.5, 1], ["sw", 0, 1], ["w", 0, 0.5],
   ];
+  /* A warp moves the letters outside the box they were laid out in, so the
+     selection rect follows where the letters ended up rather than the layout
+     box they came from. Positions inside the overlay are remapped into it. */
+  const envW = el.type === "text" && isWarped(el.ts.env as Warp) ? (el.ts.env as Warp) : null;
+  const eb = envW ? warpBounds(envW) : null;
+  const bx = eb ? el.x + eb.x0 * el.w : el.x;
+  const by = eb ? el.y + eb.y0 * el.h : el.y;
+  const bw = eb ? Math.max(1, (eb.x1 - eb.x0) * el.w) : el.w;
+  const bh = eb ? Math.max(1, (eb.y1 - eb.y0) * el.h) : el.h;
+  /* element-box units → a fraction of the selection rect */
+  const fx = (u: number) => eb ? (u - eb.x0) / (eb.x1 - eb.x0) : u;
+  const fy = (v: number) => eb ? (v - eb.y0) / (eb.y1 - eb.y0) : v;
   return (
     <div
       className={"overlay" + (editingId === el.id ? " editing" : "")}
       style={{
-        left: el.x * z, top: el.y * z, width: el.w * z, height: el.h * z,
+        left: bx * z, top: by * z, width: bw * z, height: bh * z,
         transform: el.rot ? `rotate(${el.rot}deg)` : undefined,
       }}
     >
@@ -192,14 +204,14 @@ export function renderOverlay(ed: EditorCtx) {
         (el.ts.env as Warp | undefined ?? FLAT).map((p, i) => (
           <div key={i} className="handle warpDot"
             title={i < 4 ? "Drag to pin this corner" : "Drag to bow this edge"}
-            style={{ left: `calc(${p[0] * 100}% - 5px)`, top: `calc(${p[1] * 100}% - 5px)` }}
+            style={{ left: `calc(${fx(p[0]) * 100}% - 5px)`, top: `calc(${fy(p[1]) * 100}% - 5px)` }}
             onPointerDown={(e) => startDrag(e, el, "envelope", String(i))}
             onDoubleClick={(e) => { e.stopPropagation(); setWarping(null); }} />
         ))
-      ) : handles.map(([k, fx, fy]) => (
+      ) : handles.map(([k, hx, hy]) => (
         <div key={k} className={`handle h-${k}`}
           title={el.type === "text" ? "Drag to resize · double-click to warp" : "Drag to resize"}
-          style={{ left: `calc(${fx * 100}% - 6px)`, top: `calc(${fy * 100}% - 6px)` }}
+          style={{ left: `calc(${fx(hx) * 100}% - 6px)`, top: `calc(${fy(hy) * 100}% - 6px)` }}
           onPointerDown={(e) => startDrag(e, el, "resize", k)}
           onDoubleClick={(e) => {
             if (el.type !== "text") return;
