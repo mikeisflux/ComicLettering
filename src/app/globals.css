@@ -451,6 +451,38 @@ input[type="range"] { width: 110px; }
 .stampEmoji { display: grid; grid-template-columns: repeat(auto-fill, minmax(32px, 1fr)); gap: 2px; }
 .stampEmoji button { font-size: 20px; padding: 2px 0; min-width: 0; text-align: center; }
 
+
+/* ---------------- gradient maker ---------------- */
+.gmOpen {
+  width: 100%; margin-top: 8px; padding: 6px; font-size: 12px;
+  border: 1px solid var(--edge2); border-radius: 6px; background: #eef3f9; cursor: pointer;
+}
+.gmOpen:hover { background: #dde8f5; }
+.modal.gradMaker { width: 440px; max-width: 94vw; }
+.gmPreview { height: 56px; border: 1px solid var(--edge2); border-radius: 6px; margin-bottom: 10px; }
+.gmBarWrap { padding: 0 9px 20px; }
+.gmBar {
+  position: relative; height: 22px; border: 1px solid var(--edge2); border-radius: 4px;
+  cursor: copy;
+}
+.gmStop {
+  position: absolute; top: 100%; width: 15px; height: 15px; margin: 3px 0 0 -8px;
+  border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 0 1px #6b7280, 0 1px 3px #0005;
+  padding: 0; cursor: grab; touch-action: none;
+}
+.gmStop.on { box-shadow: 0 0 0 2px var(--sel), 0 1px 3px #0005; }
+.gmRow { display: flex; align-items: center; gap: 8px; margin: 8px 0; flex-wrap: wrap; }
+.gmRow label { display: flex; align-items: center; gap: 5px; font-size: 12px; }
+.gmRow input[type=range] { width: 150px; }
+.gmPct { font: 11px/1 monospace; color: #666; min-width: 34px; }
+.gmName { flex: 1; min-width: 120px; padding: 4px 7px; border: 1px solid var(--edge2); border-radius: 5px; font-size: 12px; }
+.gmSaved { position: relative; display: inline-block; }
+.gmSaved i {
+  position: absolute; top: -5px; right: -5px; width: 14px; height: 14px;
+  background: #c33; color: #fff; border-radius: 50%; font: 700 9px/14px sans-serif;
+  text-align: center; font-style: normal; cursor: pointer;
+}
+
 /* demo mode */
 .demoBar {
   display: flex; align-items: center; justify-content: center; gap: 8px 18px;

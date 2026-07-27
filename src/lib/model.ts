@@ -85,6 +85,76 @@ export const MULTI_GRADIENTS: { name: string; stops: GradStop[] }[] = [
   { name: "Rainbow", stops: [["#ff3b30", 0], ["#ff9500", 0.2], ["#ffe14d", 0.4], ["#34c759", 0.6], ["#2e86d4", 0.8], ["#8a4fd8", 1]] },
   { name: "Steel", stops: [["#e8ecf0", 0], ["#8d99a6", 0.5], ["#3c4650", 0.85], ["#c2ccd6", 1]] },
   { name: "Cream", stops: [["#fffdf2", 0], ["#ffe9b0", 0.55], ["#e0a83c", 1]] },
+
+  /* --- metallics and foils --- */
+  { name: "Rose Gold", stops: [["#fff0ea", 0], ["#f0b8a8", 0.38], ["#a85f4c", 0.55], ["#ffd8c8", 1]] },
+  { name: "Brass", stops: [["#fff2c0", 0], ["#d4a72c", 0.45], ["#6b4c0a", 0.6], ["#f0cf6e", 1]] },
+  { name: "Bronze", stops: [["#f7d9a8", 0], ["#b07a34", 0.45], ["#5a3410", 0.7], ["#e0aa62", 1]] },
+  { name: "Gunmetal", stops: [["#cfd6dd", 0], ["#6b757f", 0.4], ["#232a31", 0.7], ["#8d99a4", 1]] },
+  { name: "Platinum", stops: [["#ffffff", 0], ["#e4e9ee", 0.35], ["#b3bcc5", 0.6], ["#f4f7fa", 1]] },
+  { name: "Titanium", stops: [["#dfe6ec", 0], ["#93a1ad", 0.45], ["#4c5a67", 0.8], ["#c4ced8", 1]] },
+  { name: "Oil Slick", stops: [["#2e1a4a", 0], ["#1f6f8f", 0.28], ["#2fa36b", 0.5], ["#c05a2e", 0.74], ["#5a2050", 1]] },
+  { name: "Holo", stops: [["#ffd9f2", 0], ["#c9e4ff", 0.25], ["#d6ffe8", 0.5], ["#fff5cc", 0.75], ["#f0d4ff", 1]] },
+  { name: "Iridescent", stops: [["#8fe8ff", 0], ["#c48fff", 0.3], ["#ff8fd0", 0.55], ["#ffd98f", 0.8], ["#9dffc4", 1]] },
+  { name: "Prism", stops: [["#ff6b9d", 0], ["#feca57", 0.25], ["#48dbfb", 0.5], ["#1dd1a1", 0.75], ["#a55eea", 1]] },
+
+  /* --- skies, weather and water --- */
+  { name: "Dawn", stops: [["#ffd6a5", 0], ["#ff9a8b", 0.4], ["#a06cd5", 0.75], ["#3b2a68", 1]] },
+  { name: "Dusk", stops: [["#f8b195", 0], ["#c06c84", 0.4], ["#6c5b7b", 0.72], ["#355c7d", 1]] },
+  { name: "Midday", stops: [["#e6f7ff", 0], ["#8fd0f5", 0.5], ["#3a8fd0", 1]] },
+  { name: "Storm", stops: [["#8d99ae", 0], ["#4a5568", 0.45], ["#1f2430", 1]] },
+  { name: "Aurora", stops: [["#0b1a2e", 0], ["#1b7a5a", 0.35], ["#4fd6a0", 0.55], ["#7a5ad6", 0.8], ["#12102e", 1]] },
+  { name: "Deep Sea", stops: [["#2ec5c0", 0], ["#1a7ba8", 0.4], ["#0d3562", 0.75], ["#04101f", 1]] },
+  { name: "Lagoon", stops: [["#d6fff5", 0], ["#5fe0c8", 0.4], ["#128f9e", 1]] },
+  { name: "Glacier", stops: [["#ffffff", 0], ["#d8f0ff", 0.35], ["#7fb8dd", 0.7], ["#2e5f85", 1]] },
+  { name: "Sandstorm", stops: [["#fff1cc", 0], ["#e0b76e", 0.45], ["#9c6b34", 1]] },
+  { name: "Smog", stops: [["#e8dcc0", 0], ["#a89878", 0.5], ["#4f4738", 1]] },
+
+  /* --- heat and hazard --- */
+  { name: "Inferno", stops: [["#fffbe0", 0], ["#ffd21f", 0.22], ["#ff6a00", 0.5], ["#c00d0d", 0.78], ["#2a0505", 1]] },
+  { name: "Ember", stops: [["#ffb36e", 0], ["#e04a1a", 0.45], ["#6b1005", 1]] },
+  { name: "Plasma", stops: [["#fff0ff", 0], ["#ff6ee8", 0.32], ["#8a2be2", 0.66], ["#1a0a3a", 1]] },
+  { name: "Radiation", stops: [["#f7ffb0", 0], ["#c8f000", 0.4], ["#4e8a00", 0.75], ["#0f2a05", 1]] },
+  { name: "Kryptonite", stops: [["#e8ffd0", 0], ["#7fe03a", 0.42], ["#1f7a2a", 1]] },
+  { name: "Acid Burn", stops: [["#fbff3a", 0], ["#3aff8a", 0.5], ["#00a86b", 1]] },
+  { name: "Blood", stops: [["#ff8a7a", 0], ["#c41818", 0.42], ["#5a0208", 1]] },
+  { name: "Rust", stops: [["#f0c08a", 0], ["#b5602a", 0.45], ["#5c2810", 1]] },
+  { name: "Toxic Waste", stops: [["#d8ff5e", 0], ["#5ec24a", 0.4], ["#1a5c3a", 0.75], ["#08221a", 1]] },
+  { name: "Warning", stops: [["#ffe14d", 0], ["#ffb300", 0.5], ["#1a1a1a", 1]] },
+
+  /* --- neon and night --- */
+  { name: "Neon Pink", stops: [["#ffd6f5", 0], ["#ff2ec4", 0.45], ["#7a0059", 1]] },
+  { name: "Neon Blue", stops: [["#d6f6ff", 0], ["#00c2ff", 0.42], ["#00306b", 1]] },
+  { name: "Neon Lime", stops: [["#f2ffd6", 0], ["#8aff00", 0.42], ["#1f5c00", 1]] },
+  { name: "Vaporwave", stops: [["#ff71ce", 0], ["#b967ff", 0.35], ["#01cdfe", 0.7], ["#05ffa1", 1]] },
+  { name: "Synthwave", stops: [["#ff2a6d", 0], ["#d1006c", 0.35], ["#3b1e6e", 0.7], ["#0d0221", 1]] },
+  { name: "Cyberpunk", stops: [["#fcee0a", 0], ["#ff2a6d", 0.4], ["#05d9e8", 0.75], ["#01012b", 1]] },
+  { name: "Midnight", stops: [["#3a4a7a", 0], ["#1a2145", 0.5], ["#05060f", 1]] },
+  { name: "Shadow", stops: [["#6b7280", 0], ["#2c313a", 0.5], ["#000000", 1]] },
+  { name: "Ultraviolet", stops: [["#e0c8ff", 0], ["#8a2be2", 0.45], ["#2a0a5e", 1]] },
+  { name: "Void", stops: [["#4a2a7a", 0], ["#160d33", 0.55], ["#000000", 1]] },
+
+  /* --- pastels and paper --- */
+  { name: "Cotton Candy", stops: [["#ffe4f2", 0], ["#ffc2e0", 0.4], ["#c2e0ff", 1]] },
+  { name: "Peach", stops: [["#fff2e8", 0], ["#ffd0b0", 0.5], ["#f0a072", 1]] },
+  { name: "Mint Cream", stops: [["#f2fffa", 0], ["#c8f0e0", 0.5], ["#7fc4ac", 1]] },
+  { name: "Lavender Ice", stops: [["#f8f2ff", 0], ["#ddc8f5", 0.5], ["#a888d8", 1]] },
+  { name: "Butter", stops: [["#fffce8", 0], ["#fff0a8", 0.5], ["#e8d060", 1]] },
+  { name: "Newsprint", stops: [["#f7f4ea", 0], ["#e0d9c6", 0.55], ["#b8ae96", 1]] },
+  { name: "Aged Paper", stops: [["#fdf6e0", 0], ["#e8d5a8", 0.5], ["#b09256", 1]] },
+  { name: "Blueprint", stops: [["#2a5fa8", 0], ["#1a3f78", 0.55], ["#0c2145", 1]] },
+  { name: "Sepia", stops: [["#f2e2c6", 0], ["#c49a5e", 0.5], ["#6b4a24", 1]] },
+  { name: "Charcoal", stops: [["#c8ccd0", 0], ["#6b7278", 0.5], ["#22262a", 1]] },
+
+  /* --- spectrum sweeps --- */
+  { name: "Spectrum", stops: [["#ff0000", 0], ["#ffff00", 0.17], ["#00ff00", 0.34], ["#00ffff", 0.5], ["#0000ff", 0.67], ["#ff00ff", 0.84], ["#ff0000", 1]] },
+  { name: "Warm Sweep", stops: [["#fff200", 0], ["#ff9a00", 0.33], ["#ff2e00", 0.66], ["#a80038", 1]] },
+  { name: "Cool Sweep", stops: [["#c8ffe8", 0], ["#00d4ff", 0.35], ["#2e5ce0", 0.7], ["#5e0ec4", 1]] },
+  { name: "Tropical", stops: [["#fff44f", 0], ["#3aff8a", 0.35], ["#00c2ff", 0.7], ["#7a3aff", 1]] },
+  { name: "Autumn", stops: [["#ffd76e", 0], ["#e08a2e", 0.4], ["#a83a1a", 0.75], ["#4a1a0c", 1]] },
+  { name: "Forest", stops: [["#d8f0c0", 0], ["#5ea83c", 0.42], ["#1f5c22", 0.78], ["#0a2a12", 1]] },
+  { name: "Desert", stops: [["#fff0c8", 0], ["#e8b76e", 0.4], ["#b5702e", 0.75], ["#6b3a14", 1]] },
+  { name: "Arctic", stops: [["#ffffff", 0], ["#cfeaff", 0.4], ["#7aa8cc", 0.75], ["#2a4a6b", 1]] },
 ];
 
 export const GRADIENT_PRESETS: [string, string][] = (() => {

@@ -3,7 +3,7 @@
    functions (NOT components — reconciliation output is identical) receive
    it as their first argument. */
 import type React from "react";
-import type { Assets, Doc, El, FillStyle, Page, TextStyle } from "@/lib/model";
+import type { Assets, Doc, El, FillStyle, GradStop, Page, TextStyle } from "@/lib/model";
 import type { ImageFormat } from "@/lib/exportPng";
 import type { BalloonPreset, ProjectMeta, ProofMatch } from "./textHelpers";
 
@@ -52,6 +52,12 @@ export interface EditorCtx {
   commit: () => void;
   autosave: () => void;
   autosaveSoon: () => void;
+  showGradMaker: boolean;
+  setShowGradMaker: SetState<boolean>;
+  /* the reader's saved gradients — read in the component, since the render
+     helpers below are plain functions and cannot hold hooks */
+  myGrads: { name: string; stops: GradStop[] }[];
+  bumpGrads: () => void;
   stampQuery: string;
   setStampQuery: SetState<string>;
   undo: () => void;

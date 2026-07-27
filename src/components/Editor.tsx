@@ -9,13 +9,14 @@ import React, {
   useCallback, useEffect, useReducer, useRef, useState,
 } from "react";
 import {
-  Assets, BalloonEl, DPI, Doc, El, FONTS, FillStyle, Page, TextEl,
+  Assets, BalloonEl, DPI, Doc, El, FONTS, FillStyle, GradStop, Page, TextEl,
   TextStyle, aabbOverlap, clamp, makeBalloon, makeImage, newPage, normalizeRuns,
   registerFont, reseedIds, rotVec, runsToText, starterDoc,
 } from "@/lib/model";
 import { LETTER_STYLES } from "@/lib/presets";
 import { BALLOON_STYLES, BOX_STYLES } from "@/lib/balloonStyles";
 import { StylesPanel, StyleTab, tabForSelection } from "./editor/stylesPanel";
+import { GradientMaker, loadCustomGrads } from "./editor/GradientMaker";
 import { fillCss } from "@/lib/fills";
 import { ImageFormat, loadImage, pageThumbnail } from "@/lib/exportPng";
 import { artUrl, ensureArt, listArtIds, requestPersistence } from "@/lib/assetStore";
@@ -29,7 +30,7 @@ import { TuckSource, makeCutout } from "./editor/tuck";
 import { PageSetupDialog, Ruler, STAGE_MX, STAGE_MY } from "./editor/chrome";
 import { EditorCtx } from "./editor/ctx";
 import {
-  addFromTray, alignSel, assignImageToPanel, copySel, cutSel, deleteSel,
+  addFromTray, alignSel, applyQuickFill, assignImageToPanel, copySel, cutSel, deleteSel,
   duplicatePage, duplicateSel, growBalloonToFit, importFontFiles, importImageFile, importJSON,
   importStampFiles, movePage, onDrop, pasteClip, readAsDataURL,
   refreshProjects, saveProject,
@@ -211,6 +212,10 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
 
 
   const [stampQuery, setStampQuery] = useState("");
+  const [showGradMaker, setShowGradMaker] = useState(false);
+  const [gradsVersion, bumpGrads] = useReducer((c: number) => c + 1, 0);
+  const [myGrads, setMyGrads] = useState<{ name: string; stops: GradStop[] }[]>([]);
+  useEffect(() => { setMyGrads(loadCustomGrads()); }, [gradsVersion]);
   const [proof, setProof] = useState<{ busy: boolean; error: string | null; matches: ProofMatch[] } | null>(null);
 
   useEffect(() => {
@@ -1166,7 +1171,8 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     showFind, setShowFind, findText, setFindText, replaceText,
     setReplaceText, findCase, setFindCase, showSafe, setShowSafe, spread,
     setSpread, showScript, setShowScript, scriptText, setScriptText,
-    stampOpen, setStampOpen, stampQuery, setStampQuery, showFill, setShowFill, showStroke,
+    stampOpen, setStampOpen, stampQuery, setStampQuery, showGradMaker,
+    setShowGradMaker, myGrads, bumpGrads, showFill, setShowFill, showStroke,
     setShowStroke, showTextColor, setShowTextColor, openMenu, setOpenMenu,
     customStamps, setCustomStamps,
   };
@@ -1375,6 +1381,17 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       {renderExportDialog(ed)}
       {renderFindDialog(ed)}
       {renderScriptDialog(ed)}
+
+      {showGradMaker && (
+        <GradientMaker
+          initial={selEl && (selEl.type === "balloon" || selEl.type === "panel") && selEl.fill.kind === "gradient"
+            ? (selEl.fill.stops as GradStop[] | undefined) ?? [[selEl.fill.a, 0], [selEl.fill.b, 1]]
+            : undefined}
+          onClose={() => setShowGradMaker(false)}
+          onSaved={bumpGrads}
+          onApply={(stops) => applyQuickFill(ed, { stops })}
+        />
+      )}
 
       {/* page setup dialog */}
       {showSetup && (

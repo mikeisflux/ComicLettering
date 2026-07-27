@@ -8,6 +8,7 @@ import { fillCss } from "@/lib/fills";
 import { ToolBtn } from "./chrome";
 import { FontMenu, SubtypeSelect, tsVariant } from "./FontMenu";
 import { clearArt, releaseAllArt } from "@/lib/assetStore";
+import { gradCss } from "./GradientMaker";
 import { EditorCtx } from "./ctx";
 import {
   addFromTray, alignSel, applyQuickFill, applyQuickStroke, balanceRag,
@@ -207,6 +208,7 @@ export function renderToolbar(ed: EditorCtx) {
 export function renderFormatBar(ed: EditorCtx) {
   const {
     selEl, mutateSel, showStroke, setShowStroke, showFill, setShowFill, showTextColor, setShowTextColor, fileFontRef,
+    setShowGradMaker, myGrads,
   } = ed;
   const selTs = selEl && (selEl.type === "balloon" || selEl.type === "text") ? selEl.ts : null;
   return (
@@ -282,11 +284,24 @@ export function renderFormatBar(ed: EditorCtx) {
               <div className="fillPopHead" style={{ marginTop: 8 }}>Multi-tier</div>
               <div className="palGrid grads">
                 {MULTI_GRADIENTS.map((m) => (
-                  <button key={m.name} title={m.name}
-                    style={{ background: `linear-gradient(180deg, ${m.stops.map(([c, p]) => `${c} ${Math.round(p * 100)}%`).join(", ")})` }}
+                  <button key={m.name} title={m.name} style={{ background: gradCss(m.stops) }}
                     onClick={() => { applyQuickFill(ed, { stops: m.stops }); }} />
                 ))}
               </div>
+              {myGrads.length > 0 && (
+                <>
+                  <div className="fillPopHead" style={{ marginTop: 8 }}>Yours</div>
+                  <div className="palGrid grads">
+                    {myGrads.map((g) => (
+                      <button key={g.name} title={g.name} style={{ background: gradCss(g.stops) }}
+                        onClick={() => { applyQuickFill(ed, { stops: g.stops }); }} />
+                    ))}
+                  </div>
+                </>
+              )}
+              <button className="gmOpen" onClick={() => { setShowFill(false); setShowGradMaker(true); }}>
+                🎨 Make a gradient…
+              </button>
             </div>
           </div>
           <div className="tips" style={{ margin: "6px 2px 0" }}>
