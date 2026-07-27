@@ -6,6 +6,8 @@
    The cutout is generated at the artwork's native resolution for the region,
    so it stays sharp in print export. */
 
+import { SamMask } from "@/lib/sam";
+
 export interface TuckSource {
   img: HTMLImageElement;   // the panel/image element's artwork (already loaded)
   elW: number; elH: number;      // the element's on-page size
@@ -16,6 +18,8 @@ export interface TuckSource {
 /* Replicates the editor's cover-crop: the image fills the element box like
    CSS object-fit: cover. Returns the source-pixel rect for an element-local
    rect. */
+export function coverRect(s: TuckSource) { return coverMap(s); }
+
 function coverMap(s: TuckSource) {
   const natW = s.img.naturalWidth, natH = s.img.naturalHeight;
   const scale = Math.max(s.elW / natW, s.elH / natH);
@@ -28,6 +32,49 @@ function coverMap(s: TuckSource) {
     sh: (s.regionH / s.elH) * sh,
     scale,
   };
+}
+
+
+/* Same cutout, but the foreground comes from a segmentation mask instead of a
+   brightness cut. The mask covers the WHOLE artwork, so it is sampled through
+   the same cover-crop mapping the region uses. */
+export function makeCutoutFromMask(
+  s: TuckSource, mask: SamMask, feather = 1.2,
+): { url: string; pxW: number; pxH: number } | null {
+  const m = coverMap(s);
+  const pxW = Math.max(1, Math.round(m.sw));
+  const pxH = Math.max(1, Math.round(m.sh));
+  if (pxW < 2 || pxH < 2) return null;
+  const cv = document.createElement("canvas");
+  cv.width = pxW; cv.height = pxH;
+  const ctx = cv.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return null;
+  ctx.drawImage(s.img, m.sx, m.sy, m.sw, m.sh, 0, 0, pxW, pxH);
+  let data: ImageData;
+  try { data = ctx.getImageData(0, 0, pxW, pxH); } catch { return null; }
+  const d = data.data;
+  const kx = mask.w / s.img.naturalWidth, ky = mask.h / s.img.naturalHeight;
+  for (let y = 0; y < pxH; y++) {
+    /* map this cutout pixel back to a mask pixel */
+    const my = Math.min(mask.h - 1, Math.max(0, Math.round((m.sy + (y / pxH) * m.sh) * ky)));
+    for (let x = 0; x < pxW; x++) {
+      const mx = Math.min(mask.w - 1, Math.max(0, Math.round((m.sx + (x / pxW) * m.sw) * kx)));
+      let a = mask.data[my * mask.w + mx];
+      if (feather > 0 && a === 1) {
+        /* soften one pixel in from the mask edge so the cut is not a staircase */
+        let n = 0;
+        if (mx > 0) n += mask.data[my * mask.w + mx - 1];
+        if (mx < mask.w - 1) n += mask.data[my * mask.w + mx + 1];
+        if (my > 0) n += mask.data[(my - 1) * mask.w + mx];
+        if (my < mask.h - 1) n += mask.data[(my + 1) * mask.w + mx];
+        if (n < 4) a = 0.55;
+      }
+      const i = (y * pxW + x) * 4;
+      d[i + 3] = Math.round(d[i + 3] * a);
+    }
+  }
+  ctx.putImageData(data, 0, 0);
+  return { url: cv.toDataURL("image/png"), pxW, pxH };
 }
 
 /* Build the transparent foreground cutout for a region.

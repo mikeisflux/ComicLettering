@@ -13,3 +13,7 @@ prisma/dev.db-journal
 .env.production.local
 prisma/dev.db.migrated
 /backups/
+
+# MobileSAM weights and ONNX runtime — fetched by scripts/fetch-sam.sh
+/public/models/
+/public/ort/

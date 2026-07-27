@@ -27,7 +27,8 @@ import {
 } from "./editor/textHelpers";
 import { closeSketchLoop, detectSketchTail, resampleRing, smoothSketchRing } from "./editor/sketch";
 import { SmartTip, pickTip } from "./editor/smartTips";
-import { TuckSource, makeCutout } from "./editor/tuck";
+import { TuckSource, coverRect, makeCutout, makeCutoutFromMask } from "./editor/tuck";
+import { encodeImage, segmentBox } from "@/lib/sam";
 import { PageSetupDialog, Ruler, STAGE_MX, STAGE_MY } from "./editor/chrome";
 import { EditorCtx } from "./editor/ctx";
 import {
@@ -115,7 +116,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const tuckRectRef = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
   const [tuckAsk, setTuckAsk] = useState<{
     src: TuckSource; pageX: number; pageY: number; pageW: number; pageH: number;
-    threshold: number; invert: boolean; preview: string | null;
+    threshold: number; invert: boolean; preview: string | null; ai?: boolean;
   } | null>(null);
   /* smart contextual tips: one at a time, each shows once (localStorage) */
   const [tip, setTip] = useState<SmartTip | null>(null);
@@ -977,12 +978,30 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
         regionX: x0 - target.x, regionY: y0 - target.y,
         regionW: x1 - x0, regionH: y1 - y0,
       };
+      /* Segment the region properly if the model is available; the luminance
+         threshold stays as the fallback for browsers that cannot run it. */
       const cut = makeCutout(src, 45);
       setTuckAsk({
         src, pageX: x0, pageY: y0, pageW: x1 - x0, pageH: y1 - y0,
         threshold: 45, invert: false, preview: cut?.url ?? null,
       });
       force();
+      (async () => {
+        setStatus("Reading the artwork…");
+        const emb = await encodeImage(target.img!, img, (_, note) => setStatus(note));
+        if (!emb) { setStatus("Drag the sliders to tune the cutout."); force(); return; }
+        /* the drag is in element-local page units; the mask wants source pixels */
+        const cm = coverRect(src);
+        const mask = await segmentBox(emb,
+          cm.sx, cm.sy, cm.sx + cm.sw, cm.sy + cm.sh);
+        if (!mask) { setStatus("Could not segment that region — tune it by hand."); force(); return; }
+        const better = makeCutoutFromMask(src, mask);
+        if (better) {
+          setTuckAsk((t) => t && t.src === src ? { ...t, preview: better.url, ai: true } : t);
+          setStatus("Foreground found — place it, or switch to manual tuning.");
+        }
+        force();
+      })();
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
