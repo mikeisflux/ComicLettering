@@ -719,10 +719,10 @@ export async function insertSfxStamp(ed: EditorCtx, slug: string, label: string)
 }
 
 export async function insertCustomStamp(ed: EditorCtx, url: string) {
-  const { aidRef, assetsRef, setStampOpen } = ed;
+  const { aidRef, setStampOpen } = ed;
   const img = await loadImage(url);
   const aid = "a" + aidRef.current++;
-  assetsRef.current[aid] = url;
+  await stashDataUrl(ed, aid, url);
   placeAsset(ed, aid, img.naturalWidth, img.naturalHeight);
   setStampOpen(false);
 }
@@ -816,6 +816,19 @@ export async function ensureAllArt(ed: EditorCtx) {
   for (const id of await ensureArt(want)) assetsRef.current[id] = artUrl(id)!;
 }
 
+/* Generated artwork (tuck cutouts, instant-alpha copies, stamps) arrives as a
+   data URL. It still has to reach the artwork store or the element it belongs
+   to comes back from a refresh with nothing to draw. */
+export async function stashDataUrl(ed: EditorCtx, aid: string, dataUrl: string): Promise<string> {
+  try {
+    const blob = await (await fetch(dataUrl)).blob();
+    return await stashArt(ed, aid, blob);
+  } catch {
+    ed.assetsRef.current[aid] = dataUrl;   // still usable this session
+    return dataUrl;
+  }
+}
+
 export async function stashArt(ed: EditorCtx, aid: string, blob: Blob): Promise<string> {
   const { assetsRef, setStatus } = ed;
   /* first artwork of the session: ask the browser to stop treating this
@@ -882,7 +895,7 @@ export async function runInstantAlpha(ed: EditorCtx, elId: string, aid: string) 
   ctx.putImageData(imgData, 0, 0);
   const url = c.toDataURL("image/png");
   const newAid = "a" + aidRef.current++;
-  assetsRef.current[newAid] = url;
+  await stashDataUrl(ed, newAid, url);
   await loadImage(url);
   const p = docRef.current!.pages[pageIndexRef.current];
   const el = p.els.find((e) => e.id === elId);

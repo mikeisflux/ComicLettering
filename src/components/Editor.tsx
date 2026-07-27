@@ -19,7 +19,7 @@ import { StylesPanel, StyleTab, tabForSelection } from "./editor/stylesPanel";
 import { GradientMaker, loadCustomGrads } from "./editor/GradientMaker";
 import { fillCss } from "@/lib/fills";
 import { ImageFormat, loadImage, pageThumbnail } from "@/lib/exportPng";
-import { artUrl, ensureArt, listArtIds, requestPersistence } from "@/lib/assetStore";
+import { artUrl, ensureArt, holdArt, listArtIds, putArt, requestPersistence } from "@/lib/assetStore";
 import {
   BalloonPreset, HINT, PRESET_KEY, ProjectMeta, ProofMatch, domToRuns,
   letterStyleCss, runsToHtml, toggleEmphasis,
@@ -406,6 +406,18 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     setPageIndex((p) => clamp(p, 0, docRef.current!.pages.length - 1));
     autosave(); force();
   }, [autosave]);
+
+  /* Generated artwork — tuck cutouts and the like — arrives as a data URL and
+     has to be handed to the artwork store, or the element it belongs to comes
+     back from a refresh with nothing to draw. */
+  const keepGenerated = useCallback((aid: string, dataUrl: string) => {
+    fetch(dataUrl)
+      .then((r) => r.blob())
+      .then((blob) => putArt(aid, blob).then((ok) => {
+        if (ok) assetsRef.current[aid] = holdArt(aid, blob);
+      }))
+      .catch(() => { /* stays session-only */ });
+  }, []);
 
   /* ---------------- local artwork ---------------- */
 
@@ -972,7 +984,10 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     setTuckAsk(null);
     if (!t || !t.preview) return;
     const aid = "a" + aidRef.current++;
+    /* show it at once, and put it in the artwork store so the tuck is still
+       there after a refresh — assetsRef alone is not persisted */
     assetsRef.current[aid] = t.preview;
+    keepGenerated(aid, t.preview);
     const el = makeImage(t.pageX, t.pageY, t.pageW, t.pageH, aid);
     el.borderW = 0;
     docRef.current!.pages[pageIndexRef.current].els.push(el); // topmost → art in front
