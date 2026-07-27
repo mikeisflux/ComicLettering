@@ -193,6 +193,8 @@ export interface TextStyle {
   /* coloured halo thrown off the letterforms (see lib/glows) */
   glow?: string;
   glowW?: number;
+  /* envelope warp control points, in units of the element box (see lib/warp) */
+  env?: number[][];
   align: Align;
   lineHeight?: number; // line-spacing multiplier (default 1.05 — comic leading is tight)
   tracking?: number;   // letter-spacing in px (default 0)

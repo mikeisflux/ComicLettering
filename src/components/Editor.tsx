@@ -17,6 +17,7 @@ import { LETTER_STYLES } from "@/lib/presets";
 import { BALLOON_STYLES, BOX_STYLES } from "@/lib/balloonStyles";
 import { StylesPanel, StyleTab, tabForSelection } from "./editor/stylesPanel";
 import { GradientMaker, loadCustomGrads } from "./editor/GradientMaker";
+import { FLAT } from "@/lib/warp";
 import { fillCss } from "@/lib/fills";
 import { ImageFormat, loadImage, pageThumbnail } from "@/lib/exportPng";
 import { artUrl, ensureArt, holdArt, listArtIds, putArt, requestPersistence } from "@/lib/assetStore";
@@ -212,6 +213,8 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
 
 
   const [stampQuery, setStampQuery] = useState("");
+  /* lettering whose envelope handles are showing (double-click a resize box) */
+  const [warping, setWarping] = useState<string | null>(null);
   const [showGradMaker, setShowGradMaker] = useState(false);
   const [gradsVersion, bumpGrads] = useReducer((c: number) => c + 1, 0);
   const [myGrads, setMyGrads] = useState<{ name: string; stops: GradStop[] }[]>([]);
@@ -627,7 +630,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
 
   const startDrag = useCallback((
     e: React.PointerEvent, el: El,
-    mode: "move" | "resize" | "rotate" | "tail" | "bow" | "tilt", handle = ""
+    mode: "move" | "resize" | "rotate" | "tail" | "bow" | "tilt" | "envelope", handle = ""
   ) => {
     e.preventDefault();
     e.stopPropagation();
@@ -642,6 +645,20 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       const pt = pagePoint(ev);
       const dx = pt.x - start.x, dy = pt.y - start.y;
       if (Math.abs(dx) + Math.abs(dy) > 1) moved = true;
+      if (mode === "envelope") {
+        /* one control point of the lettering's envelope, in units of the box
+           so the warp survives a later resize */
+        const i = parseInt(handle, 10);
+        const t = cur as TextEl;
+        const base = (orig as TextEl).ts.env ?? FLAT.map((q) => [...q]);
+        const pts = base.map((q) => [...q]);
+        if (pts[i]) {
+          pts[i] = [base[i][0] + dx / Math.max(1, cur.w), base[i][1] + dy / Math.max(1, cur.h)];
+          t.ts = { ...t.ts, env: pts };
+          force();
+        }
+        return;
+      }
       if (mode === "move") {
         let nx = Math.round(orig.x + dx), ny = Math.round(orig.y + dy);
         snapRef.current = { x: null, y: null };
@@ -1186,6 +1203,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     showFind, setShowFind, findText, setFindText, replaceText,
     setReplaceText, findCase, setFindCase, showSafe, setShowSafe, spread,
     setSpread, showScript, setShowScript, scriptText, setScriptText,
+    warping, setWarping,
     stampOpen, setStampOpen, stampQuery, setStampQuery, showGradMaker,
     setShowGradMaker, myGrads, bumpGrads, showFill, setShowFill, showStroke,
     setShowStroke, showTextColor, setShowTextColor, openMenu, setOpenMenu,

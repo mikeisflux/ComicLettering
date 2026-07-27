@@ -7,6 +7,7 @@ import { balloonGeom, arcTextLayout } from "./geometry";
 import { paintFill } from "./fills";
 import { BrushKey, brushScale, brushTile } from "./brushes";
 import { glowPasses } from "./glows";
+import { Warp, drawWarped, isWarped, warpBounds } from "./warp";
 
 interface MergeInfo { d: string; color: string; cx: number; cy: number; rot: number; bw: number; bh: number; stroke?: string; strokeW?: number }
 
@@ -257,6 +258,29 @@ export function drawStyledText(
      fill, gradient, outline and shadow alike — is drawn to a scratch canvas
      first and the texture punched out of it. Wrapping the one entry point
      keeps plain, rich and warped text identical to the DOM editor. */
+  /* an envelope warp is not a linear transform, so the block is rendered flat
+     to a scratch canvas and pushed through the patch — the same routine the
+     editor uses, so screen and print cannot drift apart */
+  const env = ts.env && isWarped(ts.env as Warp) ? (ts.env as Warp) : null;
+  if (env) {
+    const [rx, ry, rw, rh] = rect;
+    const b = warpBounds(env);
+    const sc = document.createElement("canvas");
+    const pad = Math.ceil(ts.size * 0.5);
+    sc.width = Math.max(1, Math.ceil(rw) + pad * 2);
+    sc.height = Math.max(1, Math.ceil(rh) + pad * 2);
+    const sctx = sc.getContext("2d");
+    if (sctx) {
+      sctx.translate(pad - rx, pad - ry);
+      drawStyledText(sctx, { ...ts, env: undefined }, text, rect, warp, runs);
+      ctx.save();
+      ctx.translate(rx - pad, ry - pad);
+      drawWarped(ctx, sc, sc.width, sc.height, env, sc.width, sc.height);
+      ctx.restore();
+      void b;   /* bounds are the caller's business — the page is not clipped */
+      return;
+    }
+  }
   const brush = ts.brush && ts.brush !== "none" ? (ts.brush as BrushKey) : null;
   const glow = ts.glow && ts.glow !== "none" ? glowPasses(ts.glow, ts.size, ts.glowW ?? 1) : [];
   if ((brush || glow.length) && typeof document !== "undefined") {

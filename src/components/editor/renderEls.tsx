@@ -11,6 +11,8 @@ import { fillCss } from "@/lib/fills";
 import { displayText, measureCharWidths, renderRuns, textCss, textOverflows } from "./textHelpers";
 import { BalloonShape, MergeBaseInfo } from "./BalloonShape";
 import { EditorCtx } from "./ctx";
+import { WarpedText } from "./WarpedText";
+import { FLAT, Warp, isWarped } from "@/lib/warp";
 import { onLetteringInput } from "./ops";
 
 
@@ -110,6 +112,13 @@ export function renderEl(ed: EditorCtx, el: El) {
 
   /* text / SFX */
   const editing = editingId === el.id;
+  if (el.type === "text" && !editing && isWarped(el.ts.env as Warp)) {
+    return (
+      <div {...common} className="el text" style={style}>
+        <WarpedText el={el} env={el.ts.env as Warp} zoom={zoom} />
+      </div>
+    );
+  }
   if (el.warp && !editing && el.text) {
     let raw = (el.ts.caps ? el.text.toUpperCase() : el.text).replace(/\s*\n\s*/g, " ");
     if (el.ts.crossbarI) raw = applyCrossbarI(raw);
@@ -150,7 +159,7 @@ export function renderEl(ed: EditorCtx, el: El) {
 }
 
 export function renderOverlay(ed: EditorCtx) {
-  const { selEl, page, zoom, editingId, startDrag } = ed;
+  const { selEl, page, zoom, editingId, startDrag, warping, setWarping } = ed;
   if (!selEl || !page) return null;
   const el = selEl.type === "balloon" ? resolveBalloon(page, selEl).el : selEl;
   const z = zoom;
@@ -178,10 +187,25 @@ export function renderOverlay(ed: EditorCtx) {
       }}
     >
       <div className="box" />
-      {handles.map(([k, fx, fy]) => (
+      {warping === el.id && el.type === "text" ? (
+        /* envelope mode: corners pin the patch, edge midpoints bow their side */
+        (el.ts.env as Warp | undefined ?? FLAT).map((p, i) => (
+          <div key={i} className="handle warpDot"
+            title={i < 4 ? "Drag to pin this corner" : "Drag to bow this edge"}
+            style={{ left: `calc(${p[0] * 100}% - 5px)`, top: `calc(${p[1] * 100}% - 5px)` }}
+            onPointerDown={(e) => startDrag(e, el, "envelope", String(i))}
+            onDoubleClick={(e) => { e.stopPropagation(); setWarping(null); }} />
+        ))
+      ) : handles.map(([k, fx, fy]) => (
         <div key={k} className={`handle h-${k}`}
+          title={el.type === "text" ? "Drag to resize · double-click to warp" : "Drag to resize"}
           style={{ left: `calc(${fx * 100}% - 6px)`, top: `calc(${fy * 100}% - 6px)` }}
-          onPointerDown={(e) => startDrag(e, el, "resize", k)} />
+          onPointerDown={(e) => startDrag(e, el, "resize", k)}
+          onDoubleClick={(e) => {
+            if (el.type !== "text") return;
+            e.stopPropagation();
+            setWarping(el.id);
+          }} />
       ))}
       <div className="handle rot" title="Rotate (Shift snaps to 15°)"
         style={{ left: "calc(50% - 6px)", top: -28 }}

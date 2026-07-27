@@ -457,6 +457,15 @@ input[type="range"] { width: 110px; }
 .fbGlow .fbGlowAmt { min-width: 76px; }
 .fbBrush .fbLeadIcon { font-size: 13px; }
 
+/* envelope warp: the resize squares become red dots you can pull */
+.handle.warpDot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: #e01b1b; border: 1.5px solid #fff;
+  box-shadow: 0 0 0 1px #7a0000, 0 1px 3px #0006;
+  cursor: crosshair;
+}
+.warpCv { position: absolute; left: 0; top: 0; pointer-events: none; }
+
 /* ---------------- gradient maker ---------------- */
 .gmOpen {
   width: 100%; margin-top: 8px; padding: 6px; font-size: 12px;

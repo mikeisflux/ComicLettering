@@ -58,6 +58,9 @@ export interface EditorCtx {
      helpers below are plain functions and cannot hold hooks */
   myGrads: { name: string; stops: GradStop[] }[];
   bumpGrads: () => void;
+  /* id of the lettering whose envelope handles are showing */
+  warping: string | null;
+  setWarping: SetState<string | null>;
   stampQuery: string;
   setStampQuery: SetState<string>;
   undo: () => void;
@@ -77,7 +80,7 @@ export interface EditorCtx {
   mutateSel: <T extends El>(mut: (el: T) => void, final?: boolean) => void;
   startDrag: (
     e: React.PointerEvent, el: El,
-    mode: "move" | "resize" | "rotate" | "tail" | "bow" | "tilt", handle?: string,
+    mode: "move" | "resize" | "rotate" | "tail" | "bow" | "tilt" | "envelope", handle?: string,
   ) => void;
   pagePoint: (e: { clientX: number; clientY: number }) => { x: number; y: number };
   fitZoom: (forceFit: boolean) => void;
