@@ -347,6 +347,17 @@ export function growBalloonToFit(page: Page, el: BalloonEl, textOverride?: strin
   return el.w !== before.w || el.h !== before.h;
 }
 
+/** Size a lettering block to the letters themselves. The selection box used to
+    be a fixed slab of the page with the word floating in the middle of it. */
+export function sizeTextToContent(el: TextEl, pageW: number) {
+  if (!el.text.trim()) return;
+  const m = measureBlock(el.ts, el.text, Math.max(el.ts.size * 2, pageW * 0.92));
+  const padX = Math.round(el.ts.size * 0.18 + el.ts.outlineW * 1.2);
+  const padY = Math.round(el.ts.size * 0.14 + el.ts.outlineW * 1.2);
+  el.w = Math.max(24, Math.round(m.w) + padX * 2);
+  el.h = Math.max(20, Math.round(m.h) + padY * 2);
+}
+
 /** size a freshly created balloon so it just contains its placeholder text */
 export function sizeBalloonToText(page: Page, el: BalloonEl) {
   const fitted = fitSize(page, el, el.text, false, 7);
@@ -609,13 +620,17 @@ export function addFromTray(ed: EditorCtx, kind: string) {
   } else if (kind === "sfx" || kind === "text") {
     const w = Math.round(p.w * 0.4), h = Math.round(p.w * (kind === "sfx" ? 0.18 : 0.12));
     const s = spawn(w, h);
-    el = makeText(s.x, s.y, w, h, kind === "sfx");
+    const t = makeText(s.x, s.y, w, h, kind === "sfx");
     if (kind === "sfx") {
       /* new lettering uses the active style from the STYLES panel */
       const st = LETTER_STYLES.find((x) => x.name === activeStyleRef.current) || LETTER_STYLES[0];
-      el.ts = applyLetterStyle(el.ts, st);
-      el.ts.outlineW = Math.round(el.ts.size * st.outlineF);
+      t.ts = applyLetterStyle(t.ts, st);
+      t.ts.outlineW = Math.round(t.ts.size * st.outlineF);
     }
+    sizeTextToContent(t, p.w);
+    t.x = Math.round(s.x + (w - t.w) / 2);
+    t.y = Math.round(s.y + (h - t.h) / 2);
+    el = t;
   } else {
     const caption = TAILLESS_KINDS.includes(kind as BalloonKind);
     const w = Math.round(p.w * (caption ? 0.36 : 0.34));

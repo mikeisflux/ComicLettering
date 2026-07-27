@@ -23,29 +23,32 @@ export const FLAT: Warp = [
 export const isWarped = (w?: Warp | null) =>
   !!w && w.length === 8 && w.some((p, i) => Math.abs(p[0] - FLAT[i][0]) > 1e-4 || Math.abs(p[1] - FLAT[i][1]) > 1e-4);
 
-const lerp = (a: Pt, b: Pt, t: number): Pt => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+/* Each handle displaces the box, and its influence falls off to nothing at the
+   far side: pulling the bottom edge bows the bottom and leaves the top exactly
+   where it was. A Coons patch would instead reshape the whole block, which is
+   not what dragging one edge should mean. */
+const bump = (t: number) => 4 * t * (1 - t);   // 0 at both ends, 1 at the middle
 
-/* quadratic through a, mid at t=0.5, b — the control point is placed so the
-   curve actually passes through the handle the user dragged */
-function curve(a: Pt, mid: Pt, b: Pt, t: number): Pt {
-  const c: Pt = [2 * mid[0] - (a[0] + b[0]) / 2, 2 * mid[1] - (a[1] + b[1]) / 2];
-  const s = 1 - t;
-  return [s * s * a[0] + 2 * s * t * c[0] + t * t * b[0],
-          s * s * a[1] + 2 * s * t * c[1] + t * t * b[1]];
-}
-
-/** Coons patch: (u,v) in the unit square → a point in the warped patch. */
+/** (u,v) in the unit square → a point in the warped patch, in box units. */
 export function warpPoint(w: Warp, u: number, v: number): Pt {
-  const [nw, ne, se, sw, tm, rm, bm, lm] = w;
-  const top = curve(nw, tm, ne, u);
-  const bot = curve(sw, bm, se, u);
-  const left = curve(nw, lm, sw, v);
-  const right = curve(ne, rm, se, v);
-  const c = lerp(lerp(nw, ne, u), lerp(sw, se, u), v);
-  return [
-    (1 - v) * top[0] + v * bot[0] + (1 - u) * left[0] + u * right[0] - c[0],
-    (1 - v) * top[1] + v * bot[1] + (1 - u) * left[1] + u * right[1] - c[1],
-  ];
+  let x = u, y = v;
+  for (let i = 0; i < 8; i++) {
+    const dx = w[i][0] - FLAT[i][0], dy = w[i][1] - FLAT[i][1];
+    if (!dx && !dy) continue;
+    let k: number;
+    switch (i) {
+      case 0: k = (1 - u) * (1 - v); break;          // nw
+      case 1: k = u * (1 - v); break;                // ne
+      case 2: k = u * v; break;                      // se
+      case 3: k = (1 - u) * v; break;                // sw
+      case 4: k = bump(u) * (1 - v); break;          // top edge
+      case 5: k = bump(v) * u; break;                // right edge
+      case 6: k = bump(u) * v; break;                // bottom edge
+      default: k = bump(v) * (1 - u); break;         // left edge
+    }
+    x += dx * k; y += dy * k;
+  }
+  return [x, y];
 }
 
 /** Bounds of the warped patch in element units — a warp can spill outside the box. */

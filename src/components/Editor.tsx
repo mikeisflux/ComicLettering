@@ -33,6 +33,7 @@ import { EditorCtx } from "./editor/ctx";
 import {
   addFromTray, alignSel, applyQuickFill, assignImageToPanel, copySel, cutSel, deleteSel,
   duplicatePage, duplicateSel, growBalloonToFit, importFontFiles, importImageFile, importJSON,
+  sizeTextToContent,
   importStampFiles, movePage, onDrop, pasteClip, readAsDataURL,
   refreshProjects, saveProject,
 } from "./editor/ops";
@@ -558,6 +559,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     if (rtxt === el.text && JSON.stringify(runs) === JSON.stringify(el.runs)) return false;
     el.text = rtxt; el.runs = runs;
     if (el.type === "balloon") growBalloonToFit(p, el as BalloonEl);
+    else sizeTextToContent(el as TextEl, p.w);
     return true;
   }, []);
 

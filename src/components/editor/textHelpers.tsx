@@ -241,14 +241,19 @@ export function measureBlock(ts: TextStyle, text: string, maxW: number): { w: nu
   }
   const d = measNode(ts);
   d.textContent = text;
+  /* inline-block shrink-wraps to the widest line. A block with an explicit
+     width reports that width back whatever the text does, which sized every
+     lettering box to the wrap limit instead of to the letters. */
+  d.style.display = "inline-block";
+  d.style.width = "auto";
   if (maxW >= 1e6) {
     d.style.whiteSpace = "pre";
-    d.style.width = "auto";
+    d.style.maxWidth = "none";
   } else {
     d.style.whiteSpace = "pre-wrap";
-    d.style.width = `${Math.max(1, Math.round(maxW))}px`;
+    d.style.maxWidth = `${Math.max(1, Math.round(maxW))}px`;
   }
-  return { w: Math.ceil(d.scrollWidth), h: Math.ceil(d.scrollHeight) };
+  return { w: Math.ceil(d.getBoundingClientRect().width), h: Math.ceil(d.getBoundingClientRect().height) };
 }
 
 /* The badge is consulted on every render, so remember the last answer for a
