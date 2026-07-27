@@ -2,15 +2,16 @@
   "name": "comiclettering-studio",
   "version": "2.0.0",
   "private": true,
-  "description": "Browser-based comic lettering studio — Next.js + React + Prisma/SQL",
+  "description": "Browser-based comic lettering studio \u2014 Next.js + React + Prisma/SQL",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "bash scripts/fetch-sam.sh || echo \"SAM models unavailable \u2014 tuck falls back to threshold\"; next build",
     "start": "next start",
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "node prisma/seed.mjs",
-    "setup": "prisma generate && prisma db push && node prisma/seed.mjs"
+    "setup": "prisma generate && prisma db push && node prisma/seed.mjs",
+    "fetch:sam": "bash scripts/fetch-sam.sh"
   },
   "dependencies": {
     "@prisma/client": "^6.5.0",
