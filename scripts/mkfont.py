@@ -16,7 +16,7 @@ Families (each in Regular / Bold / Italic / Bold Italic):
 Usage: pip install fonttools skia-pathops brotli && python3 mkfont.py <outdir>
 """
 import math, hashlib, io, os, sys
-from pathops import Path, union
+from pathops import Path, difference, union
 from fontTools.fontBuilder import FontBuilder
 from fontTools.pens.ttGlyphPen import TTGlyphPen
 from fontTools.ttLib import woff2
@@ -336,7 +336,61 @@ def relower(strokes, xh, asc, desc, xs):
         return xh + (y - 480) * (asc - xh) / 220.0
     return [[(x * xs, ry(y)) for (x, y) in st] for st in strokes]
 
-def build_glyph(name, strokes, r, amp, freq, shear, narrow, bounce, drips, cap="round", decim=0, rotd=0, rough=0):
+
+# ---- counters ----
+# A stroke skeleton expanded by a heavy radius swallows its own holes: the
+# triangle in an A, the bowls of a B, the ring of an O. These are the smallest
+# hole each letter should keep. They are subtracted after the strokes are
+# unioned, and because each one sits INSIDE the hole a light stroke leaves
+# open, subtracting it changes nothing until the weight would have sealed it.
+def ell(cx, cy, rx, ry, n=22):
+    return ringpts(cx, cy, rx, ry, n)
+
+def band(x0, y0, x1, y1):
+    return [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
+
+COUNTERS = {
+    # the gap under an exclamation bar, and its equivalents: a heavy stroke
+    # closes it and "BLAM!" sets as "BLAMI". Each band sits in the clear air a
+    # light stroke leaves, so it only bites once the weight would have merged.
+    "exclam":    [band(-120, 100, 360, 162)],
+    "question":  [band(-60, 92, 460, 178)],
+    "A": [[(250, 545), (196, 300), (304, 300)]],
+    "B": [ell(212, 540, 52, 62), ell(220, 190, 62, 72)],
+    "D": [ell(210, 350, 68, 140)],
+    "O": [ell(265, 350, 76, 138)],
+    "P": [ell(228, 520, 56, 68)],
+    "Q": [ell(265, 350, 76, 138)],
+    "R": [ell(228, 520, 56, 68)],
+    "zero":  [ell(240, 350, 66, 132)],
+    "six":   [ell(245, 222, 46, 82)],
+    "eight": [ell(240, 515, 52, 52), ell(240, 172, 58, 56)],
+    "nine":  [ell(235, 478, 46, 82)],
+}
+
+LOWER_COUNTERS = {
+    "i": [band(-40, 512, 220, 566)],
+    "j": [band(60, 512, 310, 566)],
+    "a": [ell(205, 240, 58, 84)],
+    "b": [ell(245, 240, 58, 84)],
+    "d": [ell(205, 240, 58, 84)],
+    "e": [ell(212, 355, 54, 52)],
+    "g": [ell(205, 255, 58, 76)],
+    "o": [ell(220, 240, 60, 86)],
+    "p": [ell(245, 240, 58, 84)],
+    "q": [ell(205, 240, 58, 84)],
+}
+
+def poly_path(pts):
+    path = Path()
+    pen = path.getPen()
+    pen.moveTo(pts[0])
+    for pt in pts[1:]:
+        pen.lineTo(pt)
+    pen.closePath()
+    return path
+
+def build_glyph(name, strokes, r, amp, freq, shear, narrow, bounce, drips, cap="round", decim=0, rotd=0, rough=0, counters=None):
     stroke_list = [(s, 1.0) for s in strokes]
     if drips == "drips":
         stroke_list += drip_strokes(name, strokes)
@@ -416,6 +470,24 @@ def build_glyph(name, strokes, r, amp, freq, shear, narrow, bounce, drips, cap="
         return None
     out = Path()
     union(paths, out.getPen())
+    if counters:
+        holes = []
+        for ring in counters:
+            pts = wobble(name, list(ring), amp, freq)
+            if rot0:
+                ca, sa = math.cos(rot0), math.sin(rot0)
+                pts = [((x - gcx) * ca - (y - gcy) * sa + gcx,
+                        (x - gcx) * sa + (y - gcy) * ca + gcy) for (x, y) in pts]
+            pts = [(x * narrow, y + dy0) for (x, y) in pts]
+            if shear:
+                pts = [(x + y * shear, y) for (x, y) in pts]
+            holes.append(poly_path(pts))
+        if holes:
+            merged = Path()
+            union(holes, merged.getPen())
+            cut = Path()
+            difference([out], [merged], cut.getPen())
+            out = cut
     return out
 
 def make_font(family, style, r, amp, freq, shear, narrow, bounce, drips, out_ttf, cap="round", decim=0, mixed=False, track=0, rotd=0, rough=0, lcase=None):
@@ -449,15 +521,29 @@ def make_font(family, style, r, amp, freq, shear, narrow, bounce, drips, out_ttf
             strokes = scribble_strokes(name, w)
         elif drips == "alien" and name != "space":
             strokes = alien_strokes(name, w)
-        path = build_glyph(name, strokes, r, amp, freq, shear, narrow, bounce, drips, cap, decim, rotd, rough)
+        cts = COUNTERS.get(name) or LOWER_COUNTERS.get(name)
+        if cts and lcase and name in LOWER_GLYPHS:
+            cts = relower(cts, *lcase)
+        path = build_glyph(name, strokes, r, amp, freq, shear, narrow, bounce, drips,
+                           cap, decim, rotd, rough, cts)
         pen = TTGlyphPen(None)
         if path is not None:
             path.draw(pen)
         glyphs[name] = pen.glyph()
         letter_h = CAP if name in GLYPHS else 480
-        adv[name] = int(max(w * narrow * 0.55,
-                        w * narrow + 60 + max(0, r - 55) * 1.25 + track)
-                        + (letter_h * shear * 0.45 if shear else 0))
+        want = max(w * narrow * 0.55,
+                   w * narrow + 60 + max(0, r - 55) * 1.25 + track)
+        # The designed widths assume a hairline skeleton, so a heavy stroke can
+        # spill past its own advance and collide with the next letter. Measure
+        # what was actually drawn and never go below it: for a pair of similar
+        # letters the gap between them is (advance - inkWidth), so this floor
+        # keeps a real gap no matter how heavy or how tightly tracked the face.
+        if path is not None:
+            b = path.bounds
+            if b:
+                ink = b[2] - b[0]
+                want = max(want, ink + 30 + r * 0.08)
+        adv[name] = int(want + (letter_h * shear * 0.45 if shear else 0))
     fb.setupGlyf(glyphs)
     hmtx = {}
     for name in names:
@@ -569,7 +655,7 @@ FAMILIES = {
     # angular graffiti tag, tall and jammed together
     "LMC Killcrazy":(50, 68, 8.0, 2.2, 6, 0.80, 42, "", "square", 6, False, -55, 6.0),
     # solid chiselled block caps with 45-degree cut corners and slit counters
-    "LMC Krakhead": (122, 146, 0.2, 0.4, 0, 1.06, 0, "", "chamfer", 3, False, -108, 0),
+    "LMC Krakhead": (96, 118, 0.2, 0.4, 0, 1.06, 0, "", "chamfer", 3, False, -46, 0),
     # heavy chopped-edge cartoon impact caps
     "LMC Onetwo":   (94, 116, 4.5, 0.9, 0, 0.94, 16, "", "chamfer", 4, False, -62, 2.2),
     # chisel-marker SFX hand, three widths
