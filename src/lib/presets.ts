@@ -20,6 +20,9 @@ export interface LetterStyle {
 export const LETTER_STYLES: LetterStyle[] = [
   /* --- SFX colourways: each pairs one of the LMC display faces with the
      punchy fill/outline/shadow treatment that genre is normally inked in --- */
+  { name: "Shock Yellow",   font: "lmcjolt",      fillA: "#ffef5e", fillB: "#f2d200", outlineC: "#000000", outlineF: 0.028, shadow: true },
+  { name: "Toon Gold",      font: "lmctoonblast", fillA: "#ffe863", fillB: "#f0a400", outlineC: "#000000", outlineF: 0.055, shadow: true },
+  { name: "Torn Orange",    font: "lmcsunder",    fillA: "#f2622e", fillB: "#d63c14", outlineC: "#000000", outlineF: 0.05,  shadow: true },
   { name: "One-Two Punch",  font: "lmconetwo",   fillA: "#ffc41c", fillB: "#ef6a00", outlineC: "#000000", outlineF: 0.055, shadow: true },
   { name: "FX Ivory",       font: "lmcefex",     fillA: "#fffce6", fillB: "#efe3ad", outlineC: "#000000", outlineF: 0.042, shadow: true },
   { name: "FX Cond Ivory",  font: "lmcefexcond", fillA: "#fffce6", fillB: "#e8dba0", outlineC: "#000000", outlineF: 0.042, shadow: true },

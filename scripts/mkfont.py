@@ -666,6 +666,12 @@ FAMILIES = {
     "LMC Efex Rough":(74, 94, 9.0, 2.4, 10, 0.96, 30, "", "chamfer", 0, False, -22, 3.5, 0.30),
     "LMC Efex Roughthin":(54, 70, 8.0, 2.2, 10, 1.00, 28, "", "chamfer", 0, False, -8, 3.5, 0.34),
     "LMC Efex Brush":(80, 100, 7.0, 2.0, 10, 0.96, 26, "taper", "chamfer", 0, False, -26, 3.0, 0.26),
+    # electrified horror scrawl — jagged shards, full lowercase
+    "LMC Jolt":     (48, 66, 11.0, 2.6, 0, 0.92, 24, "", "square", 5, True, -6, 3.5, 0.40),
+    # heavy bouncy cartoon caps with a lively lean
+    "LMC Toonblast":(96, 118, 3.0, 1.0, 4, 0.96, 44, "", "round", 2, False, -42, 4.5),
+    # heavy torn-edge display caps, chewed all round
+    "LMC Sunder":   (76, 96, 9.0, 2.2, 2, 0.90, 20, "", "round", 0, False, -30, 3.0, 0.34),
     # tall condensed dry-brush scrawl
     "LMC Rawbones": (44, 58, 10.0, 2.4, 2, 0.74, 26, "taper", "round", 0, False, -16, 4.5, 0.36),
     # compact punchy impact caps
