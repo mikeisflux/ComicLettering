@@ -188,6 +188,11 @@ export interface TextStyle {
   italic: boolean;
   underline?: boolean;
   caps: boolean;
+  /* dry-media brush texture masked over the letterforms (see lib/brushes) */
+  brush?: string;
+  /* coloured halo thrown off the letterforms (see lib/glows) */
+  glow?: string;
+  glowW?: number;
   align: Align;
   lineHeight?: number; // line-spacing multiplier (default 1.05 — comic leading is tight)
   tracking?: number;   // letter-spacing in px (default 0)

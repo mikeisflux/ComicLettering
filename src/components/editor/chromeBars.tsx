@@ -9,6 +9,8 @@ import { ToolBtn } from "./chrome";
 import { FontMenu, SubtypeSelect, tsVariant } from "./FontMenu";
 import { clearArt, releaseAllArt } from "@/lib/assetStore";
 import { gradCss } from "./GradientMaker";
+import { BRUSHES } from "@/lib/brushes";
+import { GLOWS } from "@/lib/glows";
 import { EditorCtx } from "./ctx";
 import {
   addFromTray, alignSel, applyQuickFill, applyQuickStroke, balanceRag,
@@ -395,6 +397,38 @@ export function renderFormatBar(ed: EditorCtx) {
         <option value="4">Wide +4</option>
         <option value="6">+6</option>
         <option value="10">+10</option>
+      </select>
+    </span>
+
+    {/* brushes: dry-media texture masked over the lettering */}
+    <span className="fbGroup fbBrush">
+      <span className="fbLeadIcon" aria-hidden>🖌</span>
+      <select className="fbBrushSel" disabled={!selTs}
+        title={BRUSHES.find((b) => b.k === (selTs?.brush ?? "none"))?.hint || "Brush texture"}
+        value={selTs?.brush ?? "none"}
+        onChange={(e) => mutateSel<BalloonEl | TextEl>((x) => { x.ts.brush = e.target.value; })}>
+        {BRUSHES.map((b) => <option key={b.k} value={b.k} title={b.hint}>{b.label}</option>)}
+      </select>
+    </span>
+
+    {/* glow: a coloured halo thrown off the lettering */}
+    <span className="fbGroup fbGlow">
+      <span className="fbLeadIcon" aria-hidden>✨</span>
+      <select className="fbGlowSel" disabled={!selTs} title="Glow around the lettering"
+        value={selTs?.glow ?? "none"}
+        onChange={(e) => mutateSel<BalloonEl | TextEl>((x) => { x.ts.glow = e.target.value; })}>
+        {GLOWS.map((g) => (
+          <option key={g.k} value={g.k}>{g.label}</option>
+        ))}
+      </select>
+      <select className="fbGlowAmt" disabled={!selTs || (selTs.glow ?? "none") === "none"}
+        title="How far the glow spreads"
+        value={String(selTs?.glowW ?? 1)}
+        onChange={(e) => mutateSel<BalloonEl | TextEl>((x) => { x.ts.glowW = parseFloat(e.target.value); })}>
+        <option value="0.5">Soft</option>
+        <option value="1">Normal</option>
+        <option value="1.6">Strong</option>
+        <option value="2.4">Blazing</option>
       </select>
     </span>
   </div>

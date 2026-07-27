@@ -7,6 +7,8 @@ import {
 } from "@/lib/model";
 import { LetterStyle } from "@/lib/presets";
 import { fontString } from "@/lib/exportPng";
+import { BrushKey, brushScale, brushURL } from "@/lib/brushes";
+import { glowFilter } from "@/lib/glows";
 
 export const HINT = "Double-click a balloon to type · orange dot aims the tail · drop images onto the page · Del removes";
 
@@ -43,9 +45,28 @@ export function textCss(ts: TextStyle): CSSProperties {
     st.WebkitTextStroke = `${ts.outlineW}px ${ts.outlineC}`;
     st.paintOrder = "stroke fill";
   }
-  if (ts.shadow) {
-    st.filter = `drop-shadow(${ts.size * 0.05}px ${ts.size * 0.05}px ${ts.size * 0.06}px ${ts.shadowC || "#00000088"})`;
+  if (ts.brush && ts.brush !== "none") {
+    /* the brush is a mask, so it bites into whatever fill, gradient and
+       outline the lettering already carries rather than replacing them */
+    const url = brushURL(ts.brush as BrushKey);
+    if (url) {
+      const px = `${brushScale(ts.size)}px`;
+      st.WebkitMaskImage = `url(${url})`;
+      st.maskImage = `url(${url})`;
+      st.WebkitMaskSize = px;
+      st.maskSize = px;
+      st.WebkitMaskRepeat = "repeat";
+      st.maskRepeat = "repeat";
+    }
   }
+  /* glow sits behind the drop shadow so the halo reads around the whole
+     letterform, brush texture and all — filters apply after the mask */
+  const glow = ts.glow && ts.glow !== "none" ? glowFilter(ts.glow, ts.size, ts.glowW ?? 1) : "";
+  const drop = ts.shadow
+    ? `drop-shadow(${ts.size * 0.05}px ${ts.size * 0.05}px ${ts.size * 0.06}px ${ts.shadowC || "#00000088"})`
+    : "";
+  const chain = [glow, drop].filter(Boolean).join(" ");
+  if (chain) st.filter = chain;
   return st;
 }
 

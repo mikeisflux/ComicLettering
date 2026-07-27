@@ -452,6 +452,11 @@ input[type="range"] { width: 110px; }
 .stampEmoji button { font-size: 20px; padding: 2px 0; min-width: 0; text-align: center; }
 
 
+.fbBrush .fbBrushSel { min-width: 104px; }
+.fbGlow .fbGlowSel { min-width: 104px; }
+.fbGlow .fbGlowAmt { min-width: 76px; }
+.fbBrush .fbLeadIcon { font-size: 13px; }
+
 /* ---------------- gradient maker ---------------- */
 .gmOpen {
   width: 100%; margin-top: 8px; padding: 6px; font-size: 12px;

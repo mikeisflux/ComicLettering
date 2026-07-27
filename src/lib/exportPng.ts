@@ -5,6 +5,8 @@ import {
 } from "./model";
 import { balloonGeom, arcTextLayout } from "./geometry";
 import { paintFill } from "./fills";
+import { BrushKey, brushScale, brushTile } from "./brushes";
+import { glowPasses } from "./glows";
 
 interface MergeInfo { d: string; color: string; cx: number; cy: number; rot: number; bw: number; bh: number; stroke?: string; strokeW?: number }
 
@@ -251,6 +253,54 @@ export function drawStyledText(
   ctx: CanvasRenderingContext2D, ts: TextStyle, text: string,
   rect: [number, number, number, number], warp = 0, runs?: TextRun[]
 ) {
+  /* A brush is a mask over the finished lettering, so the whole block —
+     fill, gradient, outline and shadow alike — is drawn to a scratch canvas
+     first and the texture punched out of it. Wrapping the one entry point
+     keeps plain, rich and warped text identical to the DOM editor. */
+  const brush = ts.brush && ts.brush !== "none" ? (ts.brush as BrushKey) : null;
+  const glow = ts.glow && ts.glow !== "none" ? glowPasses(ts.glow, ts.size, ts.glowW ?? 1) : [];
+  if ((brush || glow.length) && typeof document !== "undefined") {
+    const tile = brush ? brushTile(brush) : null;
+    if (tile || glow.length) {
+      const [rx, ry, rw, rh] = rect;
+      const glowPad = glow.length ? Math.ceil(Math.max(...glow.map((g) => g.blur)) * 2.4) : 0;
+      const pad = Math.ceil(ts.size * 0.8 + ts.outlineW * 2) + glowPad;
+      const w = Math.max(1, Math.ceil(rw) + pad * 2), h = Math.max(1, Math.ceil(rh) + pad * 2);
+      const sc = document.createElement("canvas");
+      sc.width = w; sc.height = h;
+      const sctx = sc.getContext("2d");
+      if (sctx) {
+        sctx.translate(pad - rx, pad - ry);
+        drawStyledText(sctx, { ...ts, brush: "none", glow: "none" }, text, rect, warp, runs);
+        sctx.setTransform(1, 0, 0, 1, 0, 0);
+        if (tile) {
+          const px = brushScale(ts.size);
+          const pat = sctx.createPattern(tile, "repeat");
+          if (pat) {
+            /* scale the tile with the type size so the grain stays in
+               proportion instead of shrink-wrapping onto big lettering */
+            pat.setTransform(new DOMMatrix([px / tile.width, 0, 0, px / tile.height, 0, 0]));
+            sctx.globalCompositeOperation = "destination-in";
+            sctx.fillStyle = pat;
+            sctx.fillRect(0, 0, w, h);
+            sctx.globalCompositeOperation = "source-over";
+          }
+        }
+        /* stamp the halo behind the finished lettering — widest and coolest
+           first, so the ramp heats up as it closes on the ink */
+        for (const g of glow) {
+          ctx.save();
+          ctx.shadowColor = g.color;
+          ctx.shadowBlur = g.blur;
+          ctx.drawImage(sc, rx - pad, ry - pad);
+          ctx.drawImage(sc, rx - pad, ry - pad);
+          ctx.restore();
+        }
+        ctx.drawImage(sc, rx - pad, ry - pad);
+        return;
+      }
+    }
+  }
   if (runs && runs.length && !warp) { drawRichText(ctx, ts, runs, rect); return; }
   const [rx, ry, rw, rh] = rect;
   ctx.font = fontString(ts);
