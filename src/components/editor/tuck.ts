@@ -15,6 +15,44 @@ export interface TuckSource {
   regionW: number; regionH: number;
 }
 
+/* How the foreground is decided.
+   trace  — the outline the reader drew. Always works; it is their judgement.
+   auto   — a segmentation mask from MobileSAM.
+   level  — the old luminance cut, kept for flat high-contrast inks. */
+export type TuckMode = "trace" | "auto" | "level";
+
+export interface TuckAsk {
+  src: TuckSource;
+  artKey: string;              // asset id of the panel artwork (for the encoder cache)
+  pageX: number; pageY: number; pageW: number; pageH: number;
+  pts: number[][];             // traced outline, ELEMENT-local page units
+  mode: TuckMode;
+  feather: number;
+  threshold: number;
+  invert: boolean;
+  mask: import("@/lib/sam").SamMask | null;
+  auto: "idle" | "busy" | "done" | "fail";
+  preview: string | null;
+}
+
+/** Bounding box of a point ring. */
+export function pathBounds(pts: number[][]) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const [x, y] of pts) {
+    if (x < x0) x0 = x; if (x > x1) x1 = x;
+    if (y < y0) y0 = y; if (y > y1) y1 = y;
+  }
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+}
+
+/** Re-render the cutout for whatever mode the dialog is currently in. */
+export function tuckPreview(t: TuckAsk): string | null {
+  if (t.mode === "trace") return makeCutoutFromPath(t.src, t.pts, t.feather)?.url ?? null;
+  if (t.mode === "auto" && t.mask) return makeCutoutFromMask(t.src, t.mask)?.url ?? null;
+  if (t.mode === "auto") return null;
+  return makeCutout(t.src, t.threshold, t.invert)?.url ?? null;
+}
+
 /* Replicates the editor's cover-crop: the image fills the element box like
    CSS object-fit: cover. Returns the source-pixel rect for an element-local
    rect. */
@@ -74,6 +112,53 @@ export function makeCutoutFromMask(
     }
   }
   ctx.putImageData(data, 0, 0);
+  return { url: cv.toDataURL("image/png"), pxW, pxH };
+}
+
+
+/* Cutout from a traced outline — the letterer's clipping mask, done by hand.
+
+   No threshold and no model: whatever you draw around is what sits in front.
+   On painted art this is the only thing that reliably works, because figure
+   and background occupy the same brightness range and there is no cut that
+   separates them.
+
+   `pts` are in ELEMENT-local page units, the same space as regionX/regionY. */
+export function makeCutoutFromPath(
+  s: TuckSource, pts: number[][], feather = 2,
+): { url: string; pxW: number; pxH: number } | null {
+  if (pts.length < 3) return null;
+  const m = coverMap(s);
+  const pxW = Math.max(1, Math.round(m.sw));
+  const pxH = Math.max(1, Math.round(m.sh));
+  if (pxW < 2 || pxH < 2) return null;
+  const cv = document.createElement("canvas");
+  cv.width = pxW; cv.height = pxH;
+  const ctx = cv.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return null;
+
+  /* element-local page units -> pixels within this cutout */
+  const kx = pxW / s.regionW, ky = pxH / s.regionH;
+  const P = pts.map(([x, y]) => [(x - s.regionX) * kx, (y - s.regionY) * ky]);
+
+  /* draw the traced shape as the mask, then keep only the art inside it.
+     Midpoint-quadratic all the way round the ring — a smooth closed outline
+     rather than the polygon the pointer actually emitted. */
+  const n = P.length;
+  ctx.beginPath();
+  ctx.moveTo((P[n - 1][0] + P[0][0]) / 2, (P[n - 1][1] + P[0][1]) / 2);
+  for (let i = 0; i < n; i++) {
+    const c = P[i], q = P[(i + 1) % n];
+    ctx.quadraticCurveTo(c[0], c[1], (c[0] + q[0]) / 2, (c[1] + q[1]) / 2);
+  }
+  ctx.closePath();
+  if (feather > 0) { ctx.filter = `blur(${feather}px)`; }
+  ctx.fillStyle = "#fff";
+  ctx.fill();
+  ctx.filter = "none";
+  ctx.globalCompositeOperation = "source-in";
+  ctx.drawImage(s.img, m.sx, m.sy, m.sw, m.sh, 0, 0, pxW, pxH);
+  ctx.globalCompositeOperation = "source-over";
   return { url: cv.toDataURL("image/png"), pxW, pxH };
 }
 

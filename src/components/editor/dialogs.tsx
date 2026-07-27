@@ -11,6 +11,7 @@ import {
   pasteClip, removeCustomStamp, reorder, resizeToActual, resolveTailAsk, runExport,
 } from "./ops";
 import { SFX_STAMPS } from "@/lib/sfxStamps";
+import type { TuckMode } from "./tuck";
 
 
 export function renderTray(ed: EditorCtx) {
@@ -403,6 +404,92 @@ export function renderFindDialog(ed: EditorCtx) {
 }
 
 /* import script dialog */
+/* Tuck Behind Art — the traced cutout, with the automatic routes demoted to
+   alternatives. The preview is what will sit IN FRONT of the lettering. */
+export function renderTuckDialog(ed: EditorCtx) {
+  const { tuckAsk: t, setTuckAsk, retuneTuck, runTuckAuto, applyTuck } = ed;
+  if (!t) return null;
+  const modes: { k: TuckMode; label: string }[] = [
+    { k: "trace", label: "My outline" },
+    { k: "auto", label: "Auto-detect" },
+    { k: "level", label: "Brightness" },
+  ];
+  return (
+    <div className="setupOverlay" onPointerDown={(e) => { if (e.target === e.currentTarget) setTuckAsk(null); }}>
+      <div className="setupDlg" style={{ width: 460 }}>
+        <div className="setupTitle">Tuck Behind Art</div>
+        <div className="setupBody" style={{ flexDirection: "column" }}>
+          <div className="tuckPreview">
+            {t.preview
+              ? <img src={t.preview} alt="Foreground cutout preview" />
+              : t.mode === "auto" && t.auto === "busy"
+                ? <span>Reading the artwork…</span>
+                : t.mode === "auto" && t.auto === "fail"
+                  ? <span>Auto-detect couldn’t run — use your outline.</span>
+                  : t.mode === "auto"
+                    ? <span>Press Detect to try the automatic cutout.</span>
+                    : <span>Could not read this artwork’s pixels.</span>}
+          </div>
+          <fieldset className="setupGroup">
+            <legend>Cut from</legend>
+            <div className="setupRow">
+              {modes.map((m) => (
+                <label key={m.k} style={{ marginRight: 14 }}>
+                  <input type="radio" name="tuckMode" checked={t.mode === m.k}
+                    onChange={() => retuneTuck({ mode: m.k })} /> {m.label}
+                </label>
+              ))}
+            </div>
+            {t.mode === "trace" && (
+              <div className="setupRow">
+                <span style={{ width: 74 }}>Soft edge</span>
+                <input type="range" min={0} max={8} step={0.5} value={t.feather}
+                  style={{ width: 200 }}
+                  onChange={(e) => retuneTuck({ feather: +e.target.value })} />
+                <span style={{ width: 30, textAlign: "right" }}>{t.feather}</span>
+              </div>
+            )}
+            {t.mode === "auto" && (
+              <div className="setupRow">
+                <button onClick={runTuckAuto} disabled={t.auto === "busy"}>
+                  {t.auto === "busy" ? "Detecting…" : t.mask ? "Detect again" : "Detect"}
+                </button>
+                <span style={{ fontSize: 12, opacity: .75 }}>
+                  Runs on your machine. The first page takes a few seconds.
+                </span>
+              </div>
+            )}
+            {t.mode === "level" && (
+              <div className="setupRow">
+                <span style={{ width: 74 }}>Strength</span>
+                <input type="range" min={5} max={95} step={1} value={t.threshold}
+                  style={{ width: 180 }}
+                  onChange={(e) => retuneTuck({ threshold: +e.target.value })} />
+                <span style={{ width: 30, textAlign: "right" }}>{t.threshold}</span>
+                <label style={{ marginLeft: 10 }}>
+                  <input type="checkbox" checked={t.invert}
+                    onChange={(e) => retuneTuck({ invert: e.target.checked })} /> Light
+                </label>
+              </div>
+            )}
+          </fieldset>
+          <div className="tips" style={{ fontSize: 12 }}>
+            The checkerboard shows what will sit IN FRONT of your lettering.
+            Your own outline is the reliable one — it is the same clipping mask
+            a letterer traces by hand. Auto-detect finds the subject’s edges
+            for you; brightness only works when the art is flat dark shapes on
+            a light background.
+          </div>
+        </div>
+        <div className="setupFoot">
+          <button onClick={() => setTuckAsk(null)}>Cancel</button>
+          <button className="okBtn" disabled={!t.preview} onClick={() => applyTuck(t)}>Place cutout</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function renderScriptDialog(ed: EditorCtx) {
   const { showScript, setShowScript, scriptText, setScriptText } = ed;
   if (!showScript) return null;

@@ -6,6 +6,7 @@ import type React from "react";
 import type { Assets, Doc, El, FillStyle, GradStop, Page, TextStyle } from "@/lib/model";
 import type { ImageFormat } from "@/lib/exportPng";
 import type { BalloonPreset, ProjectMeta, ProofMatch } from "./textHelpers";
+import type { TuckAsk } from "./tuck";
 
 type SetState<T> = React.Dispatch<React.SetStateAction<T>>;
 
@@ -84,8 +85,14 @@ export interface EditorCtx {
   ) => void;
   pagePoint: (e: { clientX: number; clientY: number }) => { x: number; y: number };
   fitZoom: (forceFit: boolean) => void;
-  /* enter tuck-behind-art region-drag mode (requires SFX selected) */
+  /* enter tuck-behind-art lasso mode (requires SFX selected) */
   startTuck: () => void;
+  /* the traced cutout awaiting confirmation, and its controls */
+  tuckAsk: TuckAsk | null;
+  setTuckAsk: SetState<TuckAsk | null>;
+  retuneTuck: (patch: Partial<TuckAsk>) => void;
+  runTuckAuto: () => void;
+  applyTuck: (t: TuckAsk) => void;
   rebuildThumbs: () => void;
   reseedAids: () => void;
   setThumbs: SetState<Record<number, string>>;

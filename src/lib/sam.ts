@@ -63,8 +63,11 @@ export async function loadSam(onProgress?: SamProgress): Promise<boolean> {
       ]);
       encoder = e; decoder = d;
       return true;
-    } catch {
-      /* not deployed, or the browser cannot run it — the caller falls back */
+    } catch (err) {
+      /* Say WHY. Swallowing this made a broken runtime look exactly like
+         "no models installed", which cost real debugging time. */
+      lastError = String(err);
+      console.warn("[tuck] segmentation model unavailable:", err);
       return false;
     } finally {
       loading = null;
@@ -74,6 +77,8 @@ export async function loadSam(onProgress?: SamProgress): Promise<boolean> {
 }
 
 export const samReady = () => !!(encoder && decoder);
+let lastError = "";
+export const samError = () => lastError;
 
 export interface Embedding {
   data: Tensor;            // [1,256,64,64]

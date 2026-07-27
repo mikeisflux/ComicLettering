@@ -27,8 +27,9 @@ import {
 } from "./editor/textHelpers";
 import { closeSketchLoop, detectSketchTail, resampleRing, smoothSketchRing } from "./editor/sketch";
 import { SmartTip, pickTip } from "./editor/smartTips";
-import { TuckSource, coverRect, makeCutout, makeCutoutFromMask } from "./editor/tuck";
-import { encodeImage, segmentBox } from "@/lib/sam";
+import { TuckAsk, coverRect, tuckPreview } from "./editor/tuck";
+import { beginTuckLasso } from "./editor/tuckDrag";
+import { encodeImage, samError, segmentBox } from "@/lib/sam";
 import { PageSetupDialog, Ruler, STAGE_MX, STAGE_MY } from "./editor/chrome";
 import { EditorCtx } from "./editor/ctx";
 import {
@@ -47,7 +48,7 @@ import {
 import { renderFormatBar, renderMenuBar, renderToolbar } from "./editor/chromeBars";
 import {
   renderContextMenu, renderExportDialog, renderFindDialog,
-  renderScriptDialog, renderTailAsk, renderTray,
+  renderScriptDialog, renderTailAsk, renderTray, renderTuckDialog,
 } from "./editor/dialogs";
 
 const AUTOSAVE_KEY = "comiclettering.autosave.v2";
@@ -110,14 +111,15 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const drawPtsRef = useRef<number[][] | null>(null);
   /* id of a freshly sketched balloon awaiting a tail choice */
   const [tailAsk, setTailAsk] = useState<string | null>(null);
-  /* "tuck behind art": drag a region over a panel, extract its foreground as
-     a transparent cutout placed above the selected SFX */
+  /* "tuck behind art": draw around the artwork that should sit in front of the
+     selected SFX; the enclosed art becomes a transparent cutout above it */
   const [tuckMode, setTuckMode] = useState(false);
-  const tuckRectRef = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
-  const [tuckAsk, setTuckAsk] = useState<{
-    src: TuckSource; pageX: number; pageY: number; pageW: number; pageH: number;
-    threshold: number; invert: boolean; preview: string | null; ai?: boolean;
-  } | null>(null);
+  const tuckPtsRef = useRef<number[][] | null>(null);
+  const [tuckAsk, setTuckAsk] = useState<TuckAsk | null>(null);
+  /* the dialog's async detect pass needs the live value, not the one closed
+     over when the button was rendered */
+  const tuckAskRef = useRef<TuckAsk | null>(null);
+  useEffect(() => { tuckAskRef.current = tuckAsk; }, [tuckAsk]);
   /* smart contextual tips: one at a time, each shows once (localStorage) */
   const [tip, setTip] = useState<SmartTip | null>(null);
   const tipsSeenRef = useRef<Set<string>>(new Set());
@@ -916,7 +918,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
 
   /* ---------------- keyboard ---------------- */
 
-  /* ---------------- tuck-behind-art (magic-wand style) ---------------- */
+  /* ---------------- tuck-behind-art (traced clipping mask) ---------------- */
 
   const startTuck = useCallback(() => {
     const s = docRef.current?.pages[pageIndexRef.current].els.find((x) => x.id === selId);
@@ -925,100 +927,58 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       return;
     }
     setTuckMode(true);
-    setStatus("Drag a box over the artwork the SFX should hide behind — Esc cancels.");
+    setStatus("Draw around the art the SFX should hide behind — Esc cancels.");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selId, setStatus]);
 
   const startTuckDrag = useCallback((e: React.PointerEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const p0 = pagePoint(e);
-    tuckRectRef.current = { x: p0.x, y: p0.y, w: 0, h: 0 };
-    force();
-    const onMove = (ev: PointerEvent) => {
-      const p = pagePoint(ev);
-      const r = tuckRectRef.current;
-      if (!r) return;
-      r.w = p.x - p0.x; r.h = p.y - p0.y;
-      force();
-    };
-    const onUp = async () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", onUp);
-      const r = tuckRectRef.current;
-      tuckRectRef.current = null;
-      setTuckMode(false);
-      if (!r) return;
-      const rect = {
-        x: Math.min(r.x, r.x + r.w), y: Math.min(r.y, r.y + r.h),
-        w: Math.abs(r.w), h: Math.abs(r.h),
-      };
-      if (rect.w < 20 || rect.h < 20) { setStatus("Drag a bigger region over the artwork."); force(); return; }
-      /* topmost unrotated panel/image with artwork under the region */
-      const pg = docRef.current!.pages[pageIndexRef.current];
-      const target = [...pg.els].reverse().find((el) =>
-        (el.type === "panel" || el.type === "image") && el.img && !el.rot &&
-        rect.x < el.x + el.w && rect.x + rect.w > el.x &&
-        rect.y < el.y + el.h && rect.y + rect.h > el.y);
-      if (!target || target.type === "balloon" || target.type === "text" || !target.img) {
-        setStatus("No artwork there — drag the box over a panel or image (unrotated).");
-        force(); return;
-      }
-      const url = assetsRef.current[target.img];
-      if (!url) { setStatus("That panel's artwork isn't loaded."); force(); return; }
-      const img = await loadImage(url);
-      /* clamp the region to the artwork element */
-      const x0 = Math.max(rect.x, target.x), y0 = Math.max(rect.y, target.y);
-      const x1 = Math.min(rect.x + rect.w, target.x + target.w);
-      const y1 = Math.min(rect.y + rect.h, target.y + target.h);
-      if (x1 - x0 < 10 || y1 - y0 < 10) { setStatus("The region barely touches the artwork — try again."); force(); return; }
-      const src: TuckSource = {
-        img, elW: target.w, elH: target.h,
-        regionX: x0 - target.x, regionY: y0 - target.y,
-        regionW: x1 - x0, regionH: y1 - y0,
-      };
-      /* Segment the region properly if the model is available; the luminance
-         threshold stays as the fallback for browsers that cannot run it. */
-      const cut = makeCutout(src, 45);
-      setTuckAsk({
-        src, pageX: x0, pageY: y0, pageW: x1 - x0, pageH: y1 - y0,
-        threshold: 45, invert: false, preview: cut?.url ?? null,
-      });
-      force();
-      (async () => {
-        setStatus("Reading the artwork…");
-        const emb = await encodeImage(target.img!, img, (_, note) => setStatus(note));
-        if (!emb) { setStatus("Drag the sliders to tune the cutout."); force(); return; }
-        /* the drag is in element-local page units; the mask wants source pixels */
-        const cm = coverRect(src);
-        const mask = await segmentBox(emb,
-          cm.sx, cm.sy, cm.sx + cm.sw, cm.sy + cm.sh);
-        if (!mask) { setStatus("Could not segment that region — tune it by hand."); force(); return; }
-        const better = makeCutoutFromMask(src, mask);
-        if (better) {
-          setTuckAsk((t) => t && t.src === src ? { ...t, preview: better.url, ai: true } : t);
-          setStatus("Foreground found — place it, or switch to manual tuning.");
-        }
-        force();
-      })();
-    };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", onUp);
-  }, [pagePoint]);
+    beginTuckLasso({
+      docRef, assetsRef, pageIndexRef, ptsRef: tuckPtsRef,
+      pagePoint, force, setStatus, setTuckMode, setTuckAsk,
+    }, e);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pagePoint, setStatus]);
 
-  const retuneTuck = useCallback((threshold: number, invert: boolean) => {
+  const retuneTuck = useCallback((patch: Partial<TuckAsk>) => {
     setTuckAsk((t) => {
       if (!t) return t;
-      const cut = makeCutout(t.src, threshold, invert);
-      return { ...t, threshold, invert, preview: cut?.url ?? t.preview };
+      const next = { ...t, ...patch };
+      return { ...next, preview: tuckPreview(next) };
     });
   }, []);
 
+  /* The model route, on demand — it costs seconds on the first page, so it is
+     no longer run behind the reader's back for every trace. */
+  const runTuckAuto = useCallback(() => {
+    setTuckAsk((t) => t && { ...t, auto: "busy", preview: null });
+    (async () => {
+      const t = tuckAskRef.current;
+      if (!t) return;
+      setStatus("Reading the artwork…");
+      const emb = await encodeImage(t.artKey, t.src.img, (_, note) => setStatus(note));
+      /* the trace is in element-local page units; the mask wants source pixels */
+      const cm = coverRect(t.src);
+      const mask = emb && await segmentBox(emb, cm.sx, cm.sy, cm.sx + cm.sw, cm.sy + cm.sh);
+      if (!mask) {
+        setStatus(samError()
+          ? "Auto-detect isn't available in this browser — use your outline."
+          : "Auto-detect found nothing there — use your outline.");
+        setTuckAsk((p) => p && { ...p, auto: "fail" });
+        return;
+      }
+      setStatus("Foreground detected — place it, or go back to your outline.");
+      setTuckAsk((p) => {
+        if (!p) return p;
+        const next: TuckAsk = { ...p, mask, auto: "done" };
+        return { ...next, preview: tuckPreview(next) };
+      });
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setStatus]);
+
   /* side effects OUTSIDE the state updater — React StrictMode double-invokes
      updaters, which would place the cutout twice */
-  const applyTuck = useCallback((t: typeof tuckAsk) => {
+  const applyTuck = useCallback((t: TuckAsk | null) => {
     setTuckAsk(null);
     if (!t || !t.preview) return;
     const aid = "a" + aidRef.current++;
@@ -1042,7 +1002,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
         setDrawMode(false);
         drawPtsRef.current = null;
         setTuckMode(false);
-        tuckRectRef.current = null;
+        tuckPtsRef.current = null;
         setTuckAsk(null);
         if (editingId) finishEditing();
         else setSelId(null);
@@ -1209,6 +1169,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     fileFontRef, fileStampRef,
     force, commit, autosave, undo, redo, setStatus, select, setSelId,
     setEditingId, finishEditing, mutateSel, startDrag, pagePoint, fitZoom, startTuck,
+    tuckAsk, setTuckAsk, retuneTuck, runTuckAuto, applyTuck,
     autosaveSoon,
     rebuildThumbs, reseedAids, setThumbs, setPageIndex, setUserZoomed,
     setZoom, bumpFonts, registerRuntimeFont, savePresets,
@@ -1364,13 +1325,11 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
               {snapRef.current.y != null && <div className="snapLineH" style={{ top: snapRef.current.y * zoom }} />}
               {tuckMode && (
                 <div className="drawLayer tuckLayer" onPointerDown={startTuckDrag}>
-                  {tuckRectRef.current && (
-                    <div className="tuckRect" style={{
-                      left: Math.min(tuckRectRef.current.x, tuckRectRef.current.x + tuckRectRef.current.w) * zoom,
-                      top: Math.min(tuckRectRef.current.y, tuckRectRef.current.y + tuckRectRef.current.h) * zoom,
-                      width: Math.abs(tuckRectRef.current.w) * zoom,
-                      height: Math.abs(tuckRectRef.current.h) * zoom,
-                    }} />
+                  {tuckPtsRef.current && tuckPtsRef.current.length > 1 && (
+                    <svg>
+                      <path className="tuckTrace"
+                        d={"M " + tuckPtsRef.current.map(([qx, qy]) => `${Math.round(qx * zoom)} ${Math.round(qy * zoom)}`).join(" L ") + " Z"} />
+                    </svg>
                   )}
                 </div>
               )}
@@ -1495,43 +1454,8 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
           if (f) importJSON(ed, f);
         }} />
 
-      {/* tuck-behind-art: threshold dialog with live cutout preview */}
-      {tuckAsk && (
-        <div className="setupOverlay" onPointerDown={(e) => { if (e.target === e.currentTarget) setTuckAsk(null); }}>
-          <div className="setupDlg" style={{ width: 460 }}>
-            <div className="setupTitle">Tuck Behind Art</div>
-            <div className="setupBody" style={{ flexDirection: "column" }}>
-              <div className="tuckPreview">
-                {tuckAsk.preview
-                  ? <img src={tuckAsk.preview} alt="Foreground cutout preview" />
-                  : <span>Could not read this artwork's pixels.</span>}
-              </div>
-              <fieldset className="setupGroup">
-                <legend>Selection strength</legend>
-                <div className="setupRow">
-                  <input type="range" min={5} max={95} step={1} value={tuckAsk.threshold}
-                    style={{ width: 220 }}
-                    onChange={(e) => retuneTuck(+e.target.value, tuckAsk.invert)} />
-                  <span style={{ width: 34, textAlign: "right" }}>{tuckAsk.threshold}</span>
-                  <label style={{ marginLeft: 12 }}>
-                    <input type="checkbox" checked={tuckAsk.invert}
-                      onChange={(e) => retuneTuck(tuckAsk.threshold, e.target.checked)} /> Light foreground
-                  </label>
-                </div>
-              </fieldset>
-              <div className="tips" style={{ fontSize: 12 }}>
-                Like a magic wand: the preview shows what will sit IN FRONT of your
-                lettering. Raise the strength to grab more of the art; check “Light
-                foreground” when the art is light shapes on a dark background.
-              </div>
-            </div>
-            <div className="setupFoot">
-              <button onClick={() => setTuckAsk(null)}>Cancel</button>
-              <button className="okBtn" disabled={!tuckAsk.preview} onClick={() => applyTuck(tuckAsk)}>Place cutout</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* tuck-behind-art: traced cutout with live preview */}
+      {renderTuckDialog(ed)}
 
       {/* smart contextual tip — one at a time, each shows once */}
       {tip && (

@@ -194,7 +194,7 @@ export function renderToolbar(ed: EditorCtx) {
       disabled={!selEl || (selEl.type !== "image" && selEl.type !== "panel") || !selEl.img}
       onClick={() => { if (selEl && (selEl.type === "image" || selEl.type === "panel") && selEl.img) runInstantAlpha(ed, selEl.id, selEl.img); }} />
     <ToolBtn label="Behind Art" icon="🖼️⃰" accent
-      title="Tuck SFX behind the art: select your sound-effect lettering, then drag a box over the artwork — the art's foreground is cut out and placed in front, so the word sits behind it like hand-traced masking."
+      title="Tuck SFX behind the art: select your sound-effect lettering, then draw around the part of the artwork that should come forward — it is cut out and placed in front, so the word sits behind it like hand-traced masking."
       disabled={!selEl || selEl.type !== "text"}
       onClick={() => ed.startTuck()} />
     <ToolBtn label="Page Setup" icon="📐" onClick={() => setShowSetup(true)} />
