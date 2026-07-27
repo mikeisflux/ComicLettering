@@ -24,7 +24,10 @@ export function WarpedText({ el, env, zoom }: { el: TextEl; env: Warp; zoom: num
     const cw = Math.max(w, (Math.max(1, b.x1) - Math.min(0, b.x0)) * w);
     const chh = Math.max(h, (Math.max(1, b.y1) - Math.min(0, b.y0)) * h);
     cv.width = Math.round(cw * dpr); cv.height = Math.round(chh * dpr);
-    Object.assign(cv.style, { left: `${ox}px`, top: `${oy}px`, width: `${cw}px`, height: `${chh}px` });
+    /* the wrapper is already positioned at the warped bounds, so the canvas
+       simply fills it — it must not draw outside its own element or clicks on
+       the visible letters land on nothing */
+    Object.assign(cv.style, { left: "0px", top: "0px", width: `${cw}px`, height: `${chh}px` });
     const ctx = cv.getContext("2d");
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);

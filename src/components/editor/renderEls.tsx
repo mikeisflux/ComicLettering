@@ -113,9 +113,22 @@ export function renderEl(ed: EditorCtx, el: El) {
   /* text / SFX */
   const editing = editingId === el.id;
   if (el.type === "text" && !editing && isWarped(el.ts.env as Warp)) {
+    /* The warp draws outside the box the text was laid out in, so the element
+       itself grows to cover what it draws. Otherwise the letters are visible
+       but not clickable — the hit area stayed on the old rect. */
+    const env = el.ts.env as Warp;
+    const b = warpBounds(env);
+    const ox = Math.min(0, b.x0), oy = Math.min(0, b.y0);
+    const wStyle: CSSProperties = {
+      ...style,
+      left: el.x + ox * el.w,
+      top: el.y + oy * el.h,
+      width: Math.max(el.w, (Math.max(1, b.x1) - ox) * el.w),
+      height: Math.max(el.h, (Math.max(1, b.y1) - oy) * el.h),
+    };
     return (
-      <div {...common} className="el text" style={style}>
-        <WarpedText el={el} env={el.ts.env as Warp} zoom={zoom} />
+      <div {...common} className="el text warped" style={wStyle}>
+        <WarpedText el={el} env={env} zoom={zoom} />
       </div>
     );
   }
