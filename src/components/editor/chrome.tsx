@@ -2,7 +2,7 @@
 /* ComicLettering Studio — editor chrome: rulers, toolbar/tray buttons and
    the Page Setup dialog, split out of Editor.tsx (module-level code, unchanged). */
 import { ReactNode, useEffect, useRef, useState } from "react";
-import { DPI, PAPER_CATEGORIES, Page, PageMargin, bleedFor, clamp, pageBleed, pageMargins } from "@/lib/model";
+import { COMIC_H_IN, COMIC_W_IN, DPI, MARGIN_IN, PAPER_CATEGORIES, Page, PageMargin, bleedFor, clamp, pageBleed, pageMargins } from "@/lib/model";
 
 /* ---------------- rulers ---------------- */
 
@@ -111,18 +111,20 @@ export function PageSetupDialog({ page, onClose, onApply }: {
   };
 
   const ok = () => {
-    const w = Math.round((parseFloat(wIn) || 6.625) * DPI);
-    const h = Math.round((parseFloat(hIn) || 10.25) * DPI);
+    const w = Math.round((parseFloat(wIn) || COMIC_W_IN) * DPI);
+    const h = Math.round((parseFloat(hIn) || COMIC_H_IN) * DPI);
+    /* kept exact: an eighth or a tenth of an inch is not a whole number of
+       pixels at this DPI, and rounding hands the value back changed */
     const margin: PageMargin = {
-      t: Math.round((parseFloat(mT) || 0) * DPI),
-      r: Math.round((parseFloat(mR) || 0) * DPI),
-      b: Math.round((parseFloat(mB) || 0) * DPI),
-      l: Math.round((parseFloat(mL) || 0) * DPI),
+      t: (parseFloat(mT) || 0) * DPI,
+      r: (parseFloat(mR) || 0) * DPI,
+      b: (parseFloat(mB) || 0) * DPI,
+      l: (parseFloat(mL) || 0) * DPI,
     };
     const bleed = clamp((parseFloat(bIn) || 0) * DPI, 0, Math.min(w, h) / 4);
-    /* Leaving the margins at the safe area means "no custom margins" — do not
+    /* Leaving the margins at the default means "no custom margins" — do not
        stamp a guide onto the page just because someone changed its size. */
-    const s = Math.round(bleed + 0.25 * DPI);
+    const s = MARGIN_IN * DPI;
     const plain = margin.t === s && margin.r === s && margin.b === s && margin.l === s;
     onApply(clamp(w, 200, 8000), clamp(h, 200, 8000), plain ? null : margin, bleed, applyAll);
   };

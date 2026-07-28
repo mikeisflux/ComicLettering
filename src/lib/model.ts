@@ -410,6 +410,10 @@ export const BLEED = BLEED_IN * DPI;
 /* Live area: how far inside the TRIM lettering must stay to survive a bad
    cut. A quarter inch is the number every printer's spec sheet gives. */
 export const SAFE_IN = 0.25;
+/* Default document margin: where panels and layouts start, measured from the
+   page edge. 0.130in puts them a hair inside the trim, so artwork runs to the
+   cut the way comic panels are supposed to, instead of floating in from it. */
+export const MARGIN_IN = 0.13;
 /* Working oversize, the way it has always been done on board: letter at 1.5×
    and reduce on the way out. Everything — including the bleed — scales, or
    the trim guide would land in the wrong place. */
@@ -421,7 +425,9 @@ export const pageBleed = (p: Page) => p.bleed ?? BLEED;
    the line the printed book actually guarantees. */
 export function pageMargins(p: Page): PageMargin {
   if (p.margin) return p.margin;
-  const s = Math.round(pageBleed(p) + SAFE_IN * DPI);
+  /* not rounded to whole pixels: 0.130in is 29.25 at 225dpi, and rounding it
+     makes Page Setup read the value back as 0.129 */
+  const s = MARGIN_IN * DPI;
   return { t: s, r: s, b: s, l: s };
 }
 
