@@ -175,10 +175,16 @@ input[type="range"] { width: 110px; }
 
 /* pages */
 .pageList {
-  flex: 0 1 40%; overflow-y: auto; padding: 8px;
+  /* Enough room for a page and half of the next, so you can see where you
+     are in the book — and it scrolls from there. */
+  flex: 1 1 58%; min-height: 120px; overflow-y: auto; padding: 8px;
   display: flex; flex-direction: column; gap: 8px;
 }
 .pageThumb {
+  /* A flex item shrinks by default, which squashed every thumbnail into a
+     sliver instead of letting the list scroll. The aspect ratio is the
+     whole point of a page thumbnail — never trade it away for fit. */
+  flex: 0 0 auto;
   position: relative; width: 100%; background: #fff;
   border: 2px solid var(--edge2); border-radius: 3px; padding: 0; overflow: hidden;
 }
@@ -196,7 +202,9 @@ input[type="range"] { width: 110px; }
 
 /* lettering styles */
 .stylesGrid {
-  flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 8px;
+  /* the pages rail gets first claim on the height; styles take the rest and
+     scroll — there are far more swatches than will ever fit anyway */
+  flex: 1 1 42%; min-height: 0; overflow-y: auto; padding: 8px;
   display: grid; grid-template-columns: 1fr 1fr; gap: 4px;
   align-content: start; grid-auto-rows: min-content;
   background: #d9dde4;

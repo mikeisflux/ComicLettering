@@ -335,7 +335,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       if (!d || !d.pages[pi]) return;
       const gen = thumbGenRef.current;
       try {
-        const url = await pageThumbnail(d.pages[pi], assetsRef.current, 140);
+        const url = await pageThumbnail(d.pages[pi], assetsRef.current, 220);
         if (thumbGenRef.current !== gen) return; // pages changed mid-render
         setThumbs((t) => ({ ...t, [pi]: url }));
       } catch { /* ignore */ }
@@ -352,7 +352,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       const next: Record<number, string> = {};
       for (let i = 0; i < d.pages.length; i++) {
         if (thumbGenRef.current !== gen) return; // superseded by a newer rebuild
-        try { next[i] = await pageThumbnail(d.pages[i], assetsRef.current, 140); } catch { /* ignore */ }
+        try { next[i] = await pageThumbnail(d.pages[i], assetsRef.current, 220); } catch { /* ignore */ }
       }
       if (thumbGenRef.current !== gen) return;
       setThumbs(next);
@@ -501,7 +501,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       for (let i = 0; i < d.pages.length; i++) {
         if (thumbGenRef.current !== gen) return; // doc replaced during boot render
         try {
-          const url = await pageThumbnail(d.pages[i], assetsRef.current, 140);
+          const url = await pageThumbnail(d.pages[i], assetsRef.current, 220);
           if (thumbGenRef.current !== gen) return;
           setThumbs((t) => ({ ...t, [i]: url }));
         } catch { /* ignore */ }
@@ -1264,7 +1264,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
               setSelId(null);
               commit();
               d.pages.forEach((pg, i) =>
-                pageThumbnail(pg, assetsRef.current, 140).then((u) => setThumbs((t) => ({ ...t, [i]: u }))).catch(() => { }));
+                pageThumbnail(pg, assetsRef.current, 220).then((u) => setThumbs((t) => ({ ...t, [i]: u }))).catch(() => { }));
             }}>Delete</button>
           </div>
           <div className="pageActs">
@@ -1435,7 +1435,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
             fitZoom(true);
             setThumbs({});
             d.pages.forEach((pg, i) =>
-              pageThumbnail(pg, assetsRef.current, 140).then((u) => setThumbs((t) => ({ ...t, [i]: u }))).catch(() => { }));
+              pageThumbnail(pg, assetsRef.current, 220).then((u) => setThumbs((t) => ({ ...t, [i]: u }))).catch(() => { }));
           }}
         />
       )}
