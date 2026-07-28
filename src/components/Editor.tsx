@@ -11,7 +11,7 @@ import React, {
 import {
   Assets, BalloonEl, DPI, Doc, El, FONTS, FillStyle, GradStop, Page, TextEl,
   TextStyle, aabbOverlap, clamp, makeBalloon, makeImage, newPage, normalizeRuns,
-  registerFont, reseedIds, rotVec, runsToText, starterDoc,
+  pageGuides, registerFont, reseedIds, rotVec, runsToText, starterDoc,
 } from "@/lib/model";
 import { LETTER_STYLES } from "@/lib/presets";
 import { BALLOON_STYLES, BOX_STYLES } from "@/lib/balloonStyles";
@@ -1314,13 +1314,23 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
                   }} />
                 )}
                 {showSafe && (() => {
-                  const inset = Math.round(Math.min(page.w, page.h) * 0.06);
+                  /* Comic page sizes are quoted WITH bleed, so the page edge
+                     is not where the book ends — the blade lands on the trim.
+                     Show both: trim is where it gets cut, safe is where
+                     lettering survives a bad cut. */
+                  const g = pageGuides(page);
+                  const bw = Math.max(2, 1.5 / zoom);
                   return (
-                    <div className="safeGuide" style={{
-                      left: inset, top: inset,
-                      width: page.w - inset * 2, height: page.h - inset * 2,
-                      borderWidth: Math.max(2, 1.5 / zoom),
-                    }} />
+                    <>
+                      <div className="trimGuide" style={{
+                        left: g.trim.x, top: g.trim.y,
+                        width: g.trim.w, height: g.trim.h, borderWidth: bw,
+                      }} />
+                      <div className="safeGuide" style={{
+                        left: g.safe.x, top: g.safe.y,
+                        width: g.safe.w, height: g.safe.h, borderWidth: bw,
+                      }} />
+                    </>
                   );
                 })()}
                 {demo && <div className="demoWatermark" aria-hidden style={{ width: page.w, height: page.h }} />}
@@ -1416,10 +1426,10 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
         <PageSetupDialog
           page={page}
           onClose={() => setShowSetup(false)}
-          onApply={(w, h, margin, applyAll) => {
+          onApply={(w, h, margin, bleed, applyAll) => {
             const d = docRef.current!;
             const targets = applyAll ? d.pages : [page];
-            for (const p of targets) { p.w = w; p.h = h; p.margin = { ...margin }; }
+            for (const p of targets) { p.w = w; p.h = h; p.margin = { ...margin }; p.bleed = bleed; }
             setShowSetup(false);
             commit();
             fitZoom(true);

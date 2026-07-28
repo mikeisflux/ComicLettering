@@ -1,6 +1,6 @@
 /* Dependency-free multi-page PDF export: each page rendered to JPEG and
    embedded via DCTDecode. Output sized in points from the page's DPI. */
-import { Assets, DPI, Doc } from "./model";
+import { Assets, DPI, Doc, pageBleed } from "./model";
 import { renderPageToCanvas } from "./exportPng";
 
 const enc = new TextEncoder();
@@ -50,7 +50,7 @@ export async function exportPdf(
   beginObj(2);
   push(`<< /Type /Pages /Count ${n} /Kids [${images.map((_, i) => `${pageObj(i)} 0 R`).join(" ")}] >>\nendobj\n`);
 
-  const M = cropMarks ? 18 : 0; // 0.25in bleed margin in points
+  const M = cropMarks ? 18 : 0; // 0.25in quiet margin around the sheet, in points
   images.forEach((img, i) => {
     const W = (img.w * 72) / outDpi;
     const H = (img.h * 72) / outDpi;
@@ -59,11 +59,17 @@ export async function exportPdf(
     push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${MW.toFixed(2)} ${MH.toFixed(2)}] /Contents ${contObj(i)} 0 R /Resources << /XObject << /Im0 ${imgObj(i)} 0 R >> >> >>\nendobj\n`);
     let content = `q ${W.toFixed(2)} 0 0 ${H.toFixed(2)} ${M} ${M} cm /Im0 Do Q`;
     if (cropMarks) {
+      /* The page already carries its bleed, so the trim is INSIDE the sheet.
+         Marks drawn at the sheet corners would tell the printer to cut on the
+         bleed line and hand back a book an eighth of an inch too big on
+         every edge. */
+      const b = (pageBleed(doc.pages[i]) / DPI) * 72;
+      const x0 = M + b, y0 = M + b, x1 = M + W - b, y1 = M + H - b;
       const marks =
-        cornerMarks(M, M, -1, -1) +          // bottom-left
-        cornerMarks(M + W, M, 1, -1) +       // bottom-right
-        cornerMarks(M, M + H, -1, 1) +       // top-left
-        cornerMarks(M + W, M + H, 1, 1);     // top-right
+        cornerMarks(x0, y0, -1, -1) +   // bottom-left
+        cornerMarks(x1, y0, 1, -1) +    // bottom-right
+        cornerMarks(x0, y1, -1, 1) +    // top-left
+        cornerMarks(x1, y1, 1, 1);      // top-right
       content += `\n0 0 0 RG 0.5 w\n${marks}S`;
     }
     beginObj(contObj(i));

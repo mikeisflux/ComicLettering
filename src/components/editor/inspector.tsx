@@ -1,7 +1,7 @@
 /* Right-panel Inspector — page / element property editors.
    Plain exported render functions taking the EditorCtx bag. */
 import {
-  BALLOON_KINDS, BalloonEl, BalloonKind, FILTERS, FONTS, PAGE_SIZES,
+  BALLOON_KINDS, BLEED, BalloonEl, BalloonKind, FILTERS, FONTS, PAGE_SIZES,
   PanelEl, TAILLESS_KINDS, TextEl, TextStyle, clamp,
 } from "@/lib/model";
 import { Fld } from "./textHelpers";
@@ -79,7 +79,9 @@ export function renderInspector(ed: EditorCtx) {
           <Fld label="Size">
             <select value={sizeKey} onChange={(e) => {
               const s = PAGE_SIZES.find((x) => x.k === e.target.value);
-              if (s) { p.w = s.w; p.h = s.h; commit(); fitZoom(true); }
+              /* the preset carries its own bleed: an oversize board
+                 needs an oversize bleed or the trim guide lies */
+              if (s) { p.w = s.w; p.h = s.h; p.bleed = s.bleed ?? BLEED; commit(); fitZoom(true); }
             }}>
               {PAGE_SIZES.map((s) => <option key={s.k} value={s.k}>{s.label}</option>)}
               <option value="custom">Custom</option>

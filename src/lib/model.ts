@@ -389,17 +389,58 @@ export interface TextEl extends BaseEl {
 export type El = PanelEl | ImageEl | BalloonEl | TextEl;
 
 export interface PageMargin { t: number; r: number; b: number; l: number }
-export interface Page { w: number; h: number; bg: FillStyle; els: El[]; margin?: PageMargin }
+export interface Page {
+  w: number; h: number; bg: FillStyle; els: El[]; margin?: PageMargin;
+  /* Bleed, in page units, on every edge. Comic page sizes are quoted WITH
+     bleed included, so the page is bigger than the printed book and the
+     blade comes down `bleed` inside each edge. Undefined = BLEED. */
+  bleed?: number;
+}
 
 /* Pixels per inch used across rulers, paper sizes and Page Setup. */
 export const DPI = 225;
+
+/* Standard US comic page, quoted the way printers quote it: the full-bleed
+   sheet, an eighth of an inch of bleed on each edge, so the trim is
+   6.63 × 10.00in. Art runs to the page edge; the blade lands on the trim. */
+export const COMIC_W_IN = 6.88;
+export const COMIC_H_IN = 10.25;
+export const BLEED_IN = 0.125;
+export const BLEED = BLEED_IN * DPI;
+/* Live area: how far inside the TRIM lettering must stay to survive a bad
+   cut. A quarter inch is the number every printer's spec sheet gives. */
+export const SAFE_IN = 0.25;
+/* Working oversize, the way it has always been done on board: letter at 1.5×
+   and reduce on the way out. Everything — including the bleed — scales, or
+   the trim guide would land in the wrong place. */
+export const OVERSIZE = 1.5;
+export const pageBleed = (p: Page) => p.bleed ?? BLEED;
+
+/* Bleed (inches) that goes with a named paper size, for Page Setup. */
+export function bleedFor(name: string): number | null {
+  if (name.startsWith("Standard Comic")) {
+    return name.includes("+1.5") ? BLEED_IN * OVERSIZE : BLEED_IN;
+  }
+  return null;
+}
+/* The three nested rectangles, in page units. */
+export function pageGuides(p: Page) {
+  const b = pageBleed(p);
+  const s = b + SAFE_IN * DPI;
+  return {
+    bleed: b,
+    trim: { x: b, y: b, w: p.w - 2 * b, h: p.h - 2 * b },
+    safe: { x: s, y: s, w: p.w - 2 * s, h: p.h - 2 * s },
+  };
+}
 
 export interface PaperCategory { name: string; sizes: [string, number, number][] }
 export const PAPER_CATEGORIES: PaperCategory[] = [
   {
     name: "Comic Sizes",
     sizes: [
-      ["Standard Comic", 6.625, 10.25],
+      ["Standard Comic (full bleed)", COMIC_W_IN, COMIC_H_IN],
+      ["Standard Comic +1.5 (oversize)", COMIC_W_IN * OVERSIZE, COMIC_H_IN * OVERSIZE],
       ["Golden Age", 7.75, 10.5],
       ["Digest", 5.5, 8.25],
       ["Magazine", 8.5, 11],
@@ -650,8 +691,10 @@ export const FILTERS: Record<FilterKey, { label: string; css: string }> = {
 
 /* ---------------- page sizes & layouts ---------------- */
 
-export const PAGE_SIZES = [
-  { k: "comic",  label: "US Comic (1500×2250)",   w: 1500, h: 2250 },
+export const PAGE_SIZES: { k: string; label: string; w: number; h: number; bleed?: number }[] = [
+  { k: "comic",  label: 'US Comic 6.88×10.25" (full bleed)', w: 1548, h: 2306 },
+  /* letter big, reduce on export — the lettering comes out finer */
+  { k: "comic15", label: 'US Comic +1.5 (10.32×15.38")', w: 2322, h: 3459, bleed: BLEED * OVERSIZE },
   { k: "manga",  label: "Manga B5 (1516×2150)",   w: 1516, h: 2150 },
   { k: "a4",     label: "A4 Portrait (1654×2339)", w: 1654, h: 2339 },
   { k: "square", label: "Square (2000×2000)",     w: 2000, h: 2000 },
@@ -834,7 +877,7 @@ export const defaultTextStyle = (over: Partial<TextStyle> = {}): TextStyle => ({
   ...over,
 });
 
-export function newPage(w = 1500, h = 2250, margin?: PageMargin): Page {
+export function newPage(w = Math.round(COMIC_W_IN * DPI), h = Math.round(COMIC_H_IN * DPI), margin?: PageMargin): Page {
   const m = margin ?? (() => { const v = Math.round(w * 0.035); return { t: v, r: v, b: v, l: v }; })();
   return { w, h, bg: solid("#ffffff"), els: [], margin: m };
 }
