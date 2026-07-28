@@ -20,7 +20,7 @@ import { GradientMaker, loadCustomGrads } from "./editor/GradientMaker";
 import { FLAT } from "@/lib/warp";
 import { fillCss } from "@/lib/fills";
 import { ImageFormat, loadImage, pageThumbnail } from "@/lib/exportPng";
-import { artUrl, ensureArt, holdArt, listArtIds, putArt, requestPersistence } from "@/lib/assetStore";
+import { artUrl, ensureArt, holdArt, listArtIds, primeArtIds, putArt, requestPersistence } from "@/lib/assetStore";
 import {
   BalloonPreset, HINT, PRESET_KEY, ProjectMeta, ProofMatch, domToRuns,
   letterStyleCss, runsToHtml, toggleEmphasis,
@@ -36,7 +36,7 @@ import {
   addFromTray, alignSel, applyQuickFill, assignImageToPanel, copySel, cutSel, deleteSel,
   duplicatePage, duplicateSel, growBalloonToFit, importFontFiles, importImageFile, importJSON,
   sizeTextToContent,
-  importStampFiles, movePage, onDrop, pasteClip, readAsDataURL,
+  importStampFiles, movePage, nextAid, onDrop, pasteClip, readAsDataURL,
   refreshProjects, saveProject,
 } from "./editor/ops";
 import { renderEl, renderOverlay } from "./editor/renderEls";
@@ -75,11 +75,27 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   /* re-seed the asset id counter from whatever assets are loaded — MUST run
      after any wholesale assets replacement (boot, project load, JSON import)
      or new images silently overwrite existing artwork ids */
-  const reseedAids = useCallback(() => {
+  /* Where new artwork ids start. `assetsRef` is only the artwork read back so
+     far — a book's pages materialise as you visit them — so seeding from that
+     alone restarts the counter low and re-issues ids other pages are already
+     using. The DOCUMENT names every id it references whether or not the bytes
+     are loaded, and `extra` carries what the browser has in store. */
+  const reseedAids = useCallback((extra?: Iterable<string>) => {
     let maxA = 0;
-    for (const k of Object.keys(assetsRef.current)) {
-      const n = parseInt(k.replace(/\D/g, ""), 10);
-      if (!isNaN(n)) maxA = Math.max(maxA, n);
+    const bump = (k: string) => {
+      const m = /^a(\d+)$/.exec(k);
+      if (m) maxA = Math.max(maxA, +m[1]);
+    };
+    for (const k of Object.keys(assetsRef.current)) bump(k);
+    if (extra) for (const k of extra) bump(k);
+    const d = docRef.current;
+    if (d) {
+      for (const pg of d.pages) {
+        for (const e of pg.els) {
+          const id = "img" in e ? (e.img as string | null) : null;
+          if (id) bump(id);
+        }
+      }
     }
     aidRef.current = maxA + 1;
   }, []);
@@ -486,16 +502,18 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       /* Artwork is NOT read wholesale: a full book is gigabytes. Boot learns
          which ids exist, then each page materialises its own as the reader
          arrives at it. */
-      if (restored) {
-        try {
-          const ids = await listArtIds();
-          if (ids.length) {
-            requestPersistence();
-            reseedAids();
-            await loadPageArt(pageIndexRef.current);
-          }
-        } catch { /* no artwork store — the lettering still came back */ }
-      }
+      /* Always learn what the store already holds, restored session or not:
+         ids belong to the browser, not to one document, and a second book
+         must not be handed ids the first one is using. */
+      try {
+        const ids = await listArtIds();
+        await primeArtIds();
+        reseedAids(ids);
+        if (restored && ids.length) {
+          requestPersistence();
+          await loadPageArt(pageIndexRef.current);
+        }
+      } catch { /* no artwork store — the lettering still came back */ }
       const d = docRef.current!;
       const gen = thumbGenRef.current;
       for (let i = 0; i < d.pages.length; i++) {
@@ -981,7 +999,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const applyTuck = useCallback((t: TuckAsk | null) => {
     setTuckAsk(null);
     if (!t || !t.preview) return;
-    const aid = "a" + aidRef.current++;
+    const aid = nextAid(ed);
     /* show it at once, and put it in the artwork store so the tuck is still
        there after a refresh — assetsRef alone is not persisted */
     assetsRef.current[aid] = t.preview;
@@ -1454,7 +1472,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
           if (!f || !targetId) return;
           const url = await readAsDataURL(f);
           await loadImage(url);
-          const aid = "a" + aidRef.current++;
+          const aid = nextAid(ed);
           assetsRef.current[aid] = url;
           await assignImageToPanel(ed, targetId, aid);
         }} />

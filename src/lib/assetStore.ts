@@ -133,6 +133,20 @@ export const fmtBytes = (n: number) =>
    backing blobs are pinned for the life of the tab. */
 
 const urls = new Map<string, string>();
+/* which blob each live URL was made from, so a reused id cannot serve stale art */
+const held = new Map<string, Blob>();
+
+/* Every id this browser has artwork stored under, including ids belonging to
+   other projects. New ids are allocated around this set — without it, opening
+   a second book can hand out an id the first book is already using and
+   overwrite its artwork on save. */
+const knownIds = new Set<string>();
+export const noteArtId = (id: string) => { knownIds.add(id); };
+export const artIdTaken = (id: string) => knownIds.has(id);
+export async function primeArtIds(): Promise<number> {
+  for (const id of await listArtIds()) knownIds.add(id);
+  return knownIds.size;
+}
 
 export function artUrl(id: string): string | undefined {
   return urls.get(id);
@@ -140,8 +154,14 @@ export function artUrl(id: string): string | undefined {
 
 export function holdArt(id: string, blob: Blob): string {
   const existing = urls.get(id);
-  if (existing) return existing;
+  /* Only reuse the URL when it is a URL for THIS blob. Returning the cached
+     one for a different blob is how a freshly imported page came up showing
+     some other page's artwork: the new bytes went into the store, but the
+     caller got handed the old page's object URL. */
+  if (existing && held.get(id) === blob) return existing;
+  if (existing) URL.revokeObjectURL(existing);
   const url = URL.createObjectURL(blob);
+  held.set(id, blob);
   urls.set(id, url);
   return url;
 }
@@ -149,13 +169,14 @@ export function holdArt(id: string, blob: Blob): string {
 export function releaseArt(ids: Iterable<string>) {
   for (const id of ids) {
     const url = urls.get(id);
-    if (url) { URL.revokeObjectURL(url); urls.delete(id); }
+    if (url) { URL.revokeObjectURL(url); urls.delete(id); held.delete(id); }
   }
 }
 
 export function releaseAllArt() {
   for (const url of urls.values()) URL.revokeObjectURL(url);
   urls.clear();
+  held.clear();
 }
 
 /** Materialise the artwork these ids need. Returns the ids newly made available. */

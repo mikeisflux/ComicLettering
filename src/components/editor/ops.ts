@@ -9,8 +9,8 @@ import {
 } from "@/lib/model";
 import { balloonGeom } from "@/lib/geometry";
 import {
-  artUrl, clearArt, ensureArt, fmtBytes, holdArt, putArt, releaseAllArt,
-  requestPersistence, storageEstimate,
+  artIdTaken, artUrl, clearArt, ensureArt, fmtBytes, holdArt, noteArtId, putArt,
+  releaseAllArt, requestPersistence, storageEstimate,
 } from "@/lib/assetStore";
 import { LETTER_STYLES, applyLetterStyle } from "@/lib/presets";
 import { BALLOON_STYLES, BOX_STYLES, applyShapeStyle } from "@/lib/balloonStyles";
@@ -724,7 +724,7 @@ export async function insertSfxStamp(ed: EditorCtx, slug: string, label: string)
     const res = await fetch(`/stamps/${slug}.png`);
     if (!res.ok) throw new Error(res.statusText);
     const blob = await res.blob();
-    const aid = "a" + aidRef.current++;
+    const aid = nextAid(ed);
     const url = await stashArt(ed, aid, blob);
     const img = await loadImage(url);
     placeAsset(ed, aid, img.naturalWidth, img.naturalHeight);
@@ -736,7 +736,7 @@ export async function insertSfxStamp(ed: EditorCtx, slug: string, label: string)
 export async function insertCustomStamp(ed: EditorCtx, url: string) {
   const { aidRef, setStampOpen } = ed;
   const img = await loadImage(url);
-  const aid = "a" + aidRef.current++;
+  const aid = nextAid(ed);
   await stashDataUrl(ed, aid, url);
   placeAsset(ed, aid, img.naturalWidth, img.naturalHeight);
   setStampOpen(false);
@@ -787,7 +787,7 @@ export async function importPdfFile(ed: EditorCtx, f: File, x?: number, y?: numb
     const c = document.createElement("canvas");
     c.width = Math.round(vp.width); c.height = Math.round(vp.height);
     await pg.render({ canvas: c, canvasContext: c.getContext("2d")!, viewport: vp }).promise;
-    const aid = "a" + aidRef.current++;
+    const aid = nextAid(ed);
     const blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/png"));
     const url = blob ? await stashArt(ed, aid, blob) : c.toDataURL("image/png");
     if (!blob) assetsRef.current[aid] = url;
@@ -804,7 +804,7 @@ export async function importImageFile(ed: EditorCtx, f: File, x?: number, y?: nu
     await importPdfFile(ed, f, x, y);
     return;
   }
-  const aid = "a" + aidRef.current++;
+  const aid = nextAid(ed);
   const url = await stashArt(ed, aid, f);
   const img = await loadImage(url);
   placeAsset(ed, aid, img.naturalWidth, img.naturalHeight, x, y);
@@ -842,6 +842,32 @@ export async function stashDataUrl(ed: EditorCtx, aid: string, dataUrl: string):
     ed.assetsRef.current[aid] = dataUrl;   // still usable this session
     return dataUrl;
   }
+}
+
+/* Hand out an artwork id nothing else is using.
+
+   A bare counter is not enough. It is seeded from what is loaded, and a book's
+   artwork is deliberately NOT all loaded — so the counter could restart low
+   and re-issue an id another page was already using. The store then wrote the
+   new bytes over the old page's artwork and served the old page's picture for
+   the new one, which is what "I dragged in page 13 and page 7 appeared" was.
+   Check every id that could exist before using one. */
+export function nextAid(ed: EditorCtx): string {
+  const { aidRef, assetsRef, docRef } = ed;
+  const used = new Set<string>(Object.keys(assetsRef.current));
+  const d = docRef.current;
+  if (d) {
+    for (const pg of d.pages) {
+      for (const e of pg.els) {
+        const id = "img" in e ? (e.img as string | null) : null;
+        if (id) used.add(id);
+      }
+    }
+  }
+  let id = "a" + aidRef.current++;
+  while (used.has(id) || artIdTaken(id)) id = "a" + aidRef.current++;
+  noteArtId(id);
+  return id;
 }
 
 export async function stashArt(ed: EditorCtx, aid: string, blob: Blob): Promise<string> {
@@ -909,7 +935,7 @@ export async function runInstantAlpha(ed: EditorCtx, elId: string, aid: string) 
   }
   ctx.putImageData(imgData, 0, 0);
   const url = c.toDataURL("image/png");
-  const newAid = "a" + aidRef.current++;
+  const newAid = nextAid(ed);
   await stashDataUrl(ed, newAid, url);
   await loadImage(url);
   const p = docRef.current!.pages[pageIndexRef.current];
@@ -946,7 +972,7 @@ export async function onDrop(ed: EditorCtx, e: React.DragEvent) {
     if (target && (target.type === "balloon" || target.type === "panel" || target.type === "image") && !target.locked) {
       const url = await readAsDataURL(f);
       const img = await loadImage(url);
-      const aid = "a" + aidRef.current++;
+      const aid = nextAid(ed);
       assetsRef.current[aid] = url;
       target.img = aid;
       /* a bare image element is the picture, not a frame — see fitBoxToArt */
