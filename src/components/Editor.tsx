@@ -11,7 +11,7 @@ import React, {
 import {
   Assets, BalloonEl, DPI, Doc, El, FONTS, FillStyle, GradStop, Page, TextEl,
   TextStyle, aabbOverlap, clamp, makeBalloon, makeImage, newPage, normalizeRuns,
-  pageGuides, registerFont, reseedIds, rotVec, runsToText, starterDoc,
+  pageGuides, pageMargins, registerFont, reseedIds, rotVec, runsToText, starterDoc,
 } from "@/lib/model";
 import { LETTER_STYLES } from "@/lib/presets";
 import { BALLOON_STYLES, BOX_STYLES } from "@/lib/balloonStyles";
@@ -688,8 +688,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
         if (!ev.altKey) {
           /* snap to margins, page centre and other elements (Alt disables) */
           const tol = Math.max(4, 8 / zoom);
-          const def = Math.round(p.w * 0.035);
-          const m = p.margin ?? { t: def, r: def, b: def, l: def };
+          const m = pageMargins(p);
           const others = p.els.filter((o) => o.id !== cur.id);
           /* snap targets: page bleed edges, margins, centre, other elements */
           const vTargets = [0, p.w, m.l, p.w - m.r, p.w / 2, ...others.flatMap((o) => [o.x, o.x + o.w / 2, o.x + o.w])];
@@ -773,8 +772,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
         snapRef.current = { x: null, y: null };
         if (!ev.altKey) {
           const tol = Math.max(4, 8 / zoom);
-          const def = Math.round(p.w * 0.035);
-          const m = p.margin ?? { t: def, r: def, b: def, l: def };
+          const m = pageMargins(p);
           const others = p.els.filter((o) => o.id !== cur.id);
           const vT = [0, p.w, m.l, p.w - m.r, p.w / 2, ...others.flatMap((o) => [o.x, o.x + o.w])];
           const hT = [0, p.h, m.t, p.h - m.b, p.h / 2, ...others.flatMap((o) => [o.y, o.y + o.h])];
@@ -1331,11 +1329,13 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
                     borderWidth: Math.max(2, 1.5 / zoom),
                   }} />
                 )}
-                {showSafe && (() => {
+                {(() => {
                   /* Comic page sizes are quoted WITH bleed, so the page edge
-                     is not where the book ends — the blade lands on the trim.
-                     Show both: trim is where it gets cut, safe is where
-                     lettering survives a bad cut. */
+                     is not where the book ends — the blade lands on the trim,
+                     an eighth of an inch in. That line is always on: it is a
+                     real edge of the printed book, not an optional overlay,
+                     and every crop decision on the page depends on it.
+                     Show Safe Area adds the lettering line inside it. */
                   const g = pageGuides(page);
                   const bw = Math.max(2, 1.5 / zoom);
                   return (
@@ -1344,10 +1344,12 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
                         left: g.trim.x, top: g.trim.y,
                         width: g.trim.w, height: g.trim.h, borderWidth: bw,
                       }} />
-                      <div className="safeGuide" style={{
-                        left: g.safe.x, top: g.safe.y,
-                        width: g.safe.w, height: g.safe.h, borderWidth: bw,
-                      }} />
+                      {showSafe && (
+                        <div className="safeGuide" style={{
+                          left: g.safe.x, top: g.safe.y,
+                          width: g.safe.w, height: g.safe.h, borderWidth: bw,
+                        }} />
+                      )}
                     </>
                   );
                 })()}
@@ -1447,7 +1449,10 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
           onApply={(w, h, margin, bleed, applyAll) => {
             const d = docRef.current!;
             const targets = applyAll ? d.pages : [page];
-            for (const p of targets) { p.w = w; p.h = h; p.margin = { ...margin }; p.bleed = bleed; }
+            for (const p of targets) {
+              p.w = w; p.h = h; p.bleed = bleed;
+              if (margin) p.margin = { ...margin }; else delete p.margin;
+            }
             setShowSetup(false);
             commit();
             fitZoom(true);

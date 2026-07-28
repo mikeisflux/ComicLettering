@@ -2,7 +2,7 @@
 /* ComicLettering Studio — editor chrome: rulers, toolbar/tray buttons and
    the Page Setup dialog, split out of Editor.tsx (module-level code, unchanged). */
 import { ReactNode, useEffect, useRef, useState } from "react";
-import { DPI, PAPER_CATEGORIES, Page, PageMargin, bleedFor, clamp, pageBleed } from "@/lib/model";
+import { DPI, PAPER_CATEGORIES, Page, PageMargin, bleedFor, clamp, pageBleed, pageMargins } from "@/lib/model";
 
 /* ---------------- rulers ---------------- */
 
@@ -90,10 +90,9 @@ const inch = (px: number) => (px / DPI).toFixed(3);
 export function PageSetupDialog({ page, onClose, onApply }: {
   page: Page;
   onClose: () => void;
-  onApply: (w: number, h: number, margin: PageMargin, bleed: number, applyAll: boolean) => void;
+  onApply: (w: number, h: number, margin: PageMargin | null, bleed: number, applyAll: boolean) => void;
 }) {
-  const def = Math.round(page.w * 0.035);
-  const m0 = page.margin ?? { t: def, r: def, b: def, l: def };
+  const m0 = pageMargins(page);
   const [cat, setCat] = useState(0);
   const [wIn, setWIn] = useState(inch(page.w));
   const [hIn, setHIn] = useState(inch(page.h));
@@ -121,7 +120,11 @@ export function PageSetupDialog({ page, onClose, onApply }: {
       l: Math.round((parseFloat(mL) || 0) * DPI),
     };
     const bleed = clamp((parseFloat(bIn) || 0) * DPI, 0, Math.min(w, h) / 4);
-    onApply(clamp(w, 200, 8000), clamp(h, 200, 8000), margin, bleed, applyAll);
+    /* Leaving the margins at the safe area means "no custom margins" — do not
+       stamp a guide onto the page just because someone changed its size. */
+    const s = Math.round(bleed + 0.25 * DPI);
+    const plain = margin.t === s && margin.r === s && margin.b === s && margin.l === s;
+    onApply(clamp(w, 200, 8000), clamp(h, 200, 8000), plain ? null : margin, bleed, applyAll);
   };
 
   return (

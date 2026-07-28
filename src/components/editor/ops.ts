@@ -4,7 +4,7 @@
 import React from "react";
 import {
   Assets, BalloonEl, BalloonKind, DPI, Doc, El, FONTS, FillStyle, GradStop, Page,
-  TAILLESS_KINDS, TextEl, TextStyle, clamp, makeBalloon, makeImage,
+  TAILLESS_KINDS, TextEl, TextStyle, clamp, makeBalloon, makeImage, pageMargins,
   makePanel, makeText, reseedIds, solid, uid,
 } from "@/lib/model";
 import { balloonGeom } from "@/lib/geometry";
@@ -547,8 +547,7 @@ export function alignSel(ed: EditorCtx, mode: "left" | "hcenter" | "right" | "to
   const el = page?.els.find((x) => x.id === selId);
   if (!el || !page) return;
   if (el.locked) { setStatus("This item is locked."); return; }
-  const def = Math.round(page.w * 0.035);
-  const m = page.margin ?? { t: def, r: def, b: def, l: def };
+  const m = pageMargins(page);
   if (mode === "left") el.x = m.l;
   if (mode === "hcenter") el.x = Math.round((page.w - el.w) / 2);
   if (mode === "right") el.x = page.w - m.r - el.w;

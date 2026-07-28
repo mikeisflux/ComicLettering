@@ -416,6 +416,15 @@ export const SAFE_IN = 0.25;
 export const OVERSIZE = 1.5;
 export const pageBleed = (p: Page) => p.bleed ?? BLEED;
 
+/* Where panels and layouts sit when the page has no explicit margins. The
+   safe area is the answer, not an arbitrary fraction of the width — it is
+   the line the printed book actually guarantees. */
+export function pageMargins(p: Page): PageMargin {
+  if (p.margin) return p.margin;
+  const s = Math.round(pageBleed(p) + SAFE_IN * DPI);
+  return { t: s, r: s, b: s, l: s };
+}
+
 /* Bleed (inches) that goes with a named paper size, for Page Setup. */
 export function bleedFor(name: string): number | null {
   if (name.startsWith("Standard Comic")) {
@@ -867,6 +876,16 @@ export function reseedIds(doc: Doc) {
     if (!isNaN(n)) max = Math.max(max, n);
   }
   idCounter = max + 1;
+  /* Pages used to be born with a margin at 3.5% of their width — not a print
+     measurement, but drawn as a bold dashed box near the edge, where it reads
+     as the trim line. Nobody chose that number, so drop it and let the page
+     show its real trim instead. Margins somebody actually set are kept. */
+  for (const p of doc.pages) {
+    const m = p.margin;
+    if (!m) continue;
+    const legacy = Math.round(p.w * 0.035);
+    if (m.t === legacy && m.r === legacy && m.b === legacy && m.l === legacy) delete p.margin;
+  }
 }
 
 export const defaultTextStyle = (over: Partial<TextStyle> = {}): TextStyle => ({
@@ -878,8 +897,12 @@ export const defaultTextStyle = (over: Partial<TextStyle> = {}): TextStyle => ({
 });
 
 export function newPage(w = Math.round(COMIC_W_IN * DPI), h = Math.round(COMIC_H_IN * DPI), margin?: PageMargin): Page {
-  const m = margin ?? (() => { const v = Math.round(w * 0.035); return { t: v, r: v, b: v, l: v }; })();
-  return { w, h, bg: solid("#ffffff"), els: [], margin: m };
+  /* No margin by default. A dashed box at 3.5% of the page width is not a
+     print measurement, and drawn near the edge it reads as the trim line —
+     which had readers believing the bleed was three times what they set.
+     Layout falls back to the safe area (pageMargins); the guide only shows
+     when someone has deliberately set margins in Page Setup. */
+  return { w, h, bg: solid("#ffffff"), els: [], ...(margin ? { margin } : {}) };
 }
 export function newDoc(): Doc {
   return { app: "comiclettering", version: 2, pages: [newPage()] };
@@ -923,8 +946,7 @@ export function makeText(x: number, y: number, w: number, h: number, sfx: boolea
 }
 
 export function applyLayout(page: Page, fracs: LayoutRect[]) {
-  const def = Math.round(page.w * 0.035);
-  const mg = page.margin ?? { t: def, r: def, b: def, l: def };
+  const mg = pageMargins(page);
   const g = Math.round(page.w * 0.02);
   const cw = page.w - mg.l - mg.r, ch = page.h - mg.t - mg.b;
   const panels = fracs.map(([fx, fy, fw, fh, rot]) => {
