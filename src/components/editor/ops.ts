@@ -3,7 +3,7 @@
    EditorCtx bag (plain function calls, not components). */
 import React from "react";
 import {
-  Assets, BalloonEl, BalloonKind, Doc, El, FONTS, FillStyle, GradStop, Page,
+  Assets, BalloonEl, BalloonKind, DPI, Doc, El, FONTS, FillStyle, GradStop, Page,
   TAILLESS_KINDS, TextEl, TextStyle, clamp, makeBalloon, makeImage,
   makePanel, makeText, reseedIds, solid, uid,
 } from "@/lib/model";
@@ -1004,6 +1004,38 @@ export async function fitToArtwork(ed: EditorCtx) {
   fitBoxToArt(el, await loadImage(src));
   commit();
   setStatus("Frame reshaped to the artwork — nothing is cropped now.");
+}
+
+/* Drop a finished page onto the page. `fill` runs the art to the page edges
+   and past them where the shapes differ (full bleed, what page art is for);
+   otherwise the whole image is brought inside the page with nothing lost.
+   Either way the aspect ratio is kept — the art is never stretched. */
+export async function fitToPage(ed: EditorCtx, fill: boolean) {
+  const { page, selId, assetsRef, setStatus, commit } = ed;
+  const el = page?.els.find((x) => x.id === selId);
+  if (!el || (el.type !== "image" && el.type !== "panel") || !el.img || !page) return;
+  if (el.locked) { setStatus("This item is locked."); return; }
+  const src = assetsRef.current[el.img];
+  if (!src) return;
+  const img = await loadImage(src);
+  if (!img.naturalWidth || !img.naturalHeight) return;
+  const ar = img.naturalWidth / img.naturalHeight;
+  const pageAr = page.w / page.h;
+  /* fill wants the SHORT side covered, fit wants the LONG side contained */
+  const widthLed = fill ? ar < pageAr : ar > pageAr;
+  const w = widthLed ? page.w : Math.round(page.h * ar);
+  const h = widthLed ? Math.round(page.w / ar) : page.h;
+  el.w = w; el.h = h;
+  el.x = Math.round((page.w - w) / 2);
+  el.y = Math.round((page.h - h) / 2);
+  el.rot = 0;
+  commit();
+  const over = fill && (w > page.w || h > page.h);
+  setStatus(fill
+    ? over
+      ? `Page art placed full bleed — it runs ${((Math.max(w - page.w, h - page.h) / 2) / DPI).toFixed(2)}in past the page, so trim has something to cut into.`
+      : "Page art placed full bleed."
+    : "Page art fitted inside the page — nothing cropped.");
 }
 
 /* ---------------- project library (SQL) ---------------- */

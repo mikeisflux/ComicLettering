@@ -402,9 +402,9 @@ export const DPI = 225;
 
 /* Standard US comic page, quoted the way printers quote it: the full-bleed
    sheet, an eighth of an inch of bleed on each edge, so the trim is
-   6.63 × 10.00in. Art runs to the page edge; the blade lands on the trim. */
+   6.63 × 10.25in. Art runs to the page edge; the blade lands on the trim. */
 export const COMIC_W_IN = 6.88;
-export const COMIC_H_IN = 10.25;
+export const COMIC_H_IN = 10.5;
 export const BLEED_IN = 0.125;
 export const BLEED = BLEED_IN * DPI;
 /* Live area: how far inside the TRIM lettering must stay to survive a bad
@@ -692,9 +692,9 @@ export const FILTERS: Record<FilterKey, { label: string; css: string }> = {
 /* ---------------- page sizes & layouts ---------------- */
 
 export const PAGE_SIZES: { k: string; label: string; w: number; h: number; bleed?: number }[] = [
-  { k: "comic",  label: 'US Comic 6.88×10.25" (full bleed)', w: 1548, h: 2306 },
+  { k: "comic",  label: 'US Comic 6.88×10.5" (full bleed)', w: 1548, h: 2363 },
   /* letter big, reduce on export — the lettering comes out finer */
-  { k: "comic15", label: 'US Comic +1.5 (10.32×15.38")', w: 2322, h: 3459, bleed: BLEED * OVERSIZE },
+  { k: "comic15", label: 'US Comic +1.5 (10.32×15.75")', w: 2322, h: 3544, bleed: BLEED * OVERSIZE },
   { k: "manga",  label: "Manga B5 (1516×2150)",   w: 1516, h: 2150 },
   { k: "a4",     label: "A4 Portrait (1654×2339)", w: 1654, h: 2339 },
   { k: "square", label: "Square (2000×2000)",     w: 2000, h: 2000 },
