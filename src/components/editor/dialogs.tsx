@@ -192,13 +192,14 @@ export function renderTray(ed: EditorCtx) {
 
 /* context menu */
 export function renderContextMenu(ed: EditorCtx) {
-  const { ctxMenu, setCtxMenu, commit, pendingLockRef, setUserZoomed,
+  const { ctxMenu, setCtxMenu, commit, pendingLockRef, setUserZoomed, setStatus,
     setZoom, clipboardRef, setEditingId, panelImageTarget, filePanelImageRef } = ed;
   const page = ed.page!;
   if (!ctxMenu) return null;
     const el = page.els.find((e) => e.id === ctxMenu.id);
     if (!el) return null;
     const close = () => setCtxMenu(null);
+    const many = ed.selIds.length > 1;
     return (
       <>
         <div className="ctxBackdrop" onClick={close} onContextMenu={(e) => { e.preventDefault(); close(); }} />
@@ -234,8 +235,17 @@ export function renderContextMenu(ed: EditorCtx) {
           <button onClick={() => { setUserZoomed(true); setZoom((z) => clamp(z * 1.2, 0.05, 4)); close(); }}>Zoom In</button>
           <button onClick={() => { setUserZoomed(true); setZoom((z) => clamp(z / 1.2, 0.05, 4)); close(); }}>Zoom Out</button>
           <div className="ctxSep" />
-          <button disabled={el.locked} onClick={() => { el.locked = true; pendingLockRef.current.delete(el.id); commit(); close(); }}>Lock</button>
-          <button disabled={!el.locked} onClick={() => { el.locked = false; pendingLockRef.current.delete(el.id); commit(); close(); }}>Unlock</button>
+          {/* act on the whole selection, so "select all then lock" is one go */}
+          <button onClick={() => {
+            ed.mutateSel((x) => { x.locked = true; pendingLockRef.current.delete(x.id); });
+            setStatus(many ? `Locked ${ed.selIds.length} items.` : "Locked.");
+            close();
+          }}>{many ? `Lock ${ed.selIds.length} Items` : "Lock"}</button>
+          <button onClick={() => {
+            ed.mutateSel((x) => { x.locked = false; pendingLockRef.current.delete(x.id); });
+            setStatus(many ? `Unlocked ${ed.selIds.length} items.` : "Unlocked.");
+            close();
+          }}>{many ? `Unlock ${ed.selIds.length} Items` : "Unlock"}</button>
           <div className="ctxSep" />
           <button disabled={el.locked} onClick={() => { cutSel(ed); close(); }}>Cut</button>
           <button onClick={() => { copySel(ed); close(); }}>Copy</button>

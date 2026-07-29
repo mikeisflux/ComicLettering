@@ -33,8 +33,20 @@ export function renderEl(ed: EditorCtx, el: El) {
     "data-id": el.id,
     onPointerDown: (e: React.PointerEvent) => {
       if (editingId === el.id) return;
-      select(el.id);
-      if (!el.locked) startDrag(e, el, "move");
+      /* A right-click fires pointerdown first. Left alone it collapsed the
+         selection to one element before the context menu could open, so
+         "select all, right-click, lock" locked exactly one thing — and it
+         started a drag with the wrong button on the way. */
+      if (e.button === 2) {
+        if (!ed.selIds.includes(el.id)) select(el.id);
+        return;
+      }
+      /* ctrl/cmd (or shift) adds to the selection instead of replacing it */
+      const add = e.ctrlKey || e.metaKey || e.shiftKey;
+      select(el.id, add);
+      /* an additive click is picking, not dragging — starting a drag here
+         would nudge the set every time you add one more to it */
+      if (!el.locked && !add) startDrag(e, el, "move");
       else e.preventDefault();
     },
     onDoubleClick: () => {
@@ -44,7 +56,9 @@ export function renderEl(ed: EditorCtx, el: El) {
     },
     onContextMenu: (e: React.MouseEvent) => {
       e.preventDefault();
-      select(el.id);
+      /* right-clicking inside an existing multi-selection keeps it, so the
+         menu acts on everything you picked rather than throwing it away */
+      if (!ed.selIds.includes(el.id)) select(el.id);
       setCtxMenu({ x: e.clientX, y: e.clientY, id: el.id });
     },
   };
@@ -172,8 +186,30 @@ export function renderEl(ed: EditorCtx, el: El) {
 }
 
 export function renderOverlay(ed: EditorCtx) {
-  const { selEl, page, zoom, editingId, startDrag, warping, setWarping } = ed;
+  const { selEl, selEls, page, zoom, editingId, startDrag, warping, setWarping } = ed;
   if (!selEl || !page) return null;
+  /* With several picked, the extras get a plain outline and the primary keeps
+     the handles — you can only resize or rotate one thing at a time, but you
+     need to see everything that a move, lock or delete will reach. */
+  if (selEls.length > 1) {
+    return (
+      <>
+        {selEls.map((e) => {
+          const b = e.type === "balloon" ? resolveBalloon(page, e).el : e;
+          return (
+            <div key={e.id} className={"overlay multi" + (e.id === selEl.id ? " lead" : "")}
+              style={{
+                left: b.x * zoom, top: b.y * zoom, width: b.w * zoom, height: b.h * zoom,
+                transform: b.rot ? `rotate(${b.rot}deg)` : undefined,
+              }}>
+              <div className="box" />
+              {e.locked && <div className="lockBadge" title="Locked">🔒</div>}
+            </div>
+          );
+        })}
+      </>
+    );
+  }
   const el = selEl.type === "balloon" ? resolveBalloon(page, selEl).el : selEl;
   const z = zoom;
   if (el.locked) {

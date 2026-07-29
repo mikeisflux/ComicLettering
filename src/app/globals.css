@@ -366,6 +366,10 @@ input[type="range"] { width: 110px; }
 
 /* selection overlay */
 .overlay { position: absolute; pointer-events: none; z-index: 50; }
+/* extras in a multi-selection: visible, but clearly not the one the handles
+   belong to */
+.overlay.multi .box { border-style: dashed; border-width: 1.5px; opacity: .75; }
+.overlay.multi.lead .box { border-style: solid; opacity: 1; box-shadow: 0 0 0 1px #ffffff80; }
 .overlay .box { position: absolute; inset: 0; border: 1.5px solid var(--sel); }
 .overlay.editing .box { border-style: dashed; opacity: .5; }
 .handle {

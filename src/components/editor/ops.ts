@@ -80,16 +80,30 @@ export function resolveTailAsk(ed: EditorCtx, choice: "speech" | "thought" | "no
 }
 
 export function deleteSel(ed: EditorCtx) {
-  const { docRef, pageIndexRef, selId, setStatus, pendingLockRef, setSelId, commit } = ed;
+  const { docRef, pageIndexRef, selIds, setStatus, pendingLockRef, setSelId, commit } = ed;
   const d = docRef.current!;
   const p = d.pages[pageIndexRef.current];
-  const i = p.els.findIndex((x) => x.id === selId);
-  if (i < 0) return;
-  if (p.els[i].locked) { setStatus("This item is locked — right-click it to unlock before deleting."); return; }
-  pendingLockRef.current.delete(p.els[i].id);
-  p.els.splice(i, 1);
+  const doomed = p.els.filter((x) => selIds.includes(x.id));
+  if (!doomed.length) return;
+  const locked = doomed.filter((x) => x.locked).length;
+  const free = doomed.filter((x) => !x.locked);
+  if (!free.length) {
+    setStatus(doomed.length > 1
+      ? "Everything selected is locked — unlock before deleting."
+      : "This item is locked — right-click it to unlock before deleting.");
+    return;
+  }
+  for (const el of free) pendingLockRef.current.delete(el.id);
+  const gone = new Set(free.map((x) => x.id));
+  p.els = p.els.filter((x) => !gone.has(x.id));
   setSelId(null);
   commit();
+  if (locked) {
+    setStatus(`Deleted ${free.length} item${free.length > 1 ? "s" : ""}; `
+      + `${locked} locked one${locked > 1 ? "s were" : " was"} left alone.`);
+  } else if (free.length > 1) {
+    setStatus(`Deleted ${free.length} items.`);
+  }
 }
 
 export function duplicateSel(ed: EditorCtx) {
@@ -1098,43 +1112,6 @@ export async function fitToPage(ed: EditorCtx, fill: boolean) {
       ? `Page art placed full bleed — it runs ${((Math.max(w - page.w, h - page.h) / 2) / DPI).toFixed(2)}in past the page, so trim has something to cut into.`
       : "Page art placed full bleed."
     : "Page art fitted inside the page — nothing cropped.");
-}
-
-/* Bring every balloon and caption in the BOOK to one lettering size.
-
-   Changing the default only helps new work; a book already lettered at the
-   old size stays at the old size. This is the catch-up, and it is one undo
-   step so a wrong guess costs nothing.
-
-   Sound effects are left alone. They have no separate element type, but they
-   are unmistakable in practice: a plain text box carries no outline and a
-   flat fill, while lettering carries at least one of the two. Resizing every
-   KRAKOOM in a book to dialogue height would be vandalism. */
-export function normalizeLetteringSize(ed: EditorCtx, size = DEFAULT_TEXT_SIZE) {
-  const { docRef, commit, setStatus, rebuildThumbs } = ed;
-  const d = docRef.current;
-  if (!d) return;
-  let changed = 0, sfxLeft = 0, locked = 0;
-  for (const pg of d.pages) {
-    for (const el of pg.els) {
-      if (el.type !== "balloon" && el.type !== "text") continue;
-      if (el.type === "text" && (el.ts.outlineW > 0 || el.ts.fillB)) { sfxLeft++; continue; }
-      if (el.locked) { locked++; continue; }
-      if (el.ts.size === size) continue;
-      el.ts.size = size;
-      changed++;
-    }
-  }
-  if (!changed) {
-    setStatus(`Every balloon and caption is already at ${size}pt.`);
-    return;
-  }
-  commit();
-  rebuildThumbs();
-  setStatus(`${changed} balloon${changed > 1 ? "s" : ""} and caption${changed > 1 ? "s" : ""} set to ${size}pt`
-    + (sfxLeft ? `, ${sfxLeft} sound effect${sfxLeft > 1 ? "s" : ""} left alone` : "")
-    + (locked ? `, ${locked} locked and skipped` : "")
-    + " — Ctrl+Z undoes the lot.");
 }
 
 /* ---------------- project library (SQL) ---------------- */

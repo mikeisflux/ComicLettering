@@ -16,8 +16,7 @@ import {
   addFromTray, alignSel, applyQuickFill, applyQuickStroke, balanceRag,
   copySel, copyStyle, cutSel, deleteCustomFont, deleteSel, duplicatePage,
   duplicateSel, exportJSON, fitBalloonToText, pasteClip, pasteStyle,
-  normalizeLetteringSize, printPage, reorder, rotateSel, runInstantAlpha,
-  runProof, saveProject,
+  printPage, reorder, rotateSel, runInstantAlpha, runProof, saveProject,
 } from "./ops";
 
 
@@ -99,8 +98,7 @@ export function renderMenuBar(ed: EditorCtx) {
         ["—", null],
         ["Bigger", () => mutateSel<BalloonEl | TextEl>((x) => { if (x.ts) x.ts.size = clamp(Math.round(x.ts.size * 1.12), 8, 800); })],
         ["Smaller", () => mutateSel<BalloonEl | TextEl>((x) => { if (x.ts) x.ts.size = clamp(Math.round(x.ts.size / 1.12), 8, 800); })],
-        ["—", null],
-        [`Set All Balloons & Captions to ${DEFAULT_TEXT_SIZE}pt`, () => normalizeLetteringSize(ed)],
+
       ]],
       ["Arrange", [
         ["Bring Forward", () => reorder(ed, 1)], ["Bring To Front", () => reorder(ed, 1e9)],
@@ -124,7 +122,37 @@ export function renderMenuBar(ed: EditorCtx) {
         ["Unlock", () => mutateSel((x) => { x.locked = false; })],
       ]],
       ["Help", [
-        ["Keyboard Shortcuts", () => window.alert("B/T/L/P — add balloon/text/lettering/panel\nCtrl+Z / Ctrl+Y — undo / redo\nCtrl+C/X/V/D — copy / cut / paste / duplicate\nCtrl+S — save · Ctrl+[ / Ctrl+] — center H / V\nShift while resizing — keep proportions\nShift while rotating — snap 15° · Alt while dragging — no snapping\nDouble-click — edit text · while editing, Ctrl+B / Ctrl+I bold/italic the selected words\nRight-click — full menu")],
+        ["Keyboard Shortcuts", () => window.alert([
+          "SELECTING",
+          "  Ctrl+A  select everything on the page      Ctrl+Shift+A  deselect",
+          "  Ctrl+click  add or remove one              Tab / Shift+Tab  step through",
+          "  Esc  deselect, or finish editing text",
+          "",
+          "ADDING",
+          "  B  balloon    T  text    L  lettering    P  panel",
+          "",
+          "EDITING",
+          "  Ctrl+Z / Ctrl+Y  undo / redo               Ctrl+D  duplicate",
+          "  Ctrl+C / X / V  copy / cut / paste         Del  delete",
+          "  Arrows  nudge (Shift = 10x)                Ctrl+F  find & replace",
+          "  Ctrl+L  lock                               Ctrl+Shift+L  unlock",
+          "  Ctrl+[ / Ctrl+]  centre across / down",
+          "  Ctrl+Shift+[ / ]  send to back / bring to front",
+          "",
+          "WHILE DRAGGING",
+          "  Shift  keep proportions resizing, snap 15\u00b0 rotating",
+          "  Alt  ignore snapping",
+          "",
+          "TEXT",
+          "  Double-click to edit \u00b7 Ctrl+B / Ctrl+I bold or italic the selected words",
+          "",
+          "PAGES & VIEW",
+          "  PageUp / PageDown  previous / next page    Ctrl+Shift+N  duplicate page",
+          "  Ctrl+= / Ctrl+-  zoom                      Ctrl+0  fit page",
+          "",
+          "FILE",
+          "  Ctrl+S  save    Ctrl+Shift+S  save as    Ctrl+E  export    Ctrl+P  print",
+        ].join("\n"))],
         ["FAQ & Support", () => window.open("/faq", "_blank")],
       ]],
     ] as [string, ([string, (() => void) | null])[]][]).map(([name, items]) => (

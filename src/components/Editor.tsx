@@ -36,8 +36,8 @@ import {
   addFromTray, alignSel, applyQuickFill, assignImageToPanel, copySel, cutSel, deleteSel,
   duplicatePage, duplicateSel, growBalloonToFit, importFontFiles, importImageFile, importJSON,
   sizeTextToContent,
-  importStampFiles, movePage, nextAid, onDrop, pasteClip, readAsDataURL,
-  refreshProjects, saveProject,
+  fitBalloonToText, importStampFiles, movePage, nextAid, onDrop, pasteClip,
+  printPage, readAsDataURL, refreshProjects, reorder, saveProject,
 } from "./editor/ops";
 import { renderEl, renderOverlay } from "./editor/renderEls";
 import { renderInspector } from "./editor/inspector";
@@ -71,6 +71,10 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     copySel: () => void; cutSel: () => void; pasteClip: () => void;
     alignSel: (m: "left" | "hcenter" | "right" | "top" | "vcenter" | "bottom") => void;
     addFromTray: (k: string) => void; deleteSel: () => void;
+    setLocked: (v: boolean) => void;
+    finishEditing: () => void; reorder: (d: number) => void;
+    fitBalloonToText: () => void; printPage: () => void;
+    duplicatePage: () => void;
   }>(null as never);
   /* re-seed the asset id counter from whatever assets are loaded — MUST run
      after any wholesale assets replacement (boot, project load, JSON import)
@@ -102,7 +106,22 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
 
   const [mounted, setMounted] = useState(false);
   const [pageIndex, setPageIndex] = useState(0);
-  const [selId, setSelId] = useState<string | null>(null);
+  /* Selection is a SET. `selId` is the primary — the last one touched — and
+     the format bar and inspector still speak to that one, because "what font
+     is this" has no answer for five things at once. Everything that can act
+     on many (move, nudge, lock, delete, style) acts on the whole set. */
+  const [selIds, setSelIds] = useState<string[]>([]);
+  const selId = selIds.length ? selIds[selIds.length - 1] : null;
+  const selIdsRef = useRef<string[]>([]);
+  useEffect(() => { selIdsRef.current = selIds; }, [selIds]);
+  /* keeps every existing single-selection caller working unchanged */
+  const setSelId = useCallback<React.Dispatch<React.SetStateAction<string | null>>>((v) => {
+    setSelIds((prev) => {
+      const cur = prev.length ? prev[prev.length - 1] : null;
+      const next = typeof v === "function" ? (v as (p: string | null) => string | null)(cur) : v;
+      return next ? [next] : [];
+    });
+  }, []);
   const [editingId, setEditingId] = useState<string | null>(null);
   const editingIdRef = useRef<string | null>(null);
   const [zoom, setZoom] = useState(0.35);
@@ -301,6 +320,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const doc = docRef.current;
   const page: Page | null = doc ? doc.pages[Math.min(pageIndex, doc.pages.length - 1)] : null;
   const selEl: El | null = page?.els.find((e) => e.id === selId) || null;
+  const selEls: El[] = page ? page.els.filter((e) => selIds.includes(e.id)) : [];
 
   const styleTab: StyleTab =
     pinnedTab && pinnedTab.id === selId
@@ -554,13 +574,30 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
 
   /* ---------------- selection / editing ---------------- */
 
-  const select = useCallback((id: string | null) => {
-    setSelId(id);
+  const select = useCallback((id: string | null, additive = false) => {
     setCtxMenu(null);
     settlePendingLock(id);
     if (editingId && editingId !== id) finishEditing();
+    if (!id) { setSelIds([]); return; }
+    setSelIds((prev) => {
+      if (!additive) return [id];
+      /* ctrl-clicking something already picked takes it back out again */
+      return prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingId, settlePendingLock]);
+
+  const selectAllOnPage = useCallback(() => {
+    const p = docRef.current?.pages[pageIndexRef.current];
+    if (!p) return;
+    setCtxMenu(null);
+    if (editingIdRef.current) keyFnsRef.current.finishEditing?.();
+    setSelIds(p.els.map((e) => e.id));
+    setStatus(p.els.length
+      ? `${p.els.length} item${p.els.length > 1 ? "s" : ""} selected — right-click to lock, or drag to move them together.`
+      : "Nothing on this page yet.");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setStatus]);
 
   /* Pull whatever is currently in the editable node into the model. Shared by
      the blur/Escape commit and by the as-you-type autosave, so an unfinished
@@ -659,6 +696,18 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     e.stopPropagation();
     const start = pagePoint(e);
     const orig = JSON.parse(JSON.stringify(el)) as El;
+    /* Everything else in the selection travels with the one being dragged.
+       Their starting corners are captured up front so the delta is always
+       measured from where the drag began, not from the last frame. */
+    const convoy = mode === "move"
+      ? selIdsRef.current
+          .filter((id) => id !== el.id)
+          .map((id) => {
+            const o = docRef.current!.pages[pageIndexRef.current].els.find((x) => x.id === id);
+            return o && !o.locked ? { id, x0: o.x, y0: o.y } : null;
+          })
+          .filter(Boolean) as { id: string; x0: number; y0: number }[]
+      : [];
     let moved = false;
     const onMove = (ev: PointerEvent) => {
       const d = docRef.current!;
@@ -732,6 +781,15 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
         }
         cur.x = nx;
         cur.y = ny;
+        /* the rest of the selection travels the same distance, after snapping,
+           so a group keeps its internal spacing exactly */
+        if (convoy.length) {
+          const sx = nx - orig.x, sy = ny - orig.y;
+          for (const o of convoy) {
+            const oe = p.els.find((x) => x.id === o.id);
+            if (oe) { oe.x = o.x0 + sx; oe.y = o.y0 + sy; }
+          }
+        }
         /* joined balloons that melt together drop their connector bend, so
            separating again starts with a clean straight band */
         if (cur.type === "balloon") {
@@ -1051,8 +1109,56 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       if (mod && e.key.toLowerCase() === "c") { e.preventDefault(); fns.copySel(); return; }
       if (mod && e.key.toLowerCase() === "x") { e.preventDefault(); fns.cutSel(); return; }
       if (mod && e.key.toLowerCase() === "v") { e.preventDefault(); fns.pasteClip(); return; }
-      if (mod && e.key === "[") { e.preventDefault(); fns.alignSel("hcenter"); return; }
-      if (mod && e.key === "]") { e.preventDefault(); fns.alignSel("vcenter"); return; }
+      if (mod && e.key === "[" && !e.shiftKey) { e.preventDefault(); fns.alignSel("hcenter"); return; }
+      if (mod && e.key === "]" && !e.shiftKey) { e.preventDefault(); fns.alignSel("vcenter"); return; }
+      /* selection */
+      if (mod && e.key.toLowerCase() === "a") {
+        e.preventDefault();
+        if (e.shiftKey) setSelId(null); else selectAllOnPage();
+        return;
+      }
+      /* stacking order — Shift with the bracket keys, as everywhere else */
+      if (mod && e.shiftKey && (e.key === "]" || e.key === "}")) { e.preventDefault(); fns.reorder(1e9); return; }
+      if (mod && e.shiftKey && (e.key === "[" || e.key === "{")) { e.preventDefault(); fns.reorder(-1e9); return; }
+      if (mod && !e.shiftKey && e.key.toLowerCase() === "l") {
+        e.preventDefault(); fns.setLocked(true);
+        setStatus("Locked. Ctrl+Shift+L unlocks."); return;
+      }
+      if (mod && e.shiftKey && e.key.toLowerCase() === "l") {
+        e.preventDefault(); fns.setLocked(false);
+        setStatus("Unlocked."); return;
+      }
+      /* view */
+      if (mod && (e.key === "=" || e.key === "+")) { e.preventDefault(); setUserZoomed(true); setZoom((z) => clamp(z * 1.2, 0.05, 4)); return; }
+      if (mod && e.key === "-") { e.preventDefault(); setUserZoomed(true); setZoom((z) => clamp(z / 1.2, 0.05, 4)); return; }
+      if (mod && e.key === "0") { e.preventDefault(); setUserZoomed(false); fitZoom(true); return; }
+      /* document */
+      if (mod && e.shiftKey && e.key.toLowerCase() === "s") { e.preventDefault(); fns.saveProject(true); return; }
+      if (mod && e.key.toLowerCase() === "f") { e.preventDefault(); setShowFind(true); return; }
+      if (mod && e.key.toLowerCase() === "p") { e.preventDefault(); fns.printPage(); return; }
+      if (mod && e.key.toLowerCase() === "e") { e.preventDefault(); if (!demo) setShowExport(true); return; }
+      if (mod && e.shiftKey && e.key.toLowerCase() === "n") { e.preventDefault(); fns.duplicatePage(); return; }
+      /* page navigation */
+      if (!mod && (e.key === "PageDown" || e.key === "PageUp")) {
+        e.preventDefault();
+        const n = docRef.current!.pages.length;
+        setPageIndex((i) => clamp(e.key === "PageDown" ? i + 1 : i - 1, 0, n - 1));
+        setSelId(null);
+        return;
+      }
+      /* step through what is on the page — faster than hunting with the mouse
+         for something buried under artwork */
+      if (!mod && e.key === "Tab") {
+        e.preventDefault();
+        const els = docRef.current!.pages[pageIndexRef.current].els;
+        if (!els.length) return;
+        const at = els.findIndex((x) => x.id === selId);
+        const next = e.shiftKey
+          ? (at <= 0 ? els.length - 1 : at - 1)
+          : (at < 0 || at === els.length - 1 ? 0 : at + 1);
+        select(els[next].id);
+        return;
+      }
       /* letterer hotkeys: B balloon, T text, L lettering, P panel */
       if (!mod && !e.altKey) {
         const k = e.key.toLowerCase();
@@ -1066,14 +1172,21 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       const el = p.els.find((x) => x.id === selId);
       if (!el) return;
       if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); fns.deleteSel(); return; }
-      if (el.locked) return;
       const step = e.shiftKey ? 10 : 2;
       const dxy: Record<string, [number, number]> = {
         ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step],
       };
       if (dxy[e.key]) {
         e.preventDefault();
-        el.x += dxy[e.key][0]; el.y += dxy[e.key][1];
+        /* nudges the whole selection, skipping anything locked */
+        let any = false;
+        for (const id of selIdsRef.current) {
+          const t2 = p.els.find((x) => x.id === id);
+          if (!t2 || t2.locked) continue;
+          t2.x += dxy[e.key][0]; t2.y += dxy[e.key][1];
+          any = true;
+        }
+        if (!any) return;
         force();
         if (thumbTimer.current) clearTimeout(thumbTimer.current);
         thumbTimer.current = setTimeout(commit, 400);
@@ -1086,14 +1199,23 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
 
   /* ---------------- element ops ---------------- */
 
+  /* Applies to every selected element, so one edit reaches the whole set.
+     Callers that only make sense for lettering guard on `el.ts` themselves —
+     a selection can hold a panel and a balloon at once. */
   const mutateSel = useCallback(<T extends El>(fn: (el: T) => void, final = true) => {
     const d = docRef.current!;
     const p = d.pages[pageIndexRef.current];
-    const el = p.els.find((x) => x.id === selId) as T | undefined;
-    if (!el) return;
-    fn(el);
+    const ids = selIdsRef.current;
+    let hit = 0;
+    for (const id of ids) {
+      const el = p.els.find((x) => x.id === id) as T | undefined;
+      if (!el) continue;
+      fn(el);
+      hit++;
+    }
+    if (!hit) return;
     if (final) commit(); else force();
-  }, [selId, commit]);
+  }, [commit]);
 
   const clipboardRef = useRef<El | null>(null);
 
@@ -1183,13 +1305,14 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
      These are plain function calls (not component boundaries), so React
      reconciliation output is byte-for-byte what the inline closures made. */
   const ed: EditorCtx = {
-    demo, doc, page, selId, selEl, editingId, zoom, status, pageIndex,
+    demo, doc, page, selId, selIds, selEl, selEls, editingId, zoom, status, pageIndex,
     docRef, assetsRef, histRef, hIndexRef, pageIndexRef, pendingLockRef,
     panelImageTarget, aidRef, activeStyleRef, styleClipRef, clipboardRef,
     customFontIdsRef, fileImageRef, filePanelImageRef, fileOpenRef,
     fileFontRef, fileStampRef,
     force, commit, autosave, undo, redo, setStatus, select, setSelId,
     setEditingId, finishEditing, mutateSel, startDrag, pagePoint, fitZoom, startTuck,
+    selectAllOnPage,
     tuckAsk, setTuckAsk, retuneTuck, runTuckAuto, applyTuck,
     autosaveSoon,
     rebuildThumbs, reseedAids, setThumbs, setPageIndex, setUserZoomed,
@@ -1223,6 +1346,12 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     alignSel: (m) => alignSel(ed, m),
     addFromTray: (k) => addFromTray(ed, k),
     deleteSel: () => deleteSel(ed),
+    setLocked: (v) => mutateSel((x) => { x.locked = v; }),
+    finishEditing: () => finishEditing(),
+    reorder: (dir) => reorder(ed, dir),
+    fitBalloonToText: () => fitBalloonToText(ed),
+    printPage: () => printPage(ed),
+    duplicatePage: () => duplicatePage(ed),
   };
 
   useEffect(() => {

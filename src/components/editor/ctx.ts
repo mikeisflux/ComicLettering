@@ -20,8 +20,10 @@ export interface EditorCtx {
   /* current document / selection (per render) */
   doc: Doc | null;
   page: Page | null;
-  selId: string | null;
+  selId: string | null;      // the primary — what the format bar speaks to
+  selIds: string[];          // everything picked, primary last
   selEl: El | null;
+  selEls: El[];
   editingId: string | null;
   zoom: number;
   status: string;
@@ -74,7 +76,8 @@ export interface EditorCtx {
   setActiveStyle: (name: string) => void;
   activeShape: { balloon: string; box: string };
   setActiveShape: (tab: "balloon" | "box", name: string) => void;
-  select: (id: string | null) => void;
+  select: (id: string | null, additive?: boolean) => void;
+  selectAllOnPage: () => void;
   setSelId: SetState<string | null>;
   setEditingId: SetState<string | null>;
   finishEditing: () => void;
