@@ -512,14 +512,17 @@ function drawEl(ctx: CanvasRenderingContext2D, el: El, assets: Assets, merge?: M
       ctx.rotate(deg2rad(merge.rot));
       ctx.translate(-merge.bw / 2, -merge.bh / 2);
       const mPath = new Path2D(merge.d);
-      ctx.fillStyle = merge.color;
-      ctx.fill(mPath);
-      /* far-apart joined partner keeps its outline over the band */
+      /* Apart (strokeW set): redraw the partner's OUTLINE over the band only.
+         Filling it would paint over the partner's own text — the editor does
+         the same (see BalloonShape). Overlapping: fill to union the blobs. */
       if (merge.strokeW) {
         ctx.strokeStyle = merge.stroke!;
         ctx.lineWidth = merge.strokeW;
         ctx.lineJoin = "round";
         ctx.stroke(mPath);
+      } else {
+        ctx.fillStyle = merge.color;
+        ctx.fill(mPath);
       }
       ctx.restore();
     } else if (el.strokeW > 0 && !g.noStroke) {

@@ -427,6 +427,14 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const pageIndexRef = useRef(0);
   useEffect(() => { pageIndexRef.current = pageIndex; }, [pageIndex]);
   useEffect(() => { commitRef.current = commit; }, [commit]);
+
+  /* Is a blocking modal up? Read as a ref by the global key handler, which
+     deliberately does not resubscribe on every state change. */
+  const modalOpenRef = useRef(false);
+  useEffect(() => {
+    modalOpenRef.current =
+      showSetup || showExport || showFind || showScript || showGradMaker || !!tuckAsk || !!tailAsk;
+  }, [showSetup, showExport, showFind, showScript, showGradMaker, tuckAsk, tailAsk]);
   useEffect(() => { editingIdRef.current = editingId; }, [editingId]);
   useEffect(() => { currentRef.current = current; }, [current]);
 
@@ -1099,6 +1107,12 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
         return;
       }
       if (inField) return;
+      /* A modal is open (Export, Find, Script, Page Setup, gradient maker,
+         the tuck dialog, the tail chooser). Its own inputs are covered by
+         `inField` above, but with focus on the backdrop the canvas
+         shortcuts below would still fire — Delete would remove the element
+         behind the dialog, B/T/L/P would add one. Block them. */
+      if (modalOpenRef.current) return;
       /* call through keyFnsRef so shortcuts always see the CURRENT render's
          closures — the effect deliberately doesn't resubscribe every render,
          and stale closures here caused Ctrl+S to re-create projects and
@@ -1152,6 +1166,9 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       /* step through what is on the page — faster than hunting with the mouse
          for something buried under artwork */
       if (!mod && e.key === "Tab") {
+        /* only cycle page elements when focus is loose on the canvas — if a
+           toolbar button or link has focus, leave Tab to move between them */
+        if (t.closest("button, a, select, [tabindex]")) return;
         e.preventDefault();
         const els = docRef.current!.pages[pageIndexRef.current].els;
         if (!els.length) return;

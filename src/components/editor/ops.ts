@@ -1230,9 +1230,14 @@ export function portableAssets(assets: Assets): { assets: Assets; local: number 
   return { assets: out, local };
 }
 
+/* Guards against a second save starting before the first returns — Ctrl+S
+   held or double-clicked would otherwise POST twice and create two projects. */
+let saveInFlight = false;
+
 export async function saveProject(ed: EditorCtx, saveAs: boolean) {
   const { demo, setStatus, current, setCurrent, docRef, assetsRef } = ed;
   if (demo) { setStatus("Saving is off in the demo — subscribe to save your comics to your library."); return; }
+  if (saveInFlight) return;
   const d = docRef.current!;
   let target = current;
   let name = current?.name;
@@ -1243,6 +1248,7 @@ export async function saveProject(ed: EditorCtx, saveAs: boolean) {
     target = null;
   }
   setStatus("Saving to library…");
+  saveInFlight = true;
   try {
     let thumbnail = "";
     try { thumbnail = await docThumbnail(d, assetsRef.current); } catch { /* optional */ }
@@ -1260,6 +1266,8 @@ export async function saveProject(ed: EditorCtx, saveAs: boolean) {
     refreshProjects(ed);
   } catch (err) {
     setStatus("Save failed: " + String(err).slice(0, 120));
+  } finally {
+    saveInFlight = false;
   }
 }
 

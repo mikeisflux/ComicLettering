@@ -56,11 +56,18 @@ export function BalloonShape({ el, mergeBase, imgSrc }: { el: BalloonEl; mergeBa
       )}
       {mergeBase && (
         <g transform={mergeBase.tf}>
-          <path d={mergeBase.d} fill={mergeBase.color} />
-          {/* far-apart joined partner: redraw its outline over the band */}
+          {/* mergeBase.strokeW is set only when the two balloons are APART.
+              Apart: redraw the partner's OUTLINE over the band so the band
+              tucks under it — but do NOT re-fill the partner. This child SVG
+              sits above the partner, so a filled copy would paint over the
+              partner's own text (that is the "Add Bubble emptied my bubble"
+              bug). Overlapping: no stroke, fill the partner to union the
+              two blobs into one melted shape. */}
           {mergeBase.strokeW ? (
             <path d={mergeBase.d} fill="none" stroke={mergeBase.stroke} strokeWidth={mergeBase.strokeW} strokeLinejoin="round" />
-          ) : null}
+          ) : (
+            <path d={mergeBase.d} fill={mergeBase.color} />
+          )}
         </g>
       )}
       {/* open connector band: fill covers both outlines at the junctions,
