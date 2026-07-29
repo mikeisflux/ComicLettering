@@ -488,7 +488,16 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     if (!want.length) return;
     const got = await ensureArt(want);
     if (!got.length) return;
-    for (const id of got) assetsRef.current[id] = artUrl(id)!;
+    /* the store can be cleared out from under this await (loading another
+       project calls releaseAllArt), leaving artUrl undefined — never write
+       an undefined src, and skip ids the current doc no longer references */
+    const live = new Set(artIdsOnPage(pageIndexRef.current));
+    let any = false;
+    for (const id of got) {
+      const url = artUrl(id);
+      if (url && live.has(id)) { assetsRef.current[id] = url; any = true; }
+    }
+    if (!any) return;
     force();
     scheduleThumb(pi);
   }, [artIdsOnPage, scheduleThumb]);

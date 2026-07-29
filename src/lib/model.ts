@@ -353,7 +353,10 @@ export function resolveBalloon(page: Page, el: BalloonEl): { el: BalloonEl; base
     return { el, base: null };
   }
 
-  const base = page.els.find((e) => e.id === el.attachTo && e.type === "balloon") as BalloonEl | undefined;
+  /* a balloon can only attach to a DIFFERENT balloon; a self-reference (from
+     a corrupt import or a future bug) would resolve to a degenerate self-merge */
+  const base = el.attachTo === el.id ? undefined
+    : page.els.find((e) => e.id === el.attachTo && e.type === "balloon") as BalloonEl | undefined;
   if (!base) return { el: { ...el, attachTo: null }, base: null };
 
   /* overlapping → melt into one shape: no connector, fills union */

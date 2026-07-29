@@ -159,7 +159,10 @@ export function makeCutoutFromPath(
   ctx.globalCompositeOperation = "source-in";
   ctx.drawImage(s.img, m.sx, m.sy, m.sw, m.sh, 0, 0, pxW, pxH);
   ctx.globalCompositeOperation = "source-over";
-  return { url: cv.toDataURL("image/png"), pxW, pxH };
+  /* a cross-origin source taints the canvas and toDataURL throws — match
+     makeCutoutFromMask and fail soft rather than crash the dialog */
+  try { return { url: cv.toDataURL("image/png"), pxW, pxH }; }
+  catch { return null; }
 }
 
 /* Build the transparent foreground cutout for a region.
