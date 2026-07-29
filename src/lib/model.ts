@@ -400,6 +400,12 @@ export interface Page {
 /* Pixels per inch used across rulers, paper sizes and Page Setup. */
 export const DPI = 225;
 
+/* Default size for dialogue and caption lettering, in page units. At 225dpi
+   this is a hair under an eighth of an inch — the size hand lettering has
+   been set at for decades, and small enough that a balloon reads as a
+   balloon rather than a poster. Sound effects set their own, far larger. */
+export const DEFAULT_TEXT_SIZE = 24;
+
 /* Standard US comic page, quoted the way printers quote it: the full-bleed
    sheet, an eighth of an inch of bleed on each edge, so the trim is
    6.63 × 10.25in. Art runs to the page edge; the blade lands on the trim. */
@@ -895,7 +901,7 @@ export function reseedIds(doc: Doc) {
 }
 
 export const defaultTextStyle = (over: Partial<TextStyle> = {}): TextStyle => ({
-  font: "lmccasual", size: 42, bold: false, italic: false, caps: false,
+  font: "lmccasual", size: DEFAULT_TEXT_SIZE, bold: false, italic: false, caps: false,
   lineHeight: 1.05,
   align: "center", fillA: "#111111", fillB: null,
   outlineC: "#111111", outlineW: 0, shadow: false, shadowC: "#00000088",
@@ -947,7 +953,7 @@ export function makeText(x: number, y: number, w: number, h: number, sfx: boolea
     text: sfx ? "POW!" : "Abc",
     ts: sfx
       ? defaultTextStyle({ font: "bangers", size: 140, fillA: "#ffd21f", fillB: "#ff7a00", outlineC: "#111111", outlineW: 16, shadow: true })
-      : defaultTextStyle({ font: "lmccasual", size: 60 }),
+      : defaultTextStyle({ font: "lmccasual" }),
   };
 }
 

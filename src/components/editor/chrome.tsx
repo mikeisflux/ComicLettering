@@ -61,6 +61,53 @@ export function Ruler({ length, zoom, vertical, offset = 0, hi }: {
 export const STAGE_MX = 40;
 export const STAGE_MY = 26;
 
+/* A number field you can actually type in.
+
+   The obvious version — value straight from the model, clamp on every
+   change — is unusable for any number whose first digit is below the
+   minimum. Typing "24" into a field with a minimum of 8 goes: "2" clamps to
+   8, the field now reads 8, the "4" lands after it, and you get 84. The only
+   way through was to type a big number and backspace it.
+
+   So: while the field has focus you are editing text, not a number. Values
+   are pushed through live once they are legal on their own, and what you
+   leave behind is clamped on blur or Enter. Escape puts it back. */
+export function NumField({ value, min, max, disabled, width, title, onCommit }: {
+  value: number; min: number; max: number;
+  disabled?: boolean; width?: number; title?: string;
+  onCommit: (n: number) => void;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+
+  const settle = (raw: string | null) => {
+    const n = parseInt(raw ?? "", 10);
+    if (!isNaN(n)) onCommit(clamp(n, min, max));
+    setDraft(null);
+  };
+
+  return (
+    <input
+      type="number" min={min} max={max} disabled={disabled} title={title}
+      style={{ width: width ?? 56 }}
+      value={draft ?? String(value)}
+      onFocus={(e) => { setDraft(String(value)); e.currentTarget.select(); }}
+      onChange={(e) => {
+        const t = e.target.value;
+        setDraft(t);
+        /* live-update only while the typed number already stands on its own;
+           a half-typed one waits for blur rather than being clamped */
+        const n = parseInt(t, 10);
+        if (t !== "" && !isNaN(n) && n >= min && n <= max) onCommit(n);
+      }}
+      onBlur={() => settle(draft)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") { settle(draft); e.currentTarget.blur(); }
+        else if (e.key === "Escape") { setDraft(null); e.currentTarget.blur(); }
+      }}
+    />
+  );
+}
+
 /* ---------------- toolbar / tray buttons ---------------- */
 
 export function ToolBtn({ label, icon, onClick, disabled, accent, title }: {

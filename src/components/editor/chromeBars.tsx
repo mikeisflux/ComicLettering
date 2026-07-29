@@ -1,11 +1,11 @@
 /* Top chrome: menu bar, toolbar and format bar.
    Plain exported render functions taking the EditorCtx bag. */
 import {
-  BalloonEl, COLOR_PALETTE, FONTS, GRADIENT_PRESETS, MULTI_GRADIENTS,
-  TextEl, clamp, newPage, reseedIds, starterDoc,
+  BalloonEl, COLOR_PALETTE, DEFAULT_TEXT_SIZE, FONTS, GRADIENT_PRESETS,
+  MULTI_GRADIENTS, TextEl, clamp, newPage, reseedIds, starterDoc,
 } from "@/lib/model";
 import { fillCss } from "@/lib/fills";
-import { ToolBtn } from "./chrome";
+import { NumField, ToolBtn } from "./chrome";
 import { FontMenu, SubtypeSelect, tsVariant } from "./FontMenu";
 import { clearArt, releaseAllArt } from "@/lib/assetStore";
 import { gradCss } from "./GradientMaker";
@@ -216,16 +216,15 @@ export function renderFormatBar(ed: EditorCtx) {
   return (
   <div className="formatBar">
     <span className="fbLabel">Stroke:</span>
-    <input type="number" min={0} max={80} disabled={!selEl}
+    <NumField min={0} max={80} width={48} disabled={!selEl} title="Outline / border width"
       value={selEl?.type === "balloon" ? selEl.strokeW
         : selEl?.type === "panel" || selEl?.type === "image" ? selEl.borderW
         : selEl?.type === "text" ? selEl.ts.outlineW : 0}
-      onChange={(e) => mutateSel((x) => {
-        const v = clamp(+e.target.value || 0, 0, 80);
+      onCommit={(v) => mutateSel((x) => {
         if (x.type === "balloon") x.strokeW = v;
         else if (x.type === "panel" || x.type === "image") x.borderW = v;
         else if (x.type === "text") x.ts.outlineW = v;
-      })} style={{ width: 48 }} />
+      })} />
     <div style={{ position: "relative" }}>
       <button className="fillSwatch" title="Stroke / outline color"
         style={{
@@ -327,8 +326,9 @@ export function renderFormatBar(ed: EditorCtx) {
       })} />
     <SubtypeSelect ts={selTs}
       onSet={(bold, italic) => mutateSel<BalloonEl | TextEl>((x) => { x.ts.bold = bold; x.ts.italic = italic; })} />
-    <input type="number" min={8} max={800} disabled={!selTs} value={selTs?.size || 42} style={{ width: 56 }}
-      onChange={(e) => mutateSel<BalloonEl | TextEl>((x) => { x.ts.size = clamp(+e.target.value || 8, 8, 800); })} />
+    <NumField min={8} max={800} width={56} disabled={!selTs} title="Font size"
+      value={selTs?.size ?? DEFAULT_TEXT_SIZE}
+      onCommit={(v) => mutateSel<BalloonEl | TextEl>((x) => { x.ts.size = v; })} />
     <div style={{ position: "relative" }}>
       <button className="fillSwatch" title="Text color" disabled={!selTs}
         style={{ background: selTs?.fillA || "#111111", width: 28 }}
