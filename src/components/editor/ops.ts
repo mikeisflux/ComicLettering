@@ -14,8 +14,10 @@ import {
   artIdTaken, artUrl, clearArt, ensureArt, fmtBytes, holdArt, noteArtId, putArt,
   releaseAllArt, requestPersistence, storageEstimate,
 } from "@/lib/assetStore";
-import { LETTER_STYLES, applyLetterStyle } from "@/lib/presets";
-import { BALLOON_STYLES, BOX_STYLES, applyShapeStyle } from "@/lib/balloonStyles";
+import { LETTER_STYLES, applyLetterStyle, captureLetterStyle } from "@/lib/presets";
+import {
+  BALLOON_STYLES, BOX_STYLES, ShapeStyle, applyShapeStyle, captureShapeStyle,
+} from "@/lib/balloonStyles";
 import {
   ImageFormat, docThumbnail, exportPageImage, exportPagePNG, loadImage,
 } from "@/lib/exportPng";
@@ -198,6 +200,32 @@ export function pasteClip(ed: EditorCtx) {
   pendingLockRef.current.add(copy.id);
   commit();
   setSelId(copy.id);
+}
+
+/* Cut/Copy/Paste mean two different things depending on where you are.
+
+   Typing inside a balloon, they mean the WORDS. The keyboard already gets
+   this right — the shortcut handler steps aside for an editable — but the
+   menus called the element ops regardless, so right-click → Copy while
+   editing copied the whole balloon, and Paste dropped a duplicate balloon on
+   top of the one you were typing in. */
+export async function clipboardText(ed: EditorCtx, mode: "cut" | "copy" | "paste") {
+  const { setStatus } = ed;
+  if (mode === "paste") {
+    try {
+      const t = await navigator.clipboard.readText();
+      if (!t) { setStatus("Nothing on the clipboard."); return; }
+      document.execCommand("insertText", false, t);
+    } catch {
+      /* reading the clipboard from a menu is blocked in some browsers; the
+         keystroke is never blocked */
+      setStatus("This browser won't let a menu read the clipboard — press Ctrl+V.");
+    }
+    return;
+  }
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed) { setStatus("Select the words you want first."); return; }
+  document.execCommand(mode);
 }
 
 export function rotateSel(ed: EditorCtx, delta: number) {
@@ -1112,6 +1140,59 @@ export async function fitToPage(ed: EditorCtx, fill: boolean) {
       ? `Page art placed full bleed — it runs ${((Math.max(w - page.w, h - page.h) / 2) / DPI).toFixed(2)}in past the page, so trim has something to cut into.`
       : "Page art placed full bleed."
     : "Page art fitted inside the page — nothing cropped.");
+}
+
+/* Save the look of the selected balloon or lettering as a reusable style,
+   stored in the document so it belongs to this book and survives a refresh.
+   Balloons file under Balloon or Box depending on their shape; lettering and
+   sound effects file under Text. */
+export function saveStyleFromSelection(ed: EditorCtx) {
+  const { docRef, page, selId, setStatus, commit, setStyleTab } = ed;
+  const el = page?.els.find((x) => x.id === selId);
+  const d = docRef.current;
+  if (!el || !d) return;
+  if (el.type !== "balloon" && el.type !== "text") {
+    setStatus("Only balloons, caption boxes and lettering have a style to save.");
+    return;
+  }
+  const existing = d.styles ?? (d.styles = {});
+  const isBox = el.type === "balloon" && TAILLESS_KINDS.includes((el as BalloonEl).kind);
+  const bucket = el.type === "text" ? "letters" : "shapes";
+  const list = (existing[bucket] ??= []) as { name: string }[];
+  const stem = el.type === "text" ? "My Lettering" : isBox ? "My Box" : "My Balloon";
+  /* names have to be unique — the panel keys and matches swatches by name */
+  let name = stem, n = 1;
+  const taken = new Set([
+    ...((existing.shapes ?? []) as { name: string }[]).map((x) => x.name),
+    ...((existing.letters ?? []) as { name: string }[]).map((x) => x.name),
+    ...BALLOON_STYLES.map((x) => x.name), ...BOX_STYLES.map((x) => x.name),
+    ...LETTER_STYLES.map((x) => x.name),
+  ]);
+  while (taken.has(name)) name = `${stem} ${++n}`;
+
+  if (el.type === "text") {
+    list.push(captureLetterStyle((el as TextEl).ts, name));
+    setStyleTab("letter");
+  } else {
+    const st = captureShapeStyle(el as BalloonEl, name);
+    (st as ShapeStyle & { forBox?: boolean }).forBox = isBox;
+    list.push(st);
+    setStyleTab(isBox ? "box" : "balloon");
+  }
+  commit();
+  setStatus(`Saved “${name}” — it is in the Styles panel for this book.`);
+}
+
+export function deleteSavedStyle(ed: EditorCtx, bucket: "shapes" | "letters", name: string) {
+  const { docRef, commit, setStatus } = ed;
+  const d = docRef.current;
+  const list = d?.styles?.[bucket] as { name: string }[] | undefined;
+  if (!list) return;
+  const i = list.findIndex((x) => x.name === name);
+  if (i < 0) return;
+  list.splice(i, 1);
+  commit();
+  setStatus(`Removed “${name}”.`);
 }
 
 /* ---------------- project library (SQL) ---------------- */

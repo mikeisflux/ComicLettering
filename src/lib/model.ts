@@ -488,7 +488,13 @@ export const PAPER_CATEGORIES: PaperCategory[] = [
     ],
   },
 ];
-export interface Doc { app: "comiclettering"; version: 2; pages: Page[] }
+export interface Doc {
+  app: "comiclettering"; version: 2; pages: Page[];
+  /* Styles saved off this book's own balloons and lettering, via right-click
+     → Save Style. They live in the document, so they travel with the project
+     and are still there after a refresh. */
+  styles?: { shapes?: unknown[]; letters?: unknown[] };
+}
 export type Assets = Record<string, string>;
 
 /* ---------------- fonts ---------------- */

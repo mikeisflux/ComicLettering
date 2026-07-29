@@ -8,8 +8,8 @@ import { EditorCtx } from "./ctx";
 import {
   addAttachedBubble, addFromTray, alignSel, copySel, cutSel, deleteSel,
   doFindReplace, duplicateSel, importScript, insertCustomStamp, insertSfxStamp,
-  fitToArtwork, fitToPage, pasteClip, removeCustomStamp, reorder, resizeToActual, resolveTailAsk,
-  runExport,
+  fitToArtwork, fitToPage, pasteClip, removeCustomStamp, reorder, resizeToActual,
+  clipboardText, resolveTailAsk, runExport, saveStyleFromSelection,
 } from "./ops";
 import { SFX_STAMPS } from "@/lib/sfxStamps";
 import type { TuckMode } from "./tuck";
@@ -215,22 +215,16 @@ export function renderContextMenu(ed: EditorCtx) {
             ? { left, bottom: window.innerHeight - ctxMenu.y, maxHeight: above }
             : { left, top: Math.max(M, ctxMenu.y), maxHeight: below };
         })()}>
+          {(el.type === "balloon" || el.type === "text") && (
+            <>
+              <button onClick={() => { saveStyleFromSelection(ed); close(); }}>Save Style</button>
+              <div className="ctxSep" />
+            </>
+          )}
           <button disabled={el.locked} onClick={() => { reorder(ed, 1); close(); }}>Bring Forward</button>
           <button disabled={el.locked} onClick={() => { reorder(ed, 1e9); close(); }}>Bring To Front</button>
           <button disabled={el.locked} onClick={() => { reorder(ed, -1); close(); }}>Send Backward</button>
           <button disabled={el.locked} onClick={() => { reorder(ed, -1e9); close(); }}>Send To Back</button>
-          <div className="ctxSep" />
-          <div className="ctxSub">
-            <button disabled={el.locked} className="ctxSubHead">Align Object ▸</button>
-            <div className="ctxSubMenu">
-              <button disabled={el.locked} onClick={() => { alignSel(ed, "left"); close(); }}>Left</button>
-              <button disabled={el.locked} onClick={() => { alignSel(ed, "hcenter"); close(); }}>Center</button>
-              <button disabled={el.locked} onClick={() => { alignSel(ed, "right"); close(); }}>Right</button>
-              <button disabled={el.locked} onClick={() => { alignSel(ed, "top"); close(); }}>Top</button>
-              <button disabled={el.locked} onClick={() => { alignSel(ed, "vcenter"); close(); }}>Middle</button>
-              <button disabled={el.locked} onClick={() => { alignSel(ed, "bottom"); close(); }}>Bottom</button>
-            </div>
-          </div>
           <div className="ctxSep" />
           <button onClick={() => { setUserZoomed(true); setZoom((z) => clamp(z * 1.2, 0.05, 4)); close(); }}>Zoom In</button>
           <button onClick={() => { setUserZoomed(true); setZoom((z) => clamp(z / 1.2, 0.05, 4)); close(); }}>Zoom Out</button>
@@ -247,9 +241,25 @@ export function renderContextMenu(ed: EditorCtx) {
             close();
           }}>{many ? `Unlock ${ed.selIds.length} Items` : "Unlock"}</button>
           <div className="ctxSep" />
-          <button disabled={el.locked} onClick={() => { cutSel(ed); close(); }}>Cut</button>
-          <button onClick={() => { copySel(ed); close(); }}>Copy</button>
-          <button disabled={!clipboardRef.current} onClick={() => { pasteClip(ed); close(); }}>Paste</button>
+          {/* Editing this element? Then these mean the words, not the object.
+              onMouseDown is swallowed so focus never leaves the text — the
+              moment it does, the selection goes with it. */}
+          {ed.editingId === el.id ? (
+            <>
+              <button onMouseDown={(e) => e.preventDefault()}
+                onClick={() => { clipboardText(ed, "cut"); close(); }}>Cut Text</button>
+              <button onMouseDown={(e) => e.preventDefault()}
+                onClick={() => { clipboardText(ed, "copy"); close(); }}>Copy Text</button>
+              <button onMouseDown={(e) => e.preventDefault()}
+                onClick={() => { clipboardText(ed, "paste"); close(); }}>Paste Text</button>
+            </>
+          ) : (
+            <>
+              <button disabled={el.locked} onClick={() => { cutSel(ed); close(); }}>Cut</button>
+              <button onClick={() => { copySel(ed); close(); }}>Copy</button>
+              <button disabled={!clipboardRef.current} onClick={() => { pasteClip(ed); close(); }}>Paste</button>
+            </>
+          )}
           <button onClick={() => { duplicateSel(ed); close(); }}>Duplicate</button>
           <button disabled={el.locked} className="danger" onClick={() => { deleteSel(ed); close(); }}>Delete</button>
           {(el.type === "balloon" || el.type === "text") && (
@@ -273,6 +283,21 @@ export function renderContextMenu(ed: EditorCtx) {
               {el.img && <button disabled={el.locked} onClick={() => { resizeToActual(ed); close(); }}>Resize Image to Actual Size</button>}
             </>
           )}
+          {/* Align lives at the BOTTOM. It is a submenu, so sitting in the
+              middle it opened under the cursor on the way past and covered
+              whatever you were actually reaching for. */}
+          <div className="ctxSep" />
+          <div className="ctxSub">
+            <button disabled={el.locked} className="ctxSubHead">Align Object ▸</button>
+            <div className="ctxSubMenu">
+              <button disabled={el.locked} onClick={() => { alignSel(ed, "left"); close(); }}>Left</button>
+              <button disabled={el.locked} onClick={() => { alignSel(ed, "hcenter"); close(); }}>Center</button>
+              <button disabled={el.locked} onClick={() => { alignSel(ed, "right"); close(); }}>Right</button>
+              <button disabled={el.locked} onClick={() => { alignSel(ed, "top"); close(); }}>Top</button>
+              <button disabled={el.locked} onClick={() => { alignSel(ed, "vcenter"); close(); }}>Middle</button>
+              <button disabled={el.locked} onClick={() => { alignSel(ed, "bottom"); close(); }}>Bottom</button>
+            </div>
+          </div>
         </div>
       </>
     );

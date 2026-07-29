@@ -131,6 +131,23 @@ export const LETTER_STYLES: LetterStyle[] = [
 ];
 
 /* Apply a preset onto an existing TextStyle (keeps size/align etc.) */
+/* Read lettering back into a style — the inverse of applyLetterStyle, for
+   "Save Style". The outline is stored as a FRACTION of the size, which is
+   what makes a style survive being applied to type of any other size. */
+export function captureLetterStyle(ts: TextStyle, name: string): LetterStyle {
+  return {
+    name,
+    font: ts.font,
+    fillA: ts.fillA,
+    fillB: ts.fillB,
+    outlineC: ts.outlineC,
+    outlineF: ts.size > 0 ? +(ts.outlineW / ts.size).toFixed(4) : 0,
+    shadow: ts.shadow,
+    italic: ts.italic,
+    lower: !ts.caps,
+  };
+}
+
 export function applyLetterStyle(ts: TextStyle, s: LetterStyle): TextStyle {
   return {
     ...ts,

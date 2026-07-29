@@ -281,6 +281,14 @@ input[type="range"] { width: 110px; }
 }
 .styleBtn:hover { border-color: var(--sel); background: #ffffff70; }
 .styleBtn.on { border-color: var(--sel); background: #fff; box-shadow: 0 0 0 1px var(--sel); }
+/* saved off this book's own artwork — a corner flag so your own styles are
+   findable in a grid of a hundred shipped ones */
+.styleBtn.mine { position: relative; }
+.styleBtn.mine::after {
+  content: ""; position: absolute; top: 2px; right: 2px;
+  border: 4px solid transparent; border-top-color: var(--accent, #f0a400);
+  border-right-color: var(--accent, #f0a400);
+}
 .styleBtn span { display: block; pointer-events: none; }
 
 /* STYLES panel tabs — Text / Balloon / Box swatch sets */

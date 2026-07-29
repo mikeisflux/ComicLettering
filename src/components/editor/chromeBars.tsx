@@ -13,7 +13,7 @@ import { BRUSHES } from "@/lib/brushes";
 import { GLOWS } from "@/lib/glows";
 import { EditorCtx } from "./ctx";
 import {
-  addFromTray, alignSel, applyQuickFill, applyQuickStroke, balanceRag,
+  addFromTray, alignSel, applyQuickFill, applyQuickStroke, balanceRag, clipboardText,
   copySel, copyStyle, cutSel, deleteCustomFont, deleteSel, duplicatePage,
   duplicateSel, exportJSON, fitBalloonToText, pasteClip, pasteStyle,
   printPage, reorder, rotateSel, runInstantAlpha, runProof, saveProject,
@@ -44,8 +44,11 @@ export function renderMenuBar(ed: EditorCtx) {
       ["Edit", [
         ["Undo", () => undo()], ["Redo", () => redo()],
         ["—", null],
-        ["Cut", () => cutSel(ed)], ["Copy", () => copySel(ed)],
-        ["Paste", () => pasteClip(ed)], ["Duplicate", () => duplicateSel(ed)],
+        /* while lettering is being edited these act on the words */
+        ["Cut", () => ed.editingId ? clipboardText(ed, "cut") : cutSel(ed)],
+        ["Copy", () => ed.editingId ? clipboardText(ed, "copy") : copySel(ed)],
+        ["Paste", () => ed.editingId ? clipboardText(ed, "paste") : pasteClip(ed)],
+        ["Duplicate", () => duplicateSel(ed)],
         ["Delete", () => deleteSel(ed)],
         ["—", null],
         ["Copy Style", () => copyStyle(ed)],

@@ -31,6 +31,24 @@ export function shapeCss(s: ShapeStyle): string {
     : s.fill;
 }
 
+/* Read a balloon back into a style — the inverse of applyShapeStyle, for
+   "Save Style". A gradient fill comes back as its two stops; anything else
+   is treated as flat, since a halftone or a photo fill is a property of that
+   one balloon rather than a colourway worth reusing. */
+export function captureShapeStyle(el: BalloonEl, name: string): ShapeStyle {
+  const f = el.fill;
+  const fill: string | [string, string] =
+    f.kind === "gradient" ? [f.a, f.b ?? f.a] : (f.a ?? "#ffffff");
+  return {
+    name,
+    fill,
+    stroke: el.stroke,
+    strokeW: el.strokeW,
+    ink: el.ts?.fillA ?? "#000000",
+    none: f.kind === "solid" && (f.a === "transparent" || f.a === "none"),
+  };
+}
+
 export function applyShapeStyle(el: BalloonEl, s: ShapeStyle) {
   el.fill = shapeFill(s);
   el.stroke = s.stroke;
