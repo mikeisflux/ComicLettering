@@ -425,7 +425,8 @@ function connectorBand(el: BalloonEl): { fill: string; edges: string } | null {
      large balloon does not grow an absurdly fat connector — the old
      rr * 0.115 with a 1.3x flare read as thick and lopsided. */
   const rr = Math.hypot(E[0] - cx, E[1] - cy) || 1;
-  const halfW = Math.min(10, Math.max(5, rr * 0.045));
+  /* half the width of the previous slim band (0.07, cap 16) — a thin neck */
+  const halfW = Math.min(8, Math.max(4, rr * 0.035));
   const tipHalf = halfW;
   /* tuck the base points slightly INSIDE the outline — they sit on the
      tangent line, which floats just outside a curved edge and leaves a
