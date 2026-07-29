@@ -16,7 +16,8 @@ import {
   addFromTray, alignSel, applyQuickFill, applyQuickStroke, balanceRag,
   copySel, copyStyle, cutSel, deleteCustomFont, deleteSel, duplicatePage,
   duplicateSel, exportJSON, fitBalloonToText, pasteClip, pasteStyle,
-  printPage, reorder, rotateSel, runInstantAlpha, runProof, saveProject,
+  normalizeLetteringSize, printPage, reorder, rotateSel, runInstantAlpha,
+  runProof, saveProject,
 } from "./ops";
 
 
@@ -98,6 +99,8 @@ export function renderMenuBar(ed: EditorCtx) {
         ["—", null],
         ["Bigger", () => mutateSel<BalloonEl | TextEl>((x) => { if (x.ts) x.ts.size = clamp(Math.round(x.ts.size * 1.12), 8, 800); })],
         ["Smaller", () => mutateSel<BalloonEl | TextEl>((x) => { if (x.ts) x.ts.size = clamp(Math.round(x.ts.size / 1.12), 8, 800); })],
+        ["—", null],
+        [`Set All Balloons & Captions to ${DEFAULT_TEXT_SIZE}pt`, () => normalizeLetteringSize(ed)],
       ]],
       ["Arrange", [
         ["Bring Forward", () => reorder(ed, 1)], ["Bring To Front", () => reorder(ed, 1e9)],
