@@ -622,11 +622,14 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   }, []);
 
   const finishEditing = useCallback(() => {
-    setEditingId((eid) => {
-      if (!eid) return null;
-      if (captureEditing(eid)) setTimeout(commit, 0);
-      return null;
-    });
+    /* Capture the editable DOM into the model SYNCHRONOUSLY, before clearing
+       editingId. A caller that finishes editing and then commits in the same
+       tick (e.g. Add Bubble) must see the just-typed words, not the stale
+       ones — the model isn't updated as you type, only here. Doing the
+       capture inside the setEditingId updater deferred it past that commit. */
+    const eid = editingIdRef.current;
+    if (eid && captureEditing(eid)) setTimeout(commit, 0);
+    setEditingId(null);
   }, [commit, captureEditing]);
 
   /* Write through now, taking any half-typed line with it. Saving the model

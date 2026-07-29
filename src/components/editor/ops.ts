@@ -28,7 +28,7 @@ import { EditorCtx } from "./ctx";
 /* Dedicated add-on bubble: a linked balloon that inherits the parent's
    look and stays joined (replaces the old drag-to-join behaviour). */
 export function addAttachedBubble(ed: EditorCtx) {
-  const { docRef, pageIndexRef, selId, setStatus, pendingLockRef, commit, setSelId } = ed;
+  const { docRef, pageIndexRef, selId, setStatus, pendingLockRef, commit, setSelId, finishEditing } = ed;
   const d = docRef.current!;
   const p = d.pages[pageIndexRef.current];
   const src = p.els.find((x) => x.id === selId);
@@ -36,6 +36,12 @@ export function addAttachedBubble(ed: EditorCtx) {
     setStatus("Select a balloon first, then click Add Bubble to link a second one to it.");
     return;
   }
+  /* If the parent is still being typed in, its words live only in the DOM —
+     while `editingId` points at it, React renders its children as null and
+     the seed effect won't re-run because editingId hasn't changed. Commit
+     the edit first, or the parent goes blank the instant selection moves to
+     the new child. This is what made the first bubble's text "vanish". */
+  finishEditing();
   const b = src as BalloonEl;
   const w = Math.round(b.w * 0.8), h = Math.round(b.h * 0.8);
   let x = b.x + Math.round(b.w * 0.55);
