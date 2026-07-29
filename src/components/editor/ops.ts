@@ -4,7 +4,7 @@
 import React from "react";
 import {
   Assets, BalloonEl, BalloonKind, DPI, Doc, El, FONTS, FillStyle, GradStop, Page,
-  TAILLESS_KINDS, TextEl, TextStyle, clamp, makeBalloon, makeImage, pageMargins,
+  TAILLESS_KINDS, TextEl, TextStyle, clamp, makeBalloon, makeImage, newPage, pageMargins,
   makePanel, makeText, reseedIds, solid, uid,
 } from "@/lib/model";
 import { balloonGeom } from "@/lib/geometry";
@@ -508,38 +508,73 @@ export function importScript(ed: EditorCtx) {
   const items = parseScript(scriptText);
   if (!items.length) { setStatus("No dialogue found — use CHARACTER: text (one per line)."); return; }
   const d = docRef.current!;
-  const p = d.pages[pageIndexRef.current];
-  const colW = Math.round(p.w * 0.42);
-  const gap = Math.round(p.w * 0.03);
-  const m0 = Math.round(p.w * 0.06);
-  let x = m0, y = m0;
-  let count = 0;
+  const start = pageIndexRef.current;
+  const first = d.pages[start];
+
+  /* A script is a book, not a page. Its PAGE headers decide which document
+     page each line lands on — everything used to pile onto whatever page
+     happened to be open, which for a 28-page script is a wall of balloons
+     nobody can untangle. Script page numbers are kept relative to the
+     lowest one, so a script starting at PAGE 5 still begins where you are. */
+  const lowest = Math.min(...items.map((i) => i.page));
+  const byPage = new Map<number, typeof items>();
   for (const it of items) {
-    const lineCt = Math.max(1, Math.ceil(it.text.length / 26));
-    let el: El;
-    if (it.kind === "sfx") {
-      el = makeText(x, y, colW, Math.round(p.w * 0.16), true);
-      const st = LETTER_STYLES.find((s) => s.name === activeStyleRef.current) || LETTER_STYLES[0];
-      (el as TextEl).ts = applyLetterStyle((el as TextEl).ts, st);
-      (el as TextEl).ts.outlineW = Math.round((el as TextEl).ts.size * st.outlineF);
-      el.text = it.text;
-    } else {
-      const kind = (["caption", "thought", "whisper", "exclaim"].includes(it.kind) ? it.kind : "speech") as BalloonKind;
-      const h = clamp(Math.round(lineCt * p.w * 0.05 + p.w * 0.06), Math.round(p.w * 0.12), Math.round(p.h * 0.4));
-      el = makeBalloon(kind, x, y, colW, h);
-      el.text = it.text;
+    const off = it.page - lowest;
+    if (!byPage.has(off)) byPage.set(off, []);
+    byPage.get(off)!.push(it);
+  }
+
+  let count = 0, madePages = 0;
+  for (const [off, group] of [...byPage.entries()].sort((a, bb) => a[0] - bb[0])) {
+    while (d.pages.length <= start + off) { d.pages.push(newPage(first.w, first.h)); madePages++; }
+    const p = d.pages[start + off];
+    const m = pageMargins(p);
+    const colW = Math.round((p.w - m.l - m.r) * 0.46);
+    const gap = Math.round(p.w * 0.025);
+    /* Split the page into a band per panel so balloons land near the art
+       they belong to, rather than all in one stack at the top. */
+    const panels = [...new Set(group.map((i) => i.panel))].sort((a, bb) => a - bb);
+    const usable = p.h - m.t - m.b;
+    const band = usable / panels.length;
+    for (let bi = 0; bi < panels.length; bi++) {
+      const inPanel = group.filter((i) => i.panel === panels[bi]);
+      let x = m.l;
+      let y = Math.round(m.t + bi * band);
+      for (const it of inPanel) {
+        const lineCt = Math.max(1, Math.ceil(it.text.length / 26));
+        let el: El;
+        if (it.kind === "sfx") {
+          el = makeText(x, y, colW, Math.round(p.w * 0.16), true);
+          const st = LETTER_STYLES.find((s) => s.name === activeStyleRef.current) || LETTER_STYLES[0];
+          (el as TextEl).ts = applyLetterStyle((el as TextEl).ts, st);
+          (el as TextEl).ts.outlineW = Math.round((el as TextEl).ts.size * st.outlineF);
+          el.text = it.text;
+        } else {
+          const kind = (["caption", "thought", "whisper", "exclaim"].includes(it.kind) ? it.kind : "speech") as BalloonKind;
+          const h = clamp(Math.round(lineCt * p.w * 0.05 + p.w * 0.06), Math.round(p.w * 0.12), Math.round(p.h * 0.3));
+          el = makeBalloon(kind, x, y, colW, h);
+          el.text = it.text;
+        }
+        p.els.push(el);
+        count++;
+        y += el.h + gap;
+        /* a talky panel spills into the second column rather than over the
+           next panel's balloons */
+        if (y > p.h - m.b) {
+          y = Math.round(m.t + bi * band);
+          x = x + colW + gap <= p.w - m.r - colW ? x + colW + gap : m.l;
+        }
+      }
     }
-    p.els.push(el);
-    count++;
-    y += el.h + gap;
-    if (y > p.h * 0.9) { y = m0; x += colW + gap; if (x + colW > p.w) x = m0; }
   }
   commit();
   rebuildThumbs();
   setShowScript(false);
   setScriptText("");
   setSelId(null);
-  setStatus(`Added ${count} item${count > 1 ? "s" : ""} from your script.`);
+  const spread = byPage.size;
+  setStatus(`Added ${count} item${count > 1 ? "s" : ""} across ${spread} page${spread > 1 ? "s" : ""}`
+    + (madePages ? ` — ${madePages} new page${madePages > 1 ? "s" : ""} added.` : "."));
 }
 
 export function alignSel(ed: EditorCtx, mode: "left" | "hcenter" | "right" | "top" | "vcenter" | "bottom") {

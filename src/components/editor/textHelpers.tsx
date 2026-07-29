@@ -301,17 +301,50 @@ export const elLabel = (el: El) =>
     : el.type === "panel" ? "Panel"
     : "Image";
 
-/* Parse a comic script (CHARACTER: dialogue, CAPTION:, SFX:, parentheticals) */
-export function parseScript(src: string): { kind: string; text: string }[] {
-  const items: { kind: string; text: string }[] = [];
-  const headerRx = /^(PAGE|PANEL|SCENE|PG|P|INT|EXT)\b/i;
+export interface ScriptItem {
+  kind: string;
+  text: string;
+  speaker: string;
+  /* the PAGE the line was written under, and the PANEL within it. Page
+     numbers are the script's own — a script that opens on PAGE 5 keeps
+     that — so gaps and repeats survive to the caller. */
+  page: number;
+  panel: number;
+}
+
+/* Parse a comic script (CHARACTER: dialogue, CAPTION:, SFX:, parentheticals),
+   keeping the page and panel structure. Headers come in every shape a writer
+   uses: "PAGE 1 - SPLASH", "PAGES 19-20 - DOUBLE-PAGE SPREAD", "PANEL 4
+   (INSET)". A spread is filed under its first page. */
+export function parseScript(src: string): ScriptItem[] {
+  const items: ScriptItem[] = [];
+  /* PAGES (plural) matters: without it a spread header fell through and got
+     glued onto the end of the previous caption */
+  const pageRx = /^PA?GE?S?\.?\s*#?\s*(\d+)/i;
+  const panelRx = /^PANELS?\.?\s*#?\s*(\d+)?/i;
+  const otherHeaderRx = /^(SCENE|INT|EXT)\b/i;
+  /* a stage direction on its own line — "(no balloons)", "(beat)" */
+  const asideRx = /^\(.*\)$/;
   const lineRx = /^\s*([A-Z0-9 .,'’&\-]{1,28}?)\s*(?:\(([^)]*)\))?\s*:\s*(.+)$/;
+  let page = 1, panel = 1, seenPage = false;
   for (const rawLine of src.split(/\r?\n/)) {
     const line = rawLine.trim();
     if (!line) continue;
-    if (headerRx.test(line) && !line.includes(":")) continue;
+    if (!line.includes(":")) {
+      const pm = line.match(pageRx);
+      if (pm) { page = parseInt(pm[1], 10); panel = 1; seenPage = true; continue; }
+      const nm = line.match(panelRx);
+      if (nm) { panel = nm[1] ? parseInt(nm[1], 10) : panel + 1; continue; }
+      if (otherHeaderRx.test(line) || asideRx.test(line)) continue;
+    }
     const m = line.match(lineRx);
-    if (!m) { if (items.length) items[items.length - 1].text += " " + line; continue; }
+    /* a bare line continues the previous balloon — but only inside the same
+       panel, or a stray header would splice two characters together */
+    if (!m) {
+      const last = items[items.length - 1];
+      if (last && last.page === page && last.panel === panel) last.text += " " + line;
+      continue;
+    }
     const speaker = m[1].trim().toUpperCase();
     const paren = (m[2] || "").toLowerCase();
     const text = m[3].trim();
@@ -321,7 +354,7 @@ export function parseScript(src: string): { kind: string; text: string }[] {
     else if (/thought|think/.test(paren)) kind = "thought";
     else if (/whisper|quiet/.test(paren)) kind = "whisper";
     else if (/shout|yell|scream|loud|angry/.test(paren)) kind = "exclaim";
-    items.push({ kind, text });
+    items.push({ kind, text, speaker, page: seenPage ? page : 1, panel });
   }
   return items;
 }
