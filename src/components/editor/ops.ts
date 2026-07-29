@@ -590,6 +590,11 @@ export function importScript(ed: EditorCtx) {
       const inPanel = group.filter((i) => i.panel === panels[bi]);
       let x = m.l;
       let y = Math.round(m.t + bi * band);
+      /* the last speech balloon placed in this panel, and who said it — a
+         following line from the SAME character becomes a JOINED secondary
+         bubble instead of a separate one, the way a letterer breaks one
+         character's two sentences across connected balloons */
+      let prev: { el: BalloonEl; speaker: string } | null = null;
       for (const it of inPanel) {
         const lineCt = Math.max(1, Math.ceil(it.text.length / 26));
         let el: El;
@@ -599,11 +604,27 @@ export function importScript(ed: EditorCtx) {
           (el as TextEl).ts = applyLetterStyle((el as TextEl).ts, st);
           (el as TextEl).ts.outlineW = Math.round((el as TextEl).ts.size * st.outlineF);
           el.text = it.text;
+          prev = null; // an effect breaks a run of dialogue
         } else {
           const kind = (["caption", "thought", "whisper", "exclaim"].includes(it.kind) ? it.kind : "speech") as BalloonKind;
           const h = clamp(Math.round(lineCt * p.w * 0.05 + p.w * 0.06), Math.round(p.w * 0.12), Math.round(p.h * 0.3));
-          el = makeBalloon(kind, x, y, colW, h);
-          el.text = it.text;
+          /* join to the previous bubble when the same NAMED character speaks
+             again — never captions (not a character) and never a bare/■ SFX */
+          const named = kind !== "caption" && !!it.speaker
+            && !/^(SFX|SOUND|FX|CAPTION|CAP|NARRATION|NARR|BOX|TITLE)$/.test(it.speaker);
+          const joinToPrev = named && prev && prev.speaker === it.speaker;
+          const bel = makeBalloon(kind, x, y, joinToPrev ? Math.round(colW * 0.9) : colW, h);
+          bel.text = it.text;
+          if (joinToPrev && prev) {
+            bel.attachTo = prev.el.id;
+            /* the connector aims from this child's centre at the parent's;
+               resolveBalloon turns that into the open band */
+            const pcx = (prev.el.x + prev.el.w / 2) - (bel.x + bel.w / 2);
+            const pcy = (prev.el.y + prev.el.h / 2) - (bel.y + bel.h / 2);
+            bel.tail = { dx: Math.round(pcx), dy: Math.round(pcy) };
+          }
+          el = bel;
+          prev = named ? { el: bel, speaker: it.speaker } : null;
         }
         p.els.push(el);
         count++;
