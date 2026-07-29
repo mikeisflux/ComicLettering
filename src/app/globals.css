@@ -37,7 +37,13 @@ body {
    give ground before the artwork does — the page is the thing being worked
    on, so it is the last thing that should shrink. */
 
-.menuBar, .toolbar, .formatBar, .tray, .tabs {
+/* A bar that hosts a pop-up must NEVER get `overflow`. The menus, the font
+   list, the fill pickers and the stamp panel are absolutely positioned and
+   hang BELOW their bar, so a scroll container clips them to nothing — the
+   button still highlights, and nothing appears. Those bars wrap instead.
+   Only the toolbar and the tab strip scroll, and neither holds a pop-up. */
+.menuBar, .formatBar, .tray { flex-wrap: wrap; row-gap: 3px; }
+.toolbar, .tabs {
   overflow-x: auto; overflow-y: hidden;
   scrollbar-width: thin; scrollbar-color: #98a0ac transparent;
 }
@@ -46,11 +52,8 @@ body {
 /* the fillers and the two bits of advisory text are what give way */
 .tbSpacer { flex: 1 1 8px; }
 .tray > .statusbar, .toolbar > .tbHint { flex: 0 1 auto; min-width: 0; }
-.menuBar::-webkit-scrollbar, .toolbar::-webkit-scrollbar,
-.formatBar::-webkit-scrollbar, .tray::-webkit-scrollbar,
-.tabs::-webkit-scrollbar { height: 6px; }
-.menuBar::-webkit-scrollbar-thumb, .toolbar::-webkit-scrollbar-thumb,
-.formatBar::-webkit-scrollbar-thumb, .tray::-webkit-scrollbar-thumb,
+.toolbar::-webkit-scrollbar, .tabs::-webkit-scrollbar { height: 6px; }
+.toolbar::-webkit-scrollbar-thumb,
 .tabs::-webkit-scrollbar-thumb { background: #98a0ac80; border-radius: 3px; }
 
 @media (max-width: 1440px) {
@@ -65,13 +68,9 @@ body {
   .canvasRow .stage { margin: 16px 18px 0 18px; }
   .toolbar { padding: 3px 6px 2px; }
   .formatBar { padding: 3px 6px; gap: 4px; }
-  /* The format bar wraps rather than scrolls: it is what you reach for on
-     every balloon, and a control you have to go looking for sideways may as
-     well not be there. Its rows are short, so this costs almost nothing.
-     The toolbar keeps scrolling — its buttons are tall, and wrapping them
-     took a third of the artwork's height, which is the wrong trade. It gets
-     smaller buttons instead so fewer need reaching for. */
-  .formatBar { flex-wrap: wrap; overflow: visible; row-gap: 3px; }
+  /* The toolbar is the one bar that scrolls: its buttons are tall, and
+     wrapping them took a third of the artwork's height, which is the wrong
+     trade. Smaller buttons instead, so fewer need reaching for. */
   .toolBtn { min-width: 40px; padding: 2px 4px; }
   .toolBtn .tIcon { font-size: 15px; }
   .toolBtn .tLabel { font-size: 9px; }
