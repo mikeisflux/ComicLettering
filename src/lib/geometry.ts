@@ -420,11 +420,13 @@ function connectorBand(el: BalloonEl): { fill: string; edges: string } | null {
   if (dLen < 6) return null;
   const u = [tail.dx / dLen, tail.dy / dLen];
   const perp = [-u[1], u[0]];
-  /* base width ≈ a pointed tail's base; the MAIN-bubble end (this band's tip)
-     opens slightly wider for a gentle taper */
+  /* A slim, RELATIVELY PARALLEL band (CLAUDE.md): both ends the same width,
+     never a wedge. Width scales gently with the balloon but is capped, so a
+     large balloon does not grow an absurdly fat connector — the old
+     rr * 0.115 with a 1.3x flare read as thick and lopsided. */
   const rr = Math.hypot(E[0] - cx, E[1] - cy) || 1;
-  const halfW = Math.max(5, rr * 0.115);
-  const tipHalf = halfW * 1.3;
+  const halfW = Math.min(16, Math.max(6, rr * 0.07));
+  const tipHalf = halfW;
   /* tuck the base points slightly INSIDE the outline — they sit on the
      tangent line, which floats just outside a curved edge and leaves a
      sliver gap between the side lines and the balloon outline */
