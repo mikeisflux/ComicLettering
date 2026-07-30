@@ -341,7 +341,11 @@ export function fillCss(f: FillStyle): CSSProperties {
 /* Paint a fill inside a canvas region (local coords 0,0..w,h), optionally
    clipped to a Path2D. Used by the PNG exporter. */
 export function paintFill(
-  ctx: CanvasRenderingContext2D, f: FillStyle, w: number, h: number, clip?: Path2D
+  ctx: CanvasRenderingContext2D, f: FillStyle, w: number, h: number, clip?: Path2D,
+  /* joined balloons: span gradients (and anchor pattern phase) over the whole
+     join-group box instead of this element's own, so the fill flows across
+     both bubbles without a restart seam at the join */
+  grect?: { x: number; y: number; w: number; h: number } | null,
 ) {
   ctx.save();
   if (clip) ctx.clip(clip);
@@ -349,9 +353,10 @@ export function paintFill(
      connector bands) — paint an expanded rect so those regions fill too */
   const X = -w, Y = -h, W = w * 3, H = h * 3;
   if (f.kind === "gradient") {
+    const gw = grect ? grect.w : w, gh = grect ? grect.h : h;
     const rad = ((f.angle - 90) * Math.PI) / 180;
-    const cx = w / 2, cy = h / 2;
-    const len = (Math.abs(Math.cos(rad)) * w + Math.abs(Math.sin(rad)) * h) / 2;
+    const cx = (grect ? grect.x : 0) + gw / 2, cy = (grect ? grect.y : 0) + gh / 2;
+    const len = (Math.abs(Math.cos(rad)) * gw + Math.abs(Math.sin(rad)) * gh) / 2;
     const g = ctx.createLinearGradient(
       cx - Math.cos(rad) * len, cy - Math.sin(rad) * len,
       cx + Math.cos(rad) * len, cy + Math.sin(rad) * len
@@ -371,7 +376,14 @@ export function paintFill(
     if (tile) {
       if (isRepeating(f)) {
         const pat = ctx.createPattern(tile, "repeat");
-        if (pat) { ctx.fillStyle = pat; ctx.fillRect(X, Y, W, H); }
+        if (pat) {
+          /* anchor the tiling to the group box so joined bubbles' patterns
+             line up phase-for-phase (mirrors the SVG pattern x/y) */
+          if (grect && typeof DOMMatrix !== "undefined")
+            pat.setTransform(new DOMMatrix().translate(grect.x, grect.y));
+          ctx.fillStyle = pat;
+          ctx.fillRect(X, Y, W, H);
+        }
       } else {
         ctx.drawImage(tile, 0, 0, w, h);
       }

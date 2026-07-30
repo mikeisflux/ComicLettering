@@ -1,7 +1,7 @@
 /* Full-resolution canvas renderer — used for PNG export and page thumbnails. */
 import {
   Assets, BalloonEl, Doc, El, FILTERS, FONTS, Page, TextRun, TextStyle,
-  aabbOverlap, applyCrossbarI, deg2rad, lightenHex, resolveBalloon, rotVec,
+  aabbOverlap, applyCrossbarI, deg2rad, joinGroupRect, lightenHex, resolveBalloon, rotVec,
 } from "./model";
 import { balloonGeom, arcTextLayout } from "./geometry";
 import { paintFill } from "./fills";
@@ -445,7 +445,11 @@ function clearShadow(ctx: CanvasRenderingContext2D) {
   ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0; ctx.shadowBlur = 0;
 }
 
-function drawEl(ctx: CanvasRenderingContext2D, el: El, assets: Assets, merge?: MergeInfo | null) {
+function drawEl(
+  ctx: CanvasRenderingContext2D, el: El, assets: Assets, merge?: MergeInfo | null,
+  /* join-group box in el-local coords — joined balloons share fill geometry */
+  joinRect?: { x: number; y: number; w: number; h: number } | null,
+) {
   ctx.save();
   ctx.globalAlpha = el.opacity ?? 1;
   ctx.translate(el.x + el.w / 2, el.y + el.h / 2);
@@ -514,7 +518,7 @@ function drawEl(ctx: CanvasRenderingContext2D, el: El, assets: Assets, merge?: M
         }
       }
     }
-    paintFill(ctx, el.fill, el.w, el.h, path);
+    paintFill(ctx, el.fill, el.w, el.h, path, joinRect);
     const bImgSrc = el.img ? assets[el.img] : null;
     const bImg = bImgSrc ? imgCache.get(bImgSrc) : null;
     if (bImg) {
@@ -553,8 +557,14 @@ function drawEl(ctx: CanvasRenderingContext2D, el: El, assets: Assets, merge?: M
        only the two sides get inked — both junctions stay open */
     if (g.bandFill) {
       ctx.setLineDash([]);
-      ctx.fillStyle = el.fill.a;
-      ctx.fill(new Path2D(g.bandFill));
+      if (el.fill.kind === "gradient") {
+        /* the band carries the shared gradient too (the editor fills it with
+           the same gradient ref), so the join reads as one continuous shape */
+        paintFill(ctx, el.fill, el.w, el.h, new Path2D(g.bandFill), joinRect);
+      } else {
+        ctx.fillStyle = el.fill.a;
+        ctx.fill(new Path2D(g.bandFill));
+      }
       if (g.bandEdges && el.strokeW > 0) {
         ctx.strokeStyle = el.stroke;
         ctx.lineWidth = el.strokeW;
@@ -578,8 +588,13 @@ function drawEl(ctx: CanvasRenderingContext2D, el: El, assets: Assets, merge?: M
       ctx.clip(clip, "evenodd");
       const tailP = new Path2D();
       tailP.addPath(new Path2D(merge.d), m);
-      ctx.fillStyle = merge.color;
-      ctx.fill(tailP);
+      if (el.type === "balloon" && el.fill.kind === "gradient" && joinRect) {
+        /* gradient join: the wedge carries the shared gradient (see editor) */
+        paintFill(ctx, el.fill, el.w, el.h, tailP, joinRect);
+      } else {
+        ctx.fillStyle = merge.color;
+        ctx.fill(tailP);
+      }
       ctx.strokeStyle = merge.stroke!;
       ctx.lineWidth = merge.strokeW;
       ctx.lineJoin = "round";
@@ -633,7 +648,9 @@ export async function renderPageToCanvas(
           ...(aabbOverlap(el, base) ? {} : { stroke: base.stroke, strokeW: base.strokeW }),
         };
       }
-      drawEl(ctx, bEl as BalloonEl, assets, merge);
+      const jg = joinGroupRect(page, el);
+      const joinRect = jg ? { x: jg.x - el.x, y: jg.y - el.y, w: jg.w, h: jg.h } : null;
+      drawEl(ctx, bEl as BalloonEl, assets, merge, joinRect);
     } else {
       drawEl(ctx, el, assets);
     }

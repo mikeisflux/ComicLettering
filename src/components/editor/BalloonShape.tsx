@@ -9,7 +9,13 @@ import { fillOverlayTile, fillOverlayURL, isRepeating } from "@/lib/fills";
 
 export interface MergeBaseInfo { d: string; bodyD?: string; color: string; tf: string; stroke?: string; strokeW?: number }
 
-export function BalloonShape({ el, mergeBase, imgSrc }: { el: BalloonEl; mergeBase?: MergeBaseInfo | null; imgSrc?: string | null }) {
+export function BalloonShape({ el, mergeBase, imgSrc, joinRect }: {
+  el: BalloonEl; mergeBase?: MergeBaseInfo | null; imgSrc?: string | null;
+  /* bounding box of this balloon's JOIN GROUP in el-local coords — gradients
+     span it (and pattern tiles anchor to it) so the fill flows continuously
+     across joined bubbles instead of restarting in each one */
+  joinRect?: { x: number; y: number; w: number; h: number } | null;
+}) {
   const g = balloonGeom(el);
   const f = el.fill;
   const gid = `grad-${el.id}`, cid = `clip-${el.id}`, pid = `pat-${el.id}`, mid = `melt-${el.id}`;
@@ -38,16 +44,37 @@ export function BalloonShape({ el, mergeBase, imgSrc }: { el: BalloonEl; mergeBa
       style={{ position: "absolute", inset: 0, overflow: "visible", filter: el.shadow ? "drop-shadow(8px 8px 10px #00000059)" : undefined }}
     >
       <defs>
-        {f.kind === "gradient" && (
-          <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1" gradientTransform={`rotate(${f.angle - 180}, 0.5, 0.5)`}>
-            {f.stops?.length
-              ? f.stops.map(([c, p], i) => <stop key={i} offset={p} stopColor={c} />)
-              : <><stop offset="0" stopColor={f.a} /><stop offset="1" stopColor={f.b} /></>}
-          </linearGradient>
-        )}
+        {f.kind === "gradient" && (() => {
+          const stops = f.stops?.length
+            ? f.stops.map(([c, p], i) => <stop key={i} offset={p} stopColor={c} />)
+            : <><stop offset="0" stopColor={f.a} /><stop offset="1" stopColor={f.b} /></>;
+          if (joinRect) {
+            /* joined balloons: ONE gradient across the whole group, in user
+               space (same axis formula as export's paintFill) — a per-bubble
+               gradient restarts at the join and draws a seam line there */
+            const rad = ((f.angle - 90) * Math.PI) / 180;
+            const cx = joinRect.x + joinRect.w / 2, cy = joinRect.y + joinRect.h / 2;
+            const len = (Math.abs(Math.cos(rad)) * joinRect.w + Math.abs(Math.sin(rad)) * joinRect.h) / 2;
+            return (
+              <linearGradient id={gid} gradientUnits="userSpaceOnUse"
+                x1={cx - Math.cos(rad) * len} y1={cy - Math.sin(rad) * len}
+                x2={cx + Math.cos(rad) * len} y2={cy + Math.sin(rad) * len}>
+                {stops}
+              </linearGradient>
+            );
+          }
+          return (
+            <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1" gradientTransform={`rotate(${f.angle - 180}, 0.5, 0.5)`}>
+              {stops}
+            </linearGradient>
+          );
+        })()}
         {needClip && <clipPath id={cid}><path d={g.d} /></clipPath>}
         {tileURL && repeating && tile && (
-          <pattern id={pid} patternUnits="userSpaceOnUse" width={tile.width} height={tile.height}>
+          /* joined balloons anchor the tiling to the group box so the pattern
+             phase matches across both bubbles */
+          <pattern id={pid} patternUnits="userSpaceOnUse" width={tile.width} height={tile.height}
+            x={joinRect ? joinRect.x : 0} y={joinRect ? joinRect.y : 0}>
             <image href={tileURL} width={tile.width} height={tile.height} />
           </pattern>
         )}
@@ -104,7 +131,10 @@ export function BalloonShape({ el, mergeBase, imgSrc }: { el: BalloonEl; mergeBa
            two inked sides sit over the band). Clipped to the wedge, so the
            band's opening into the partner body is untouched. */
         <g clipPath={`url(#${wid})`}>
-          <path d={mergeBase.d} transform={mergeBase.tf} fill={mergeBase.color} />
+          {/* on a gradient join the wedge carries the SHARED user-space
+              gradient — a flat colour there would draw its own seam */}
+          <path d={mergeBase.d} transform={mergeBase.tf}
+            fill={f.kind === "gradient" && joinRect ? fillRef : mergeBase.color} />
           <path d={mergeBase.d} transform={mergeBase.tf} fill="none"
             stroke={mergeBase.stroke} strokeWidth={mergeBase.strokeW} strokeLinejoin="round" />
         </g>

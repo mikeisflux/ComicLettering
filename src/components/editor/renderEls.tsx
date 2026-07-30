@@ -4,7 +4,7 @@
    contentEditable text keeps focus while editing). */
 import React, { CSSProperties } from "react";
 import {
-  El, FILTERS, TextEl, aabbOverlap, applyCrossbarI, resolveBalloon, rotVec,
+  El, FILTERS, TextEl, aabbOverlap, applyCrossbarI, joinGroupRect, resolveBalloon, rotVec,
 } from "@/lib/model";
 import { arcTextLayout, balloonGeom, connectorMid } from "@/lib/geometry";
 import { fillCss } from "@/lib/fills";
@@ -105,9 +105,12 @@ export function renderEl(ed: EditorCtx, el: El) {
     const g = balloonGeom(bEl);
     const [tx, ty, tw, th] = g.textRect;
     const editing = editingId === el.id;
+    /* joined group: fills span the whole group so styles flow across the join */
+    const jg = joinGroupRect(page!, el);
+    const joinRect = jg ? { x: jg.x - el.x, y: jg.y - el.y, w: jg.w, h: jg.h } : null;
     return (
       <div {...common} className="el balloon" style={style}>
-        <BalloonShape el={bEl} mergeBase={mergeBase} imgSrc={el.img ? assetsRef.current[el.img] : null} />
+        <BalloonShape el={bEl} mergeBase={mergeBase} imgSrc={el.img ? assetsRef.current[el.img] : null} joinRect={joinRect} />
         <div
           key={editing ? "edit" : "static"}
           className="txt"

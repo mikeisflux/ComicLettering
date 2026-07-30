@@ -348,6 +348,30 @@ function bandToward(from: BalloonEl, to: BalloonEl, keep?: BalloonEl["tail"]): B
   return t;
 }
 
+/* Balloons joined into one group — a parent and every balloon attached to it —
+   share fill geometry: a gradient spans the WHOLE group instead of restarting
+   inside each bubble, so a styled pair reads as one inked shape with no seam
+   at the join (a colour mismatch there is what draws the "line"). Returns the
+   group's page-coord bounding box, or null for an unjoined balloon. Rotation
+   is ignored — the union is page-aligned. */
+export function joinGroupRect(page: Page, el: BalloonEl): { x: number; y: number; w: number; h: number } | null {
+  const rootId = el.attachTo && page.els.some((o) => o.id === el.attachTo && o.type === "balloon")
+    ? el.attachTo : el.id;
+  const root = page.els.find((o) => o.id === rootId && o.type === "balloon") as BalloonEl | undefined;
+  if (!root) return null;
+  const group = [root, ...page.els.filter(
+    (o): o is BalloonEl => o.type === "balloon" && (o as BalloonEl).attachTo === rootId)];
+  if (group.length < 2 || !group.some((o) => o.id === el.id)) return null;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const o of group) {
+    if (o.x < x0) x0 = o.x;
+    if (o.y < y0) y0 = o.y;
+    if (o.x + o.w > x1) x1 = o.x + o.w;
+    if (o.y + o.h > y1) y1 = o.y + o.h;
+  }
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+}
+
 /* Resolve a balloon's effective tail for rendering. Joined balloons connect
    with a wide band that opens into BOTH balloons; once they overlap they melt
    into one shape and the connector vanishes entirely. */
