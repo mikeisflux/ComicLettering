@@ -494,7 +494,24 @@ function drawEl(ctx: CanvasRenderingContext2D, el: El, assets: Assets, merge?: M
       if (merge) {
         /* joined balloons: stroke under, fills over → union outline */
         ctx.lineWidth = el.strokeW * 2;
-        ctx.stroke(path);
+        if (!merge.strokeW) {
+          /* melt (overlapping): hide this balloon's outline where it crosses
+             INTO the partner, so the union has no inner seam — clip to
+             everything OUTSIDE the partner (big rect XOR partner, evenodd) */
+          ctx.save();
+          const clip = new Path2D();
+          clip.rect(-el.w, -el.h, el.w * 3, el.h * 3);
+          const m = new DOMMatrix();
+          m.translateSelf(merge.cx, merge.cy);
+          m.rotateSelf(merge.rot);
+          m.translateSelf(-merge.bw / 2, -merge.bh / 2);
+          clip.addPath(new Path2D(merge.d), m);
+          ctx.clip(clip, "evenodd");
+          ctx.stroke(path);
+          ctx.restore();
+        } else {
+          ctx.stroke(path);
+        }
       }
     }
     paintFill(ctx, el.fill, el.w, el.h, path);
@@ -511,18 +528,16 @@ function drawEl(ctx: CanvasRenderingContext2D, el: El, assets: Assets, merge?: M
       ctx.translate(merge.cx, merge.cy);
       ctx.rotate(deg2rad(merge.rot));
       ctx.translate(-merge.bw / 2, -merge.bh / 2);
-      const mPath = new Path2D(merge.d);
       /* Apart (strokeW set): redraw the partner's OUTLINE over the band only.
-         Filling it would paint over the partner's own text — the editor does
-         the same (see BalloonShape). Overlapping: fill to union the blobs. */
+         Filling it would paint over the partner's own text (see BalloonShape).
+         Overlapping (melt) fills nothing: the two same-colour bodies union on
+         their own and this balloon's outline is clipped above instead. */
       if (merge.strokeW) {
+        const mPath = new Path2D(merge.d);
         ctx.strokeStyle = merge.stroke!;
         ctx.lineWidth = merge.strokeW;
         ctx.lineJoin = "round";
         ctx.stroke(mPath);
-      } else {
-        ctx.fillStyle = merge.color;
-        ctx.fill(mPath);
       }
       ctx.restore();
     } else if (el.strokeW > 0 && !g.noStroke) {

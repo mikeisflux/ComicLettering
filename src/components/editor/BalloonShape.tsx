@@ -12,7 +12,13 @@ export interface MergeBaseInfo { d: string; color: string; tf: string; stroke?: 
 export function BalloonShape({ el, mergeBase, imgSrc }: { el: BalloonEl; mergeBase?: MergeBaseInfo | null; imgSrc?: string | null }) {
   const g = balloonGeom(el);
   const f = el.fill;
-  const gid = `grad-${el.id}`, cid = `clip-${el.id}`, pid = `pat-${el.id}`;
+  const gid = `grad-${el.id}`, cid = `clip-${el.id}`, pid = `pat-${el.id}`, mid = `melt-${el.id}`;
+  /* melt (overlapping join): the two same-colour bodies union on their own —
+     we must NOT fill the partner over this SVG (that painted over the
+     partner's own text). Instead mask THIS balloon's outline so its seam
+     inside the partner vanishes; the partner's seam inside us is already
+     hidden by our fill. */
+  const melt = !!mergeBase && !mergeBase.strokeW;
   const tile = f.kind !== "solid" && f.kind !== "gradient" ? fillOverlayTile(f) : null;
   const tileURL = tile ? fillOverlayURL(f) : null;
   const needClip = !!tileURL || !!imgSrc;
@@ -40,11 +46,20 @@ export function BalloonShape({ el, mergeBase, imgSrc }: { el: BalloonEl; mergeBa
             <image href={tileURL} width={tile.width} height={tile.height} />
           </pattern>
         )}
+        {melt && mergeBase && (
+          /* white = keep, black = drop: hide this balloon's outline where it
+             crosses INTO the partner, so the melted blob has no inner seam */
+          <mask id={mid} maskUnits="userSpaceOnUse" x={-el.w} y={-el.h} width={el.w * 3} height={el.h * 3}>
+            <rect x={-el.w} y={-el.h} width={el.w * 3} height={el.h * 3} fill="white" />
+            <path d={mergeBase.d} transform={mergeBase.tf} fill="black" />
+          </mask>
+        )}
       </defs>
       {mergeBase && el.strokeW > 0 && !g.noStroke && (
         /* joined balloons: stroke under, fills over → outlines union */
         <path d={g.d} fill="none" stroke={el.stroke} strokeWidth={el.strokeW * 2}
-          strokeLinejoin="round" strokeDasharray={g.dash ? g.dash.join(" ") : undefined} />
+          strokeLinejoin="round" strokeDasharray={g.dash ? g.dash.join(" ") : undefined}
+          mask={melt ? `url(#${mid})` : undefined} />
       )}
       <path d={g.d} fill={fillRef} />
       {tileURL && (repeating
@@ -54,20 +69,14 @@ export function BalloonShape({ el, mergeBase, imgSrc }: { el: BalloonEl; mergeBa
         <image href={imgSrc} x={0} y={0} width={el.w} height={el.h}
           preserveAspectRatio="xMidYMid slice" clipPath={`url(#${cid})`} />
       )}
-      {mergeBase && (
+      {mergeBase && mergeBase.strokeW && (
+        /* APART: redraw the partner's OUTLINE over the band so the band tucks
+           under it — but do NOT re-fill the partner (that painted over the
+           partner's text). OVERLAPPING (melt) fills nothing here: the two
+           same-colour bodies union on their own and this balloon's outline is
+           masked instead — see the melt mask above. */
         <g transform={mergeBase.tf}>
-          {/* mergeBase.strokeW is set only when the two balloons are APART.
-              Apart: redraw the partner's OUTLINE over the band so the band
-              tucks under it — but do NOT re-fill the partner. This child SVG
-              sits above the partner, so a filled copy would paint over the
-              partner's own text (that is the "Add Bubble emptied my bubble"
-              bug). Overlapping: no stroke, fill the partner to union the
-              two blobs into one melted shape. */}
-          {mergeBase.strokeW ? (
-            <path d={mergeBase.d} fill="none" stroke={mergeBase.stroke} strokeWidth={mergeBase.strokeW} strokeLinejoin="round" />
-          ) : (
-            <path d={mergeBase.d} fill={mergeBase.color} />
-          )}
+          <path d={mergeBase.d} fill="none" stroke={mergeBase.stroke} strokeWidth={mergeBase.strokeW} strokeLinejoin="round" />
         </g>
       )}
       {/* open connector band: fill covers both outlines at the junctions,
