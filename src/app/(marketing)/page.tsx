@@ -80,21 +80,21 @@ export default function Home() {
         </p>
         <figure className="shotHero">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/shots/studio.png" width={1600} height={1000}
-            alt="The LetterMyComic studio: a comic cover with speech balloons, a BOOM! sound effect and halftones, with the full editor toolbar, lettering-style swatches and balloon tray." />
+          <img src="/shots/studio.webp" width={1600} height={1000}
+            alt="The LetterMyComic studio: a comic page with joined gradient speech balloons, a warped KRAKOOM! sound effect, speedline and halftone panels, with the full editor toolbar, lettering-style swatches, balloon tray and layouts." />
           <figcaption>The full studio — toolbar, one-click lettering styles, balloon tray and layouts, all in your browser.</figcaption>
         </figure>
         <div className="shotRow">
           <figure>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/shots/page.png" width={492} height={738}
-              alt="A finished comic cover page with joined speech balloons, a styled BOOM! sound effect and a red halftone gradient." />
+            <img src="/shots/page.webp" width={492} height={751}
+              alt="A finished comic page with joined gradient speech balloons, a warped KRAKOOM! sound effect, a thought bubble over speedlines and a shout burst over halftones." />
             <figcaption>Finished pages export print-ready at up to 450 DPI.</figcaption>
           </figure>
           <figure>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/shots/fonts.png" width={250} height={480}
-              alt="The font menu showing comic lettering fonts, each previewed in its own typeface." />
+            <img src="/shots/fonts.webp" width={250} height={479}
+              alt="The font menu showing comic lettering fonts, each previewed live in its own typeface." />
             <figcaption>150+ comic fonts with live previews — plus upload your own.</figcaption>
           </figure>
         </div>
