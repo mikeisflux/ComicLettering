@@ -81,13 +81,12 @@ export function drawWarped(
       const bx = (p01[0] - p00[0]) / ch, by = (p01[1] - p00[1]) / ch;
       if (!Number.isFinite(ax) || !Number.isFinite(by)) continue;
       ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(p00[0], p00[1]); ctx.lineTo(p10[0], p10[1]);
-      ctx.lineTo(p11[0], p11[1]); ctx.lineTo(p01[0], p01[1]);
-      ctx.closePath();
-      ctx.clip();
+      /* NO per-cell clip: an antialiased clip edge lets the background bleed
+         through along every cell border, drawing the mesh as a faint grid
+         over the letters. Neighbouring cells overdraw each other by a hair
+         instead — their content matches to sub-pixel accuracy at the seam, so
+         the overlap is invisible and the grid is gone. */
       ctx.transform(ax, ay, bx, by, p00[0] - ax * sx - bx * sy, p00[1] - ay * sx - by * sy);
-      /* overdraw slightly so neighbouring cells leave no hairline seams */
       ctx.drawImage(src, sx - 0.6, sy - 0.6, cw + 1.2, ch + 1.2,
         sx - 0.6, sy - 0.6, cw + 1.2, ch + 1.2);
       ctx.restore();
