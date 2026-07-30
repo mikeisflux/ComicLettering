@@ -810,7 +810,16 @@ export async function importStampFiles(ed: EditorCtx, files: File[]) {
   const { customStamps, setCustomStamps, setStatus } = ed;
   const list = [...customStamps];
   for (const f of files) {
-    const url = await readAsDataURL(f);
+    if (!isSupportedArtFile(f) || f.type === "application/pdf" || /\.pdf$/i.test(f.name)) {
+      setStatus(`"${f.name}" isn't a supported stamp image — use ${ART_FORMATS_LABEL.replace(" or PDF", "")}.`);
+      continue;
+    }
+    let blob: Blob = f;
+    if (isTiffFile(f)) {
+      try { blob = await normalizeArtFile(f); }
+      catch { setStatus(`Could not read "${f.name}" — save that TIFF as PNG first.`); continue; }
+    }
+    const url = await readAsDataURL(blob);
     const serverId = await uploadAsset("stamp", f.name.replace(/\.\w+$/, ""), url);
     list.push({ id: serverId || crypto.randomUUID(), url, serverId: serverId || undefined });
   }
@@ -856,12 +865,63 @@ export function removeCustomStamp(ed: EditorCtx, id: string) {
   try { localStorage.setItem("lmc.stamps", JSON.stringify(list)); } catch { /* ignore */ }
 }
 
-export const readAsDataURL = (f: File) => new Promise<string>((res, rej) => {
+export const readAsDataURL = (f: Blob) => new Promise<string>((res, rej) => {
   const r = new FileReader();
   r.onload = () => res(r.result as string);
   r.onerror = rej;
   r.readAsDataURL(f);
 });
+
+/* Browsers cannot decode TIFF, yet scans and print masters commonly arrive as
+   .tif — so dropped TIFFs are converted to PNG in-page (UTIF, lazy-loaded)
+   and then flow through the normal artwork pipeline. Any other file type is
+   returned untouched. Some pickers/OSes leave the MIME type empty for .tif,
+   so the name is checked too. */
+export const isTiffFile = (f: File) =>
+  f.type === "image/tiff" || f.type === "image/tif" || /\.tiff?$/i.test(f.name);
+
+/* The single source of truth for what artwork the importer accepts: every
+   format browsers decode natively, plus PDF (rasterised on import) and TIFF
+   (converted in-page). Mirrored in the site docs — update both together. */
+const ART_MIMES = [
+  "image/png", "image/jpeg", "image/webp", "image/gif", "image/avif",
+  "image/bmp", "image/svg+xml", "image/tiff", "application/pdf",
+];
+const ART_EXTS = ["png", "jpg", "jpeg", "webp", "gif", "avif", "bmp", "svg", "tif", "tiff", "pdf"];
+export const ART_ACCEPT = ART_MIMES.join(",") + ",.tif,.tiff,.pdf";
+export const ART_FORMATS_LABEL = "PNG, JPG, WebP, GIF, AVIF, BMP, SVG, TIFF or PDF";
+export const isSupportedArtFile = (f: File) =>
+  ART_MIMES.includes(f.type) ||
+  ART_EXTS.includes((f.name.split(".").pop() || "").toLowerCase());
+
+export async function normalizeArtFile(f: File): Promise<Blob> {
+  if (!isTiffFile(f)) return f;
+  const UTIF = await import("utif2");
+  const buf = await f.arrayBuffer();
+  const ifds = UTIF.decode(buf);
+  if (!ifds.length) throw new Error("no image in TIFF");
+  /* multi-page TIFFs often carry a thumbnail page — decode all, keep the
+     largest */
+  for (const ifd of ifds) {
+    try { UTIF.decodeImage(buf, ifd); } catch { /* skip undecodable pages */ }
+  }
+  const best = ifds.reduce((a, b) =>
+    ((b.width || 0) * (b.height || 0) > ((a.width || 0) * (a.height || 0)) ? b : a));
+  const rgba = UTIF.toRGBA8(best);
+  const w = best.width, h = best.height;
+  if (!w || !h || !rgba?.length) throw new Error("empty TIFF");
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext("2d");
+  if (!ctx) throw new Error("no canvas");
+  const id = ctx.createImageData(w, h);
+  id.data.set(new Uint8ClampedArray(rgba.buffer, rgba.byteOffset, rgba.byteLength));
+  ctx.putImageData(id, 0, 0);
+  const blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/png"));
+  if (!blob) throw new Error("TIFF convert failed");
+  return blob;
+}
 
 export function placeAsset(ed: EditorCtx, aid: string, natW: number, natH: number, x?: number, y?: number) {
   const { docRef, pageIndexRef, pendingLockRef, commit, setSelId } = ed;
@@ -904,15 +964,30 @@ export async function importPdfFile(ed: EditorCtx, f: File, x?: number, y?: numb
 }
 
 export async function importImageFile(ed: EditorCtx, f: File, x?: number, y?: number) {
-  const { aidRef, assetsRef } = ed;
+  const { aidRef, assetsRef, setStatus } = ed;
+  if (!isSupportedArtFile(f)) {
+    setStatus(`"${f.name}" isn't a supported image — use ${ART_FORMATS_LABEL}.`);
+    return;
+  }
   if (f.type === "application/pdf" || /\.pdf$/i.test(f.name)) {
     await importPdfFile(ed, f, x, y);
     return;
   }
+  let src: Blob = f;
+  if (isTiffFile(f)) {
+    setStatus("Converting TIFF…");
+    try {
+      src = await normalizeArtFile(f);
+    } catch {
+      setStatus(`Could not read "${f.name}" — that TIFF uses a compression this browser can't open. Save it as PNG and drop that instead.`);
+      return;
+    }
+  }
   const aid = nextAid(ed);
-  const url = await stashArt(ed, aid, f);
+  const url = await stashArt(ed, aid, src);
   const img = await loadImage(url);
   placeAsset(ed, aid, img.naturalWidth, img.naturalHeight, x, y);
+  if (isTiffFile(f)) setStatus("TIFF converted and placed.");
 }
 
 /* Put artwork in the local store as a Blob and hand back a URL the canvas and
@@ -1065,8 +1140,12 @@ export function hitElAt(ed: EditorCtx, x: number, y: number): El | null {
 export async function onDrop(ed: EditorCtx, e: React.DragEvent) {
   const { pagePoint, aidRef, assetsRef, commit, setSelId, setStatus } = ed;
   e.preventDefault();
-  const files = [...(e.dataTransfer?.files || [])].filter(
-    (f) => f.type.startsWith("image/") || f.type === "application/pdf" || /\.pdf$/i.test(f.name));
+  const all = [...(e.dataTransfer?.files || [])];
+  const files = all.filter(isSupportedArtFile);
+  const rejected = all.length - files.length;
+  if (rejected > 0) {
+    setStatus(`${rejected === all.length ? "That file type isn't" : `${rejected} of those files aren't`} supported — use ${ART_FORMATS_LABEL}.`);
+  }
   if (!files.length) return;
   const pt = pagePoint(e);
   let off = 0;
@@ -1075,7 +1154,17 @@ export async function onDrop(ed: EditorCtx, e: React.DragEvent) {
     /* dropping an image onto a balloon or panel fills it in place */
     const target = !isPdf && off === 0 ? hitElAt(ed, pt.x, pt.y) : null;
     if (target && (target.type === "balloon" || target.type === "panel" || target.type === "image") && !target.locked) {
-      const url = await readAsDataURL(f);
+      let blob: Blob = f;
+      if (isTiffFile(f)) {
+        setStatus("Converting TIFF…");
+        try {
+          blob = await normalizeArtFile(f);
+        } catch {
+          setStatus(`Could not read "${f.name}" — save that TIFF as PNG and drop it again.`);
+          continue;
+        }
+      }
+      const url = await readAsDataURL(blob);
       const img = await loadImage(url);
       const aid = nextAid(ed);
       assetsRef.current[aid] = url;

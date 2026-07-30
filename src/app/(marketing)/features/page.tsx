@@ -69,7 +69,7 @@ const GROUPS: { h: string; items: [string, string][] }[] = [
   {
     h: "Artwork & Export",
     items: [
-      ["Drop-in artwork", "Drag images straight onto the page or double-click a panel to fill it. Images resize proportionally and snap to the border for a perfect fit."],
+      ["Drop-in artwork", "Drag images straight onto the page or double-click a panel to fill it — PNG, JPG, WebP, GIF, AVIF, BMP, SVG, TIFF or PDF. Print-res TIFFs convert automatically on drop. Images resize proportionally and snap to the border for a perfect fit."],
       ["Lettering-only export", "Export just your balloons and text as a transparent PNG — drop your lettering straight onto artwork in any other tool."],
       ["Print-ready formats", "Full-resolution PNG, JPG, print TIFF, PDF and CBZ, at up to 450 dpi — plus a cloud project library, JSON backups and autosave."],
     ],

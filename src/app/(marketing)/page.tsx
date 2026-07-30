@@ -48,7 +48,7 @@ const FEATURES = [
   { e: "🔤", t: "150+ comic fonts & styles", d: "90+ pro SFX presets with gradient fills, outlines and drop shadows, plus 150+ built-in comic fonts — including original typefaces you won't find anywhere else." },
   { e: "🗒️", t: "60+ panel layouts", d: "Golden-age grids to modern widescreen, manga, Euro album and tilted action layouts — applied in one click. Duplicate and reorder pages as your story grows." },
   { e: "🎯", t: "Halftones & speedlines", d: "Classic print halftones, motion lines, bursts, tile screens and textures — generated sharp at any size." },
-  { e: "🖼️", t: "Your art, your pages", d: "Drop artwork straight onto panels — it resizes proportionally and snaps to the border — apply photo filters, and letter over it. Nothing is ever uploaded." },
+  { e: "🖼️", t: "Your art, your pages", d: "Drop artwork straight onto panels — PNG, JPG, WebP, TIFF, even PDF — it resizes proportionally and snaps to the border. Apply photo filters and letter over it. Nothing is ever uploaded." },
   { e: "🖨️", t: "Print-ready export", d: "PNG, JPG, TIFF, PDF and CBZ at up to 450 dpi — plus lettering-only transparent PNGs and a cloud project library so your books are saved and versioned." },
   { e: "⚡", t: "No installs, no crashes", d: "Runs in any modern browser on Windows, Mac, Linux and Chromebooks. Your work autosaves as you go." },
   { e: "🔒", t: "Private by design", d: "Your artwork renders locally in your browser. Only projects you choose to save touch our servers." },

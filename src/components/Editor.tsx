@@ -33,9 +33,10 @@ import { encodeImage, samError, segmentBox } from "@/lib/sam";
 import { PageSetupDialog, Ruler, STAGE_MX, STAGE_MY } from "./editor/chrome";
 import { EditorCtx } from "./editor/ctx";
 import {
-  addFromTray, alignSel, applyQuickFill, assignImageToPanel, copySel, cutSel, deleteSel,
+  ART_ACCEPT, ART_FORMATS_LABEL, addFromTray, alignSel, applyQuickFill, assignImageToPanel,
+  copySel, cutSel, deleteSel,
   duplicatePage, duplicateSel, growBalloonToFit, importFontFiles, importImageFile, importJSON,
-  sizeTextToContent,
+  isSupportedArtFile, normalizeArtFile, sizeTextToContent,
   fitBalloonToText, importStampFiles, movePage, nextAid, onDrop, pasteClip,
   printPage, readAsDataURL, refreshProjects, reorder, saveProject,
 } from "./editor/ops";
@@ -1391,19 +1392,26 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
         />
       )}
       {/* hidden inputs */}
-      <input ref={fileImageRef} type="file" accept="image/*,application/pdf,.pdf" multiple hidden
+      <input ref={fileImageRef} type="file" accept={ART_ACCEPT} multiple hidden
         onChange={async (e) => {
           for (const f of Array.from(e.target.files || [])) await importImageFile(ed, f);
           e.target.value = "";
         }} />
-      <input ref={filePanelImageRef} type="file" accept="image/*" hidden
+      <input ref={filePanelImageRef} type="file" accept={ART_ACCEPT.replace(/,?application\/pdf|,?\.pdf/g, "")} hidden
         onChange={async (e) => {
           const f = e.target.files?.[0];
           e.target.value = "";
           const targetId = panelImageTarget.current;
           panelImageTarget.current = null;
           if (!f || !targetId) return;
-          const url = await readAsDataURL(f);
+          if (!isSupportedArtFile(f) || f.type === "application/pdf" || /\.pdf$/i.test(f.name)) {
+            setStatus(`"${f.name}" isn't a supported image — use ${ART_FORMATS_LABEL.replace(" or PDF", "")}.`);
+            return;
+          }
+          let blob: Blob = f;
+          try { blob = await normalizeArtFile(f); }
+          catch { setStatus(`Could not read "${f.name}" — save that TIFF as PNG first.`); return; }
+          const url = await readAsDataURL(blob);
           await loadImage(url);
           const aid = nextAid(ed);
           assetsRef.current[aid] = url;
