@@ -347,6 +347,23 @@ function bandToward(from: BalloonEl, to: BalloonEl, keep?: BalloonEl["tail"]): B
     const perp = Math.abs(keep.bx * dy - keep.by * dx) / len; // sideways deviation
     if (along > -len * 0.4 && along < len * 1.8 && perp <= len * 1.8) {
       t.bx = keep.bx; t.by = keep.by; t.tx = keep.tx; t.ty = keep.ty;
+      /* The tip must stay CONNECTED to the partner's edge as the curve sweeps:
+         seat it where the ray from the partner's centre toward the bend point
+         crosses the partner's outline (just inside), so the attach point walks
+         around the partner instead of staying pinned at the centre-to-centre
+         spot with the curve arriving somewhere else. */
+      const [bpx, bpy] = rotVec(keep.bx, keep.by, from.rot);   // bend, page frame
+      const bendPX = fcx + bpx, bendPY = fcy + bpy;
+      let ex = bendPX - pcx, ey = bendPY - pcy;
+      const eL = Math.hypot(ex, ey);
+      if (eL > 4) {
+        ex /= eL; ey /= eL;
+        const rEdge = (prx * pry) / (Math.hypot(pry * ex, prx * ey) || 1);
+        const r = Math.max(prx * 0.25, rEdge - seatIn);
+        const tipPX = pcx + ex * r, tipPY = pcy + ey * r;
+        const [ldx, ldy] = rotVec(tipPX - fcx, tipPY - fcy, -from.rot);
+        t.dx = Math.round(ldx); t.dy = Math.round(ldy);
+      }
     } else {
       t.bx = Math.round(dx / 2); t.by = Math.round(dy / 2);   // reset to midpoint
     }
