@@ -376,7 +376,7 @@ export function renderOverlay(ed: EditorCtx) {
           Reposition a joined bubble by dragging its body; bend/tilt the band
           with the handles below. */}
       {el.type === "balloon" && el.tail && !el.attachTo && (
-        <div className="handle tail" title="Drag to aim the tail tip"
+        <div className="handle tail" title="Drag to aim the tail tip · drop it inside another bubble to join them"
           style={{ left: (el.w / 2 + el.tail.dx) * z - 7, top: (el.h / 2 + el.tail.dy) * z - 7 }}
           onPointerDown={(e) => startDrag(e, el, "tail")} />
       )}

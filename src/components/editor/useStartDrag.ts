@@ -231,6 +231,25 @@ export function useStartDrag(deps: DragDeps) {
           next.by = oldTail.by;
         }
         cur.tail = next;
+        /* dropping the tip inside another bubble JOINS them — bubbles join in
+           any order, including onto one that already has a partner. The band
+           appears live while hovering; dragging back out detaches again. A
+           join that would loop the chain back onto itself is refused. */
+        const chainReaches = (from: BalloonEl, targetId: string): boolean => {
+          let n: BalloonEl | undefined = from;
+          for (let i = 0; i < 32 && n; i++) {
+            if (n.id === targetId) return true;
+            n = n.attachTo
+              ? p.els.find((o) => o.id === n!.attachTo && o.type === "balloon") as BalloonEl | undefined
+              : undefined;
+          }
+          return false;
+        };
+        const hit = p.els.find((o) =>
+          o.type === "balloon" && o.id !== cur.id && !o.locked &&
+          pt.x >= o.x && pt.x <= o.x + o.w && pt.y >= o.y && pt.y <= o.y + o.h &&
+          !chainReaches(o as BalloonEl, cur.id));
+        if (hit) cur.attachTo = hit.id;
       } else if (mode === "bow" && cur.type === "balloon" && cur.tail) {
         const cx = orig.x + orig.w / 2, cy = orig.y + orig.h / 2;
         const [ldx, ldy] = rotVec(pt.x - cx, pt.y - cy, -orig.rot);

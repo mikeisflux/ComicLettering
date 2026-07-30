@@ -355,15 +355,31 @@ function bandToward(from: BalloonEl, to: BalloonEl, keep?: BalloonEl["tail"]): B
    group's page-coord bounding box, or null for an unjoined balloon. Rotation
    is ignored — the union is page-aligned. */
 export function joinGroupRect(page: Page, el: BalloonEl): { x: number; y: number; w: number; h: number } | null {
-  const rootId = el.attachTo && page.els.some((o) => o.id === el.attachTo && o.type === "balloon")
-    ? el.attachTo : el.id;
-  const root = page.els.find((o) => o.id === rootId && o.type === "balloon") as BalloonEl | undefined;
-  if (!root) return null;
-  const group = [root, ...page.els.filter(
-    (o): o is BalloonEl => o.type === "balloon" && (o as BalloonEl).attachTo === rootId)];
-  if (group.length < 2 || !group.some((o) => o.id === el.id)) return null;
+  /* the group is the CONNECTED COMPONENT over attachTo links, walked in both
+     directions — bubbles join in any order (chains, stars, a third bubble
+     hung off an existing pair), so a root-plus-direct-children view misses
+     members and splits the shared fill */
+  const balloons = page.els.filter((o): o is BalloonEl => o.type === "balloon");
+  const seen = new Set<string>([el.id]);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const b of balloons) {
+      if (seen.has(b.id)) {
+        if (b.attachTo && !seen.has(b.attachTo) && balloons.some((x) => x.id === b.attachTo)) {
+          seen.add(b.attachTo);
+          grew = true;
+        }
+      } else if (b.attachTo && seen.has(b.attachTo)) {
+        seen.add(b.id);
+        grew = true;
+      }
+    }
+  }
+  if (seen.size < 2) return null;
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-  for (const o of group) {
+  for (const o of balloons) {
+    if (!seen.has(o.id)) continue;
     if (o.x < x0) x0 = o.x;
     if (o.y < y0) y0 = o.y;
     if (o.x + o.w > x1) x1 = o.x + o.w;
