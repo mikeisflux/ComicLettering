@@ -22,6 +22,7 @@ export interface TuckDragDeps {
   pageIndexRef: React.RefObject<number>;
   ptsRef: React.RefObject<number[][] | null>;
   pagePoint: (e: { clientX: number; clientY: number }) => { x: number; y: number };
+  zoom: number;
   force: () => void;
   setStatus: (msg: string) => void;
   setTuckMode: (v: boolean) => void;
@@ -32,6 +33,93 @@ export interface TuckDragDeps {
    afterwards anyway. */
 const MIN_STEP = 2.5;
 
+/* ---------------- magnetic trace (edge snapping) ----------------
+
+   The lasso works like a magnetic pen: a Sobel edge map of the artwork under
+   the cursor is built once when the drag starts, and every sampled point then
+   snaps to the strongest nearby edge (weighted toward the cursor, so a faint
+   line right under the pen beats a bold one at the search rim). Where the art
+   has no edges the raw hand line is kept — and holding Alt draws freehand. */
+
+interface EdgeField {
+  mag: Float32Array;         // gradient magnitude, normalised 0..1
+  w: number; h: number;      // field dimensions in pixels
+  ex: number; ey: number;    // element origin in page coords
+  scale: number;             // field px per page unit
+}
+
+function buildEdgeField(
+  img: HTMLImageElement, ex: number, ey: number, elW: number, elH: number,
+): EdgeField | null {
+  const scale = Math.min(1, 1100 / Math.max(elW, elH));
+  const w = Math.max(2, Math.round(elW * scale));
+  const h = Math.max(2, Math.round(elH * scale));
+  const cv = document.createElement("canvas");
+  cv.width = w; cv.height = h;
+  const ctx = cv.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return null;
+  /* same cover-crop the editor uses to show the artwork */
+  const natW = img.naturalWidth, natH = img.naturalHeight;
+  const s = Math.max(elW / natW, elH / natH);
+  const sw = elW / s, sh = elH / s;
+  ctx.drawImage(img, (natW - sw) / 2, (natH - sh) / 2, sw, sh, 0, 0, w, h);
+  let data: ImageData;
+  try { data = ctx.getImageData(0, 0, w, h); } catch { return null; } // tainted
+  const dpx = data.data;
+  const lum = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) {
+    lum[i] = 0.2126 * dpx[i * 4] + 0.7152 * dpx[i * 4 + 1] + 0.0722 * dpx[i * 4 + 2];
+  }
+  const mag = new Float32Array(w * h);
+  let maxM = 1e-6;
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x;
+      const gx = -lum[i - w - 1] - 2 * lum[i - 1] - lum[i + w - 1]
+        + lum[i - w + 1] + 2 * lum[i + 1] + lum[i + w + 1];
+      const gy = -lum[i - w - 1] - 2 * lum[i - w] - lum[i - w + 1]
+        + lum[i + w - 1] + 2 * lum[i + w] + lum[i + w + 1];
+      const m = Math.hypot(gx, gy);
+      mag[i] = m;
+      if (m > maxM) maxM = m;
+    }
+  }
+  for (let i = 0; i < mag.length; i++) mag[i] /= maxM;
+  return { mag, w, h, ex, ey, scale };
+}
+
+/* An edge weaker than this is noise — keep the hand's own line there. */
+const SNAP_FLOOR = 0.14;
+
+function snapToEdge(f: EdgeField, x: number, y: number, radiusPage: number): [number, number] {
+  const fx = (x - f.ex) * f.scale, fy = (y - f.ey) * f.scale;
+  const r = Math.min(28, Math.max(2, radiusPage * f.scale));
+  const x0 = Math.max(1, Math.round(fx - r)), x1 = Math.min(f.w - 2, Math.round(fx + r));
+  const y0 = Math.max(1, Math.round(fy - r)), y1 = Math.min(f.h - 2, Math.round(fy + r));
+  let best = 0, bx = -1, by = -1;
+  for (let py = y0; py <= y1; py++) {
+    for (let px = x0; px <= x1; px++) {
+      const dist = Math.hypot(px - fx, py - fy);
+      if (dist > r) continue;
+      /* distance falloff: the pen's own neighbourhood wins ties */
+      const score = f.mag[py * f.w + px] * (1 - 0.45 * (dist / r));
+      if (score > best) { best = score; bx = px; by = py; }
+    }
+  }
+  if (best < SNAP_FLOOR || bx < 0) return [x, y];
+  return [f.ex + bx / f.scale, f.ey + by / f.scale];
+}
+
+/* Topmost unrotated panel/image with artwork at a page point, skipping
+   cutouts this tool already placed (they sit on top, mostly transparent). */
+function artTargetAt(d: TuckDragDeps, x: number, y: number) {
+  const pg = d.docRef.current!.pages[d.pageIndexRef.current];
+  return [...pg.els].reverse().find((el) =>
+    (el.type === "panel" || el.type === "image") && el.img && !el.rot &&
+    !(el.type === "image" && el.cut) &&
+    x >= el.x && x <= el.x + el.w && y >= el.y && y <= el.y + el.h);
+}
+
 export function beginTuckLasso(d: TuckDragDeps, e: React.PointerEvent) {
   e.preventDefault();
   e.stopPropagation();
@@ -39,10 +127,32 @@ export function beginTuckLasso(d: TuckDragDeps, e: React.PointerEvent) {
   d.ptsRef.current = [[p0.x, p0.y]];
   d.force();
 
+  /* build the magnetic field in the background; until it arrives (or if the
+     art is unreadable) the lasso is plain freehand */
+  let field: EdgeField | null = null;
+  const target = artTargetAt(d, p0.x, p0.y);
+  if (target && "img" in target && target.img) {
+    const url = d.assetsRef.current[target.img];
+    if (url) {
+      loadImage(url).then((img) => {
+        field = buildEdgeField(img, target.x, target.y, target.w, target.h);
+        if (field && d.ptsRef.current) {
+          d.setStatus("Magnetic trace: the line snaps to the art's edges — hold Alt to draw freehand.");
+        }
+      }).catch(() => { /* freehand */ });
+    }
+  }
+  /* a comfortable magnet reach: ~10 screen px, expressed in page units */
+  const snapRadius = Math.min(40, Math.max(6, 10 / Math.max(0.05, d.zoom)));
+
   const onMove = (ev: PointerEvent) => {
     const arr = d.ptsRef.current;
     if (!arr) return;
-    const p = d.pagePoint(ev);
+    let p = d.pagePoint(ev);
+    if (field && !ev.altKey) {
+      const [sx, sy] = snapToEdge(field, p.x, p.y, snapRadius);
+      p = { x: sx, y: sy };
+    }
     const last = arr[arr.length - 1];
     if (Math.hypot(p.x - last[0], p.y - last[1]) < MIN_STEP) return;
     arr.push([p.x, p.y]);

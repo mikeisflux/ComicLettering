@@ -797,10 +797,10 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const startTuckDrag = useCallback((e: React.PointerEvent) => {
     beginTuckLasso({
       docRef, assetsRef, pageIndexRef, ptsRef: tuckPtsRef,
-      pagePoint, force, setStatus, setTuckMode, setTuckAsk,
+      pagePoint, zoom, force, setStatus, setTuckMode, setTuckAsk,
     }, e);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pagePoint, setStatus]);
+  }, [pagePoint, zoom, setStatus]);
 
   const retuneTuck = useCallback((patch: Partial<TuckAsk>) => {
     setTuckAsk((t) => {
