@@ -302,12 +302,12 @@ export function renderOverlay(ed: EditorCtx) {
       })()}
       {el.type === "balloon" && el.tail && el.attachTo && (() => {
         /* Connector controls on a joined bubble — NEITHER moves the bubble:
-           - the MIDDLE dot SWINGS the connecting tail around the main bubble
-             along a circular axis. The straight band re-aims to a new point
-             around the partner; it does NOT bend or distort, and the bubbles
-             stay put and stay joined.
+           - the MIDDLE dot bends the connecting band into a smooth flowing
+             CURVE through wherever you drag it, so you can sweep it into a
+             graceful arc around the main bubble (like hand-inked lettering).
+             The bubbles stay put and stay joined.
            - double-clicking the middle dot reveals the tilt axis: two
-             satellite dots that tilt/distort the connector's angle. */
+             satellite dots that lean the curve's angle. */
         /* handle sits at the TRUE middle of the visible band (child edge →
            partner edge), not center→tip which biases toward this bubble */
         const M = connectorMid(el) ?? [el.w / 2 + el.tail.dx / 2, el.h / 2 + el.tail.dy / 2];
@@ -339,9 +339,9 @@ export function renderOverlay(ed: EditorCtx) {
                 onPointerDown={(e) => startDrag(e, el, "tilt", "t2")} />
             )}
             <div className="handle connMove"
-              title="Drag to swing the connecting tail around · double-click to tilt"
+              title="Drag to curve the connecting tail · double-click to tilt"
               style={{ left: M[0] * z - 7, top: M[1] * z - 7 }}
-              onPointerDown={(e) => startDrag(e, el, "swing")}
+              onPointerDown={(e) => startDrag(e, el, "bow")}
               onDoubleClick={(e) => {
                 e.stopPropagation();
                 setTiltConn(showTilt ? null : el.id);

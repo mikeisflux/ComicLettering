@@ -337,13 +337,15 @@ function bandToward(from: BalloonEl, to: BalloonEl, keep?: BalloonEl["tail"]): B
   const t: NonNullable<BalloonEl["tail"]> = { dx: Math.round(ux * tipDist), dy: Math.round(uy * tipDist) };
   if (swung) t.aa = keep!.aa;
   if (keep && keep.bx != null && keep.by != null) {
-    /* keep a user-set bend only while it still lies between the balloons —
-       a stale bend (after dragging the pair around) would fling the band the
-       wrong way or collapse it entirely */
+    /* Keep the user's curve generously — the connector is meant to sweep into
+       wide graceful arcs (like hand-inked lettering), so allow the bend to sit
+       well off the straight axis. Only a truly degenerate bend (folded back
+       behind this balloon, or flung absurdly far) collapses back to a clean
+       midpoint, which otherwise happened after dragging the pair around. */
     const len = Math.hypot(dx, dy) || 1;
     const along = (keep.bx * dx + keep.by * dy) / len;      // projection on the axis
     const perp = Math.abs(keep.bx * dy - keep.by * dx) / len; // sideways deviation
-    if (along > 8 && along < len && perp <= len * 0.75) {
+    if (along > -len * 0.4 && along < len * 1.8 && perp <= len * 1.8) {
       t.bx = keep.bx; t.by = keep.by; t.tx = keep.tx; t.ty = keep.ty;
     } else {
       t.bx = Math.round(dx / 2); t.by = Math.round(dy / 2);   // reset to midpoint
