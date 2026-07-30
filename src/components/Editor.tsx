@@ -713,7 +713,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
 
   const startDrag = useCallback((
     e: React.PointerEvent, el: El,
-    mode: "move" | "resize" | "rotate" | "tail" | "bow" | "tilt" | "swing" | "envelope", handle = ""
+    mode: "move" | "resize" | "rotate" | "tail" | "bow" | "tilt" | "envelope", handle = ""
   ) => {
     e.preventDefault();
     e.stopPropagation();
@@ -824,7 +824,6 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
             if (owner.tail) {
               delete owner.tail.bx; delete owner.tail.by;
               delete owner.tail.tx; delete owner.tail.ty;
-              delete owner.tail.aa;
             }
           }
         }
@@ -916,18 +915,6 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
         const cx = orig.x + orig.w / 2, cy = orig.y + orig.h / 2;
         const [ldx, ldy] = rotVec(pt.x - cx, pt.y - cy, -orig.rot);
         cur.tail = { ...cur.tail, bx: Math.round(ldx), by: Math.round(ldy) };
-      } else if (mode === "swing" && cur.type === "balloon" && cur.tail && cur.attachTo) {
-        /* swing the STRAIGHT connector around the main (partner) balloon: the
-           band's attach point orbits the partner's perimeter, nothing bends,
-           nothing moves. Distortion is reserved for the double-click tilt axis,
-           so any existing bend/tilt is cleared here. */
-        const parent = p.els.find((o) => o.id === (cur as BalloonEl).attachTo);
-        if (parent) {
-          const pcx = parent.x + parent.w / 2, pcy = parent.y + parent.h / 2;
-          const aa = Math.atan2(pt.y - pcy, pt.x - pcx);
-          const next: NonNullable<BalloonEl["tail"]> = { dx: cur.tail.dx, dy: cur.tail.dy, aa };
-          cur.tail = next; // drops bx/by/tx/ty — straight, undistorted
-        }
       } else if (mode === "tilt" && cur.type === "balloon" && cur.tail) {
         /* the two satellite dots tilt the connector's tangent at the bend —
            this is the ONLY control that distorts the band. Seed a bend point

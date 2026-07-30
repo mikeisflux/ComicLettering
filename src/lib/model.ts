@@ -279,11 +279,8 @@ export interface BalloonEl extends BaseEl {
   /* dx/dy: tail tip relative to the balloon centre (local, unrotated).
      bx/by: optional bend point the tail curves through.
      tx/ty: optional tangent direction at the bend (the tilt axis of a
-     joined-balloon connector).
-     aa: optional aim angle (radians, page frame) — where around the PARTNER
-     balloon a joined connector attaches. Swinging the connector handle sets
-     this so the straight band orbits the main balloon without distorting. */
-  tail: { dx: number; dy: number; bx?: number; by?: number; tx?: number; ty?: number; aa?: number } | null;
+     joined-balloon connector). */
+  tail: { dx: number; dy: number; bx?: number; by?: number; tx?: number; ty?: number } | null;
   /* id of a balloon this one is attached to: they render joined, with the
      connector tail aimed at the partner automatically */
   attachTo?: string | null;
@@ -307,35 +304,15 @@ function bandToward(from: BalloonEl, to: BalloonEl, keep?: BalloonEl["tail"]): B
   const pcx = to.x + to.w / 2, pcy = to.y + to.h / 2;
   const prx = to.w / 2, pry = to.h / 2;
   const seatIn = Math.max(8, to.strokeW * 2.5);
-  /* Where the band aims. By default it aims at the partner's centre and stops
-     just inside the near edge. When the connector has been SWUNG (keep.aa),
-     it instead aims at a chosen point around the partner's perimeter — the
-     straight band orbits the main balloon without bending. */
-  const swung = keep != null && keep.aa != null;
-  let aimX: number, aimY: number;
-  if (swung) {
-    const ex = Math.cos(keep!.aa!), ey = Math.sin(keep!.aa!);
-    const rEdge = (prx * pry) / (Math.hypot(pry * ex, prx * ey) || 1);
-    const r = Math.max(prx * 0.25, rEdge - seatIn); // just inside the partner edge
-    aimX = pcx + ex * r; aimY = pcy + ey * r;
-  } else {
-    aimX = pcx; aimY = pcy;
-  }
-  const [dx, dy] = rotVec(aimX - fcx, aimY - fcy, -from.rot);
+  const [dx, dy] = rotVec(pcx - fcx, pcy - fcy, -from.rot);
   /* edge-to-edge: the band ends just INSIDE the partner's near edge — never
      at its centre — so the open band spans balloon edge to balloon edge and
      its inked sides can't run across the partner's body */
   const dist = Math.hypot(dx, dy) || 1;
   const ux = dx / dist, uy = dy / dist;
-  let tipDist: number;
-  if (swung) {
-    tipDist = Math.max(dist * 0.3, dist); // aim point is already seated inside
-  } else {
-    const rr = (prx * pry) / (Math.hypot(pry * ux, prx * uy) || 1);
-    tipDist = Math.max(dist * 0.3, dist - rr + seatIn);
-  }
+  const rr = (prx * pry) / (Math.hypot(pry * ux, prx * uy) || 1);
+  const tipDist = Math.max(dist * 0.3, dist - rr + seatIn);
   const t: NonNullable<BalloonEl["tail"]> = { dx: Math.round(ux * tipDist), dy: Math.round(uy * tipDist) };
-  if (swung) t.aa = keep!.aa;
   if (keep && keep.bx != null && keep.by != null) {
     /* Keep the user's curve generously — the connector is meant to sweep into
        wide graceful arcs (like hand-inked lettering), so allow the bend to sit

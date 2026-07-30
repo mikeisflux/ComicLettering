@@ -88,7 +88,7 @@ export interface EditorCtx {
   mutateSel: <T extends El>(mut: (el: T) => void, final?: boolean) => void;
   startDrag: (
     e: React.PointerEvent, el: El,
-    mode: "move" | "resize" | "rotate" | "tail" | "bow" | "tilt" | "swing" | "envelope", handle?: string,
+    mode: "move" | "resize" | "rotate" | "tail" | "bow" | "tilt" | "envelope", handle?: string,
   ) => void;
   pagePoint: (e: { clientX: number; clientY: number }) => { x: number; y: number };
   fitZoom: (forceFit: boolean) => void;

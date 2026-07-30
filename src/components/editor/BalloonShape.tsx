@@ -81,7 +81,7 @@ export function BalloonShape({ el, mergeBase, imgSrc }: { el: BalloonEl; mergeBa
         <image href={imgSrc} x={0} y={0} width={el.w} height={el.h}
           preserveAspectRatio="xMidYMid slice" clipPath={`url(#${cid})`} />
       )}
-      {mergeBase && mergeBase.strokeW && (
+      {mergeBase && !!mergeBase.strokeW && (
         /* APART: redraw the partner's OUTLINE over the band so the band tucks
            under it — but do NOT re-fill the partner (that painted over the
            partner's text). OVERLAPPING (melt) fills nothing here: the two
