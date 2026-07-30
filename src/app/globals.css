@@ -552,6 +552,18 @@ input[type="range"] { width: 110px; }
 .fbGlow .fbGlowAmt { min-width: 76px; }
 .fbBrush .fbLeadIcon { font-size: 13px; }
 
+/* opacity: see the art through the letters while lining up Behind Art */
+.fbOpacity { display: inline-flex; align-items: center; gap: 4px; }
+.fbOpacity input[type="range"] { width: 72px; accent-color: var(--sel); }
+.fbOpacity input[type="range"]:disabled { opacity: .4; }
+.fbOpacityVal {
+  font-size: 11px; min-width: 40px; padding: 2px 4px; text-align: center;
+  background: none; border: 1px solid transparent; border-radius: 3px; cursor: pointer;
+  color: #444;
+}
+.fbOpacityVal:hover:not(:disabled) { border-color: var(--edge2); background: #f4f6f9; }
+.fbOpacityVal:disabled { opacity: .4; cursor: default; }
+
 /* envelope warp: the resize squares become red dots you can pull */
 .handle.warpDot {
   width: 10px; height: 10px; border-radius: 50%;

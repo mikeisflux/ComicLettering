@@ -244,7 +244,7 @@ export function renderToolbar(ed: EditorCtx) {
 export function renderFormatBar(ed: EditorCtx) {
   const {
     selEl, mutateSel, showStroke, setShowStroke, showFill, setShowFill, showTextColor, setShowTextColor, fileFontRef,
-    setShowGradMaker, myGrads,
+    setShowGradMaker, myGrads, commit,
   } = ed;
   const selTs = selEl && (selEl.type === "balloon" || selEl.type === "text") ? selEl.ts : null;
   return (
@@ -464,6 +464,22 @@ export function renderFormatBar(ed: EditorCtx) {
         <option value="1.6">Strong</option>
         <option value="2.4">Blazing</option>
       </select>
+    </span>
+
+    {/* opacity: drop the letters see-through to line up a Behind Art cutout
+        over the artwork, then snap back to full with the % button */}
+    <span className="fbGroup fbOpacity"
+      title="Opacity — lower it to see the art through the letters while lining up Behind Art, then click the % to snap back to full">
+      <span className="fbLeadIcon" aria-hidden>◐</span>
+      <input type="range" min={10} max={100} disabled={!selEl}
+        value={Math.round((selEl?.opacity ?? 1) * 100)}
+        onChange={(e) => mutateSel((x) => { x.opacity = (+e.target.value) / 100; }, false)}
+        onPointerUp={() => commit()} />
+      <button className="fbOpacityVal" disabled={!selEl}
+        title="Back to fully opaque"
+        onClick={() => { if ((selEl?.opacity ?? 1) < 1) mutateSel((x) => { x.opacity = 1; }); }}>
+        {Math.round((selEl?.opacity ?? 1) * 100)}%
+      </button>
     </span>
   </div>
   );
