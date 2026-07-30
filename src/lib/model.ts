@@ -357,22 +357,12 @@ function bandToward(from: BalloonEl, to: BalloonEl, keep?: BalloonEl["tail"]): B
    into one shape and the connector vanishes entirely. */
 export function resolveBalloon(page: Page, el: BalloonEl): { el: BalloonEl; base: BalloonEl | null } {
   if (!el.attachTo) {
-    /* a parent keeps its speaker tail for pointing at the character — but if
-       that tail aims into a joined child, hide it so the pointed wedge never
-       stacks on top of the connector band */
-    if (el.tail) {
-      for (const o of page.els) {
-        if (o.type !== "balloon" || (o as BalloonEl).attachTo !== el.id) continue;
-        const [cdx, cdy] = rotVec(
-          o.x + o.w / 2 - (el.x + el.w / 2),
-          o.y + o.h / 2 - (el.y + el.h / 2), -el.rot);
-        const toChild = Math.atan2(cdy, cdx);
-        const toTail = Math.atan2(el.tail.dy, el.tail.dx);
-        let diff = Math.abs(toChild - toTail);
-        if (diff > Math.PI) diff = 2 * Math.PI - diff;
-        if (diff < 0.7) return { el: { ...el, tail: null }, base: null }; // ~40°
-      }
-    }
+    /* A parent ALWAYS keeps its own speaker tail pointing at the character,
+       even when a joined child sits in the same direction. The connecting band
+       is the same fill colour and tucks under the partner's outline (see the
+       mergeBase redraw in BalloonShape / drawEl), so it reads as falling BEHIND
+       the parent's tail rather than replacing it. Hiding the tail here made it
+       vanish the moment you dragged the child into its line — a regression. */
     return { el, base: null };
   }
 

@@ -12,9 +12,12 @@
   (`bandFill`/`bandEdges` from `balloonGeom`) painted AFTER both balloon
   bodies — fill covers the outline crossings, stroke only along the two
   sides. It is NOT spliced into either balloon's outline path.
-- The parent balloon keeps its own pointed speaker tail, except when that
-  tail aims into the joined child (then it is hidden so it never stacks on
-  the connector).
+- The parent balloon ALWAYS keeps its own pointed speaker tail pointing at
+  the character — even when a joined child sits in the same direction. The
+  connecting band is the same fill colour and tucks under the partner's
+  outline, so it reads as falling BEHIND the parent's tail. Do NOT hide the
+  parent tail when the child lines up with it (that made the tail vanish
+  mid-drag — a reported regression).
 - When joined balloons overlap they melt into one shape and the connector
   disappears; separating them brings the band back with a clean straight
   default (stale bend points must never fling or collapse the band).
