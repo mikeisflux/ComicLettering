@@ -186,7 +186,7 @@ export function renderEl(ed: EditorCtx, el: El) {
 }
 
 export function renderOverlay(ed: EditorCtx) {
-  const { selEl, selEls, page, zoom, editingId, startDrag, warping, setWarping } = ed;
+  const { selEl, selEls, page, zoom, editingId, startDrag, warping, setWarping, tiltConn, setTiltConn } = ed;
   if (!selEl || !page) return null;
   /* With several picked, the extras get a plain outline and the primary keeps
      the handles — you can only resize or rotate one thing at a time, but you
@@ -298,7 +298,12 @@ export function renderOverlay(ed: EditorCtx) {
         );
       })()}
       {el.type === "balloon" && el.tail && el.attachTo && (() => {
-        /* three-point connector axis: middle bends, satellites tilt */
+        /* Connector controls on a joined bubble — NEITHER moves the bubble:
+           - the MIDDLE dot drags ONLY the connecting tail, routing the band
+             around the main bubble (a bend on the child's connector). The
+             bubbles stay put and stay joined.
+           - double-clicking the middle dot reveals the tilt axis: two
+             satellite dots that tilt the connector's angle. */
         const bx = el.tail.bx ?? el.tail.dx / 2, by = el.tail.by ?? el.tail.dy / 2;
         const M = [el.w / 2 + bx, el.h / 2 + by];
         const dl = Math.hypot(el.tail.dx, el.tail.dy) || 1;
@@ -310,17 +315,32 @@ export function renderOverlay(ed: EditorCtx) {
         const L = 55 / z;
         const h1 = [M[0] + T[0] * L, M[1] + T[1] * L];
         const h2 = [M[0] - T[0] * L, M[1] - T[1] * L];
+        const showTilt = tiltConn === el.id;
         return (
           <>
-            <svg style={{ position: "absolute", left: 0, top: 0, width: 1, height: 1, overflow: "visible", pointerEvents: "none" }}>
-              <line x1={h1[0] * z} y1={h1[1] * z} x2={h2[0] * z} y2={h2[1] * z} stroke="#777" strokeWidth={1} />
-            </svg>
-            <div className="handle tiltDot" title="Tilt the connector"
-              style={{ left: h1[0] * z - 5, top: h1[1] * z - 5 }}
-              onPointerDown={(e) => startDrag(e, el, "tilt", "t1")} />
-            <div className="handle tiltDot" title="Tilt the connector"
-              style={{ left: h2[0] * z - 5, top: h2[1] * z - 5 }}
-              onPointerDown={(e) => startDrag(e, el, "tilt", "t2")} />
+            {showTilt && (
+              <svg style={{ position: "absolute", left: 0, top: 0, width: 1, height: 1, overflow: "visible", pointerEvents: "none" }}>
+                <line x1={h1[0] * z} y1={h1[1] * z} x2={h2[0] * z} y2={h2[1] * z} stroke="#777" strokeWidth={1} />
+              </svg>
+            )}
+            {showTilt && (
+              <div className="handle tiltDot" title="Tilt the connector"
+                style={{ left: h1[0] * z - 5, top: h1[1] * z - 5 }}
+                onPointerDown={(e) => startDrag(e, el, "tilt", "t1")} />
+            )}
+            {showTilt && (
+              <div className="handle tiltDot" title="Tilt the connector"
+                style={{ left: h2[0] * z - 5, top: h2[1] * z - 5 }}
+                onPointerDown={(e) => startDrag(e, el, "tilt", "t2")} />
+            )}
+            <div className="handle connMove"
+              title="Drag to move the connecting tail · double-click to tilt"
+              style={{ left: M[0] * z - 7, top: M[1] * z - 7 }}
+              onPointerDown={(e) => startDrag(e, el, "bow")}
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                setTiltConn(showTilt ? null : el.id);
+              }} />
           </>
         );
       })()}

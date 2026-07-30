@@ -254,6 +254,9 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const [stampQuery, setStampQuery] = useState("");
   /* lettering whose envelope handles are showing (double-click a resize box) */
   const [warping, setWarping] = useState<string | null>(null);
+  /* joined balloon whose connector tilt axis is showing (double-click the
+     connector handle) */
+  const [tiltConn, setTiltConn] = useState<string | null>(null);
   const [showGradMaker, setShowGradMaker] = useState(false);
   const [gradsVersion, bumpGrads] = useReducer((c: number) => c + 1, 0);
   const [myGrads, setMyGrads] = useState<{ name: string; stops: GradStop[] }[]>([]);
@@ -1359,6 +1362,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     setReplaceText, findCase, setFindCase, showSafe, setShowSafe, spread,
     setSpread, showScript, setShowScript, scriptText, setScriptText,
     warping, setWarping,
+    tiltConn, setTiltConn,
     stampOpen, setStampOpen, stampQuery, setStampQuery, showGradMaker,
     setShowGradMaker, myGrads, bumpGrads, showFill, setShowFill, showStroke,
     setShowStroke, showTextColor, setShowTextColor, openMenu, setOpenMenu,

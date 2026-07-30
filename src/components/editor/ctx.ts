@@ -64,6 +64,10 @@ export interface EditorCtx {
   /* id of the lettering whose envelope handles are showing */
   warping: string | null;
   setWarping: SetState<string | null>;
+  /* id of the joined balloon whose connector tilt axis is showing
+     (revealed by double-clicking the connector handle) */
+  tiltConn: string | null;
+  setTiltConn: SetState<string | null>;
   stampQuery: string;
   setStampQuery: SetState<string>;
   undo: () => void;
