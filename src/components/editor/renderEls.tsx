@@ -12,7 +12,7 @@ import { displayText, measureBlock, measureCharWidths, renderRuns, textCss, text
 import { BalloonShape, MergeBaseInfo } from "./BalloonShape";
 import { EditorCtx } from "./ctx";
 import { WarpedText } from "./WarpedText";
-import { FLAT, Warp, isWarped, warpBounds } from "@/lib/warp";
+import { FLAT, Warp, isWarped, warpBounds, warpPoint } from "@/lib/warp";
 import { onLetteringInput } from "./ops";
 
 
@@ -238,6 +238,33 @@ function textInkFractions(el: TextEl): { x0: number; y0: number; x1: number; y1:
   };
 }
 
+/* Ink bounds of an ENVELOPE-warped lettering element: measure the straight
+   ink, then push that rect through the warp — the patch bounds alone span the
+   whole (often oversized) layout box, which left the manipulation box far from
+   the letters on warped SFX. */
+function warpInkBounds(el: TextEl, env: Warp): { x0: number; y0: number; x1: number; y1: number } {
+  const ink = textInkFractions(el) ?? { x0: 0, y0: 0, x1: 1, y1: 1 };
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  const take = (u: number, v: number) => {
+    const [x, y] = warpPoint(env, u, v);
+    if (x < x0) x0 = x;
+    if (x > x1) x1 = x;
+    if (y < y0) y0 = y;
+    if (y > y1) y1 = y;
+  };
+  /* sample the ink rect's boundary — every warp handle's influence peaks on
+     an edge or corner, so the boundary carries the extremes */
+  const N = 10;
+  for (let i = 0; i <= N; i++) {
+    const t = i / N;
+    take(ink.x0 + t * (ink.x1 - ink.x0), ink.y0);
+    take(ink.x0 + t * (ink.x1 - ink.x0), ink.y1);
+    take(ink.x0, ink.y0 + t * (ink.y1 - ink.y0));
+    take(ink.x1, ink.y0 + t * (ink.y1 - ink.y0));
+  }
+  return { x0, y0, x1, y1 };
+}
+
 export function renderOverlay(ed: EditorCtx) {
   const { selEl, selEls, page, zoom, editingId, startDrag, warping, setWarping, tiltConn, setTiltConn } = ed;
   if (!selEl || !page) return null;
@@ -286,9 +313,10 @@ export function renderOverlay(ed: EditorCtx) {
      measured ink, so the manipulation box hugs the letters. Positions inside
      the overlay are remapped into it. Skipped while editing (the caret needs
      the true box) and while warping (envelope dots live in box units). */
-  const envW = el.type === "text" && isWarped(el.ts.env as Warp) ? (el.ts.env as Warp) : null;
-  const eb = envW ? warpBounds(envW)
-    : el.type === "text" && editingId !== el.id && warping !== el.id
+  const editingThis = editingId === el.id;
+  const envW = el.type === "text" && !editingThis && isWarped(el.ts.env as Warp) ? (el.ts.env as Warp) : null;
+  const eb = envW ? warpInkBounds(el as TextEl, envW)
+    : el.type === "text" && !editingThis && warping !== el.id
       ? textInkFractions(el as TextEl)
       : null;
   const bx = eb ? el.x + eb.x0 * el.w : el.x;
