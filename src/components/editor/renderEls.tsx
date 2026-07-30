@@ -322,9 +322,12 @@ export function renderOverlay(ed: EditorCtx) {
             onDoubleClick={(e) => { e.stopPropagation(); setWarping(null); }} />
         ))
       ) : handles.map(([k, hx, hy]) => (
+        /* handles sit on the (possibly ink-hugged) selection rect itself —
+           remapping them back into layout-box corners flung them far off the
+           letters whenever the box was bigger than the ink */
         <div key={k} className={`handle h-${k}`}
           title={el.type === "text" ? "Drag to resize · double-click to warp" : "Drag to resize"}
-          style={{ left: `calc(${fx(hx) * 100}% - 6px)`, top: `calc(${fy(hy) * 100}% - 6px)` }}
+          style={{ left: `calc(${hx * 100}% - 6px)`, top: `calc(${hy * 100}% - 6px)` }}
           onPointerDown={(e) => startDrag(e, el, "resize", k)}
           onDoubleClick={(e) => {
             if (el.type !== "text") return;
