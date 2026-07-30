@@ -271,13 +271,21 @@ export function renderOverlay(ed: EditorCtx) {
       <div className="handle rot" title="Rotate (Shift snaps to 15°)"
         style={{ left: "calc(50% - 6px)", top: -28 }}
         onPointerDown={(e) => startDrag(e, el, "rotate")} />
-      {el.type === "balloon" && el.tail && (
+      {/* The tail TIP handle only makes sense on a free balloon aiming its
+          speaker tail. On a JOINED bubble the connector runs between the two
+          balloons and re-aims itself as you move either one — an orange tip
+          there does nothing but detach the pair when grabbed, so hide it.
+          Reposition a joined bubble by dragging its body; bend/tilt the band
+          with the handles below. */}
+      {el.type === "balloon" && el.tail && !el.attachTo && (
         <div className="handle tail" title="Drag to aim the tail tip"
           style={{ left: (el.w / 2 + el.tail.dx) * z - 7, top: (el.h / 2 + el.tail.dy) * z - 7 }}
           onPointerDown={(e) => startDrag(e, el, "tail")} />
       )}
-      {el.type === "balloon" && el.tail &&
-        (["speech", "whisper", "double", "thought"].includes(el.kind) || el.attachTo) && (() => {
+      {/* single-tail bend handle — NOT on joined bubbles, which get the
+          dedicated three-point connector axis below instead */}
+      {el.type === "balloon" && el.tail && !el.attachTo &&
+        ["speech", "whisper", "double", "thought"].includes(el.kind) && (() => {
         const t = Math.atan2(el.tail.dy, el.tail.dx);
         const ex = el.w / 2 + (el.w / 2) * Math.cos(t);
         const ey = el.h / 2 + (el.h / 2) * Math.sin(t);
