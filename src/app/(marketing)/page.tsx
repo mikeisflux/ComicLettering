@@ -81,14 +81,14 @@ export default function Home() {
         <figure className="shotHero">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/shots/studio.webp" width={1600} height={1000}
-            alt="The LetterMyComic studio: a comic page with joined gradient speech balloons, a warped KRAKOOM! sound effect, speedline and halftone panels, with the full editor toolbar, lettering-style swatches, balloon tray and layouts." />
+            alt="The LetterMyComic studio: a tank-battle comic page being lettered — a warped BADOOM! sound effect selected on the canvas, speech balloons and a caption over the artwork, with the full editor toolbar, lettering-style swatches, balloon tray, layouts and page thumbnails." />
           <figcaption>The full studio — toolbar, one-click lettering styles, balloon tray and layouts, all in your browser.</figcaption>
         </figure>
         <div className="shotRow">
           <figure>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/shots/page.webp" width={492} height={751}
-              alt="A finished comic page with joined gradient speech balloons, a warped KRAKOOM! sound effect, a thought bubble over speedlines and a shout burst over halftones." />
+              alt="A finished snow-convoy comic page lettered in LetterMyComic: a caption, speech balloons, a joined balloon pair with an open connector, and a radio balloon over the artwork." />
             <figcaption>Finished pages export print-ready at up to 450 DPI.</figcaption>
           </figure>
           <figure>
