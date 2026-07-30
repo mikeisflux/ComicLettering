@@ -443,7 +443,7 @@ export function renderFindDialog(ed: EditorCtx) {
 }
 
 /* import script dialog */
-/* Tuck Behind Art — the traced cutout, with the automatic routes demoted to
+/* Tuck Back — the traced cutout, with the automatic routes demoted to
    alternatives. The preview is what will sit IN FRONT of the lettering. */
 export function renderTuckDialog(ed: EditorCtx) {
   const { tuckAsk: t, setTuckAsk, retuneTuck, runTuckAuto, applyTuck } = ed;
@@ -456,7 +456,7 @@ export function renderTuckDialog(ed: EditorCtx) {
   return (
     <div className="setupOverlay" onPointerDown={(e) => { if (e.target === e.currentTarget) setTuckAsk(null); }}>
       <div className="setupDlg" style={{ width: 460 }}>
-        <div className="setupTitle">Tuck Behind Art</div>
+        <div className="setupTitle">Tuck Back</div>
         <div className="setupBody" style={{ flexDirection: "column" }}>
           <div className="tuckPreview">
             {t.preview

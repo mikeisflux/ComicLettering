@@ -85,7 +85,7 @@ letterers' work, not from a clip-art library.
 - **Manipulation boxes hug the letters**, so selection and handles sit right
   on the ink — no chasing handles across the page.
 
-### Tuck Behind Art
+### Tuck Back
 
 Make the artwork overlap your lettering — the letterer's clipping-mask trick,
 automated:
@@ -179,5 +179,5 @@ goals are ordered so the core ships first).
 ---
 
 *Draft — update goal figures, tier prices, dates, and add campaign imagery
-(screen recordings of: joining balloons, script import, Tuck Behind Art,
+(screen recordings of: joining balloons, script import, Tuck Back,
 and a full page lettered start-to-finish).*

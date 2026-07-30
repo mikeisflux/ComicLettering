@@ -36,7 +36,7 @@ const GROUPS: { h: string; items: [string, string][] }[] = [
     h: "SFX, Scripts & Proofing",
     items: [
       ["Warp your SFX", "Bend sound-effect lettering along an arc — curve KABOOM up into a shockwave or dip it down — with a live, WYSIWYG preview that exports exactly as you see it."],
-      ["Tuck SFX behind the art", "Drag a region over your artwork and the app cuts out its foreground and places it in front of your lettering — a magic-wand version of the letterer's traced mask, with a strength slider and live preview."],
+      ["Tuck Back", "Drag a region over your artwork and the app cuts out its foreground and places it in front of your lettering — a magic-wand version of the letterer's traced mask, with a strength slider and live preview."],
       ["Import your script", "Paste a comic script — CHARACTER: dialogue, CAPTION:, SFX:, parentheticals — and get speech, thought, whisper and caption balloons laid out on the page automatically."],
       ["Two-page spread view", "See facing pages side by side with correct left/right pairing, so your lettering reads right across the gutter."],
       ["Print-ready proofing", "Toggle a safe-area guide and add printer crop marks with a bleed margin on PDF export — everything a printer needs to trim your book."],

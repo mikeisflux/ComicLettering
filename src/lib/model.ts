@@ -264,7 +264,7 @@ export interface ImageEl extends BaseEl {
   type: "image";
   img: string; filter: FilterKey;
   borderW: number; borderC: string;
-  /* a Tuck Behind Art cutout rather than artwork in its own right. It sits
+  /* a Tuck Back cutout rather than artwork in its own right. It sits
      above the lettering, so it would otherwise be the first thing the next
      trace lands on — and tracing a cutout of a cutout gets you nowhere. */
   cut?: boolean;

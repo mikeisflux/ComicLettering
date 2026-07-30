@@ -1,4 +1,4 @@
-/* "Tuck behind art" engine — the digital version of the letterer's traced
+/* "Tuck Back" engine — the digital version of the letterer's traced
    clipping mask. Given a region of a panel's artwork, extract the FOREGROUND
    (inked/dark shapes) as a transparent cutout PNG. Placed above an SFX, the
    cutout makes the art read as being in front of the lettering.

@@ -1,4 +1,4 @@
-/* Segment-anything cutouts for Tuck Behind Art.
+/* Segment-anything cutouts for Tuck Back.
 
    The old cutout separated foreground from background by luminance threshold,
    which only works when the subject happens to be lighter or darker than

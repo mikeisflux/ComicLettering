@@ -146,7 +146,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const drawPtsRef = useRef<number[][] | null>(null);
   /* id of a freshly sketched balloon awaiting a tail choice */
   const [tailAsk, setTailAsk] = useState<string | null>(null);
-  /* "tuck behind art": draw around the artwork that should sit in front of the
+  /* Tuck Back: draw around the artwork that should sit in front of the
      selected SFX; the enclosed art becomes a transparent cutout above it */
   const [tuckMode, setTuckMode] = useState(false);
   const tuckPtsRef = useRef<number[][] | null>(null);
@@ -781,12 +781,12 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
 
   /* ---------------- keyboard ---------------- */
 
-  /* ---------------- tuck-behind-art (traced clipping mask) ---------------- */
+  /* ---------------- Tuck Back (traced clipping mask) ---------------- */
 
   const startTuck = useCallback(() => {
     const s = docRef.current?.pages[pageIndexRef.current].els.find((x) => x.id === selId);
     if (!s || s.type !== "text") {
-      setStatus("Select your SFX lettering first, then Tuck Behind Art.");
+      setStatus("Select your SFX lettering first, then Tuck Back.");
       return;
     }
     setTuckMode(true);
@@ -1420,7 +1420,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
           if (f) importJSON(ed, f);
         }} />
 
-      {/* tuck-behind-art: traced cutout with live preview */}
+      {/* Tuck Back: traced cutout with live preview */}
       {renderTuckDialog(ed)}
 
       {/* smart contextual tip — one at a time, each shows once */}

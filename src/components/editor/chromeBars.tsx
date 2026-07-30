@@ -115,7 +115,7 @@ export function renderMenuBar(ed: EditorCtx) {
         ["—", null],
         ["Fit Balloon to Text", () => fitBalloonToText(ed)],
         ["Balance Line Breaks", () => balanceRag(ed)],
-        ["Tuck SFX Behind Art…", () => ed.startTuck()],
+        ["Tuck Back…", () => ed.startTuck()],
         ["Center Horizontally (Ctrl+[)", () => alignSel(ed, "hcenter")],
         ["Center Vertically (Ctrl+])", () => alignSel(ed, "vcenter")],
         ["Flip Horizontal", () => mutateSel((x) => { x.flipH = !x.flipH; })],
@@ -227,8 +227,8 @@ export function renderToolbar(ed: EditorCtx) {
     <ToolBtn label="Instant Alpha" icon="🪄"
       disabled={!selEl || (selEl.type !== "image" && selEl.type !== "panel") || !selEl.img}
       onClick={() => { if (selEl && (selEl.type === "image" || selEl.type === "panel") && selEl.img) runInstantAlpha(ed, selEl.id, selEl.img); }} />
-    <ToolBtn label="Behind Art" icon="🖼️⃰" accent
-      title="Tuck SFX behind the art: select your sound-effect lettering, then draw around the part of the artwork that should come forward — it is cut out and placed in front, so the word sits behind it like hand-traced masking."
+    <ToolBtn label="Tuck Back" icon="🖼️⃰" accent
+      title="Tuck Back: select your sound-effect lettering, then draw around the part of the artwork that should come forward — it is cut out and placed in front, so the word sits behind it like hand-traced masking."
       disabled={!selEl || selEl.type !== "text"}
       onClick={() => ed.startTuck()} />
     <ToolBtn label="Page Setup" icon="📐" onClick={() => setShowSetup(true)} />
@@ -466,10 +466,10 @@ export function renderFormatBar(ed: EditorCtx) {
       </select>
     </span>
 
-    {/* opacity: drop the letters see-through to line up a Behind Art cutout
+    {/* opacity: drop the letters see-through to line up a Tuck Back cutout
         over the artwork, then snap back to full with the % button */}
     <span className="fbGroup fbOpacity"
-      title="Opacity — lower it to see the art through the letters while lining up Behind Art, then click the % to snap back to full">
+      title="Opacity — lower it to see the art through the letters while lining up Tuck Back, then click the % to snap back to full">
       <span className="fbLeadIcon" aria-hidden>◐</span>
       <input type="range" min={10} max={100} disabled={!selEl}
         value={Math.round((selEl?.opacity ?? 1) * 100)}

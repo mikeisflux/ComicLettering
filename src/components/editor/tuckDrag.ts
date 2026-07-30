@@ -1,4 +1,4 @@
-/* The lasso for "tuck behind art".
+/* The lasso for Tuck Back.
 
    Threshold cutting and even a segmentation model both guess at where the
    foreground ends. On painted or busy art they guess wrong, because figure

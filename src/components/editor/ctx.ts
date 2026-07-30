@@ -92,7 +92,7 @@ export interface EditorCtx {
   ) => void;
   pagePoint: (e: { clientX: number; clientY: number }) => { x: number; y: number };
   fitZoom: (forceFit: boolean) => void;
-  /* enter tuck-behind-art lasso mode (requires SFX selected) */
+  /* enter Tuck Back lasso mode (requires SFX selected) */
   startTuck: () => void;
   /* the traced cutout awaiting confirmation, and its controls */
   tuckAsk: TuckAsk | null;
