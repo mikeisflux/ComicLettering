@@ -4,11 +4,11 @@
    contentEditable text keeps focus while editing). */
 import React, { CSSProperties } from "react";
 import {
-  El, FILTERS, aabbOverlap, applyCrossbarI, resolveBalloon, rotVec,
+  El, FILTERS, TextEl, aabbOverlap, applyCrossbarI, resolveBalloon, rotVec,
 } from "@/lib/model";
 import { arcTextLayout, balloonGeom, connectorMid } from "@/lib/geometry";
 import { fillCss } from "@/lib/fills";
-import { displayText, measureCharWidths, renderRuns, textCss, textOverflows } from "./textHelpers";
+import { displayText, measureBlock, measureCharWidths, renderRuns, textCss, textOverflows } from "./textHelpers";
 import { BalloonShape, MergeBaseInfo } from "./BalloonShape";
 import { EditorCtx } from "./ctx";
 import { WarpedText } from "./WarpedText";
@@ -188,6 +188,56 @@ export function renderEl(ed: EditorCtx, el: El) {
   );
 }
 
+/* Ink bounds of a lettering element, as FRACTIONS of its box. The layout box
+   is often larger than the letters themselves — arc warps lay glyphs out from
+   the centre, and a one-axis resize widens the box while the font size (which
+   follows the SMALLER ratio) stays put — so the manipulation box hugs the
+   measured ink instead of the box. Returns null when the box already fits. */
+function textInkFractions(el: TextEl): { x0: number; y0: number; x1: number; y1: number } | null {
+  if (!el.text || !el.text.trim() || el.w < 2 || el.h < 2) return null;
+  const ts = el.ts;
+  const pad = ts.outlineW / 2 + 2; // centred text-stroke spills half out, plus a hair
+  if (el.warp) {
+    /* arc-warped SFX: replicate the render layout and take the extents of the
+       rotated per-glyph boxes */
+    let raw = (ts.caps ? el.text.toUpperCase() : el.text).replace(/\s*\n\s*/g, " ");
+    if (ts.crossbarI) raw = applyCrossbarI(raw);
+    const chars = raw.match(/\P{M}\p{M}*/gu) || [];
+    if (!chars.length) return null;
+    const widths = measureCharWidths(ts, chars);
+    const layout = arcTextLayout(widths, el.warp);
+    const cx = el.w / 2, cy = el.h / 2;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (let i = 0; i < chars.length; i++) {
+      if (chars[i] === " ") continue;
+      const hw = widths[i] / 2, hh = ts.size / 2;
+      const c = Math.abs(Math.cos(layout[i].rot)), s = Math.abs(Math.sin(layout[i].rot));
+      const ex = c * hw + s * hh, ey = s * hw + c * hh;
+      const px = cx + layout[i].x, py = cy + layout[i].y;
+      if (px - ex < x0) x0 = px - ex;
+      if (px + ex > x1) x1 = px + ex;
+      if (py - ey < y0) y0 = py - ey;
+      if (py + ey > y1) y1 = py + ey;
+    }
+    if (x1 <= x0 || y1 <= y0) return null;
+    return {
+      x0: (x0 - pad) / el.w, y0: (y0 - pad) / el.h,
+      x1: (x1 + pad) / el.w, y1: (y1 + pad) / el.h,
+    };
+  }
+  /* straight lettering: the block is centred vertically (the .txt flex column)
+     and placed horizontally by ts.align inside the box */
+  const m = measureBlock(ts, el.text, el.w);
+  if (m.w < 1 || m.h < 1) return null;
+  const y0 = (el.h - m.h) / 2;
+  const x0 = ts.align === "center" ? (el.w - m.w) / 2
+    : ts.align === "right" ? el.w - m.w : 0;
+  return {
+    x0: (x0 - pad) / el.w, y0: (y0 - pad) / el.h,
+    x1: (x0 + m.w + pad) / el.w, y1: (y0 + m.h + pad) / el.h,
+  };
+}
+
 export function renderOverlay(ed: EditorCtx) {
   const { selEl, selEls, page, zoom, editingId, startDrag, warping, setWarping, tiltConn, setTiltConn } = ed;
   if (!selEl || !page) return null;
@@ -232,9 +282,15 @@ export function renderOverlay(ed: EditorCtx) {
   ];
   /* A warp moves the letters outside the box they were laid out in, so the
      selection rect follows where the letters ended up rather than the layout
-     box they came from. Positions inside the overlay are remapped into it. */
+     box they came from. Plain lettering gets the same treatment via the
+     measured ink, so the manipulation box hugs the letters. Positions inside
+     the overlay are remapped into it. Skipped while editing (the caret needs
+     the true box) and while warping (envelope dots live in box units). */
   const envW = el.type === "text" && isWarped(el.ts.env as Warp) ? (el.ts.env as Warp) : null;
-  const eb = envW ? warpBounds(envW) : null;
+  const eb = envW ? warpBounds(envW)
+    : el.type === "text" && editingId !== el.id && warping !== el.id
+      ? textInkFractions(el as TextEl)
+      : null;
   const bx = eb ? el.x + eb.x0 * el.w : el.x;
   const by = eb ? el.y + eb.y0 * el.h : el.y;
   const bw = eb ? Math.max(1, (eb.x1 - eb.x0) * el.w) : el.w;
@@ -248,6 +304,11 @@ export function renderOverlay(ed: EditorCtx) {
       style={{
         left: bx * z, top: by * z, width: bw * z, height: bh * z,
         transform: el.rot ? `rotate(${el.rot}deg)` : undefined,
+        /* the element rotates about ITS box centre — when the overlay is the
+           smaller ink rect, rotate it about that same point or the two drift */
+        transformOrigin: el.rot
+          ? `${(el.x + el.w / 2 - bx) * z}px ${(el.y + el.h / 2 - by) * z}px`
+          : undefined,
       }}
     >
       <div className="box" />
