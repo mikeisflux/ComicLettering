@@ -9,7 +9,7 @@ import { BrushKey, brushScale, brushTile } from "./brushes";
 import { glowPasses } from "./glows";
 import { Warp, drawWarped, isWarped, warpBounds } from "./warp";
 
-interface MergeInfo { d: string; color: string; cx: number; cy: number; rot: number; bw: number; bh: number; stroke?: string; strokeW?: number }
+interface MergeInfo { d: string; bodyD?: string; color: string; cx: number; cy: number; rot: number; bw: number; bh: number; stroke?: string; strokeW?: number }
 
 const imgCache = new Map<string, HTMLImageElement>();
 
@@ -563,6 +563,29 @@ function drawEl(ctx: CanvasRenderingContext2D, el: El, assets: Assets, merge?: M
         ctx.stroke(new Path2D(g.bandEdges));
       }
     }
+    /* partner's speaker-tail WEDGE on top of the band (apart + it has a tail):
+       the band falls behind the tail while the opening into the body stays
+       open — the wedge (tailed shape XOR plain body) excludes the body */
+    if (merge && merge.strokeW && merge.bodyD && merge.bodyD !== merge.d) {
+      ctx.save();
+      const m = new DOMMatrix();
+      m.translateSelf(merge.cx, merge.cy);
+      m.rotateSelf(merge.rot);
+      m.translateSelf(-merge.bw / 2, -merge.bh / 2);
+      const clip = new Path2D();
+      clip.addPath(new Path2D(merge.bodyD), m);
+      clip.addPath(new Path2D(merge.d), m);
+      ctx.clip(clip, "evenodd");
+      const tailP = new Path2D();
+      tailP.addPath(new Path2D(merge.d), m);
+      ctx.fillStyle = merge.color;
+      ctx.fill(tailP);
+      ctx.strokeStyle = merge.stroke!;
+      ctx.lineWidth = merge.strokeW;
+      ctx.lineJoin = "round";
+      ctx.stroke(tailP);
+      ctx.restore();
+    }
     ctx.setLineDash([]);
     drawStyledText(ctx, el.ts, el.text, g.textRect, 0, el.runs);
   } else if (el.type === "text") {
@@ -602,7 +625,9 @@ export async function renderPageToCanvas(
           base.x + base.w / 2 - (el.x + el.w / 2),
           base.y + base.h / 2 - (el.y + el.h / 2), -el.rot);
         merge = {
-          d: bg.d, color: base.fill.a,
+          d: bg.d,
+          bodyD: balloonGeom({ ...base, tail: null, band: false, attachTo: null }).d,
+          color: base.fill.a,
           cx: el.w / 2 + rx, cy: el.h / 2 + ry,
           rot: base.rot - el.rot, bw: base.w, bh: base.h,
           ...(aabbOverlap(el, base) ? {} : { stroke: base.stroke, strokeW: base.strokeW }),

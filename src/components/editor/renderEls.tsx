@@ -92,6 +92,9 @@ export function renderEl(ed: EditorCtx, el: El) {
         base.y + base.h / 2 - (el.y + el.h / 2), -el.rot);
       mergeBase = {
         d: bg.d,
+        /* the partner's plain BODY (no tail) — the wedge = d minus bodyD, used
+           to redraw the partner's speaker tail ON TOP of the connector band */
+        bodyD: balloonGeom({ ...base, tail: null, band: false, attachTo: null }).d,
         color: base.fill.a,
         tf: `translate(${el.w / 2 + rx} ${el.h / 2 + ry}) rotate(${base.rot - el.rot}) translate(${-base.w / 2} ${-base.h / 2})`,
         /* apart: partner redraws with its outline so the band tucks under;

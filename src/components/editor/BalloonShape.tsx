@@ -7,7 +7,7 @@ import { fillOverlayTile, fillOverlayURL, isRepeating } from "@/lib/fills";
 
 /* ---------------- balloon SVG ---------------- */
 
-export interface MergeBaseInfo { d: string; color: string; tf: string; stroke?: string; strokeW?: number }
+export interface MergeBaseInfo { d: string; bodyD?: string; color: string; tf: string; stroke?: string; strokeW?: number }
 
 export function BalloonShape({ el, mergeBase, imgSrc }: { el: BalloonEl; mergeBase?: MergeBaseInfo | null; imgSrc?: string | null }) {
   const g = balloonGeom(el);
@@ -19,6 +19,11 @@ export function BalloonShape({ el, mergeBase, imgSrc }: { el: BalloonEl; mergeBa
      inside the partner vanishes; the partner's seam inside us is already
      hidden by our fill. */
   const melt = !!mergeBase && !mergeBase.strokeW;
+  /* apart + the partner has a speaker tail: redraw its tail WEDGE on top of
+     the band so the band falls BEHIND the tail (the wedge excludes the body,
+     so the band's opening into the body stays open) */
+  const wedge = !!mergeBase && !!mergeBase.strokeW && !!mergeBase.bodyD && mergeBase.bodyD !== mergeBase.d;
+  const wid = `wedge-${el.id}`;
   const tile = f.kind !== "solid" && f.kind !== "gradient" ? fillOverlayTile(f) : null;
   const tileURL = tile ? fillOverlayURL(f) : null;
   const needClip = !!tileURL || !!imgSrc;
@@ -54,6 +59,13 @@ export function BalloonShape({ el, mergeBase, imgSrc }: { el: BalloonEl; mergeBa
             <path d={mergeBase.d} transform={mergeBase.tf} fill="black" />
           </mask>
         )}
+        {wedge && mergeBase && (
+          /* wedge = partner's full tailed shape XOR its plain body = the tail
+             only (evenodd), in this balloon's coordinate space */
+          <clipPath id={wid} clipPathUnits="userSpaceOnUse">
+            <path d={`${mergeBase.bodyD} ${mergeBase.d}`} transform={mergeBase.tf} clipRule="evenodd" />
+          </clipPath>
+        )}
       </defs>
       {mergeBase && el.strokeW > 0 && !g.noStroke && (
         /* joined balloons: stroke under, fills over → outlines union */
@@ -85,6 +97,17 @@ export function BalloonShape({ el, mergeBase, imgSrc }: { el: BalloonEl; mergeBa
       {g.bandEdges && el.strokeW > 0 && (
         <path d={g.bandEdges} fill="none" stroke={el.stroke} strokeWidth={el.strokeW}
           strokeLinejoin="round" strokeLinecap="round" />
+      )}
+      {wedge && mergeBase && (
+        /* partner's speaker-tail wedge, ON TOP of the band: fill (covers the
+           band in the wedge with the partner's colour) + stroke (the tail's
+           two inked sides sit over the band). Clipped to the wedge, so the
+           band's opening into the partner body is untouched. */
+        <g clipPath={`url(#${wid})`}>
+          <path d={mergeBase.d} transform={mergeBase.tf} fill={mergeBase.color} />
+          <path d={mergeBase.d} transform={mergeBase.tf} fill="none"
+            stroke={mergeBase.stroke} strokeWidth={mergeBase.strokeW} strokeLinejoin="round" />
+        </g>
       )}
       {!mergeBase && el.strokeW > 0 && !g.noStroke && (
         <path d={g.d} fill="none" stroke={el.stroke} strokeWidth={el.strokeW}
