@@ -6,7 +6,7 @@ import React, { CSSProperties } from "react";
 import {
   El, FILTERS, aabbOverlap, applyCrossbarI, resolveBalloon, rotVec,
 } from "@/lib/model";
-import { arcTextLayout, balloonGeom } from "@/lib/geometry";
+import { arcTextLayout, balloonGeom, connectorMid } from "@/lib/geometry";
 import { fillCss } from "@/lib/fills";
 import { displayText, measureCharWidths, renderRuns, textCss, textOverflows } from "./textHelpers";
 import { BalloonShape, MergeBaseInfo } from "./BalloonShape";
@@ -299,13 +299,15 @@ export function renderOverlay(ed: EditorCtx) {
       })()}
       {el.type === "balloon" && el.tail && el.attachTo && (() => {
         /* Connector controls on a joined bubble — NEITHER moves the bubble:
-           - the MIDDLE dot drags ONLY the connecting tail, routing the band
-             around the main bubble (a bend on the child's connector). The
-             bubbles stay put and stay joined.
+           - the MIDDLE dot SWINGS the connecting tail around the main bubble
+             along a circular axis. The straight band re-aims to a new point
+             around the partner; it does NOT bend or distort, and the bubbles
+             stay put and stay joined.
            - double-clicking the middle dot reveals the tilt axis: two
-             satellite dots that tilt the connector's angle. */
-        const bx = el.tail.bx ?? el.tail.dx / 2, by = el.tail.by ?? el.tail.dy / 2;
-        const M = [el.w / 2 + bx, el.h / 2 + by];
+             satellite dots that tilt/distort the connector's angle. */
+        /* handle sits at the TRUE middle of the visible band (child edge →
+           partner edge), not center→tip which biases toward this bubble */
+        const M = connectorMid(el) ?? [el.w / 2 + el.tail.dx / 2, el.h / 2 + el.tail.dy / 2];
         const dl = Math.hypot(el.tail.dx, el.tail.dy) || 1;
         let T = el.tail.tx != null && el.tail.ty != null
           ? [el.tail.tx, el.tail.ty]
@@ -334,9 +336,9 @@ export function renderOverlay(ed: EditorCtx) {
                 onPointerDown={(e) => startDrag(e, el, "tilt", "t2")} />
             )}
             <div className="handle connMove"
-              title="Drag to move the connecting tail · double-click to tilt"
+              title="Drag to swing the connecting tail around · double-click to tilt"
               style={{ left: M[0] * z - 7, top: M[1] * z - 7 }}
-              onPointerDown={(e) => startDrag(e, el, "bow")}
+              onPointerDown={(e) => startDrag(e, el, "swing")}
               onDoubleClick={(e) => {
                 e.stopPropagation();
                 setTiltConn(showTilt ? null : el.id);

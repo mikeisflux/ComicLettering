@@ -404,6 +404,22 @@ function connectorBase(el: BalloonEl): { A: number[]; B: number[]; E: number[] }
   return { A: Epoly, B: Epoly, E: Epoly };
 }
 
+/* Local-coordinate midpoint of the visible connecting band, for placing the
+   connector handle. The band spans from THIS balloon's edge (E) to the tip
+   just inside the partner's edge, so its true middle is halfway between them —
+   NOT center→tip, which the child's deep center pulls toward this balloon.
+   A user bend takes over the midpoint once set. */
+export function connectorMid(el: BalloonEl): [number, number] | null {
+  const tail = el.tail;
+  if (!tail) return null;
+  const cx = el.w / 2, cy = el.h / 2;
+  if (tail.bx != null && tail.by != null) return [cx + tail.bx, cy + tail.by];
+  const base = connectorBase(el);
+  const E = base ? base.E : [cx, cy];
+  const tip = [cx + tail.dx, cy + tail.dy];
+  return [(E[0] + tip[0]) / 2, (E[1] + tip[1]) / 2];
+}
+
 /* The open connector band between joined balloons. Drawn AFTER both bodies:
    the fill quad reaches a little inside this balloon and deep into the
    partner, covering both outline strokes where it crosses them, so each
