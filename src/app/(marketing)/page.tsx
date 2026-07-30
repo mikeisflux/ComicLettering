@@ -81,14 +81,14 @@ export default function Home() {
         <figure className="shotHero">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/shots/studio.webp" width={1600} height={1000}
-            alt="The LetterMyComic studio: a tank-battle comic page being lettered — a warped BADOOM! sound effect selected on the canvas, speech balloons and a caption over the artwork, with the full editor toolbar, lettering-style swatches, balloon tray, layouts and page thumbnails." />
+            alt="The LetterMyComic studio with a fully lettered occult comic page on the canvas — speech balloons, captions and KRAKOOM and SCRIIIITCH sound effects over the artwork — surrounded by the editor toolbar, lettering-style swatches, balloon tray, layouts and page thumbnails." />
           <figcaption>The full studio — toolbar, one-click lettering styles, balloon tray and layouts, all in your browser.</figcaption>
         </figure>
         <div className="shotRow">
           <figure>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/shots/page.webp" width={492} height={751}
-              alt="A finished snow-convoy comic page lettered in LetterMyComic: a caption, speech balloons, a joined balloon pair with an open connector, and a radio balloon over the artwork." />
+              alt="A finished comic page lettered in LetterMyComic: captions, a speech balloon with an aimed tail, and glowing BZZZZZT and CRACKLE sound effects over a candle-lit ritual scene." />
             <figcaption>Finished pages export print-ready at up to 450 DPI.</figcaption>
           </figure>
           <figure>
