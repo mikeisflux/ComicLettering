@@ -16,7 +16,16 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
     e.preventDefault();
     setBusy(true); setErr("");
     const f = new FormData(e.currentTarget);
-    const captcha = await getCaptcha(mode);
+    let captcha: string | null = null;
+    try {
+      captcha = await getCaptcha(mode);
+    } catch (ex) {
+      /* the check couldn't run (usually an ad blocker) — tell the user what
+         to do instead of posting a doomed request */
+      setErr(ex instanceof Error ? ex.message : "The sign-up check didn't run — please reload and try again.");
+      setBusy(false);
+      return;
+    }
     const res = await fetch(mode === "signup" ? "/api/auth/register" : "/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

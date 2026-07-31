@@ -11,7 +11,14 @@ export default function ContactForm() {
     e.preventDefault();
     setState("busy");
     const f = new FormData(e.currentTarget);
-    const captcha = await getCaptcha("contact");
+    let captcha: string | null = null;
+    try {
+      captcha = await getCaptcha("contact");
+    } catch (ex) {
+      setErr(ex instanceof Error ? ex.message : "The spam check didn't run — please reload and try again.");
+      setState("err");
+      return;
+    }
     const res = await fetch("/api/contact", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
