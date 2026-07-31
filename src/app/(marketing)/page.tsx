@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import HeroSlider from "./_components/HeroSlider";
 
 export const metadata: Metadata = {
   title: "LetterMyComic — Comic Lettering Software in Your Browser",
@@ -65,6 +66,7 @@ export default function Home() {
           LetterMyComic is the modern comic lettering studio that never crashes,
           never needs installing, and exports print-ready pages.
         </p>
+        <HeroSlider />
         <div className="heroBtns">
           <Link className="btnBig primary" href="/signup?next=/app&demo=1">Try the Free Demo</Link>
           <Link className="btnBig secondary" href="/pricing">Pricing — $20/mo</Link>
