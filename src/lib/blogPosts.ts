@@ -9,10 +9,46 @@ export interface BlogPost {
   description: string;
   date: string;      // ISO
   minutes: number;
+  /* small label above the headline; defaults to "Lettering tutorial" */
+  kicker?: string;
   blocks: PostBlock[];
 }
 
 export const BLOG_POSTS: BlogPost[] = [
+  {
+    slug: "introducing-lettermycomic",
+    title: "LetterMyComic Launches: Professional Comic Lettering in Your Browser",
+    description:
+      "LetterMyComic.com is live — a complete comic-lettering studio that runs in any browser: word balloons that behave like ink, 600+ comic fonts, SFX warping, tuck-behind-art lettering, and print-ready export.",
+    date: "2026-08-01",
+    minutes: 5,
+    kicker: "Press release",
+    blocks: [
+      { p: "FOR IMMEDIATE RELEASE — LetterMyComic today announced the launch of lettermycomic.com, a complete comic-book lettering studio that runs entirely in the web browser. Built for indie creators, small-press studios and webcomic artists, LetterMyComic brings the balloon-first, drag-and-drop workflow letterers loved in classic desktop tools to every modern platform — with no installation, no plugins, and page output ready for the printer." },
+      { p: "Comic lettering has long forced a choice between general-purpose design software that fights the medium and beloved desktop tools that stopped being updated. LetterMyComic is built the other way around: every tool in it exists because comic pages need it." },
+      { h: "Word balloons that behave like ink" },
+      { p: "Balloons are the heart of the studio. Speech, thought, shout, burst, caption and hand-sketched custom shapes all carry pointed tails you aim at the speaker with a single drag. Drop one balloon onto another and they join automatically — connected by an open band, the way hand-inked dialogue chains have always been drawn. Joined balloons share their fill and gradient across the whole chain, melt into a single shape when they touch, and separate cleanly again. Chains of three, four or five bubbles join in any order, in either direction." },
+      { ul: [
+        "Auto-fit balloons that grow with the dialogue as you type",
+        "Balloon-to-balloon joins with open connector bands and shared styles",
+        "Saved balloon and lettering styles — capture a look once, reuse it book-wide",
+        "Micro-nudge positioning with arrow keys for print-precise placement",
+      ] },
+      { h: "Type built for comics" },
+      { p: "The studio ships with 600+ comic fonts and 100+ ready lettering styles, plus import for a letterer's own fonts. Dialogue follows comic-grammar conventions automatically, including the crossbar-I rule. Individual words can be bolded, italicised or underlined inline, exactly as emphasis is done on the printed page. A full comic script can be imported and broken into balloons automatically, and built-in spelling and grammar proofing checks every balloon on the page." },
+      { h: "Sound effects and lettering that sits inside the art" },
+      { p: "Display lettering gets arc and envelope warping, gradient and texture fills, brush edges and glows. The studio's Tuck Back tool slips a sound effect behind foreground artwork — its magnetic tracer snaps to the art's own edges, so a KRAKOOM can dive behind a character's arm in seconds and read like it was painted there." },
+      { h: "From artwork to the printer" },
+      { p: "Pages import artwork in PNG, JPG, WebP, GIF, AVIF, BMP, SVG, TIFF or PDF, and lay out on real comic page sizes with bleed and safe-area guides at print resolution. Finished books export as PNG, JPG or TIFF, as PDF with crop and bleed marks, or as CBZ for digital readers — and a lettering-only export hands transparent overlays back to the artist or production team." },
+      { h: "Your pages stay yours" },
+      { p: "LetterMyComic uses no generative AI: nothing on the page is generated, and creators' pages are never used to train anything. Full-resolution artwork stays in the creator's browser rather than being pushed through the cloud. Work saves continuously to the browser and to a project library, so a session survives a closed laptop." },
+      { p: "\"Lettering is the last craft step where the story can still be saved or sunk, and it deserved a real tool on the open web,\" said the LetterMyComic team. \"We built the balloon behaviour first — tails, joins, melts, the things letterers actually fight with — and then built a studio around it.\"" },
+      { h: "Availability" },
+      { p: "LetterMyComic is available now at lettermycomic.com. Creating an account is free and opens the full studio in demo mode; subscriptions unlock saving to the library, printing and print-ready export. Plans and pricing are listed at lettermycomic.com/pricing." },
+      { h: "About LetterMyComic" },
+      { p: "LetterMyComic is an independent software studio dedicated to the craft of comic lettering. Press and partnership enquiries: lettermycomic.com/contact." },
+    ],
+  },
   {
     slug: "word-balloon-placement-basics",
     title: "Word Balloon Placement: The Rules That Make Pages Read Themselves",

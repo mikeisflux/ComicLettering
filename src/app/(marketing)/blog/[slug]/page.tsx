@@ -61,7 +61,7 @@ export default async function BlogPost(
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       <article className="prose blogPost">
-        <p className="heroKicker">Lettering tutorial</p>
+        <p className="heroKicker">{post.kicker ?? "Lettering tutorial"}</p>
         <h1>{post.title}</h1>
         <p className="blogMeta">
           <time dateTime={post.date}>{fmtDate(post.date)}</time> · {post.minutes} min read
