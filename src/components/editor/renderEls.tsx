@@ -434,7 +434,7 @@ export function renderOverlay(ed: EditorCtx) {
                 onPointerDown={(e) => startDrag(e, el, "tilt", "t2")} />
             )}
             <div className="handle connMove"
-              title="Drag to curve the connecting tail · double-click to tilt"
+              title="Drag to curve the connecting tail — drop it inside another bubble to join that one instead · double-click to tilt"
               style={{ left: M[0] * z - 7, top: M[1] * z - 7 }}
               onPointerDown={(e) => startDrag(e, el, "bow")}
               onDoubleClick={(e) => {

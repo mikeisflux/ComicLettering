@@ -12,6 +12,53 @@ import { FLAT } from "@/lib/warp";
 
 export const MIN_SIZE = 24;
 
+/* ---------- joined-balloon helpers (drag-to-join, both directions) ---------- */
+
+type PageLike = { els: El[] };
+
+/* TOPMOST balloon under a page point (last in the array renders on top) —
+   locked balloons still count: joining onto one doesn't move it. */
+function topBalloonAt(p: PageLike, x: number, y: number, excludeId: string): BalloonEl | undefined {
+  return [...p.els].reverse().find((o) =>
+    o.type === "balloon" && o.id !== excludeId &&
+    x >= o.x && x <= o.x + o.w && y >= o.y && y <= o.y + o.h) as BalloonEl | undefined;
+}
+
+const chainReaches = (p: PageLike, from: BalloonEl, targetId: string): boolean => {
+  let n: BalloonEl | undefined = from;
+  for (let i = 0; i < 32 && n; i++) {
+    if (n.id === targetId) return true;
+    n = n.attachTo
+      ? p.els.find((o) => o.id === n!.attachTo && o.type === "balloon") as BalloonEl | undefined
+      : undefined;
+  }
+  return false;
+};
+
+/* Join `cur` onto `hit` — in EITHER direction. Bubbles join in any order:
+   when the target sits downstream of the dragged bubble (its chain leads
+   back here), a naive attach would loop the chain, so the links between the
+   two are re-rooted first (every pair stays connected, nothing can cycle).
+   Grabbing any bubble's tail or connector and dropping it on any neighbour
+   always works. */
+function joinTo(p: PageLike, cur: BalloonEl, hit: BalloonEl) {
+  if (chainReaches(p, hit, cur.id)) {
+    /* reverse the links from the target up to (not including) this bubble */
+    let n: BalloonEl | undefined = hit;
+    let prev: BalloonEl | null = null;
+    for (let i = 0; i < 32 && n && n.id !== cur.id; i++) {
+      const up: BalloonEl | undefined = n.attachTo
+        ? p.els.find((o) => o.id === n!.attachTo && o.type === "balloon") as BalloonEl | undefined
+        : undefined;
+      n.attachTo = prev ? prev.id : null;
+      if (n.tail) { delete n.tail.bx; delete n.tail.by; delete n.tail.tx; delete n.tail.ty; }
+      prev = n;
+      n = up;
+    }
+  }
+  cur.attachTo = hit.id;
+}
+
 export type DragMode =
   | "move" | "resize" | "rotate" | "tail" | "bow" | "tilt" | "envelope";
 
@@ -231,29 +278,25 @@ export function useStartDrag(deps: DragDeps) {
           next.by = oldTail.by;
         }
         cur.tail = next;
-        /* dropping the tip inside another bubble JOINS them — bubbles join in
-           any order, including onto one that already has a partner. The band
-           appears live while hovering; dragging back out detaches again. A
-           join that would loop the chain back onto itself is refused. */
-        const chainReaches = (from: BalloonEl, targetId: string): boolean => {
-          let n: BalloonEl | undefined = from;
-          for (let i = 0; i < 32 && n; i++) {
-            if (n.id === targetId) return true;
-            n = n.attachTo
-              ? p.els.find((o) => o.id === n!.attachTo && o.type === "balloon") as BalloonEl | undefined
-              : undefined;
-          }
-          return false;
-        };
-        const hit = p.els.find((o) =>
-          o.type === "balloon" && o.id !== cur.id && !o.locked &&
-          pt.x >= o.x && pt.x <= o.x + o.w && pt.y >= o.y && pt.y <= o.y + o.h &&
-          !chainReaches(o as BalloonEl, cur.id));
-        if (hit) cur.attachTo = hit.id;
+        /* dropping the tip inside another bubble JOINS them — see joinTo */
+        const hitT = topBalloonAt(p, pt.x, pt.y, cur.id);
+        if (hitT) joinTo(p, cur, hitT);
       } else if (mode === "bow" && cur.type === "balloon" && cur.tail) {
         const cx = orig.x + orig.w / 2, cy = orig.y + orig.h / 2;
         const [ldx, ldy] = rotVec(pt.x - cx, pt.y - cy, -orig.rot);
         cur.tail = { ...cur.tail, bx: Math.round(ldx), by: Math.round(ldy) };
+        /* a JOINED bubble has no tail tip — dragging its connector handle
+           into a different bubble is how it changes partners. Bending inside
+           the current partner stays a bend. */
+        if (cur.attachTo) {
+          const hitB = topBalloonAt(p, pt.x, pt.y, cur.id);
+          if (hitB && hitB.id !== cur.attachTo) {
+            joinTo(p, cur, hitB);
+            /* fresh straight band to the new partner */
+            delete cur.tail.bx; delete cur.tail.by;
+            delete cur.tail.tx; delete cur.tail.ty;
+          }
+        }
       } else if (mode === "tilt" && cur.type === "balloon" && cur.tail) {
         /* the two satellite dots tilt the connector's tangent at the bend —
            this is the ONLY control that distorts the band. Seed a bend point
