@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: tablet/android
+        working-directory: tablet/droid
     env:
       KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD || 'lettermycomic-dev' }}
     steps:
@@ -63,13 +63,13 @@ jobs:
         with:
           name: lettermycomic-android
           path: |
-            tablet/android/*.aab
-            tablet/android/*.apk
-            tablet/android/assetlinks-fingerprint.txt
+            tablet/droid/*.aab
+            tablet/droid/*.apk
+            tablet/droid/assetlinks-fingerprint.txt
           if-no-files-found: error
       - name: Attach the generated keystore (KEEP THIS — it is your signing key)
         if: env.GENERATED_KEYSTORE == '1'
         uses: actions/upload-artifact@v4
         with:
           name: android-keystore-KEEP-SAFE
-          path: tablet/android/android.keystore
+          path: tablet/droid/android.keystore

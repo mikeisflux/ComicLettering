@@ -8,7 +8,7 @@ resize, tails, warp, pinch-zoom) all work with touch and stylus.
 No store needed at all: Android Chrome → menu → *Install app*;
 iPad Safari → Share → *Add to Home Screen*.
 
-## Android (`/tablet/android`) — Google Play
+## Android (`/tablet/droid`) — Google Play
 
 A **Trusted Web Activity**: a Play package whose UI is Chrome rendering
 lettermycomic.com full screen, no browser bar. Google Play signs the app
