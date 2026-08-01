@@ -1,0 +1,38 @@
+{
+  "name": "lettermycomic-desktop",
+  "productName": "LetterMyComic",
+  "version": "1.0.0",
+  "description": "LetterMyComic desktop app — comic lettering studio with native .lmc project files",
+  "author": "LetterMyComic <hello@lettermycomic.com>",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --publish never"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.lettermycomic.app",
+    "productName": "LetterMyComic",
+    "files": ["main.js"],
+    "icon": "build/icon.png",
+    "fileAssociations": [
+      {
+        "ext": "lmc",
+        "name": "LetterMyComic Project",
+        "description": "LetterMyComic comic-lettering project",
+        "mimeType": "application/x-lettermycomic",
+        "role": "Editor",
+        "icon": "build/icon.png"
+      }
+    ],
+    "win": { "target": ["nsis"] },
+    "nsis": { "oneClick": true, "perMachine": false },
+    "mac": { "target": ["dmg", "zip"], "category": "public.app-category.graphics-design" },
+    "linux": { "target": ["AppImage"], "category": "Graphics" }
+  }
+}

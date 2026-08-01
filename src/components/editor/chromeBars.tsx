@@ -39,6 +39,7 @@ export function renderMenuBar(ed: EditorCtx) {
         ["Save As… (.lmc)", () => exportJSON(ed)],
         ["Save a Copy to Library…", () => saveProject(ed, true)],
         ["Open Project File…", () => fileOpenRef.current?.click()],
+        ["Install as App…", () => ed.installApp()],
         ["—", null],
         ["Page Setup…", () => setShowSetup(true)],
         ["Export…", () => demo ? setStatus("Export is off in the demo — subscribe to unlock.") : setShowExport(true)],

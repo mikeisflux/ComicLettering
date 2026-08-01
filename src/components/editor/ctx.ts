@@ -82,6 +82,8 @@ export interface EditorCtx {
   setActiveShape: (tab: "balloon" | "box", name: string) => void;
   select: (id: string | null, additive?: boolean) => void;
   selectAllOnPage: () => void;
+  /* prompt the browser's PWA install (or explain how, per platform) */
+  installApp: () => void;
   setSelId: SetState<string | null>;
   setEditingId: SetState<string | null>;
   finishEditing: () => void;
