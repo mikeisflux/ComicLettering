@@ -266,6 +266,10 @@ function textInkFractions(el: TextEl): { x0: number; y0: number; x1: number; y1:
       if (py + ey > y1) y1 = py + ey;
     }
     if (x1 <= x0 || y1 <= y0) return null;
+    /* snug box → no re-hug (see the straight branch below) */
+    const fx = ts.size * 0.18 + ts.outlineW * 1.2 + 3;
+    const fy = ts.size * 0.14 + ts.outlineW * 1.2 + 3;
+    if (x0 <= fx && el.w - x1 <= fx && y0 <= fy && el.h - y1 <= fy) return null;
     return {
       x0: (x0 - pad) / el.w, y0: (y0 - pad) / el.h,
       x1: (x1 + pad) / el.w, y1: (y1 + pad) / el.h,
@@ -278,6 +282,12 @@ function textInkFractions(el: TextEl): { x0: number; y0: number; x1: number; y1:
   const y0 = (el.h - m.h) / 2;
   const x0 = ts.align === "center" ? (el.w - m.w) / 2
     : ts.align === "right" ? el.w - m.w : 0;
+  /* a box that's already snug (what a fresh or migrated element gets) is NOT
+     re-hugged: the selection box, resize handles and warp dots then all sit
+     on the SAME rect instead of three subtly different ones */
+  const fitX = ts.size * 0.18 + ts.outlineW * 1.2 + 3;
+  const fitY = ts.size * 0.14 + ts.outlineW * 1.2 + 3;
+  if (x0 <= fitX && el.w - (x0 + m.w) <= fitX && y0 <= fitY && el.h - (y0 + m.h) <= fitY) return null;
   return {
     x0: (x0 - pad) / el.w, y0: (y0 - pad) / el.h,
     x1: (x0 + m.w + pad) / el.w, y1: (y0 + m.h + pad) / el.h,
@@ -360,11 +370,29 @@ export function renderOverlay(ed: EditorCtx) {
      the overlay are remapped into it. Skipped while editing (the caret needs
      the true box) and while warping (envelope dots live in box units). */
   const editingThis = editingId === el.id;
-  const envW = el.type === "text" && !editingThis && isWarped(el.ts.env as Warp) ? (el.ts.env as Warp) : null;
-  const eb = envW ? warpInkBounds(el as TextEl, envW)
-    : el.type === "text" && !editingThis && warping !== el.id
-      ? textInkFractions(el as TextEl)
-      : null;
+  const warpingThis = warping === el.id && el.type === "text";
+  const envW = el.type === "text" && !editingThis && !warpingThis && isWarped(el.ts.env as Warp) ? (el.ts.env as Warp) : null;
+  let eb: { x0: number; y0: number; x1: number; y1: number } | null = null;
+  if (warpingThis) {
+    /* warp mode: the overlay box is the bounding box of the DOTS themselves,
+       so box and handles always agree — previously the box hugged the ink
+       while the dots sat at layout-box corners, two different rects */
+    const env = (el.ts.env as Warp | undefined) ?? FLAT;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const [u, v] of env) {
+      if (u < x0) x0 = u;
+      if (u > x1) x1 = u;
+      if (v < y0) y0 = v;
+      if (v > y1) y1 = v;
+    }
+    if (x1 - x0 > 0.01 && y1 - y0 > 0.01 && (x0 !== 0 || y0 !== 0 || x1 !== 1 || y1 !== 1)) {
+      eb = { x0, y0, x1, y1 };
+    }
+  } else if (envW) {
+    eb = warpInkBounds(el as TextEl, envW);
+  } else if (el.type === "text" && !editingThis) {
+    eb = textInkFractions(el as TextEl);
+  }
   const bx = eb ? el.x + eb.x0 * el.w : el.x;
   const by = eb ? el.y + eb.y0 * el.h : el.y;
   const bw = eb ? Math.max(1, (eb.x1 - eb.x0) * el.w) : el.w;

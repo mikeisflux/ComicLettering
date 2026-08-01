@@ -38,7 +38,7 @@ import {
   duplicatePage, duplicateSel, growBalloonToFit, importFontFiles, importImageFile, importJSON,
   isSupportedArtFile, normalizeArtFile, sizeTextToContent,
   fitBalloonToText, importStampFiles, movePage, nextAid, onDrop, pasteClip,
-  printPage, readAsDataURL, refreshProjects, reorder, saveProject,
+  printPage, readAsDataURL, refitLegacyLettering, refreshProjects, reorder, saveProject,
 } from "./editor/ops";
 import { renderEl, renderJoinBands, renderOverlay } from "./editor/renderEls";
 import { useStartDrag } from "./editor/useStartDrag";
@@ -565,6 +565,15 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
         }
       } catch { /* no artwork store — the lettering still came back */ }
       const d = docRef.current!;
+      /* legacy lettering slabs refit to their ink once the real fonts are in —
+         old documents behave like freshly lettered ones (see refitLegacyLettering) */
+      try {
+        if (restored && await refitLegacyLettering(d)) {
+          if (hIndexRef.current === 0 && histRef.current.length === 1) histRef.current = [JSON.stringify(d)];
+          autosave();
+          force();
+        }
+      } catch { /* best-effort migration */ }
       const gen = thumbGenRef.current;
       for (let i = 0; i < d.pages.length; i++) {
         if (thumbGenRef.current !== gen) return; // doc replaced during boot render

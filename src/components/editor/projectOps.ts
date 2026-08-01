@@ -10,7 +10,7 @@ import {
 } from "@/lib/exportPng";
 import { LT_URL, ProofMatch } from "./textHelpers";
 import { EditorCtx } from "./ctx";
-import { ensureAllArt } from "./ops";
+import { ensureAllArt, refitLegacyLettering } from "./ops";
 
 
 /* ---------------- project library (SQL) ---------------- */
@@ -99,6 +99,7 @@ export async function loadProject(ed: EditorCtx, id: string) {
     assetsRef.current = payload.assets || {};
     reseedIds(docRef.current!);
     reseedAids();
+    try { await refitLegacyLettering(docRef.current!); } catch { /* best-effort */ }
     histRef.current = [JSON.stringify(docRef.current)];
     hIndexRef.current = 0;
     setCurrent({ id: p.id, name: p.name });
@@ -147,6 +148,7 @@ export async function importJSON(ed: EditorCtx, f: File) {
     assetsRef.current = payload.assets || {};
     reseedIds(d);
     reseedAids();
+    try { await refitLegacyLettering(d); } catch { /* best-effort */ }
     histRef.current = [JSON.stringify(d)];
     hIndexRef.current = 0;
     setCurrent(null);
