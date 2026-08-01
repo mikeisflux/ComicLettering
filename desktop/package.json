@@ -30,8 +30,16 @@
         "icon": "build/icon.png"
       }
     ],
-    "win": { "target": ["nsis"] },
+    "win": { "target": ["nsis", "appx"] },
     "nsis": { "oneClick": true, "perMachine": false },
+    "appx": {
+      "identityName": "REPLACE.WITH.PartnerCenter.IdentityName",
+      "publisher": "CN=REPLACE-WITH-PARTNER-CENTER-PUBLISHER-GUID",
+      "publisherDisplayName": "LetterMyComic",
+      "applicationId": "LetterMyComic",
+      "displayName": "LetterMyComic",
+      "backgroundColor": "#24303f"
+    },
     "mac": { "target": ["dmg", "zip"], "category": "public.app-category.graphics-design" },
     "linux": { "target": ["AppImage"], "category": "Graphics" }
   }

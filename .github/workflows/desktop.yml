@@ -30,6 +30,7 @@ jobs:
           name: lettermycomic-desktop-${{ matrix.os }}
           path: |
             desktop/dist/*.exe
+            desktop/dist/*.appx
             desktop/dist/*.dmg
             desktop/dist/*.zip
             desktop/dist/*.AppImage

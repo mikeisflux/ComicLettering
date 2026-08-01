@@ -41,6 +41,7 @@ import {
   printPage, readAsDataURL, refitLegacyLettering, refreshProjects, reorder, saveProject,
 } from "./editor/ops";
 import { renderEl, renderJoinBands, renderOverlay } from "./editor/renderEls";
+import { useInstallPrompt, useOpenFileBridge, usePinchZoom } from "./editor/usePlatform";
 import { useStartDrag } from "./editor/useStartDrag";
 import { renderInspector } from "./editor/inspector";
 import {
@@ -1130,31 +1131,9 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     })();
   }, [registerRuntimeFont]);
 
-  /* Browsers only offer "Install app" quietly (an address-bar icon or a
-     buried menu item), so surface it: capture the install prompt and expose
-     it as File → Install as App…, with honest per-platform guidance where
-     the prompt API doesn't exist (Safari, Firefox). */
-  const installEvtRef = useRef<(Event & { prompt: () => Promise<void> }) | null>(null);
-  useEffect(() => {
-    const onBip = (e: Event) => { e.preventDefault(); installEvtRef.current = e as Event & { prompt: () => Promise<void> }; };
-    window.addEventListener("beforeinstallprompt", onBip);
-    return () => window.removeEventListener("beforeinstallprompt", onBip);
-  }, []);
-  const installApp = useCallback(() => {
-    if (window.matchMedia?.("(display-mode: standalone)").matches) {
-      setStatus("LetterMyComic is already installed — you're running the app now.");
-      return;
-    }
-    const ev = installEvtRef.current;
-    if (ev) { ev.prompt(); return; }
-    const ua = navigator.userAgent;
-    setStatus(/iPhone|iPad|iPod/.test(ua)
-      ? "On iPhone/iPad: tap Share, then “Add to Home Screen”."
-      : /Mac/.test(ua) && /Safari/.test(ua) && !/Chrome|Edg/.test(ua)
-        ? "In Safari: File → Add to Dock installs LetterMyComic as an app."
-        : "In Chrome or Edge: look for the install icon at the right end of the address bar, or the browser menu → “Install LetterMyComic”. Installing also gives .lmc project files the app's icon.");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  /* Tablet pinch-zoom and the PWA install prompt — see usePlatform.ts */
+  usePinchZoom(areaRef, zoom, setZoom, setUserZoomed);
+  const installApp = useInstallPrompt(setStatus);
 
   /* ---------------- shared context bag ---------------- */
   /* One plain object per render; extracted modules receive it as `ed`.
@@ -1216,28 +1195,8 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, projects]);
 
-  /* Installed-app file handling: when LetterMyComic is installed as an app,
-     the OS hands double-clicked .lmc files here (see file_handlers in
-     src/app/manifest.ts) — open them straight into the studio. The desktop
-     wrapper (see /desktop) feeds files through window.lmcOpenProject. */
-  const edRef = useRef<EditorCtx>(ed);
-  edRef.current = ed;
-  useEffect(() => {
-    (window as unknown as { lmcOpenProject?: (text: string, name?: string) => void }).lmcOpenProject =
-      (text, name = "project.lmc") => {
-        importJSON(edRef.current, new File([text], name, { type: "application/x-lettermycomic" }));
-      };
-    const lq = (window as unknown as {
-      launchQueue?: { setConsumer: (cb: (p: { files?: { getFile: () => Promise<File> }[] }) => void) => void };
-    }).launchQueue;
-    if (!lq) return;
-    lq.setConsumer(async (params) => {
-      const fh = params.files?.[0];
-      if (!fh) return;
-      try { await importJSON(edRef.current, await fh.getFile()); } catch { /* bad file — importJSON reports */ }
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  /* .lmc file-open bridge (installed app + desktop wrapper) — usePlatform.ts */
+  useOpenFileBridge(ed);
 
   /* ---------------- top-level render ---------------- */
 

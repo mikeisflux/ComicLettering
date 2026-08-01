@@ -1,0 +1,75 @@
+# Builds the Android tablet app (see /tablet) — a Trusted Web Activity that
+# renders lettermycomic.com full screen. Produces the Play-Store .aab and a
+# sideloadable .apk as workflow artifacts. Run from the Actions tab or push
+# a tablet-v* tag.
+#
+# Signing: set the ANDROID_KEYSTORE_B64 + ANDROID_KEYSTORE_PASSWORD secrets
+# to use your upload key. With no secrets set, the workflow GENERATES a
+# keystore and attaches it as an artifact — download and keep it, then store
+# it in the secrets so every future build signs with the same key.
+name: Tablet app (Android)
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["tablet-v*"]
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tablet/android
+    env:
+      KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD || 'lettermycomic-dev' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - run: npm install -g @bubblewrap/cli
+      - name: Point bubblewrap at the runner's JDK and Android SDK
+        run: |
+          mkdir -p ~/.bubblewrap
+          printf '{"jdkPath": "%s", "androidSdkPath": "%s"}\n' "$JAVA_HOME" "$ANDROID_HOME" > ~/.bubblewrap/config.json
+      - name: Keystore (from secret, or generate a fresh one)
+        run: |
+          if [ -n "${{ secrets.ANDROID_KEYSTORE_B64 }}" ]; then
+            echo "${{ secrets.ANDROID_KEYSTORE_B64 }}" | base64 -d > android.keystore
+          else
+            keytool -genkeypair -v -keystore android.keystore -alias lettermycomic \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass "$KS_PASS" -keypass "$KS_PASS" \
+              -dname "CN=LetterMyComic"
+            echo "GENERATED_KEYSTORE=1" >> "$GITHUB_ENV"
+          fi
+          keytool -list -v -keystore android.keystore -alias lettermycomic -storepass "$KS_PASS" \
+            | grep -E "SHA256:" > assetlinks-fingerprint.txt || true
+      - name: Generate the Android project from twa-manifest.json
+        run: bubblewrap update --skipVersionUpgrade
+        env:
+          BUBBLEWRAP_KEYSTORE_PASSWORD: ${{ env.KS_PASS }}
+          BUBBLEWRAP_KEY_PASSWORD: ${{ env.KS_PASS }}
+      - name: Build .aab + .apk
+        run: bubblewrap build --skipPwaValidation
+        env:
+          BUBBLEWRAP_KEYSTORE_PASSWORD: ${{ env.KS_PASS }}
+          BUBBLEWRAP_KEY_PASSWORD: ${{ env.KS_PASS }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lettermycomic-android
+          path: |
+            tablet/android/*.aab
+            tablet/android/*.apk
+            tablet/android/assetlinks-fingerprint.txt
+          if-no-files-found: error
+      - name: Attach the generated keystore (KEEP THIS — it is your signing key)
+        if: env.GENERATED_KEYSTORE == '1'
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-keystore-KEEP-SAFE
+          path: tablet/android/android.keystore
