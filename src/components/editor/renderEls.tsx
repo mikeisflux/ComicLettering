@@ -86,7 +86,12 @@ export function renderEl(ed: EditorCtx, el: El) {
       }
       /* ctrl/cmd (or shift) adds to the selection instead of replacing it */
       const add = e.ctrlKey || e.metaKey || e.shiftKey;
-      select(el.id, add);
+      /* grabbing a member of a MULTI-selection keeps the whole set — the
+         drag moves the convoy together. Collapsing here made a group drag
+         silently move only the grabbed one; the collapse now happens on
+         pointer-up when nothing moved (see useStartDrag's onUp). */
+      const inGroup = !add && !el.locked && ed.selIds.length > 1 && ed.selIds.includes(el.id);
+      if (!inGroup) select(el.id, add);
       /* an additive click is picking, not dragging — starting a drag here
          would nudge the set every time you add one more to it */
       if (!el.locked && !add) startDrag(e, el, "move");

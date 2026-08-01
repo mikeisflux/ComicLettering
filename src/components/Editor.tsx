@@ -735,7 +735,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
      to ./editor/useStartDrag (the 1500-line rule) */
   const startDrag = useStartDrag({
     pagePoint, commit, force, zoom,
-    docRef, pageIndexRef, selIdsRef, snapRef, dragTipRef,
+    docRef, pageIndexRef, selIdsRef, snapRef, dragTipRef, setSelIds,
   });
 
 

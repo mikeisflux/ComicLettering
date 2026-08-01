@@ -75,10 +75,11 @@ export interface DragDeps {
   selIdsRef: Ref<string[]>;
   snapRef: Ref<{ x: number | null; y: number | null }>;
   dragTipRef: Ref<{ x: number; y: number; w: number; h: number; mode: string; live: boolean } | null>;
+  setSelIds: (ids: string[]) => void;
 }
 
 export function useStartDrag(deps: DragDeps) {
-  const { pagePoint, commit, force, zoom, docRef, pageIndexRef, selIdsRef, snapRef, dragTipRef } = deps;
+  const { pagePoint, commit, force, zoom, docRef, pageIndexRef, selIdsRef, snapRef, dragTipRef, setSelIds } = deps;
   return useCallback((
     e: React.PointerEvent, el: El, mode: DragMode, handle = ""
   ) => {
@@ -327,6 +328,14 @@ export function useStartDrag(deps: DragDeps) {
         }, 900);
       }
       if (moved) commit();
+      /* A multi-selection is KEPT at pointerdown so a body-drag moves the
+         whole convoy (see renderEl). If the pointer never actually moved,
+         this was a plain click on one member — collapse to it, the way a
+         click always worked. */
+      else if (mode === "move" && selIdsRef.current.length > 1 && selIdsRef.current.includes(el.id)) {
+        setSelIds([el.id]);
+        force();
+      }
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
@@ -334,5 +343,5 @@ export function useStartDrag(deps: DragDeps) {
        palm rejection) — without this the listeners leak and the element keeps
        tracking a phantom pointer */
     window.addEventListener("pointercancel", onUp);
-  }, [pagePoint, commit, force, zoom, docRef, pageIndexRef, selIdsRef, snapRef, dragTipRef]);
+  }, [pagePoint, commit, force, zoom, docRef, pageIndexRef, selIdsRef, snapRef, dragTipRef, setSelIds]);
 }
