@@ -12,6 +12,9 @@ export interface ShapeStyle {
   strokeW: number;
   /** ink colour for the lettering inside — defaults to black */
   ink?: string;
+  /** font key for the lettering inside — saved user styles carry the
+      balloon's font; the built-in colourways leave the target's font alone */
+  font?: string;
   /** transparent body: no fill drawn at all */
   none?: boolean;
 }
@@ -45,6 +48,8 @@ export function captureShapeStyle(el: BalloonEl, name: string): ShapeStyle {
     stroke: el.stroke,
     strokeW: el.strokeW,
     ink: el.ts?.fillA ?? "#000000",
+    /* the bubble's lettering font travels with the saved style */
+    font: el.ts?.font,
     none: f.kind === "solid" && (f.a === "transparent" || f.a === "none"),
   };
 }
@@ -53,7 +58,13 @@ export function applyShapeStyle(el: BalloonEl, s: ShapeStyle) {
   el.fill = shapeFill(s);
   el.stroke = s.stroke;
   el.strokeW = s.strokeW;
-  el.ts = { ...el.ts, fillA: s.ink ?? "#000000", fillB: null, outlineW: 0, shadow: false };
+  el.ts = {
+    ...el.ts,
+    fillA: s.ink ?? "#000000", fillB: null, outlineW: 0, shadow: false,
+    /* saved styles carry a font; built-in colourways don't and leave the
+       target's font untouched */
+    ...(s.font ? { font: s.font } : {}),
+  };
 }
 
 /* --- word balloons: classic ink-and-colour combinations --- */

@@ -2,7 +2,7 @@
    colourways for text, balloon colourways for word balloons, box colourways
    for captions. Clicking a swatch restyles whatever is selected — and also
    becomes the style the next new element of that kind is created with. */
-import { BalloonEl, TextEl, TAILLESS_KINDS } from "@/lib/model";
+import { BalloonEl, FONTS, TextEl, TAILLESS_KINDS } from "@/lib/model";
 import { LETTER_STYLES, LetterStyle, applyLetterStyle } from "@/lib/presets";
 import { BALLOON_STYLES, BOX_STYLES, ShapeStyle, applyShapeStyle, shapeCss } from "@/lib/balloonStyles";
 import { EditorCtx } from "./ctx";
@@ -32,7 +32,8 @@ function ShapeSwatch({ s, on, box, mine, onPick, onRemove }: {
       onClick={onPick}>
       <span className={"shapeSw" + (box ? " box" : "") + (s.none ? " none" : "")}
         style={{ background: shapeCss(s), borderColor: s.stroke, borderWidth: Math.max(1, Math.round(s.strokeW / 1.6)) }}>
-        <i style={{ color: s.ink ?? "#000000" }}>ABC</i>
+        {/* a saved style carries its bubble's font — preview it live */}
+        <i style={{ color: s.ink ?? "#000000", fontFamily: s.font ? FONTS[s.font]?.css : undefined }}>ABC</i>
       </span>
     </button>
   );
