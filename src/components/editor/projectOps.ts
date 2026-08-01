@@ -123,15 +123,43 @@ export async function deleteProject(ed: EditorCtx, id: string) {
   refreshProjects(ed);
 }
 
-export function exportJSON(ed: EditorCtx) {
+/* Save As… — the project as a FILE on disk, the way a desktop app does it.
+   The format is our JSON payload under the .lmc extension; import accepts
+   both .lmc and legacy .json. Where the browser offers a real save dialog
+   (Chromium's File System Access API) we use it so the user picks the
+   location and filename; elsewhere it falls back to a download. */
+export async function exportJSON(ed: EditorCtx) {
   const { demo, setStatus, docRef, assetsRef, current } = ed;
-  if (demo) { setStatus("Export is off in the demo — subscribe to unlock."); return; }
-  const blob = new Blob([JSON.stringify({ doc: docRef.current, assets: portableAssets(assetsRef.current).assets })], { type: "application/json" });
+  if (demo) { setStatus("Saving project files is off in the demo — subscribe to unlock."); return; }
+  const blob = new Blob(
+    [JSON.stringify({ doc: docRef.current, assets: portableAssets(assetsRef.current).assets })],
+    { type: "application/x-lettermycomic" });
+  const name = (current?.name || "comic-project") + ".lmc";
+  const picker = (window as unknown as {
+    showSaveFilePicker?: (opts: unknown) => Promise<{ createWritable: () => Promise<{ write: (b: Blob) => Promise<void>; close: () => Promise<void> }> }>;
+  }).showSaveFilePicker;
+  if (picker) {
+    try {
+      const handle = await picker({
+        suggestedName: name,
+        types: [{ description: "LetterMyComic Project", accept: { "application/x-lettermycomic": [".lmc"] } }],
+      });
+      const w = await handle.createWritable();
+      await w.write(blob);
+      await w.close();
+      setStatus(`Saved “${name}”.`);
+      return;
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return;   // user cancelled
+      /* picker unavailable/blocked — fall through to the download path */
+    }
+  }
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = (current?.name || "comic-project") + ".json";
+  a.download = name;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  setStatus(`Saved “${name}” to your downloads.`);
 }
 
 export async function importJSON(ed: EditorCtx, f: File) {

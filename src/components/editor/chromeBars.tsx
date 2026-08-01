@@ -34,9 +34,11 @@ export function renderMenuBar(ed: EditorCtx) {
         ["New Document", () => { if (window.confirm("Start a new document?")) { docRef.current = starterDoc(); assetsRef.current = {}; releaseAllArt(); clearArt(); reseedIds(docRef.current); histRef.current = [JSON.stringify(docRef.current)]; hIndexRef.current = 0; setCurrent(null); setSelId(null); setPageIndex(0); setThumbs({}); autosave(); force(); fitZoom(true); } }],
         ["Open Library", () => setTab("library")],
         ["Save", () => saveProject(ed, false)],
-        ["Save As…", () => saveProject(ed, true)],
-        ["Import Project File…", () => fileOpenRef.current?.click()],
-        ["Export Project File", () => demo ? setStatus("Export is off in the demo — subscribe to unlock.") : exportJSON(ed)],
+        /* Save As… writes a real project FILE (.lmc) to disk, desktop-app
+           style; the library copy lives under "Save a Copy to Library…" */
+        ["Save As… (.lmc)", () => exportJSON(ed)],
+        ["Save a Copy to Library…", () => saveProject(ed, true)],
+        ["Open Project File…", () => fileOpenRef.current?.click()],
         ["—", null],
         ["Page Setup…", () => setShowSetup(true)],
         ["Export…", () => demo ? setStatus("Export is off in the demo — subscribe to unlock.") : setShowExport(true)],

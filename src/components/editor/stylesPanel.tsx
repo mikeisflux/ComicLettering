@@ -44,11 +44,8 @@ export function StylesPanel({ ed }: { ed: EditorCtx }) {
     selEl, mutateSel, setStatus, styleTab, setStyleTab,
     activeStyle, setActiveStyle, activeShape, setActiveShape,
   } = ed;
-
-  const locked = () => {
-    if (selEl && selEl.locked) { setStatus("That item is locked — unlock it to restyle."); return true; }
-    return false;
-  };
+  /* Restyling deliberately works on LOCKED elements too — a lock pins an
+     element's place on the page, it doesn't freeze its look. */
 
   /* Styles this book saved off its own artwork come first — you reach for
      your own far more often than the shipped set. */
@@ -86,7 +83,6 @@ export function StylesPanel({ ed }: { ed: EditorCtx }) {
               onClick={() => {
                 setActiveStyle(s.name);
                 if (selEl && (selEl.type === "text" || selEl.type === "balloon")) {
-                  if (locked()) return;
                   mutateSel<BalloonEl | TextEl>((x) => {
                     x.ts = applyLetterStyle(x.ts, s);
                     x.ts.outlineW = Math.round(x.ts.size * s.outlineF);
@@ -108,7 +104,6 @@ export function StylesPanel({ ed }: { ed: EditorCtx }) {
               onPick={() => {
                 setActiveShape(styleTab, s.name);
                 if (selEl && selEl.type === "balloon") {
-                  if (locked()) return;
                   mutateSel<BalloonEl>((x) => applyShapeStyle(x, s));
                 } else {
                   setStatus(`Style “${s.name}” selected — new ${kindWord} will use it.`);

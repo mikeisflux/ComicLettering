@@ -1190,6 +1190,24 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, projects]);
 
+  /* Installed-app file handling: when LetterMyComic is installed as an app,
+     the OS hands double-clicked .lmc files here (see file_handlers in
+     src/app/manifest.ts) — open them straight into the studio. */
+  const edRef = useRef<EditorCtx>(ed);
+  edRef.current = ed;
+  useEffect(() => {
+    const lq = (window as unknown as {
+      launchQueue?: { setConsumer: (cb: (p: { files?: { getFile: () => Promise<File> }[] }) => void) => void };
+    }).launchQueue;
+    if (!lq) return;
+    lq.setConsumer(async (params) => {
+      const fh = params.files?.[0];
+      if (!fh) return;
+      try { await importJSON(edRef.current, await fh.getFile()); } catch { /* bad file — importJSON reports */ }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   /* ---------------- top-level render ---------------- */
 
   if (!mounted || !doc || !page) {
@@ -1459,7 +1477,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
         onChange={async (e) => { await importFontFiles(ed, Array.from(e.target.files || [])); e.target.value = ""; }} />
       <input ref={fileStampRef} type="file" accept="image/*" multiple hidden
         onChange={async (e) => { await importStampFiles(ed, Array.from(e.target.files || [])); e.target.value = ""; }} />
-      <input ref={fileOpenRef} type="file" accept=".json,application/json" hidden
+      <input ref={fileOpenRef} type="file" accept=".lmc,.json,application/json,application/x-lettermycomic" hidden
         onChange={(e) => {
           const f = e.target.files?.[0];
           e.target.value = "";

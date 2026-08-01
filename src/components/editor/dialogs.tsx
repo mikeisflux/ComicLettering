@@ -229,17 +229,34 @@ export function renderContextMenu(ed: EditorCtx) {
           <button onClick={() => { setUserZoomed(true); setZoom((z) => clamp(z * 1.2, 0.05, 4)); close(); }}>Zoom In</button>
           <button onClick={() => { setUserZoomed(true); setZoom((z) => clamp(z / 1.2, 0.05, 4)); close(); }}>Zoom Out</button>
           <div className="ctxSep" />
-          {/* act on the whole selection, so "select all then lock" is one go */}
-          <button onClick={() => {
-            ed.mutateSel((x) => { x.locked = true; pendingLockRef.current.delete(x.id); });
-            setStatus(many ? `Locked ${ed.selIds.length} items.` : "Locked.");
-            close();
-          }}>{many ? `Lock ${ed.selIds.length} Items` : "Lock"}</button>
-          <button onClick={() => {
-            ed.mutateSel((x) => { x.locked = false; pendingLockRef.current.delete(x.id); });
-            setStatus(many ? `Unlocked ${ed.selIds.length} items.` : "Unlocked.");
-            close();
-          }}>{many ? `Unlock ${ed.selIds.length} Items` : "Unlock"}</button>
+          {/* act on the whole selection, so "select all then lock" is one go.
+              Only the action that APPLIES is offered — an all-locked selection
+              gets just Unlock (and vice versa); offering both invited a
+              misclick that read as "unlock didn't work". A mixed selection
+              keeps both. */}
+          {(() => {
+            const sel = page.els.filter((x) => ed.selIds.includes(x.id));
+            const anyLocked = sel.some((x) => x.locked);
+            const allLocked = sel.length > 0 && sel.every((x) => x.locked);
+            return (
+              <>
+                {!allLocked && (
+                  <button onClick={() => {
+                    ed.mutateSel((x) => { x.locked = true; pendingLockRef.current.delete(x.id); });
+                    setStatus(many ? `Locked ${ed.selIds.length} items.` : "Locked.");
+                    close();
+                  }}>{many ? `Lock ${ed.selIds.length} Items` : "Lock"}</button>
+                )}
+                {anyLocked && (
+                  <button onClick={() => {
+                    ed.mutateSel((x) => { x.locked = false; pendingLockRef.current.delete(x.id); });
+                    setStatus(many ? `Unlocked ${ed.selIds.length} items.` : "Unlocked.");
+                    close();
+                  }}>{many ? `Unlock ${ed.selIds.length} Items` : "Unlock"}</button>
+                )}
+              </>
+            );
+          })()}
           <div className="ctxSep" />
           {/* Editing this element? Then these mean the words, not the object.
               onMouseDown is swallowed so focus never leaves the text — the
