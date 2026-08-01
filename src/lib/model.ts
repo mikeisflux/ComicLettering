@@ -210,7 +210,7 @@ export interface TextStyle {
 /* Inline emphasis: a balloon/text's lettering can be broken into runs, each
    optionally bold and/or italic, on top of the element's base TextStyle. When
    `runs` is absent the plain `text` (with the base style) is used. */
-export interface TextRun { t: string; b?: boolean; i?: boolean }
+export interface TextRun { t: string; b?: boolean; i?: boolean; u?: boolean }
 export function runsToText(runs: TextRun[]): string {
   return runs.map((r) => r.t).join("");
 }
@@ -221,8 +221,8 @@ export function normalizeRuns(runs: TextRun[]): TextRun[] | undefined {
   for (const r of runs) {
     if (!r.t) continue;
     const last = merged[merged.length - 1];
-    if (last && !!last.b === !!r.b && !!last.i === !!r.i) last.t += r.t;
-    else merged.push({ t: r.t, ...(r.b ? { b: true } : {}), ...(r.i ? { i: true } : {}) });
+    if (last && !!last.b === !!r.b && !!last.i === !!r.i && !!last.u === !!r.u) last.t += r.t;
+    else merged.push({ t: r.t, ...(r.b ? { b: true } : {}), ...(r.i ? { i: true } : {}), ...(r.u ? { u: true } : {}) });
   }
   /* drop the trailing blank the browser leaves behind, so the runs and the
      plain text agree on where the lettering ends */
@@ -233,7 +233,7 @@ export function normalizeRuns(runs: TextRun[]): TextRun[] | undefined {
     merged.pop();
   }
   if (merged.length === 0) return undefined;
-  if (merged.length === 1 && !merged[0].b && !merged[0].i) return undefined;
+  if (merged.length === 1 && !merged[0].b && !merged[0].i && !merged[0].u) return undefined;
   return merged;
 }
 
@@ -419,6 +419,72 @@ export function resolveBalloon(page: Page, el: BalloonEl): { el: BalloonEl; base
 export const aabbOverlap = (
   a: Pick<BaseEl, "x" | "y" | "w" | "h">, b: Pick<BaseEl, "x" | "y" | "w" | "h">
 ) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+
+/* Every join LINK on the page (a child balloon → the balloon it attaches to),
+   with the z-position its connector band paints after. Bands are their own
+   render pass, one per link, drawn after WHICHEVER partner renders later:
+   painting the band inside the child's own SVG meant a chain's later bubble
+   re-inked seams an earlier link had opened, and a child sitting below its
+   partner in z-order had its band painted over. Each link acts alone — it
+   only ever touches its own two junctions. */
+export interface JoinLink { child: BalloonEl; base: BalloonEl; afterIndex: number }
+export function joinLinks(page: Page): JoinLink[] {
+  const out: JoinLink[] = [];
+  page.els.forEach((el, i) => {
+    if (el.type !== "balloon" || !el.attachTo || el.attachTo === el.id) return;
+    const j = page.els.findIndex((o) => o.id === el.attachTo && o.type === "balloon");
+    if (j < 0) return;
+    out.push({ child: el, base: page.els[j] as BalloonEl, afterIndex: Math.max(i, j) });
+  });
+  return out;
+}
+
+/* Bring a document loaded from storage up to the current data shape. Old
+   saves carry things the code no longer writes — legacy tail fields, a
+   transient band flag that leaked into an autosave, links to balloons that
+   were deleted, even a cycle from a buggy vintage. Every load path runs the
+   doc through here, so a balloon saved months ago behaves exactly like one
+   made this morning instead of needing to be deleted and rebuilt. */
+export function normalizeDoc(doc: Doc): Doc {
+  for (const p of doc.pages ?? []) {
+    for (const el of p.els ?? []) {
+      if (el.type !== "balloon") continue;
+      delete el.band;                       // transient — must never persist
+      if (el.tail) {
+        const t = el.tail as Record<string, unknown>;
+        if (typeof t.dx !== "number" || typeof t.dy !== "number") {
+          el.tail = null;
+        } else {
+          /* keep only the fields the current renderer understands */
+          el.tail = {
+            dx: t.dx, dy: t.dy,
+            ...(typeof t.bx === "number" && typeof t.by === "number"
+              ? { bx: t.bx, by: t.by } : {}),
+            ...(typeof t.tx === "number" && typeof t.ty === "number"
+              ? { tx: t.tx, ty: t.ty } : {}),
+          };
+        }
+      }
+      if (el.attachTo && (el.attachTo === el.id ||
+        !p.els.some((o) => o.id === el.attachTo && o.type === "balloon"))) {
+        el.attachTo = null;
+      }
+    }
+    /* a cycle in attachTo links would hang every chain walk — cut it */
+    for (const el of p.els ?? []) {
+      if (el.type !== "balloon") continue;
+      const seen = new Set<string>([el.id]);
+      let n: BalloonEl = el;
+      while (n.attachTo) {
+        const up = p.els.find((o) => o.id === n.attachTo && o.type === "balloon") as BalloonEl | undefined;
+        if (!up || seen.has(up.id)) { n.attachTo = null; break; }
+        seen.add(up.id);
+        n = up;
+      }
+    }
+  }
+  return doc;
+}
 
 /* The balloon underneath `el` that overlaps it (candidate to attach to). */
 export function findMergeBase(page: Page, el: BalloonEl): BalloonEl | null {

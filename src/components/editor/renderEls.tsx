@@ -4,17 +4,60 @@
    contentEditable text keeps focus while editing). */
 import React, { CSSProperties } from "react";
 import {
-  El, FILTERS, TextEl, aabbOverlap, applyCrossbarI, joinGroupRect, resolveBalloon, rotVec,
+  El, FILTERS, TextEl, aabbOverlap, applyCrossbarI, joinGroupRect, joinLinks, resolveBalloon, rotVec,
 } from "@/lib/model";
 import { arcTextLayout, balloonGeom, connectorMid } from "@/lib/geometry";
 import { fillCss } from "@/lib/fills";
 import { displayText, measureBlock, measureCharWidths, renderRuns, textCss, textOverflows } from "./textHelpers";
-import { BalloonShape, MergeBaseInfo } from "./BalloonShape";
+import { BalloonShape, JoinBandShape, MergeBaseInfo } from "./BalloonShape";
 import { EditorCtx } from "./ctx";
 import { WarpedText } from "./WarpedText";
 import { FLAT, Warp, isWarped, warpBounds, warpPoint } from "@/lib/warp";
 import { onLetteringInput } from "./ops";
 
+
+/* Connector bands are their own render pass: one overlay per join link,
+   inserted right after WHICHEVER partner renders later (joinLinks.afterIndex),
+   so the band's fill covers both outline crossings no matter which bubble is
+   on top — and no link ever repaints another link's junction. */
+export function renderJoinBands(ed: EditorCtx, index: number) {
+  const page = ed.page!;
+  return joinLinks(page)
+    .filter((l) => l.afterIndex === index)
+    .map((l) => {
+      const { el: bEl, base } = resolveBalloon(page, l.child);
+      if (!base || !bEl.band) return null;   // melted or detached — no band
+      const bg = balloonGeom(resolveBalloon(page, base).el);
+      const [rx, ry] = rotVec(
+        base.x + base.w / 2 - (l.child.x + l.child.w / 2),
+        base.y + base.h / 2 - (l.child.y + l.child.h / 2), -l.child.rot);
+      const mergeBase: MergeBaseInfo = {
+        d: bg.d,
+        bodyD: balloonGeom({ ...base, tail: null, band: false, attachTo: null }).d,
+        color: base.fill.a,
+        tf: `translate(${l.child.w / 2 + rx} ${l.child.h / 2 + ry}) rotate(${base.rot - l.child.rot}) translate(${-base.w / 2} ${-base.h / 2})`,
+        stroke: base.stroke, strokeW: base.strokeW,
+      };
+      const jg = joinGroupRect(page, l.child);
+      const joinRect = jg ? { x: jg.x - l.child.x, y: jg.y - l.child.y, w: jg.w, h: jg.h } : null;
+      const tf = [
+        l.child.rot ? `rotate(${l.child.rot}deg)` : "",
+        l.child.flipH ? "scaleX(-1)" : "",
+        l.child.flipV ? "scaleY(-1)" : "",
+      ].filter(Boolean).join(" ");
+      return (
+        <div key={`band-${l.child.id}`} className="bandOverlay"
+          style={{
+            position: "absolute", left: l.child.x, top: l.child.y,
+            width: l.child.w, height: l.child.h,
+            transform: tf || undefined, opacity: l.child.opacity ?? 1,
+            pointerEvents: "none",
+          }}>
+          <JoinBandShape el={bEl} mergeBase={mergeBase} joinRect={joinRect} />
+        </div>
+      );
+    });
+}
 
 export function renderEl(ed: EditorCtx, el: El) {
   const { editingId, select, startDrag, setStatus, setEditingId, panelImageTarget, filePanelImageRef, setCtxMenu, assetsRef, page, zoom, finishEditing } = ed;

@@ -12,10 +12,11 @@ import { gradCss } from "./GradientMaker";
 import { BRUSHES } from "@/lib/brushes";
 import { GLOWS } from "@/lib/glows";
 import { EditorCtx } from "./ctx";
+import { toggleEmphasis } from "./textHelpers";
 import {
   addFromTray, alignSel, applyQuickFill, applyQuickStroke, balanceRag, clipboardText,
   copySel, copyStyle, cutSel, deleteCustomFont, deleteSel, duplicatePage,
-  duplicateSel, exportJSON, fitBalloonToText, pasteClip, pasteStyle,
+  duplicateSel, exportJSON, fitBalloonToText, onLetteringInput, pasteClip, pasteStyle,
   printPage, reorder, rotateSel, runInstantAlpha, runProof, saveProject,
 } from "./ops";
 
@@ -247,6 +248,21 @@ export function renderFormatBar(ed: EditorCtx) {
     setShowGradMaker, myGrads, commit,
   } = ed;
   const selTs = selEl && (selEl.type === "balloon" || selEl.type === "text") ? selEl.ts : null;
+  /* B/I/U while lettering is open act on the HIGHLIGHTED words, like a word
+     processor; with the box merely selected they restyle the whole element.
+     (The buttons preventDefault on mousedown so clicking them doesn't blur
+     the contentEditable and collapse the text selection.) */
+  const emphasis = (kind: "bold" | "italic" | "underline") => {
+    if (ed.editingId) {
+      const dom = document.querySelector(`.el[data-id="${ed.editingId}"] .txt`) as HTMLElement | null;
+      if (dom && toggleEmphasis(dom, kind)) { onLetteringInput(ed, ed.editingId, dom); return; }
+    }
+    mutateSel<BalloonEl | TextEl>((x) => {
+      if (kind === "bold") x.ts.bold = !x.ts.bold;
+      else if (kind === "italic") x.ts.italic = !x.ts.italic;
+      else x.ts.underline = !x.ts.underline;
+    });
+  };
   return (
   <div className="formatBar">
     <span className="fbLabel">Stroke:</span>
@@ -390,11 +406,17 @@ export function renderFormatBar(ed: EditorCtx) {
       )}
     </div>
     <button className={"fbTog" + (selTs?.bold ? " on" : "")} disabled={!selTs}
-      onClick={() => mutateSel<BalloonEl | TextEl>((x) => { x.ts.bold = !x.ts.bold; })}><b>B</b></button>
+      title="Bold — highlight words while editing to bold just those (Ctrl+B)"
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={() => emphasis("bold")}><b>B</b></button>
     <button className={"fbTog" + (selTs?.italic ? " on" : "")} disabled={!selTs}
-      onClick={() => mutateSel<BalloonEl | TextEl>((x) => { x.ts.italic = !x.ts.italic; })}><i>I</i></button>
+      title="Italic — highlight words while editing to italicise just those (Ctrl+I)"
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={() => emphasis("italic")}><i>I</i></button>
     <button className={"fbTog" + (selTs?.underline ? " on" : "")} disabled={!selTs}
-      onClick={() => mutateSel<BalloonEl | TextEl>((x) => { x.ts.underline = !x.ts.underline; })}><u>U</u></button>
+      title="Underline — highlight words while editing to underline just those (Ctrl+U)"
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={() => emphasis("underline")}><u>U</u></button>
     {(["left", "center", "right", "justify"] as const).map((a) => (
       <button key={a} className={"fbTog" + (selTs?.align === a ? " on" : "")} disabled={!selTs}
         title={a[0].toUpperCase() + a.slice(1)}

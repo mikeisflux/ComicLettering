@@ -1,7 +1,7 @@
 /* Full-resolution canvas renderer — used for PNG export and page thumbnails. */
 import {
-  Assets, BalloonEl, Doc, El, FILTERS, FONTS, Page, TextRun, TextStyle,
-  aabbOverlap, applyCrossbarI, deg2rad, joinGroupRect, lightenHex, resolveBalloon, rotVec,
+  Assets, BalloonEl, Doc, El, FILTERS, FONTS, JoinLink, Page, TextRun, TextStyle,
+  aabbOverlap, applyCrossbarI, deg2rad, joinGroupRect, joinLinks, lightenHex, resolveBalloon, rotVec,
 } from "./model";
 import { balloonGeom, arcTextLayout } from "./geometry";
 import { paintFill } from "./fills";
@@ -91,12 +91,12 @@ function drawRichText(
   const tr = ts.tracking ?? 0;
   try { (ctx as unknown as { letterSpacing: string }).letterSpacing = "0px"; } catch { /* ignore */ }
 
-  type Cl = { ch: string; b: boolean; i: boolean };
+  type Cl = { ch: string; b: boolean; i: boolean; u: boolean };
   const clusters: Cl[] = [];
   for (const run of runs) {
     const t0 = ts.caps ? run.t.toUpperCase() : run.t;
     const t = ts.crossbarI ? applyCrossbarI(t0) : t0;
-    for (const cl of (t.match(/\P{M}\p{M}*|\n/gu) || [])) clusters.push({ ch: cl, b: !!run.b, i: !!run.i });
+    for (const cl of (t.match(/\P{M}\p{M}*|\n/gu) || [])) clusters.push({ ch: cl, b: !!run.b, i: !!run.i, u: !!run.u });
   }
   const measure = (cl: Cl) => { ctx.font = fontFor(cl.b, cl.i); return ctx.measureText(cl.ch).width + tr; };
   ctx.font = fontFor(false, false);
@@ -181,6 +181,17 @@ function drawRichText(
         }
         if (ts.outlineW > 0) { ctx.lineWidth = ts.outlineW; ctx.strokeStyle = ts.outlineC; ctx.strokeText(cl.ch, x, y); }
         ctx.fillStyle = fill; ctx.fillText(cl.ch, x, y);
+        if (cl.u && !ts.underline) {
+          /* run-level underline — same constants as the block underline */
+          ctx.save();
+          ctx.strokeStyle = ts.fillA;
+          ctx.lineWidth = Math.max(1, ts.size * 0.06);
+          ctx.beginPath();
+          ctx.moveTo(x, y + ts.size * 0.45);
+          ctx.lineTo(x + cw, y + ts.size * 0.45);
+          ctx.stroke();
+          ctx.restore();
+        }
         x += cw;
       }
     }
@@ -527,24 +538,7 @@ function drawEl(
       drawCover(ctx, bImg, el.w, el.h);
       ctx.restore();
     }
-    if (merge) {
-      ctx.save();
-      ctx.translate(merge.cx, merge.cy);
-      ctx.rotate(deg2rad(merge.rot));
-      ctx.translate(-merge.bw / 2, -merge.bh / 2);
-      /* Apart (strokeW set): redraw the partner's OUTLINE over the band only.
-         Filling it would paint over the partner's own text (see BalloonShape).
-         Overlapping (melt) fills nothing: the two same-colour bodies union on
-         their own and this balloon's outline is clipped above instead. */
-      if (merge.strokeW) {
-        const mPath = new Path2D(merge.d);
-        ctx.strokeStyle = merge.stroke!;
-        ctx.lineWidth = merge.strokeW;
-        ctx.lineJoin = "round";
-        ctx.stroke(mPath);
-      }
-      ctx.restore();
-    } else if (el.strokeW > 0 && !g.noStroke) {
+    if (!merge && el.strokeW > 0 && !g.noStroke) {
       ctx.lineWidth = el.strokeW;
       ctx.stroke(path);
       if (g.d2) ctx.stroke(new Path2D(g.d2));
@@ -553,54 +547,9 @@ function drawEl(
       ctx.fillStyle = el.stroke;
       ctx.fill(new Path2D(g.deco));
     }
-    /* open connector band over both bodies: fill hides the outline crossings,
-       only the two sides get inked — both junctions stay open */
-    if (g.bandFill) {
-      ctx.setLineDash([]);
-      if (el.fill.kind === "gradient") {
-        /* the band carries the shared gradient too (the editor fills it with
-           the same gradient ref), so the join reads as one continuous shape */
-        paintFill(ctx, el.fill, el.w, el.h, new Path2D(g.bandFill), joinRect);
-      } else {
-        ctx.fillStyle = el.fill.a;
-        ctx.fill(new Path2D(g.bandFill));
-      }
-      if (g.bandEdges && el.strokeW > 0) {
-        ctx.strokeStyle = el.stroke;
-        ctx.lineWidth = el.strokeW;
-        ctx.lineJoin = "round";
-        ctx.lineCap = "round";
-        ctx.stroke(new Path2D(g.bandEdges));
-      }
-    }
-    /* partner's speaker-tail WEDGE on top of the band (apart + it has a tail):
-       the band falls behind the tail while the opening into the body stays
-       open — the wedge (tailed shape XOR plain body) excludes the body */
-    if (merge && merge.strokeW && merge.bodyD && merge.bodyD !== merge.d) {
-      ctx.save();
-      const m = new DOMMatrix();
-      m.translateSelf(merge.cx, merge.cy);
-      m.rotateSelf(merge.rot);
-      m.translateSelf(-merge.bw / 2, -merge.bh / 2);
-      const clip = new Path2D();
-      clip.addPath(new Path2D(merge.bodyD), m);
-      clip.addPath(new Path2D(merge.d), m);
-      ctx.clip(clip, "evenodd");
-      const tailP = new Path2D();
-      tailP.addPath(new Path2D(merge.d), m);
-      if (el.type === "balloon" && el.fill.kind === "gradient" && joinRect) {
-        /* gradient join: the wedge carries the shared gradient (see editor) */
-        paintFill(ctx, el.fill, el.w, el.h, tailP, joinRect);
-      } else {
-        ctx.fillStyle = merge.color;
-        ctx.fill(tailP);
-      }
-      ctx.strokeStyle = merge.stroke!;
-      ctx.lineWidth = merge.strokeW;
-      ctx.lineJoin = "round";
-      ctx.stroke(tailP);
-      ctx.restore();
-    }
+    /* the connector band and the partner's tail wedge are NOT drawn here —
+       each join link is its own pass after BOTH partners (drawJoinBand),
+       so a chain's links never repaint each other's junctions */
     ctx.setLineDash([]);
     drawStyledText(ctx, el.ts, el.text, g.textRect, 0, el.runs);
   } else if (el.type === "text") {
@@ -629,34 +578,109 @@ export async function renderPageToCanvas(
   // lettering-only export: transparent background, no panels/artwork —
   // just balloons and lettering, for handing back to the artist/production
   if (!letteringOnly) paintFill(ctx, page.bg, page.w, page.h);
-  for (const el of page.els) {
-    if (letteringOnly && (el.type === "panel" || el.type === "image")) continue;
-    if (el.type === "balloon") {
-      const { el: bEl, base } = resolveBalloon(page, el);
-      let merge: MergeInfo | null = null;
-      if (base) {
-        const bg = balloonGeom(resolveBalloon(page, base).el);
-        const [rx, ry] = rotVec(
-          base.x + base.w / 2 - (el.x + el.w / 2),
-          base.y + base.h / 2 - (el.y + el.h / 2), -el.rot);
-        merge = {
-          d: bg.d,
-          bodyD: balloonGeom({ ...base, tail: null, band: false, attachTo: null }).d,
-          color: base.fill.a,
-          cx: el.w / 2 + rx, cy: el.h / 2 + ry,
-          rot: base.rot - el.rot, bw: base.w, bh: base.h,
-          ...(aabbOverlap(el, base) ? {} : { stroke: base.stroke, strokeW: base.strokeW }),
-        };
+  const links = joinLinks(page);
+  page.els.forEach((el, i) => {
+    if (!(letteringOnly && (el.type === "panel" || el.type === "image"))) {
+      if (el.type === "balloon") {
+        const { el: bEl, base } = resolveBalloon(page, el);
+        let merge: MergeInfo | null = null;
+        if (base) {
+          const bg = balloonGeom(resolveBalloon(page, base).el);
+          const [rx, ry] = rotVec(
+            base.x + base.w / 2 - (el.x + el.w / 2),
+            base.y + base.h / 2 - (el.y + el.h / 2), -el.rot);
+          merge = {
+            d: bg.d,
+            bodyD: balloonGeom({ ...base, tail: null, band: false, attachTo: null }).d,
+            color: base.fill.a,
+            cx: el.w / 2 + rx, cy: el.h / 2 + ry,
+            rot: base.rot - el.rot, bw: base.w, bh: base.h,
+            ...(aabbOverlap(el, base) ? {} : { stroke: base.stroke, strokeW: base.strokeW }),
+          };
+        }
+        const jg = joinGroupRect(page, el);
+        const joinRect = jg ? { x: jg.x - el.x, y: jg.y - el.y, w: jg.w, h: jg.h } : null;
+        drawEl(ctx, bEl as BalloonEl, assets, merge, joinRect);
+      } else {
+        drawEl(ctx, el, assets);
       }
-      const jg = joinGroupRect(page, el);
-      const joinRect = jg ? { x: jg.x - el.x, y: jg.y - el.y, w: jg.w, h: jg.h } : null;
-      drawEl(ctx, bEl as BalloonEl, assets, merge, joinRect);
-    } else {
-      drawEl(ctx, el, assets);
     }
-  }
+    /* each join link's connector band paints right after the LATER of its
+       two partners (same pass structure as the editor's renderJoinBands) */
+    for (const l of links) if (l.afterIndex === i) drawJoinBand(ctx, page, l);
+  });
   clearShadow(ctx);
   return canvas;
+}
+
+/* One join link's connector band — the export twin of JoinBandShape.
+   Painted after BOTH partner balloons: the band fill covers the outline
+   crossings at both junctions (open into each body), only the two sides get
+   inked, and the partner's speaker-tail wedge is redrawn on top so the band
+   falls behind it. Independent per link, whatever the chain looks like. */
+function drawJoinBand(ctx: CanvasRenderingContext2D, page: Page, link: JoinLink) {
+  const { el: bEl, base } = resolveBalloon(page, link.child);
+  if (!base || !bEl.band) return;             // melted or detached — no band
+  const g = balloonGeom(bEl);
+  if (!g.bandFill) return;
+  const el = bEl;
+  ctx.save();
+  ctx.globalAlpha = el.opacity ?? 1;
+  ctx.translate(el.x + el.w / 2, el.y + el.h / 2);
+  ctx.rotate(deg2rad(el.rot || 0));
+  ctx.scale(el.flipH ? -1 : 1, el.flipV ? -1 : 1);
+  ctx.translate(-el.w / 2, -el.h / 2);
+  const jg = joinGroupRect(page, link.child);
+  const joinRect = jg ? { x: jg.x - el.x, y: jg.y - el.y, w: jg.w, h: jg.h } : null;
+  ctx.setLineDash([]);
+  if (el.fill.kind === "gradient") {
+    /* the band carries the shared join-group gradient, so the join reads as
+       one continuous shape instead of restarting at the junction */
+    paintFill(ctx, el.fill, el.w, el.h, new Path2D(g.bandFill), joinRect);
+  } else {
+    ctx.fillStyle = el.fill.a;
+    ctx.fill(new Path2D(g.bandFill));
+  }
+  if (g.bandEdges && el.strokeW > 0) {
+    ctx.strokeStyle = el.stroke;
+    ctx.lineWidth = el.strokeW;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.stroke(new Path2D(g.bandEdges));
+  }
+  /* partner's speaker-tail WEDGE (tailed shape XOR plain body, evenodd) on
+     top of the band — the opening into the partner's body stays untouched */
+  const bg = balloonGeom(resolveBalloon(page, base).el);
+  const bodyD = balloonGeom({ ...base, tail: null, band: false, attachTo: null }).d;
+  if (base.strokeW > 0 && bodyD !== bg.d) {
+    const [rx, ry] = rotVec(
+      base.x + base.w / 2 - (el.x + el.w / 2),
+      base.y + base.h / 2 - (el.y + el.h / 2), -el.rot);
+    ctx.save();
+    const m = new DOMMatrix();
+    m.translateSelf(el.w / 2 + rx, el.h / 2 + ry);
+    m.rotateSelf(base.rot - el.rot);
+    m.translateSelf(-base.w / 2, -base.h / 2);
+    const clip = new Path2D();
+    clip.addPath(new Path2D(bodyD), m);
+    clip.addPath(new Path2D(bg.d), m);
+    ctx.clip(clip, "evenodd");
+    const tailP = new Path2D();
+    tailP.addPath(new Path2D(bg.d), m);
+    if (el.fill.kind === "gradient" && joinRect) {
+      /* gradient join: the wedge carries the shared gradient (see editor) */
+      paintFill(ctx, el.fill, el.w, el.h, tailP, joinRect);
+    } else {
+      ctx.fillStyle = base.fill.a;
+      ctx.fill(tailP);
+    }
+    ctx.strokeStyle = base.stroke;
+    ctx.lineWidth = base.strokeW;
+    ctx.lineJoin = "round";
+    ctx.stroke(tailP);
+    ctx.restore();
+  }
+  ctx.restore();
 }
 
 function download(blob: Blob, filename: string) {

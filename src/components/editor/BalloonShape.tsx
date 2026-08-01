@@ -25,11 +25,6 @@ export function BalloonShape({ el, mergeBase, imgSrc, joinRect }: {
      inside the partner vanishes; the partner's seam inside us is already
      hidden by our fill. */
   const melt = !!mergeBase && !mergeBase.strokeW;
-  /* apart + the partner has a speaker tail: redraw its tail WEDGE on top of
-     the band so the band falls BEHIND the tail (the wedge excludes the body,
-     so the band's opening into the body stays open) */
-  const wedge = !!mergeBase && !!mergeBase.strokeW && !!mergeBase.bodyD && mergeBase.bodyD !== mergeBase.d;
-  const wid = `wedge-${el.id}`;
   const tile = f.kind !== "solid" && f.kind !== "gradient" ? fillOverlayTile(f) : null;
   const tileURL = tile ? fillOverlayURL(f) : null;
   const needClip = !!tileURL || !!imgSrc;
@@ -86,13 +81,6 @@ export function BalloonShape({ el, mergeBase, imgSrc, joinRect }: {
             <path d={mergeBase.d} transform={mergeBase.tf} fill="black" />
           </mask>
         )}
-        {wedge && mergeBase && (
-          /* wedge = partner's full tailed shape XOR its plain body = the tail
-             only (evenodd), in this balloon's coordinate space */
-          <clipPath id={wid} clipPathUnits="userSpaceOnUse">
-            <path d={`${mergeBase.bodyD} ${mergeBase.d}`} transform={mergeBase.tf} clipRule="evenodd" />
-          </clipPath>
-        )}
       </defs>
       {mergeBase && el.strokeW > 0 && !g.noStroke && (
         /* joined balloons: stroke under, fills over → outlines union */
@@ -108,37 +96,9 @@ export function BalloonShape({ el, mergeBase, imgSrc, joinRect }: {
         <image href={imgSrc} x={0} y={0} width={el.w} height={el.h}
           preserveAspectRatio="xMidYMid slice" clipPath={`url(#${cid})`} />
       )}
-      {mergeBase && !!mergeBase.strokeW && (
-        /* APART: redraw the partner's OUTLINE over the band so the band tucks
-           under it — but do NOT re-fill the partner (that painted over the
-           partner's text). OVERLAPPING (melt) fills nothing here: the two
-           same-colour bodies union on their own and this balloon's outline is
-           masked instead — see the melt mask above. */
-        <g transform={mergeBase.tf}>
-          <path d={mergeBase.d} fill="none" stroke={mergeBase.stroke} strokeWidth={mergeBase.strokeW} strokeLinejoin="round" />
-        </g>
-      )}
-      {/* open connector band: fill covers both outlines at the junctions,
-          only the two sides get inked — both openings stay clear */}
-      {g.bandFill && <path d={g.bandFill} fill={fillRef} stroke="none" />}
-      {g.bandEdges && el.strokeW > 0 && (
-        <path d={g.bandEdges} fill="none" stroke={el.stroke} strokeWidth={el.strokeW}
-          strokeLinejoin="round" strokeLinecap="round" />
-      )}
-      {wedge && mergeBase && (
-        /* partner's speaker-tail wedge, ON TOP of the band: fill (covers the
-           band in the wedge with the partner's colour) + stroke (the tail's
-           two inked sides sit over the band). Clipped to the wedge, so the
-           band's opening into the partner body is untouched. */
-        <g clipPath={`url(#${wid})`}>
-          {/* on a gradient join the wedge carries the SHARED user-space
-              gradient — a flat colour there would draw its own seam */}
-          <path d={mergeBase.d} transform={mergeBase.tf}
-            fill={f.kind === "gradient" && joinRect ? fillRef : mergeBase.color} />
-          <path d={mergeBase.d} transform={mergeBase.tf} fill="none"
-            stroke={mergeBase.stroke} strokeWidth={mergeBase.strokeW} strokeLinejoin="round" />
-        </g>
-      )}
+      {/* the connector band, its junction covers and the partner's tail wedge
+          are NOT drawn here — each join link paints its own JoinBandShape
+          overlay after BOTH partners, so a chain's links stay independent */}
       {!mergeBase && el.strokeW > 0 && !g.noStroke && (
         <path d={g.d} fill="none" stroke={el.stroke} strokeWidth={el.strokeW}
           strokeLinejoin="round" strokeDasharray={g.dash ? g.dash.join(" ") : undefined} />
@@ -148,6 +108,73 @@ export function BalloonShape({ el, mergeBase, imgSrc, joinRect }: {
           strokeLinejoin="round" strokeDasharray={g.dash ? g.dash.join(" ") : undefined} />
       )}
       {g.deco && el.strokeW > 0 && <path d={g.deco} fill={el.stroke} />}
+    </svg>
+  );
+}
+
+/* One join link's connector band, painted as its own overlay AFTER both
+   partner balloons (see joinLinks in model.ts). Open connector rules: the
+   band fill covers the outline crossings at BOTH junctions, only the two
+   relatively-parallel sides get inked, and the partner's speaker-tail wedge
+   is redrawn on top so the band reads as falling behind it. Because every
+   link draws only its own band + wedge here, a third or fourth bubble in a
+   chain can never re-ink a seam another link opened. */
+export function JoinBandShape({ el, mergeBase, joinRect }: {
+  /* the CHILD balloon of the link, already resolved (band tail aimed) */
+  el: BalloonEl; mergeBase: MergeBaseInfo;
+  joinRect?: { x: number; y: number; w: number; h: number } | null;
+}) {
+  const g = balloonGeom(el);
+  if (!g.bandFill) return null;
+  const f = el.fill;
+  const gid = `bandgrad-${el.id}`, wid = `bandwedge-${el.id}`;
+  const wedge = !!mergeBase.strokeW && !!mergeBase.bodyD && mergeBase.bodyD !== mergeBase.d;
+  const fillRef = f.kind === "gradient" && joinRect ? `url(#${gid})` : f.a;
+  return (
+    <svg width={el.w} height={el.h} style={{ position: "absolute", inset: 0, overflow: "visible" }}>
+      <defs>
+        {f.kind === "gradient" && joinRect && (() => {
+          /* the SHARED user-space gradient across the whole join group — the
+             same axis formula as BalloonShape / export's paintFill */
+          const stops = f.stops?.length
+            ? f.stops.map(([c, p], i) => <stop key={i} offset={p} stopColor={c} />)
+            : <><stop offset="0" stopColor={f.a} /><stop offset="1" stopColor={f.b} /></>;
+          const rad = ((f.angle - 90) * Math.PI) / 180;
+          const cx = joinRect.x + joinRect.w / 2, cy = joinRect.y + joinRect.h / 2;
+          const len = (Math.abs(Math.cos(rad)) * joinRect.w + Math.abs(Math.sin(rad)) * joinRect.h) / 2;
+          return (
+            <linearGradient id={gid} gradientUnits="userSpaceOnUse"
+              x1={cx - Math.cos(rad) * len} y1={cy - Math.sin(rad) * len}
+              x2={cx + Math.cos(rad) * len} y2={cy + Math.sin(rad) * len}>
+              {stops}
+            </linearGradient>
+          );
+        })()}
+        {wedge && (
+          /* wedge = partner's full tailed shape XOR its plain body = the tail
+             only (evenodd), in this balloon's coordinate space */
+          <clipPath id={wid} clipPathUnits="userSpaceOnUse">
+            <path d={`${mergeBase.bodyD} ${mergeBase.d}`} transform={mergeBase.tf} clipRule="evenodd" />
+          </clipPath>
+        )}
+      </defs>
+      {/* fill covers both outline crossings — both openings stay clear */}
+      <path d={g.bandFill} fill={fillRef} stroke="none" />
+      {g.bandEdges && el.strokeW > 0 && (
+        <path d={g.bandEdges} fill="none" stroke={el.stroke} strokeWidth={el.strokeW}
+          strokeLinejoin="round" strokeLinecap="round" />
+      )}
+      {wedge && (
+        /* partner's speaker-tail wedge ON TOP of the band: same fill colour
+           (or the shared gradient) + its two inked sides. Clipped to the
+           wedge, so the band's opening into the partner body is untouched. */
+        <g clipPath={`url(#${wid})`}>
+          <path d={mergeBase.d} transform={mergeBase.tf}
+            fill={f.kind === "gradient" && joinRect ? fillRef : mergeBase.color} />
+          <path d={mergeBase.d} transform={mergeBase.tf} fill="none"
+            stroke={mergeBase.stroke} strokeWidth={mergeBase.strokeW} strokeLinejoin="round" />
+        </g>
+      )}
     </svg>
   );
 }

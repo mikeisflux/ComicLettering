@@ -10,7 +10,7 @@ import React, {
 } from "react";
 import {
   Assets, BalloonEl, DPI, Doc, El, FONTS, FillStyle, GradStop, Page, TextEl,
-  TextStyle, aabbOverlap, clamp, makeBalloon, makeImage, newPage, normalizeRuns,
+  TextStyle, aabbOverlap, clamp, makeBalloon, makeImage, newPage, normalizeDoc, normalizeRuns,
   pageGuides, pageMargins, registerFont, reseedIds, rotVec, runsToText, starterDoc,
 } from "@/lib/model";
 import { LETTER_STYLES } from "@/lib/presets";
@@ -40,7 +40,7 @@ import {
   fitBalloonToText, importStampFiles, movePage, nextAid, onDrop, pasteClip,
   printPage, readAsDataURL, refreshProjects, reorder, saveProject,
 } from "./editor/ops";
-import { renderEl, renderOverlay } from "./editor/renderEls";
+import { renderEl, renderJoinBands, renderOverlay } from "./editor/renderEls";
 import { useStartDrag } from "./editor/useStartDrag";
 import { renderInspector } from "./editor/inspector";
 import {
@@ -524,7 +524,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       if (raw) {
         const payload = JSON.parse(raw);
         if (payload?.doc?.app === "comiclettering" && Array.isArray(payload.doc.pages)) {
-          docRef.current = payload.doc;
+          docRef.current = normalizeDoc(payload.doc);
           assetsRef.current = payload.assets || {};
           /* come back to the page the user was looking at, and to the project
              they had open — not to page one of an untitled document */
@@ -890,8 +890,9 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
          edited — its own handling strands the caret inside the run it just
          closed (see toggleEmphasis) */
       if ((e.ctrlKey || e.metaKey) && !e.altKey && t.isContentEditable &&
-          (e.key.toLowerCase() === "b" || e.key.toLowerCase() === "i")) {
-        if (toggleEmphasis(t, e.key.toLowerCase() === "b" ? "bold" : "italic")) e.preventDefault();
+          ["b", "i", "u"].includes(e.key.toLowerCase())) {
+        const kind = e.key.toLowerCase() === "b" ? "bold" : e.key.toLowerCase() === "i" ? "italic" : "underline";
+        if (toggleEmphasis(t, kind)) e.preventDefault();
         return;
       }
       if (inField) return;
@@ -1270,7 +1271,14 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
                 }}
                 onPointerDown={(e) => { if (e.target === e.currentTarget) select(null); }}
               >
-                {page.els.map((el) => renderEl(ed, el))}
+                {/* each join link's connector band paints right after the
+                    later of its two partners — links stay independent */}
+                {page.els.map((el, i) => (
+                  <React.Fragment key={el.id}>
+                    {renderEl(ed, el)}
+                    {renderJoinBands(ed, i)}
+                  </React.Fragment>
+                ))}
                 {page.margin && (
                   <div className="marginGuide" style={{
                     left: page.margin.l, top: page.margin.t,

@@ -99,7 +99,7 @@ function escapeHtml(s: string): string {
    next lands where the user is looking. */
 export const ZWSP = "\u200b";
 
-function emphasisAncestor(node: Node | null, kind: "bold" | "italic", root: HTMLElement): HTMLElement | null {
+function emphasisAncestor(node: Node | null, kind: "bold" | "italic" | "underline", root: HTMLElement): HTMLElement | null {
   let found: HTMLElement | null = null;
   let n: Node | null = node;
   while (n && n !== root) {
@@ -109,7 +109,8 @@ function emphasisAncestor(node: Node | null, kind: "bold" | "italic", root: HTML
       const fw = e.style?.fontWeight;
       const isBold = tag === "b" || tag === "strong" || fw === "bold" || (!!fw && +fw >= 600);
       const isItal = tag === "i" || tag === "em" || e.style?.fontStyle === "italic";
-      if (kind === "bold" ? isBold : isItal) found = e;   // keep going: take the outermost
+      const isUnder = tag === "u" || !!e.style?.textDecoration?.includes("underline");
+      if (kind === "bold" ? isBold : kind === "italic" ? isItal : isUnder) found = e;   // keep going: take the outermost
     }
     n = n.parentNode;
   }
@@ -117,7 +118,7 @@ function emphasisAncestor(node: Node | null, kind: "bold" | "italic", root: HTML
 }
 
 /** Toggle bold/italic on the editable node. Returns false if it could not. */
-export function toggleEmphasis(root: HTMLElement, kind: "bold" | "italic"): boolean {
+export function toggleEmphasis(root: HTMLElement, kind: "bold" | "italic" | "underline"): boolean {
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0 || !root.contains(sel.anchorNode)) return false;
   const wasOn = document.queryCommandState(kind);
@@ -136,7 +137,7 @@ export function toggleEmphasis(root: HTMLElement, kind: "bold" | "italic"): bool
     /* just switched ON — make sure there is a formatting element to type into */
     const host = emphasisAncestor(range.startContainer, kind, root);
     if (host) return true;
-    const wrap = document.createElement(kind === "bold" ? "b" : "i");
+    const wrap = document.createElement(kind === "bold" ? "b" : kind === "italic" ? "i" : "u");
     wrap.appendChild(anchor);
     range.insertNode(wrap);
   }
@@ -151,6 +152,7 @@ export function toggleEmphasis(root: HTMLElement, kind: "bold" | "italic"): bool
 export function runsToHtml(runs: TextRun[]): string {
   return runs.map((r) => {
     let h = escapeHtml(r.t).replace(/\n/g, "<br>");
+    if (r.u) h = `<u>${h}</u>`;
     if (r.i) h = `<i>${h}</i>`;
     if (r.b) h = `<b>${h}</b>`;
     return h;
@@ -158,26 +160,28 @@ export function runsToHtml(runs: TextRun[]): string {
 }
 export function domToRuns(root: HTMLElement): TextRun[] {
   const runs: TextRun[] = [];
-  const walk = (node: Node, b: boolean, i: boolean) => {
+  const walk = (node: Node, b: boolean, i: boolean, u: boolean) => {
     node.childNodes.forEach((child) => {
       if (child.nodeType === 3) {
         const txt = (child.textContent || "").replace(/\u200b/g, "");
-        if (txt) runs.push({ t: txt, ...(b ? { b: true } : {}), ...(i ? { i: true } : {}) });
+        if (txt) runs.push({ t: txt, ...(b ? { b: true } : {}), ...(i ? { i: true } : {}), ...(u ? { u: true } : {}) });
       } else if (child.nodeType === 1) {
         const e = child as HTMLElement;
         const tag = e.tagName.toLowerCase();
-        if (tag === "br") { runs.push({ t: "\n", ...(b ? { b: true } : {}), ...(i ? { i: true } : {}) }); return; }
-        let nb = b, ni = i;
+        if (tag === "br") { runs.push({ t: "\n", ...(b ? { b: true } : {}), ...(i ? { i: true } : {}), ...(u ? { u: true } : {}) }); return; }
+        let nb = b, ni = i, nu = u;
         if (tag === "b" || tag === "strong") nb = true;
         if (tag === "i" || tag === "em") ni = true;
+        if (tag === "u") nu = true;
         const fw = e.style?.fontWeight; if (fw === "bold" || (fw && +fw >= 600)) nb = true;
         if (e.style?.fontStyle === "italic") ni = true;
+        if (e.style?.textDecoration?.includes("underline") || e.style?.textDecorationLine?.includes("underline")) nu = true;
         if ((tag === "div" || tag === "p") && runs.length && runs[runs.length - 1].t !== "\n") runs.push({ t: "\n" });
-        walk(e, nb, ni);
+        walk(e, nb, ni, nu);
       }
     });
   };
-  walk(root, false, false);
+  walk(root, false, false, false);
   return runs;
 }
 export function renderRuns(runs: TextRun[], ts: TextStyle): ReactNode {
@@ -187,6 +191,7 @@ export function renderRuns(runs: TextRun[], ts: TextStyle): ReactNode {
     const content: ReactNode[] = [];
     parts.forEach((p, i) => { if (i > 0) content.push(<br key={`b${idx}-${i}`} />); content.push(p); });
     let node: ReactNode = content;
+    if (r.u) node = <u>{node}</u>;
     if (r.i) node = <i>{node}</i>;
     if (r.b) node = <b>{node}</b>;
     return <span key={idx}>{node}</span>;
