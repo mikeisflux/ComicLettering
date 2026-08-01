@@ -42,9 +42,9 @@ deploy the site:
 }]
 ```
 
-## iPad (`/tablet/ios`) — App Store
+## iPad (`/tablet/apple`) — App Store
 
-See `ios/README.md`. Short version: PWABuilder generates the Xcode
+See `apple/README.md`. Short version: PWABuilder generates the Xcode
 project from our manifest; building/submitting needs a Mac with Xcode and
 an Apple Developer account ($99/yr), and Apple's "minimum functionality"
 guideline (4.2) means a bare wrapper may get pushback — declaring the
