@@ -137,7 +137,7 @@ export function renderMenuBar(ed: EditorCtx) {
           "EDITING",
           "  Ctrl+Z / Ctrl+Y  undo / redo               Ctrl+D  duplicate",
           "  Ctrl+C / X / V  copy / cut / paste         Del  delete",
-          "  Arrows  nudge (Shift = 10x)                Ctrl+F  find & replace",
+          "  Arrows  micro-nudge 1px (Shift = 10px)     Ctrl+F  find & replace",
           "  Ctrl+L  lock                               Ctrl+Shift+L  unlock",
           "  Ctrl+[ / Ctrl+]  centre across / down",
           "  Ctrl+Shift+[ / ]  send to back / bring to front",

@@ -111,17 +111,26 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
      the format bar and inspector still speak to that one, because "what font
      is this" has no answer for five things at once. Everything that can act
      on many (move, nudge, lock, delete, style) acts on the whole set. */
-  const [selIds, setSelIds] = useState<string[]>([]);
+  const [selIds, setSelIdsState] = useState<string[]>([]);
   const selId = selIds.length ? selIds[selIds.length - 1] : null;
   const selIdsRef = useRef<string[]>([]);
-  useEffect(() => { selIdsRef.current = selIds; }, [selIds]);
+  /* The ref MUST update synchronously with the click, not on the next render:
+     clicking a fresh bubble select()s it and starts the drag in the SAME
+     pointerdown, and the drag's convoy reads selIdsRef — with the ref one
+     render behind, the previously selected bubble came along for the ride
+     (the "moving two bubbles" bug). All selection writes go through here. */
+  const setSelIds = useCallback((v: React.SetStateAction<string[]>) => {
+    const next = typeof v === "function" ? (v as (p: string[]) => string[])(selIdsRef.current) : v;
+    selIdsRef.current = next;
+    setSelIdsState(next);
+  }, []);
   /* keeps every existing single-selection caller working unchanged */
   const setSelId = useCallback<React.Dispatch<React.SetStateAction<string | null>>>((v) => {
-    setSelIds((prev) => {
-      const cur = prev.length ? prev[prev.length - 1] : null;
-      const next = typeof v === "function" ? (v as (p: string | null) => string | null)(cur) : v;
-      return next ? [next] : [];
-    });
+    const prev = selIdsRef.current;
+    const cur = prev.length ? prev[prev.length - 1] : null;
+    const next = typeof v === "function" ? (v as (p: string | null) => string | null)(cur) : v;
+    setSelIds(next ? [next] : []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [editingId, setEditingId] = useState<string | null>(null);
   const editingIdRef = useRef<string | null>(null);
@@ -971,7 +980,11 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       const el = p.els.find((x) => x.id === selId);
       if (!el) return;
       if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); fns.deleteSel(); return; }
-      const step = e.shiftKey ? 10 : 2;
+      /* micro-nudge: 1 page unit per press (~0.1mm in print), Shift = 10.
+         At a fit zoom a single unit is sub-pixel on screen, which used to
+         read as "arrows do nothing" — so the drag's coordinate tip pops up
+         as visible confirmation of every nudge. */
+      const step = e.shiftKey ? 10 : 1;
       const dxy: Record<string, [number, number]> = {
         ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step],
       };
@@ -986,6 +999,14 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
           any = true;
         }
         if (!any) return;
+        const lead = p.els.find((x) => x.id === selId);
+        if (lead) {
+          const tip = { x: lead.x, y: lead.y, w: lead.w, h: lead.h, mode: "move", live: true };
+          dragTipRef.current = tip;
+          setTimeout(() => {
+            if (dragTipRef.current === tip) { dragTipRef.current = null; force(); }
+          }, 900);
+        }
         force();
         if (thumbTimer.current) clearTimeout(thumbTimer.current);
         thumbTimer.current = setTimeout(commit, 400);
