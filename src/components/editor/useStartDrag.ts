@@ -100,12 +100,14 @@ export function useStartDrag(deps: DragDeps) {
           .filter(Boolean) as { id: string; x0: number; y0: number }[]
       : [];
     let moved = false;
+    let lastPt = start;   // where the pointer ends up — drop-to-join reads it
     const onMove = (ev: PointerEvent) => {
       const d = docRef.current!;
       const p = d.pages[pageIndexRef.current];
       const cur = p.els.find((x) => x.id === el.id);
       if (!cur) return;
       const pt = pagePoint(ev);
+      lastPt = pt;
       const dx = pt.x - start.x, dy = pt.y - start.y;
       if (Math.abs(dx) + Math.abs(dy) > 1) moved = true;
       if (mode === "envelope") {
@@ -279,25 +281,14 @@ export function useStartDrag(deps: DragDeps) {
           next.by = oldTail.by;
         }
         cur.tail = next;
-        /* dropping the tip inside another bubble JOINS them — see joinTo */
-        const hitT = topBalloonAt(p, pt.x, pt.y, cur.id);
-        if (hitT) joinTo(p, cur, hitT);
+        /* joining happens on RELEASE (see onUp) — joining here, mid-move,
+           meant merely SWEEPING the tip across another bubble while aiming
+           the tail snapped them together (a reported bug) */
       } else if (mode === "bow" && cur.type === "balloon" && cur.tail) {
         const cx = orig.x + orig.w / 2, cy = orig.y + orig.h / 2;
         const [ldx, ldy] = rotVec(pt.x - cx, pt.y - cy, -orig.rot);
         cur.tail = { ...cur.tail, bx: Math.round(ldx), by: Math.round(ldy) };
-        /* a JOINED bubble has no tail tip — dragging its connector handle
-           into a different bubble is how it changes partners. Bending inside
-           the current partner stays a bend. */
-        if (cur.attachTo) {
-          const hitB = topBalloonAt(p, pt.x, pt.y, cur.id);
-          if (hitB && hitB.id !== cur.attachTo) {
-            joinTo(p, cur, hitB);
-            /* fresh straight band to the new partner */
-            delete cur.tail.bx; delete cur.tail.by;
-            delete cur.tail.tx; delete cur.tail.ty;
-          }
-        }
+        /* partner changes also happen on RELEASE only — see onUp */
       } else if (mode === "tilt" && cur.type === "balloon" && cur.tail) {
         /* the two satellite dots tilt the connector's tangent at the bend —
            this is the ONLY control that distorts the band. Seed a bend point
@@ -326,6 +317,29 @@ export function useStartDrag(deps: DragDeps) {
         setTimeout(() => {
           if (dragTipRef.current === tip) { dragTipRef.current = null; force(); }
         }, 900);
+      }
+      /* drop-to-join: only where the tip was RELEASED counts. Passing over
+         a bubble mid-drag must never join — sweeping the tail across the
+         page used to snap it onto whatever it crossed. */
+      if (moved && (mode === "tail" || mode === "bow")) {
+        const p = docRef.current!.pages[pageIndexRef.current];
+        const cur = p.els.find((x) => x.id === el.id);
+        if (cur && cur.type === "balloon") {
+          if (mode === "tail") {
+            const hit = topBalloonAt(p, lastPt.x, lastPt.y, cur.id);
+            if (hit) joinTo(p, cur, hit);
+          } else if (cur.attachTo && cur.tail) {
+            /* a JOINED bubble has no tail tip — dropping its connector
+               handle inside a different bubble is how it changes partners */
+            const hit = topBalloonAt(p, lastPt.x, lastPt.y, cur.id);
+            if (hit && hit.id !== cur.attachTo) {
+              joinTo(p, cur, hit);
+              /* fresh straight band to the new partner */
+              delete cur.tail.bx; delete cur.tail.by;
+              delete cur.tail.tx; delete cur.tail.ty;
+            }
+          }
+        }
       }
       if (moved) commit();
       /* A multi-selection is KEPT at pointerdown so a body-drag moves the
