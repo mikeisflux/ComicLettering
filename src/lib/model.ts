@@ -315,14 +315,17 @@ function bandToward(from: BalloonEl, to: BalloonEl, keep?: BalloonEl["tail"]): B
   const t: NonNullable<BalloonEl["tail"]> = { dx: Math.round(ux * tipDist), dy: Math.round(uy * tipDist) };
   if (keep && keep.bx != null && keep.by != null) {
     /* Keep the user's curve generously — the connector is meant to sweep into
-       wide graceful arcs (like hand-inked lettering), so allow the bend to sit
-       well off the straight axis. Only a truly degenerate bend (folded back
-       behind this balloon, or flung absurdly far) collapses back to a clean
-       midpoint, which otherwise happened after dragging the pair around. */
+       wide graceful arcs around BOTH bubbles (dragging the bend far out to
+       one side walks the band's openings around them), so the limits are
+       size-aware: with close bubbles the axis length is tiny, and bounding
+       by it alone collapsed the curve the moment the bend left the straight
+       line. Only a truly runaway bend (flung balloon-widths away — stale
+       data after big layout moves) resets to the clean midpoint. */
     const len = Math.hypot(dx, dy) || 1;
     const along = (keep.bx * dx + keep.by * dy) / len;      // projection on the axis
     const perp = Math.abs(keep.bx * dy - keep.by * dx) / len; // sideways deviation
-    if (along > -len * 0.4 && along < len * 1.8 && perp <= len * 1.8) {
+    const reach = Math.max(len, (from.w + from.h) / 2, (to.w + to.h) / 2);
+    if (along > -reach && along < len + reach && perp <= reach * 2.5) {
       t.bx = keep.bx; t.by = keep.by; t.tx = keep.tx; t.ty = keep.ty;
       /* The tip must stay CONNECTED to the partner's edge as the curve sweeps:
          seat it where the ray from the partner's centre toward the bend point

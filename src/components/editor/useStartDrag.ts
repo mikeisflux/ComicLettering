@@ -269,7 +269,10 @@ export function useStartDrag(deps: DragDeps) {
         if (norm < 3 || norm > 357) ang = 0;
         cur.rot = Math.round(ang * 10) / 10;
       } else if (mode === "tail" && cur.type === "balloon") {
-        cur.attachTo = null; // dragging the tip detaches a joined balloon
+        /* NOTE: aiming the tail never detaches a joined balloon — a join is
+           permanent until the balloon is deleted or detached explicitly.
+           (Joined balloons hide the tip handle anyway; this mode is for a
+           free balloon aiming its speaker tail.) */
         const cx = orig.x + orig.w / 2, cy = orig.y + orig.h / 2;
         const [ldx, ldy] = rotVec(pt.x - cx, pt.y - cy, -orig.rot);
         const oldTail = (orig as BalloonEl).tail;
@@ -318,27 +321,16 @@ export function useStartDrag(deps: DragDeps) {
           if (dragTipRef.current === tip) { dragTipRef.current = null; force(); }
         }, 900);
       }
-      /* drop-to-join: only where the tip was RELEASED counts. Passing over
-         a bubble mid-drag must never join — sweeping the tail across the
-         page used to snap it onto whatever it crossed. */
-      if (moved && (mode === "tail" || mode === "bow")) {
+      /* drop-to-join: only where the tip was RELEASED counts, and only for a
+         FREE balloon's tail — passing over a bubble mid-drag never joins,
+         and an existing join is PERMANENT: bending the connector can never
+         detach it or hand it to another balloon. */
+      if (moved && mode === "tail") {
         const p = docRef.current!.pages[pageIndexRef.current];
         const cur = p.els.find((x) => x.id === el.id);
-        if (cur && cur.type === "balloon") {
-          if (mode === "tail") {
-            const hit = topBalloonAt(p, lastPt.x, lastPt.y, cur.id);
-            if (hit) joinTo(p, cur, hit);
-          } else if (cur.attachTo && cur.tail) {
-            /* a JOINED bubble has no tail tip — dropping its connector
-               handle inside a different bubble is how it changes partners */
-            const hit = topBalloonAt(p, lastPt.x, lastPt.y, cur.id);
-            if (hit && hit.id !== cur.attachTo) {
-              joinTo(p, cur, hit);
-              /* fresh straight band to the new partner */
-              delete cur.tail.bx; delete cur.tail.by;
-              delete cur.tail.tx; delete cur.tail.ty;
-            }
-          }
+        if (cur && cur.type === "balloon" && !cur.attachTo) {
+          const hit = topBalloonAt(p, lastPt.x, lastPt.y, cur.id);
+          if (hit) joinTo(p, cur, hit);
         }
       }
       if (moved) commit();
