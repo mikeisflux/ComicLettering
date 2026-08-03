@@ -18,6 +18,7 @@ import {
   duplicateSel, exportJSON, fitBalloonToText, pasteClip, pasteStyle,
   printPage, reorder, rotateSel, runInstantAlpha, runProof, saveProject, toggleSelEmphasis,
 } from "./ops";
+import { detectPanelsFromArt } from "./panelOps";
 
 
 export function renderMenuBar(ed: EditorCtx) {
@@ -87,6 +88,7 @@ export function renderMenuBar(ed: EditorCtx) {
         ["Duplicate Page", () => duplicatePage(ed)],
         ["—", null],
         ["Panel", () => addFromTray(ed, "panel")],
+        ["Detect Panels From Art", () => detectPanelsFromArt(ed)],
         ["Image…", () => fileImageRef.current?.click()],
         ["Speech Balloon", () => addFromTray(ed, "speech")],
         ["Thought Balloon", () => addFromTray(ed, "thought")],

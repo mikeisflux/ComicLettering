@@ -11,6 +11,7 @@ import {
   fitToArtwork, fitToPage, pasteClip, removeCustomStamp, reorder, resizeToActual,
   clipboardText, resolveTailAsk, runExport, saveStyleFromSelection,
 } from "./ops";
+import { detectPanelsFromArt } from "./panelOps";
 import { SFX_STAMPS } from "@/lib/sfxStamps";
 import type { TuckMode } from "./tuck";
 
@@ -235,6 +236,9 @@ export function renderContextMenu(ed: EditorCtx) {
                   : "Now ARTWORK — it may fill the bleed.");
                 close();
               }}>{el.stamp ? "✓ Clip At Bleed (Stamp)" : "Clip At Bleed (Stamp)"}</button>
+              {!el.stamp && (
+                <button onClick={() => { detectPanelsFromArt(ed, el.id); close(); }}>Detect Panels From Art</button>
+              )}
               <div className="ctxSep" />
             </>
           )}

@@ -10,6 +10,7 @@ import {
   applyProofFix, assignImageToPanel, deleteProject, exportAllPages,
   exportJSON, loadProject, refreshProjects, runProof, saveProject,
 } from "./ops";
+import { detectPanelsFromArt } from "./panelOps";
 
 
 export function renderLayoutsTab(ed: EditorCtx) {
@@ -37,6 +38,10 @@ export function renderLayoutsTab(ed: EditorCtx) {
         ))}
       </div>
       <div className="tips">Applying a layout replaces the page&apos;s panels; balloons, lettering and images are kept.</div>
+      <div className="btnRow">
+        <button onClick={() => detectPanelsFromArt(ed)}>Detect panels from page art</button>
+      </div>
+      <div className="tips">Already have the page drawn? This reads the artwork on the page and lays panel frames over the panels it finds — works best with clear gutters between panels.</div>
     </div>
   );
 }
