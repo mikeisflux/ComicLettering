@@ -138,6 +138,7 @@ export function renderMenuBar(ed: EditorCtx) {
         ["Unlock", () => mutateSel((x) => { x.locked = false; })],
       ]],
       ["Help", [
+        ["User Guide", () => window.open("/guide", "_blank")],
         ["Keyboard Shortcuts", () => window.alert([
           "SELECTING",
           "  Ctrl+A  select everything on the page      Ctrl+Shift+A  deselect",
