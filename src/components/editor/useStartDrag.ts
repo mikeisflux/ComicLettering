@@ -129,7 +129,13 @@ export function useStartDrag(deps: DragDeps) {
         const base = (orig as TextEl).ts.env ?? FLAT.map((q) => [...q]);
         const pts = base.map((q) => [...q]);
         if (pts[i]) {
-          pts[i] = [base[i][0] + dx / Math.max(1, cur.w), base[i][1] + dy / Math.max(1, cur.h)];
+          /* the envelope lives in the element's LOCAL (unrotated) box space —
+             rotate the pointer's page-space movement into that frame, or the
+             dot pulls the wrong way the moment the word is rotated */
+          const [edx0, edy0] = rotVec(dx, dy, -orig.rot);
+          const edx = orig.flipH ? -edx0 : edx0;
+          const edy = orig.flipV ? -edy0 : edy0;
+          pts[i] = [base[i][0] + edx / Math.max(1, cur.w), base[i][1] + edy / Math.max(1, cur.h)];
           t.ts = { ...t.ts, env: pts };
           force();
         }
@@ -271,6 +277,18 @@ export function useStartDrag(deps: DragDeps) {
           cur.ts.size = clamp(Math.round(orig.ts.size * ratio), 8, 800);
           cur.ts.outlineW = Math.max(0, Math.round(orig.ts.outlineW * ratio));
           if (orig.ts.tracking) cur.ts.tracking = Math.round(orig.ts.tracking * ratio * 10) / 10;
+        }
+        /* A rotated element rotates about its CENTRE, so the x/y bookkeeping
+           above — exact at rot 0 — lets the whole box drift around the page
+           while resizing. Pin the ANCHOR (the corner/edge opposite the
+           handle) to the page position it had when the drag started. */
+        if (orig.rot) {
+          const ax = handle.includes("w") ? 1 : handle.includes("e") ? 0 : 0.5;
+          const ay = handle.includes("n") ? 1 : handle.includes("s") ? 0 : 0.5;
+          const [oax, oay] = rotVec((ax - 0.5) * orig.w, (ay - 0.5) * orig.h, orig.rot);
+          const [nax, nay] = rotVec((ax - 0.5) * cur.w, (ay - 0.5) * cur.h, orig.rot);
+          cur.x += Math.round((orig.x + orig.w / 2 + oax) - (cur.x + cur.w / 2 + nax));
+          cur.y += Math.round((orig.y + orig.h / 2 + oay) - (cur.y + cur.h / 2 + nay));
         }
       } else if (mode === "rotate") {
         const cx = orig.x + orig.w / 2, cy = orig.y + orig.h / 2;
