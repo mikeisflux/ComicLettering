@@ -2,7 +2,8 @@
    where the facing page sits on screen, the cross-page drop that moves a
    dragged selection onto it, and the add-page insert. */
 import type React from "react";
-import { Doc, El, newPage } from "@/lib/model";
+import { Doc, El, newPage, pageBleed } from "@/lib/model";
+import { elCrossesSpine, spreadNeighbor } from "@/lib/exportPng";
 import type { EditorCtx } from "./ctx";
 
 /* Insert a blank page (same size/margins as the current one) at `at`, jump
@@ -76,10 +77,29 @@ export function makeCrossPageDrop(d: CrossPageDropDeps) {
     for (const e2 of cur.els) {
       if (e2.type === "balloon" && e2.attachTo && movingIds.has(e2.attachTo) && !movingIds.has(e2.id)) e2.attachTo = null;
     }
+    /* Two content spaces exist between facing pages: the CANVAS (with the
+       gutter and both bleed strips between the pages) and the TRIM JOIN
+       (where the pages' printed content is glued edge to edge — what the
+       split rendering shows). A dragged element that is NOT split moves
+       with the canvas offset, so it stays exactly under the cursor. One
+       that IS split across the spine must move with the trim-join offset
+       instead — its ink is drawn in join space, and using the canvas
+       offset visibly lurched the word sideways by gutter + bleeds the
+       moment it was dropped. */
+    const mainEl = cur.els.find((e) => e.id === mainId);
+    const spanning = (() => {
+      if (!mainEl) return false;
+      const b = pageBleed(cur);
+      const side: 1 | -1 = (d.pageIndexRef.current + 1) % 2 === 0 ? 1 : -1;
+      return elCrossesSpine(mainEl, side === 1 ? cur.w - b : b, side);
+    })();
+    const join = spreadNeighbor(doc, off.index);   // source content → target coords
+    const tx = spanning && join ? join.dx : -off.offX;
+    const ty = spanning ? 0 : -off.offY;
     cur.els = cur.els.filter((e2: El) => !movingIds.has(e2.id));
     for (const m of moving) {
-      m.x = Math.round(m.x - off.offX);
-      m.y = Math.round(m.y - off.offY);
+      m.x = Math.round(m.x + tx);
+      m.y = Math.round(m.y + ty);
       target.els.push(m);
     }
     d.setSelIds([]);
