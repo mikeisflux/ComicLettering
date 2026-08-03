@@ -11,6 +11,7 @@ export default async function MarketingLayout({ children }: { children: React.Re
         <nav className="mktNav" aria-label="Main">
           <Link href="/features">Features</Link>
           <Link href="/pricing">Pricing</Link>
+          <Link href="/get-the-app">Get the App</Link>
           <Link href="/blog">Blog</Link>
           <Link href="/faq">FAQ</Link>
           <Link href="/contact">Contact</Link>
@@ -39,6 +40,7 @@ export default async function MarketingLayout({ children }: { children: React.Re
             <div className="foot-h">Product</div>
             <Link href="/features">Features</Link>
             <Link href="/pricing">Pricing</Link>
+            <Link href="/get-the-app">Get the App</Link>
             <Link href="/blog">Blog</Link>
             <Link href="/faq">FAQ</Link>
             <Link href="/contact">Contact</Link>
