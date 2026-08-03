@@ -636,7 +636,20 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     setZoom(clamp(z, 0.05, 2));
   }, []);
 
-  useEffect(() => { if (mounted) fitZoom(true); }, [mounted, pageIndex, fitZoom]);
+  /* Re-fit on page change ONLY when the page size actually changes. On the
+     spread canvas the ops target flips silently whenever something on the
+     other half is pressed — force-fitting there threw away the user's zoom
+     the moment they dropped a drag. */
+  const lastFitDimsRef = useRef<{ w: number; h: number } | null>(null);
+  useEffect(() => {
+    if (!mounted) return;
+    const d = docRef.current;
+    const p = d?.pages[Math.min(pageIndex, (d?.pages.length ?? 1) - 1)];
+    const prev = lastFitDimsRef.current;
+    const sameSize = !!p && !!prev && prev.w === p.w && prev.h === p.h;
+    if (p) lastFitDimsRef.current = { w: p.w, h: p.h };
+    fitZoom(!sameSize);
+  }, [mounted, pageIndex, fitZoom]);
   useEffect(() => {
     const onR = () => fitZoom(false);
     window.addEventListener("resize", onR);

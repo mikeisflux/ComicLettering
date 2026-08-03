@@ -203,12 +203,18 @@ function renderSpreadCanvas(ed: EditorCtx, sh: ShellProps) {
       {snapRef.current.x != null && <div className="snapLineV" style={{ left: (snapRef.current.x + curOff) * zoom }} />}
       {snapRef.current.y != null && <div className="snapLineH" style={{ top: snapRef.current.y * zoom }} />}
       {tuckMode && (
+        /* Tuck's spread version: the lasso layer covers BOTH pages, so a
+           trace can start and end anywhere on the spread. Trace points are
+           kept in current-page units (like every op), so the drawn path
+           rides at the current page's canvas offset. */
         <div className="drawLayer tuckLayer" onPointerDown={sh.startTuckDrag}
-          style={{ left: curOff * zoom, top: 0, width: page.w * zoom, height: page.h * zoom }}>
+          style={{ left: 0, top: 0, width: totalW * zoom, height: totalH * zoom }}>
           {sh.tuckPtsRef.current && sh.tuckPtsRef.current.length > 1 && (
-            <svg>
-              <path className="tuckTrace"
-                d={"M " + sh.tuckPtsRef.current.map(([qx, qy]) => `${Math.round(qx * zoom)} ${Math.round(qy * zoom)}`).join(" L ") + " Z"} />
+            <svg style={{ width: "100%", height: "100%" }}>
+              <g transform={`translate(${curOff * zoom} 0)`}>
+                <path className="tuckTrace"
+                  d={"M " + sh.tuckPtsRef.current.map(([qx, qy]) => `${Math.round(qx * zoom)} ${Math.round(qy * zoom)}`).join(" L ") + " Z"} />
+              </g>
             </svg>
           )}
         </div>

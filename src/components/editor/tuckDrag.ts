@@ -175,6 +175,9 @@ export function beginTuckLasso(d: TuckDragDeps, e: React.PointerEvent) {
       fieldF = buildEdgeField(img, tF.x + f.offX, tF.y + f.offY, tF.w, tF.h);
     }).catch(() => { /* freehand on the far side */ });
   };
+  /* on the spread canvas the lasso can START on the other page — arm its
+     magnetic field from the very first point, not only after crossing */
+  maybeStartFacingField(p0);
 
   const onMove = (ev: PointerEvent) => {
     const arr = d.ptsRef.current;
