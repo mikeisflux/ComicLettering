@@ -634,10 +634,18 @@ export async function renderPageToCanvas(
   if (!letteringOnly) paintFill(ctx, page.bg, page.w, page.h);
   drawPageEls(ctx, page, assets, letteringOnly);
   if (neighbor) {
-    /* spread partner: whatever overhangs the spine continues onto this
-       page, drawn ON TOP — double-page lettering sits above both pages'
-       art. The canvas clips it to this page's bounds. */
+    /* Spread partner: ONLY what extends past the partner's own page edge
+       carries over — content within the partner's page (including its
+       full-bleed art) is the partner's alone, and drawing it here doubled
+       a strip of the neighbouring page's bleed onto this one. The clip
+       boundary is exactly where the partner's page edge lands in THIS
+       page's coordinates. */
     ctx.save();
+    const bound = neighbor.dx > 0 ? neighbor.dx : neighbor.page.w + neighbor.dx;
+    const clip = new Path2D();
+    if (neighbor.dx > 0) clip.rect(-page.w, -page.h, bound + page.w, page.h * 3);
+    else clip.rect(bound, -page.h, page.w * 2, page.h * 3);
+    ctx.clip(clip);
     ctx.translate(neighbor.dx, 0);
     drawPageEls(ctx, neighbor.page, assets, letteringOnly);
     ctx.restore();
