@@ -85,3 +85,16 @@ jobs:
         with:
           name: android-keystore-KEEP-SAFE
           path: tablet/droid/android.keystore
+      # publish the signed APK at a stable URL so the site's Get the App
+      # page can offer a direct Android download (sideload) alongside Play
+      - name: Publish APK to the android-latest release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-latest
+          name: LetterMyComic for Android (direct download)
+          body: >
+            Signed Android app, straight from the build. Play-Store release
+            of the same app: https://play.google.com/store/apps/details?id=com.lettermycomic.app
+          files: tablet/droid/app-release-signed.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -9,6 +9,7 @@ export const metadata: Metadata = {
 };
 
 const PLAY_URL = "https://play.google.com/store/apps/details?id=com.lettermycomic.app";
+const APK_URL = "https://github.com/mikeisflux/ComicLettering/releases/download/android-latest/app-release-signed.apk";
 
 /* store-badge buttons: custom-styled (no remote badge art), swap hrefs as
    each store listing goes live */
@@ -45,6 +46,11 @@ export default function GetTheAppPage() {
             </span>
           </div>
           <p style={{ fontSize: 14, color: "#5a6472", marginTop: 14 }}>
+            Can&apos;t wait for the store? <a href={APK_URL}>Download the Android
+            app directly (.apk)</a> — open the file on your device and allow
+            the install when Android asks.
+          </p>
+          <p style={{ fontSize: 14, color: "#5a6472", marginTop: 10 }}>
             No store needed either: on Android Chrome use menu → <b>Install app</b>;
             on iPad Safari use Share → <b>Add to Home Screen</b>. Desktop
             installers live under File → <b>Install as App…</b> in the{" "}
