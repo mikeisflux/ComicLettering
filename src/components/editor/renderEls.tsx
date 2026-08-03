@@ -51,6 +51,13 @@ export function renderCarriedLettering(ed: EditorCtx) {
   /* the copies resolve joins/styles against their OWN page, unclipped at
      the partner trim (the piece we show is exactly what that clip removes) */
   const edP: EditorCtx = { ...ed, page: nb.page, bleedClip: null, selIds: [], editingId: null };
+  /* the copy's SOURCE page — this ctx's spread partner */
+  const pn = ed.pageIndex + 1;
+  const srcIndex = pn % 2 === 0 ? ed.pageIndex + 1 : ed.pageIndex - 1;
+  /* when the source page is the one being edited, a drag started on the
+     carried half edits directly (drags are delta-based); otherwise the
+     click jumps to the source page and selects — same pixels, now live */
+  const srcIsCurrent = srcIndex === ed.pageIndexRef.current;
   return (
     <div className="carriedLettering" style={{
       position: "absolute", left: nb.dx, top: 0,
@@ -61,7 +68,18 @@ export function renderCarriedLettering(ed: EditorCtx) {
       transform: "translateZ(0)", willChange: "transform",
     }}>
       {carried.map((el) => (
-        <React.Fragment key={`carry-${el.id}`}>{renderEl(edP, el)}</React.Fragment>
+        /* lettering shared across two pages is selectable from EITHER half:
+           this wrapper re-enables pointer events on the copy and routes the
+           press to the real element on its home page */
+        <div key={`carry-${el.id}`} style={{ pointerEvents: "auto" }}
+          onClick={(e) => e.stopPropagation()}
+          onPointerDownCapture={(e) => {
+            ed.setPageIndex(srcIndex);
+            ed.select(el.id);
+            if (!srcIsCurrent) { e.stopPropagation(); e.preventDefault(); }
+          }}>
+          {renderEl(edP, el)}
+        </div>
       ))}
       {nb.page.els.map((_, i) => (
         <React.Fragment key={`carryband-${i}`}>
