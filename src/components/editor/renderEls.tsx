@@ -297,6 +297,18 @@ export function renderEl(ed: EditorCtx, el: El) {
       width: Math.max(el.w, (Math.max(1, b.x1) - ox) * el.w),
       height: Math.max(el.h, (Math.max(1, b.y1) - oy) * el.h),
     };
+    /* the bleed clip was computed for the ORIGINAL element box — this
+       wrapper sits at the grown warp bounds, so reusing that polygon cuts
+       the ink in the wrong place and the lettering appears to MOVE the
+       moment a warp is applied. Recompute it for the wrapper's real
+       geometry so the item stays put and only the pulled edge bends. */
+    if (style.clipPath && bc) {
+      wStyle.clipPath = bleedClipPath({
+        x: wStyle.left as number, y: wStyle.top as number,
+        w: wStyle.width as number, h: wStyle.height as number,
+        rot: el.rot, flipH: el.flipH, flipV: el.flipV,
+      }, bc);
+    }
     return (
       <div {...common} className="el text warped" style={wStyle}>
         <WarpedText el={el} env={env} zoom={zoom} />
