@@ -27,13 +27,14 @@ export function addPageAt(ed: EditorCtx, at: number) {
 export function facingOffset(
   pageDiv: HTMLElement | null, zoom: number,
 ): { index: number; offX: number; offY: number } | null {
-  const fpDiv = document.querySelector(".facingPage") as HTMLElement | null;
-  const idx = fpDiv ? parseInt(fpDiv.dataset.pageIndex ?? "-1", 10) : -1;
-  if (!fpDiv || !pageDiv || idx < 0) return null;
-  /* the live facing render (scaled div) is the content origin; its rect
-     already includes the print-view crop shift */
-  const fr = (fpDiv.querySelector(".facingLive") ?? fpDiv).getBoundingClientRect();
-  const pr = pageDiv.getBoundingClientRect();
+  /* both pages live on the spread canvas as .pageHalf wrappers — the
+     other page's content origin, in CURRENT-page-local units */
+  const cur = document.querySelector(".pageHalf.cur") as HTMLElement | null;
+  const other = document.querySelector(".pageHalf:not(.cur)") as HTMLElement | null;
+  const idx = other ? parseInt(other.dataset.pageIndex ?? "-1", 10) : -1;
+  if (!cur || !other || idx < 0) return null;
+  const fr = other.getBoundingClientRect();
+  const pr = cur.getBoundingClientRect();
   return { index: idx, offX: (fr.left - pr.left) / zoom, offY: (fr.top - pr.top) / zoom };
 }
 
@@ -57,14 +58,14 @@ export function makeCrossPageDrop(d: CrossPageDropDeps) {
   return (mainId: string, cx: number, cy: number): boolean => {
     const doc = d.docRef.current;
     const pgEl = d.pageDivRef.current;
-    const fpDiv = document.querySelector(".facingPage") as HTMLElement | null;
+    const fpDiv = document.querySelector(".pageHalf:not(.cur)") as HTMLElement | null;
     if (!doc || !pgEl || !fpDiv) return false;
     const hit = fpDiv.getBoundingClientRect();
     if (cx < hit.left || cx > hit.right || cy < hit.top || cy > hit.bottom) return false;
     const off = facingOffset(pgEl, d.zoom);
     if (!off) return false;
     const cur = doc.pages[d.pageIndexRef.current];
-    const target = doc.pages[d.facingIndex];
+    const target = doc.pages[off.index];
     const ids = new Set(d.selIdsRef.current.length ? d.selIdsRef.current : [mainId]);
     const moving = cur.els.filter((e) => ids.has(e.id) && !e.locked);
     if (!moving.length) return false;

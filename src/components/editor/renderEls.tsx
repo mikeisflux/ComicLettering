@@ -50,14 +50,15 @@ export function renderCarriedLettering(ed: EditorCtx) {
   ].map(([x, y]) => `${Math.round(x)}px ${Math.round(y)}px`).join(", ")})`;
   /* the copies resolve joins/styles against their OWN page, unclipped at
      the partner trim (the piece we show is exactly what that clip removes) */
-  const edP: EditorCtx = { ...ed, page: nb.page, bleedClip: null, selIds: [], editingId: null };
-  /* the copy's SOURCE page — this ctx's spread partner */
+  /* the copy's SOURCE page — this ctx's spread partner. The copies carry
+     that identity, so pressing one claims the source page automatically
+     (claimPage in renderEl) and edits the real element directly. */
   const pn = ed.pageIndex + 1;
   const srcIndex = pn % 2 === 0 ? ed.pageIndex + 1 : ed.pageIndex - 1;
-  /* when the source page is the one being edited, a drag started on the
-     carried half edits directly (drags are delta-based); otherwise the
-     click jumps to the source page and selects — same pixels, now live */
-  const srcIsCurrent = srcIndex === ed.pageIndexRef.current;
+  const edP: EditorCtx = {
+    ...ed, page: nb.page, pageIndex: srcIndex,
+    bleedClip: null, selIds: [], editingId: null,
+  };
   return (
     <div className="carriedLettering" style={{
       position: "absolute", left: nb.dx, top: 0,
@@ -68,16 +69,10 @@ export function renderCarriedLettering(ed: EditorCtx) {
       transform: "translateZ(0)", willChange: "transform",
     }}>
       {carried.map((el) => (
-        /* lettering shared across two pages is selectable from EITHER half:
-           this wrapper re-enables pointer events on the copy and routes the
-           press to the real element on its home page */
-        <div key={`carry-${el.id}`} style={{ pointerEvents: "auto" }}
-          onClick={(e) => e.stopPropagation()}
-          onPointerDownCapture={(e) => {
-            ed.setPageIndex(srcIndex);
-            ed.select(el.id);
-            if (!srcIsCurrent) { e.stopPropagation(); e.preventDefault(); }
-          }}>
+        /* lettering shared across two pages is editable from EITHER half:
+           this wrapper re-enables pointer events on the copy, and the
+           copy's own handlers (with its source-page ctx) do the rest */
+        <div key={`carry-${el.id}`} style={{ pointerEvents: "auto" }}>
           {renderEl(edP, el)}
         </div>
       ))}
@@ -165,6 +160,17 @@ export function renderJoinBands(
     });
 }
 
+/* On the spread canvas both pages are live at once: pressing anything
+   claims ITS page as the ops target — synchronously (the ref first), so the
+   very same pointerdown's drag/selection machinery already sees the right
+   page. Invisible to the user: nothing changes on screen. */
+export function claimPage(ed: EditorCtx) {
+  if (ed.pageIndexRef.current !== ed.pageIndex) {
+    (ed.pageIndexRef as React.RefObject<number>).current = ed.pageIndex;
+    ed.setPageIndex(ed.pageIndex);
+  }
+}
+
 export function renderEl(ed: EditorCtx, el: El) {
   const { editingId, select, startDrag, setStatus, setEditingId, panelImageTarget, filePanelImageRef, setCtxMenu, assetsRef, page, zoom, finishEditing } = ed;
   const tf = [
@@ -191,6 +197,7 @@ export function renderEl(ed: EditorCtx, el: El) {
     "data-id": el.id,
     onPointerDown: (e: React.PointerEvent) => {
       if (editingId === el.id) return;
+      claimPage(ed);
       /* A right-click fires pointerdown first. Left alone it collapsed the
          selection to one element before the context menu could open, so
          "select all, right-click, lock" locked exactly one thing — and it
@@ -214,11 +221,13 @@ export function renderEl(ed: EditorCtx, el: El) {
     },
     onDoubleClick: () => {
       if (el.locked) { setStatus("This item is locked — right-click it to unlock."); return; }
+      claimPage(ed);
       if (el.type === "balloon" || el.type === "text") { select(el.id); setEditingId(el.id); }
       else if (el.type === "panel" || el.type === "image") { panelImageTarget.current = el.id; filePanelImageRef.current?.click(); }
     },
     onContextMenu: (e: React.MouseEvent) => {
       e.preventDefault();
+      claimPage(ed);
       /* right-clicking inside an existing multi-selection keeps it, so the
          menu acts on everything you picked rather than throwing it away */
       if (!ed.selIds.includes(el.id)) select(el.id);
@@ -544,23 +553,23 @@ export function renderOverlay(ed: EditorCtx) {
   const carry = (() => {
     if (el.rot) return null;
     const d = ed.doc;
-    if (!d || typeof document === "undefined") return null;
+    if (!d) return null;
     const pn = ed.pageIndex + 1;
     const fi = pn === 1 ? -1 : pn % 2 === 0 ? ed.pageIndex + 1 : ed.pageIndex - 1;
     if (fi < 0 || fi >= d.pages.length) return null;
-    const onto = spreadNeighbor(d, fi);      // current content → facing coords
+    /* only when the partner shares the spread canvas */
+    if (!ed.spreadLayout.some((s) => s.idx === fi)) return null;
+    const onto = spreadNeighbor(d, fi);      // this page's content → partner coords
     if (!onto) return null;
     const pg = d.pages[ed.pageIndex];
     const b = pageBleed(pg);
     const side: 1 | -1 = pn % 2 === 0 ? 1 : -1;
     const trimX = side === 1 ? pg.w - b : b;
     if (!elCrossesSpine(el, trimX, side)) return null;
-    const fpDiv = document.querySelector(".facingPage") as HTMLElement | null;
-    const pgDiv = document.querySelector(".page") as HTMLElement | null;
-    if (!fpDiv || !pgDiv || parseInt(fpDiv.dataset.pageIndex ?? "-1", 10) !== fi) return null;
-    const fr = (fpDiv.querySelector(".facingLive") ?? fpDiv).getBoundingClientRect();
-    const pr = pgDiv.getBoundingClientRect();
-    return { side, trimX, dx: onto.dx, offX: (fr.left - pr.left) / z, offY: (fr.top - pr.top) / z };
+    return {
+      side, trimX, dx: onto.dx,
+      offX: ed.spreadOffX(fi) - ed.spreadOffX(ed.pageIndex), offY: 0,
+    };
   })();
   /* a point in PAGE coords → where it visually appears (overlay coords) */
   const vis = (px: number, py: number): [number, number] =>

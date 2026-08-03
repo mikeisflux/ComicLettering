@@ -54,6 +54,8 @@ import {
 } from "./editor/dialogs";
 
 const AUTOSAVE_KEY = "comiclettering.autosave.v2";
+/* gutter between facing pages on the spread canvas, in page units */
+const SPREAD_GAP = 90;
 
 
 export default function Editor({ demo = false }: { demo?: boolean }) {
@@ -64,6 +66,9 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const hIndexRef = useRef(-1);
   const pageDivRef = useRef<HTMLDivElement>(null);
   const areaRef = useRef<HTMLDivElement>(null);
+  /* the current page's x-offset on the spread canvas — read by pagePoint at
+     event time, assigned fresh every render (0 in single view) */
+  const spreadOffXRef = useRef<(i: number) => number>(() => 0);
   const aidRef = useRef(1);
   /* latest keyboard-shortcut handlers — refreshed every render so the
      long-lived keydown listener never runs a stale closure */
@@ -302,7 +307,25 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     const b = pageBleed(pg);
     return { x0: b, y0: b, x1: pg.w - b, y1: pg.h - b };
   })();
-  /* (the facing page renders LIVE in the shell — no preview pipeline) */
+  /* Two-up: its own SPREAD CANVAS — both pages live side by side on one
+     shared surface, everything on either page directly editable. Each
+     entry is a page index plus its x-offset on that canvas (page units).
+     Regular spread keeps both bleeds and a gutter; print view joins the
+     pages at their trims. Single view = one entry at offset 0 (the plain
+     one-page canvas). */
+  const spreadLayout = (() => {
+    const d = docRef.current;
+    if (!d || !spread || facingIndex < 0) return [{ idx: pageIndex, off: 0 }];
+    const li = currentOnLeft ? pageIndex : facingIndex;
+    const ri = currentOnLeft ? facingIndex : pageIndex;
+    const L = d.pages[li], R = d.pages[ri];
+    const off = spreadPrint
+      ? L.w - pageBleed(L) - pageBleed(R)
+      : L.w + SPREAD_GAP;
+    return [{ idx: li, off: 0 }, { idx: ri, off }];
+  })();
+  const spreadOffX = (i: number) => spreadLayout.find((s) => s.idx === i)?.off ?? 0;
+  spreadOffXRef.current = spreadOffX;
 
   /* auto-lock: newly placed items lock themselves once you click away */
   const settlePendingLock = useCallback((exceptId: string | null) => {
@@ -734,9 +757,16 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
 
   /* ---------------- pointer interactions ---------------- */
 
+  /* On the SPREAD canvas, pageDivRef spans BOTH pages — pagePoint returns
+     coordinates local to the page currently being operated on by
+     subtracting that page's offset on the canvas (0 in single view), so
+     every op keeps thinking in one page's coordinates. */
   const pagePoint = useCallback((e: { clientX: number; clientY: number }) => {
     const r = pageDivRef.current!.getBoundingClientRect();
-    return { x: (e.clientX - r.left) / zoom, y: (e.clientY - r.top) / zoom };
+    return {
+      x: (e.clientX - r.left) / zoom - spreadOffXRef.current(pageIndexRef.current),
+      y: (e.clientY - r.top) / zoom,
+    };
   }, [zoom]);
 
   /* move/resize/rotate + balloon levers + envelope drags — extracted verbatim
@@ -864,7 +894,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     setExportCropMarks, exportFrom, setExportFrom, exportTo, setExportTo,
     showFind, setShowFind, findText, setFindText, replaceText,
     setReplaceText, findCase, setFindCase, showSafe, setShowSafe, spread,
-    setSpread, spreadPrint, setSpreadPrint, bleedClip, showScript, setShowScript, scriptText, setScriptText,
+    setSpread, spreadPrint, setSpreadPrint, bleedClip, spreadLayout, spreadOffX, showScript, setShowScript, scriptText, setScriptText,
     warping, setWarping,
     tiltConn, setTiltConn,
     stampOpen, setStampOpen, stampQuery, setStampQuery, showGradMaker,

@@ -173,6 +173,12 @@ export interface EditorCtx {
      balloons, text boxes, lettering and stamps in EVERY view (each item
      kind runs its own crossing test in renderEls); art is exempt */
   bleedClip: { x0: number; y0: number; x1: number; y1: number } | null;
+  /* Two-up: BOTH pages are live on ONE shared canvas — everything on
+     either page is directly editable, no switching. Each entry is a page
+     index with its x-offset in the shared canvas (page units); a single
+     entry at offset 0 in single-page view. */
+  spreadLayout: { idx: number; off: number }[];
+  spreadOffX: (i: number) => number;
   showScript: boolean;
   setShowScript: SetState<boolean>;
   scriptText: string;

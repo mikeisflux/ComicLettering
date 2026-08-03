@@ -96,49 +96,148 @@ export function renderPagesPanel(ed: EditorCtx, sh: ShellProps) {
   );
 }
 
-/* One facing-page preview (either side of the stage in spread view). */
-function facingPage(ed: EditorCtx, sh: ShellProps, innerCropSide: "left" | "right") {
-  const { setPageIndex, setSelId, spreadPrint, zoom } = ed;
-  const fp = ed.doc!.pages[sh.facingIndex];
-  const crop = spreadPrint ? pageBleed(fp) * zoom : 0;
-  /* The facing page is a LIVE page, not a rendered preview: both pages of
-     the spread load at once and share the editing canvas, drawn by the SAME
-     DOM renderer — so they always match, and anything spanning the spine
-     (lettering, warp edits mid-drag) updates on both pages in the same
-     frame. It stays one click from editable: clicking it makes it the
-     current page, exactly where you left off. */
-  const edF: EditorCtx = {
-    ...ed, page: fp, pageIndex: sh.facingIndex,
-    selIds: [], selId: null, editingId: null, warping: null,
+/* One page of the SPREAD CANVAS — fully live and fully editable, whichever
+   half it is. Pressing anything inside claims this page as the ops target
+   (see claimPage in renderEls), so everything on both pages edits directly
+   with no switching. */
+function spreadHalf(ed: EditorCtx, sh: ShellProps, idx: number, off: number) {
+  const doc = ed.doc!;
+  const pg = doc.pages[idx];
+  const isCur = idx === ed.pageIndex;
+  const zoom = ed.zoom;
+  const b = pageBleed(pg);
+  const edH: EditorCtx = isCur ? ed : {
+    ...ed, page: pg, pageIndex: idx,
+    selIds: [], selId: null, selEl: null, selEls: [],
+    editingId: null, warping: null,
+    bleedClip: { x0: b, y0: b, x1: pg.w - b, y1: pg.h - b },
   };
+  const g = pageGuides(pg);
+  const bw = Math.max(2, 1.5 / zoom);
+  /* print view joins the pages at their trims — each half hides its own
+     spine-side bleed strip */
+  const spineCrop = ed.spreadPrint
+    ? (off === 0 ? `inset(0 ${b}px 0 0)` : `inset(0 0 0 ${b}px)`)
+    : undefined;
   return (
-    <div className="facingPage" data-page-index={sh.facingIndex}
-      title={spreadPrint
-        ? `Facing page ${sh.facingIndex + 1} — print view joins the pages at the spine; the bleed between them is dropped`
-        : `Facing page ${sh.facingIndex + 1}`}
-      style={{ width: fp.w * zoom - crop, height: fp.h * zoom, overflow: "hidden" }}
-      onClick={() => {
-        /* not while tucking — a trace that ends over this page must not
-           switch pages under the dialog */
-        if (sh.tuckMode || Date.now() - sh.tuckJustEndedRef.current < 500) return;
-        setPageIndex(sh.facingIndex); setSelId(null);
-      }}>
-      <div className="facingLive" style={{
-        position: "absolute", left: innerCropSide === "left" ? -crop : 0, top: 0,
-        width: fp.w, height: fp.h,
-        transform: `scale(${zoom})`, transformOrigin: "0 0",
-        pointerEvents: "none",
-        ...fillCss(fp.bg),
-      }}>
-        {fp.els.map((el, i) => (
-          <React.Fragment key={el.id}>
-            {renderEl(edF, el)}
-            {renderJoinBands(edF, i)}
-          </React.Fragment>
-        ))}
-        {renderCarriedLettering(edF)}
+    <div key={idx} data-page-index={idx}
+      className={"pageHalf" + (isCur ? " cur" : "")}
+      style={{
+        position: "absolute", left: off, top: 0, width: pg.w, height: pg.h,
+        overflow: isCur && sh.tuckMode ? "visible" : "hidden",
+        clipPath: spineCrop,
+        boxShadow: "0 4px 26px #00000066",
+        ...fillCss(pg.bg),
+      }}
+      onPointerDown={(e) => {
+        if (e.target !== e.currentTarget) return;
+        /* empty press on either page: it becomes the ops target (tray
+           inserts, paste, page setup) and the selection clears */
+        if (ed.pageIndexRef.current !== idx) {
+          (ed.pageIndexRef as React.RefObject<number>).current = idx;
+          ed.setPageIndex(idx);
+        }
+        ed.select(null);
+      }}
+    >
+      {pg.els.map((el, i) => (
+        <React.Fragment key={el.id}>
+          {renderEl(edH, el)}
+          {renderJoinBands(edH, i)}
+        </React.Fragment>
+      ))}
+      {renderCarriedLettering(edH)}
+      {pg.margin && (
+        <div className="marginGuide" style={{
+          left: pg.margin.l, top: pg.margin.t,
+          width: pg.w - pg.margin.l - pg.margin.r,
+          height: pg.h - pg.margin.t - pg.margin.b,
+          borderWidth: bw,
+        }} />
+      )}
+      <div className="trimGuide" style={{
+        left: g.trim.x, top: g.trim.y,
+        width: g.trim.w, height: g.trim.h, borderWidth: bw,
+      }} />
+      {ed.showSafe && (
+        <div className="safeGuide" style={{
+          left: g.safe.x, top: g.safe.y,
+          width: g.safe.w, height: g.safe.h, borderWidth: bw,
+        }} />
+      )}
+      {ed.demo && <div className="demoWatermark" aria-hidden style={{ width: pg.w, height: pg.h }} />}
+      <span className="facingNum">{idx + 1}</span>
+    </div>
+  );
+}
+
+/* The SPREAD CANVAS: two-up's own editing surface, separate from the
+   one-page canvas. Both pages live on it at once — split without being
+   split — and every tool works anywhere on it. */
+function renderSpreadCanvas(ed: EditorCtx, sh: ShellProps) {
+  const { zoom, drawMode } = ed;
+  const doc = ed.doc!;
+  const lay = ed.spreadLayout;
+  const totalW = Math.max(...lay.map((s) => s.off + doc.pages[s.idx].w));
+  const totalH = Math.max(...lay.map((s) => doc.pages[s.idx].h));
+  const curOff = ed.spreadOffX(ed.pageIndex);
+  const page = ed.page!;
+  const { dragTipRef, snapRef, tuckMode } = sh;
+  return (
+    <div className="stage" style={{ width: totalW * zoom, height: totalH * zoom }}>
+      <div ref={sh.pageDivRef} className="page spreadCanvas"
+        style={{
+          width: totalW, height: totalH,
+          transform: `scale(${zoom})`, transformOrigin: "0 0",
+          background: "transparent", boxShadow: "none", overflow: "visible",
+        }}>
+        {lay.map(({ idx, off }) => spreadHalf(ed, sh, idx, off))}
       </div>
-      <span className="facingNum">{sh.facingIndex + 1}</span>
+      {/* tool layers ride at the CURRENT page's offset so their coordinates
+          stay page-local, exactly like the one-page canvas */}
+      {!tuckMode && (
+        <div style={{ position: "absolute", left: curOff * zoom, top: 0 }}>
+          {renderOverlay(ed)}
+        </div>
+      )}
+      {snapRef.current.x != null && <div className="snapLineV" style={{ left: (snapRef.current.x + curOff) * zoom }} />}
+      {snapRef.current.y != null && <div className="snapLineH" style={{ top: snapRef.current.y * zoom }} />}
+      {tuckMode && (
+        <div className="drawLayer tuckLayer" onPointerDown={sh.startTuckDrag}
+          style={{ left: curOff * zoom, top: 0, width: page.w * zoom, height: page.h * zoom }}>
+          {sh.tuckPtsRef.current && sh.tuckPtsRef.current.length > 1 && (
+            <svg>
+              <path className="tuckTrace"
+                d={"M " + sh.tuckPtsRef.current.map(([qx, qy]) => `${Math.round(qx * zoom)} ${Math.round(qy * zoom)}`).join(" L ") + " Z"} />
+            </svg>
+          )}
+        </div>
+      )}
+      {drawMode && (
+        <div className="drawLayer" onPointerDown={sh.startSketch}
+          style={{ left: curOff * zoom, top: 0, width: page.w * zoom, height: page.h * zoom }}>
+          {sh.drawPtsRef.current && sh.drawPtsRef.current.length > 1 && (
+            <svg>
+              <path d={"M " + sh.drawPtsRef.current.map(([qx, qy]) => `${Math.round(qx * zoom)} ${Math.round(qy * zoom)}`).join(" L ")} />
+            </svg>
+          )}
+        </div>
+      )}
+      {dragTipRef.current && (
+        <div className="dragTip" style={{
+          left: (dragTipRef.current.x + dragTipRef.current.w + curOff) * zoom + 6,
+          top: dragTipRef.current.y * zoom - 4,
+        }}>
+          {dragTipRef.current.mode === "resize"
+            ? `${(dragTipRef.current.w / DPI).toFixed(2)}×${(dragTipRef.current.h / DPI).toFixed(2)}"`
+            : `${(dragTipRef.current.x / DPI).toFixed(2)}, ${(dragTipRef.current.y / DPI).toFixed(2)}"`}
+          {dragTipRef.current.warn && (
+            <div style={{ color: "#ffb020", maxWidth: 230, whiteSpace: "normal" }}>
+              {dragTipRef.current.warn}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -149,33 +248,26 @@ export function renderCanvasArea(ed: EditorCtx, sh: ShellProps) {
     setUserZoomed, setZoom,
   } = ed;
   const page = ed.page!;
-  const { dragTipRef, snapRef, facingIndex, currentOnLeft, tuckMode } = sh;
+  const { dragTipRef, snapRef, tuckMode } = sh;
+  /* two-up: its own canvas — both pages live on one shared surface */
+  const twoUp = spread && ed.spreadLayout.length === 2;
+  const curOff = twoUp ? ed.spreadOffX(ed.pageIndex) : 0;
+  const rulerW = twoUp
+    ? Math.max(...ed.spreadLayout.map((s) => s.off + ed.doc!.pages[s.idx].w))
+    : page.w;
   return (
     <div className="canvasArea" ref={sh.areaRef}
       onDragOver={(e) => e.preventDefault()} onDrop={(e) => onDrop(ed, e)}>
       <div className="rulerRow">
         <div className="rulerCorner" />
-        <Ruler length={page.w} zoom={zoom} vertical={false} offset={STAGE_MX}
-          hi={dragTipRef.current?.live ? [dragTipRef.current.x, dragTipRef.current.x + dragTipRef.current.w] : null} />
+        <Ruler length={rulerW} zoom={zoom} vertical={false} offset={STAGE_MX}
+          hi={dragTipRef.current?.live ? [dragTipRef.current.x + curOff, dragTipRef.current.x + dragTipRef.current.w + curOff] : null} />
       </div>
       <div className="canvasRow">
         <Ruler length={page.h} zoom={zoom} vertical offset={STAGE_MY}
           hi={dragTipRef.current?.live ? [dragTipRef.current.y, dragTipRef.current.y + dragTipRef.current.h] : null} />
-        {/* facing page on the LEFT; print view crops its inner (right) bleed
-            so the two pages join at the spine */}
-        {spread && facingIndex >= 0 && !currentOnLeft && facingPage(ed, sh, "right")}
-        <div className="stage" style={(() => {
-          const bl = pageBleed(page) * zoom;
-          const cropL = spreadPrint && facingIndex >= 0 && !currentOnLeft;
-          const cropR = spreadPrint && facingIndex >= 0 && currentOnLeft;
-          return {
-            width: page.w * zoom - (cropL || cropR ? bl : 0),
-            height: page.h * zoom,
-            overflow: cropL || cropR ? ("hidden" as const) : undefined,
-            marginLeft: cropL ? 0 : undefined,
-            marginRight: cropR ? 0 : undefined,
-          };
-        })()}>
+        {twoUp ? renderSpreadCanvas(ed, sh) : (
+        <div className="stage" style={{ width: page.w * zoom, height: page.h * zoom }}>
           <div
             ref={sh.pageDivRef}
             className="page"
@@ -185,7 +277,6 @@ export function renderCanvasArea(ed: EditorCtx, sh: ShellProps) {
               /* print view: this page's INNER bleed is clipped by the stage;
                  when the spine is on our left, shift so the cropped strip is
                  the left bleed */
-              left: spreadPrint && facingIndex >= 0 && !currentOnLeft ? -pageBleed(page) * zoom : undefined,
               /* while the tuck lasso is armed the page unclips, so a trace
                  sweeping across the spine stays visible */
               overflow: tuckMode ? "visible" : undefined,
@@ -276,8 +367,7 @@ export function renderCanvasArea(ed: EditorCtx, sh: ShellProps) {
             </div>
           )}
         </div>
-        {/* facing page on the RIGHT; print view crops its inner (left) bleed */}
-        {spread && facingIndex >= 0 && currentOnLeft && facingPage(ed, sh, "left")}
+        )}
       </div>
       <div className="zoomCtl">
         <select value={String(Math.round(zoom * 100))} onChange={(e) => {
