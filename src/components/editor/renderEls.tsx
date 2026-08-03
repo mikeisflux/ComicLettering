@@ -4,7 +4,7 @@
    contentEditable text keeps focus while editing). */
 import React, { CSSProperties } from "react";
 import {
-  El, FILTERS, TextEl, aabbOverlap, applyCrossbarI, joinGroupRect, joinLinks, resolveBalloon, rotVec,
+  El, FILTERS, JoinLink, TextEl, aabbOverlap, applyCrossbarI, joinGroupRect, joinLinks, resolveBalloon, rotVec,
 } from "@/lib/model";
 import { arcTextLayout, balloonGeom, connectorMid } from "@/lib/geometry";
 import { fillCss } from "@/lib/fills";
@@ -13,8 +13,62 @@ import { BalloonShape, JoinBandShape, MergeBaseInfo } from "./BalloonShape";
 import { EditorCtx } from "./ctx";
 import { WarpedText } from "./WarpedText";
 import { FLAT, Warp, isWarped, warpBounds, warpPoint } from "@/lib/warp";
-import { TrimRect, balloonCrossesTrim, stampCrossesTrim, textCrossesTrim } from "@/lib/exportPng";
+import {
+  TrimRect, balloonCrossesSpine, balloonCrossesTrim, elCrossesSpine, spreadNeighbor,
+  stampCrossesTrim, textCrossesTrim,
+} from "@/lib/exportPng";
+import { pageBleed } from "@/lib/model";
 import { onLetteringInput } from "./ops";
+
+/* ---------- autoclipping self-replication ----------
+   Lettering cut off at the facing page's spine-side bleed line REAPPEARS
+   here, starting at THIS page's bleed line: each crossing item on the
+   partner page renders again as a read-only, auto-positioned copy — the
+   same element, translated by the trim join, so it can never drift from
+   its source. Clipped to this page's trim rect; not selectable (its home
+   is the partner page). Mirrors the canvas renderer's partner pass, so
+   the live page matches previews, thumbnails and every export. */
+export function renderCarriedLettering(ed: EditorCtx) {
+  const doc = ed.doc;
+  if (!doc) return null;
+  const nb = spreadNeighbor(doc, ed.pageIndex);
+  if (!nb) return null;
+  /* the partner's spine is the side FACING us: partner on our right (dx>0)
+     crosses its LEFT bleed line, partner on our left crosses its RIGHT */
+  const pSide: 1 | -1 = nb.dx > 0 ? -1 : 1;
+  const pb = pageBleed(nb.page);
+  const pTrim = pSide === 1 ? nb.page.w - pb : pb;
+  const carried = nb.page.els.filter((el) => elCrossesSpine(el, pTrim, pSide));
+  if (!carried.length) return null;
+  const page = ed.page!;
+  const b = pageBleed(page);
+  /* our trim rect, in the (translated) partner frame — the copy starts at
+     our bleed line and may never show past any of our bleed lines */
+  const clip = `polygon(${[
+    [b - nb.dx, b], [page.w - b - nb.dx, b],
+    [page.w - b - nb.dx, page.h - b], [b - nb.dx, page.h - b],
+  ].map(([x, y]) => `${Math.round(x)}px ${Math.round(y)}px`).join(", ")})`;
+  /* the copies resolve joins/styles against their OWN page, unclipped at
+     the partner trim (the piece we show is exactly what that clip removes) */
+  const edP: EditorCtx = { ...ed, page: nb.page, bleedClip: null, selIds: [], editingId: null };
+  return (
+    <div className="carriedLettering" style={{
+      position: "absolute", left: nb.dx, top: 0,
+      width: nb.page.w, height: nb.page.h,
+      pointerEvents: "none", clipPath: clip,
+    }}>
+      {carried.map((el) => (
+        <React.Fragment key={`carry-${el.id}`}>{renderEl(edP, el)}</React.Fragment>
+      ))}
+      {nb.page.els.map((_, i) => (
+        <React.Fragment key={`carryband-${i}`}>
+          {renderJoinBands(edP, i, (l) =>
+            balloonCrossesSpine(l.child, pTrim, pSide) || balloonCrossesSpine(l.base, pTrim, pSide))}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+}
 
 /* The bleed line is a HARD border for word balloons, text boxes, lettering
    and stamps — in the live editor page too, whatever the view. Each of
@@ -45,10 +99,13 @@ function bleedClipPath(
    inserted right after WHICHEVER partner renders later (joinLinks.afterIndex),
    so the band's fill covers both outline crossings no matter which bubble is
    on top — and no link ever repaints another link's junction. */
-export function renderJoinBands(ed: EditorCtx, index: number) {
+export function renderJoinBands(
+  ed: EditorCtx, index: number,
+  only?: (l: JoinLink) => boolean,
+) {
   const page = ed.page!;
   return joinLinks(page)
-    .filter((l) => l.afterIndex === index)
+    .filter((l) => l.afterIndex === index && (!only || only(l)))
     .map((l) => {
       const { el: bEl, base } = resolveBalloon(page, l.child);
       if (!base || !bEl.band) return null;   // melted or detached — no band

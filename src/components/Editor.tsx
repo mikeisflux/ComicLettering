@@ -596,11 +596,18 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   }, []);
 
   useEffect(() => { if (mounted) loadPageArt(pageIndex); }, [pageIndex, mounted, loadPageArt]);
-  /* spread view shows the facing page too — bring its artwork in as well,
-     or the facing preview renders with the art missing after a fresh load */
+  /* The facing page's artwork loads in EVERY view, not just spread: the
+     facing preview needs it, and so do carried stamps (autoclipping
+     self-replication renders the partner's spine-crossing lettering on
+     the current page, whatever the view). */
   useEffect(() => {
-    if (mounted && spread && facingIndex >= 0) loadPageArt(facingIndex);
-  }, [spread, facingIndex, mounted, loadPageArt]);
+    if (!mounted) return;
+    const d = docRef.current;
+    if (!d) return;
+    const pn = pageIndex + 1;
+    const fi = pn === 1 ? -1 : pn % 2 === 0 ? pageIndex + 1 : pageIndex - 1;
+    if (fi >= 0 && fi < d.pages.length) loadPageArt(fi);
+  }, [pageIndex, mounted, loadPageArt]);
 
   /* fit zoom — read userZoomed through a ref so fitZoom's identity is stable;
      otherwise the page-change effect below re-fires on every zoom toggle and

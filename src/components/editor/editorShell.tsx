@@ -9,7 +9,7 @@ import { fillCss } from "@/lib/fills";
 import { loadImage } from "@/lib/exportPng";
 import { Ruler, STAGE_MX, STAGE_MY } from "./chrome";
 import { EditorCtx } from "./ctx";
-import { renderEl, renderJoinBands, renderOverlay } from "./renderEls";
+import { renderCarriedLettering, renderEl, renderJoinBands, renderOverlay } from "./renderEls";
 import { StylesPanel } from "./stylesPanel";
 import { addPageAt } from "./spreadOps";
 import {
@@ -179,6 +179,9 @@ export function renderCanvasArea(ed: EditorCtx, sh: ShellProps) {
                 {renderJoinBands(ed, i)}
               </React.Fragment>
             ))}
+            {/* autoclipping self-replication: lettering the facing page cut
+                off at its bleed line reappears here from ours */}
+            {renderCarriedLettering(ed)}
             {page.margin && (
               <div className="marginGuide" style={{
                 left: page.margin.l, top: page.margin.t,
