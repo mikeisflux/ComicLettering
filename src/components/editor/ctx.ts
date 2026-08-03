@@ -169,6 +169,9 @@ export interface EditorCtx {
   /* print view: facing pages join at the spine, inner bleeds dropped */
   spreadPrint: boolean;
   setSpreadPrint: SetState<boolean>;
+  /* spread view with a facing partner: the spine-side bleed border is a hard
+     split for spanning elements — side 1 = spine on this page's right edge */
+  spineClip: { side: 1 | -1; trimX: number } | null;
   showScript: boolean;
   setShowScript: SetState<boolean>;
   scriptText: string;

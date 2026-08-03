@@ -11,7 +11,7 @@ import React, {
 import {
   Assets, BalloonEl, Doc, El, FillStyle, GradStop, Page, TextEl,
   TextStyle, aabbOverlap, clamp, newPage, normalizeDoc, normalizeRuns,
-  pageMargins, reseedIds, rotVec, runsToText, starterDoc,
+  pageBleed, pageMargins, reseedIds, rotVec, runsToText, starterDoc,
 } from "@/lib/model";
 import { LETTER_STYLES } from "@/lib/presets";
 import { BALLOON_STYLES, BOX_STYLES } from "@/lib/balloonStyles";
@@ -294,6 +294,17 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     return fi >= 0 && fi < d.pages.length ? fi : -1;
   })();
   const currentOnLeft = spread && (pageIndex + 1) % 2 === 0;
+  /* spread with a facing partner: the spine-side bleed border is a HARD
+     split — spanning elements clip at the trim here and their overhang
+     (bleed sliver included) renders on the facing preview instead */
+  const spineClip = (() => {
+    const d = docRef.current;
+    if (!spread || facingIndex < 0 || !d) return null;
+    const pg = d.pages[pageIndex];
+    return currentOnLeft
+      ? { side: 1 as const, trimX: pg.w - pageBleed(pg) }
+      : { side: -1 as const, trimX: pageBleed(pg) };
+  })();
   useEffect(() => {
     let alive = true;
     const d = docRef.current;
@@ -500,8 +511,10 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     if (!got.length) return;
     /* the store can be cleared out from under this await (loading another
        project calls releaseAllArt), leaving artUrl undefined — never write
-       an undefined src, and skip ids the current doc no longer references */
-    const live = new Set(artIdsOnPage(pageIndexRef.current));
+       an undefined src, and skip ids the current doc no longer references
+       (checked against the REQUESTED page — this also loads the facing
+       page's art for spread view, not just the page being edited) */
+    const live = new Set(artIdsOnPage(pi));
     let any = false;
     for (const id of got) {
       const url = artUrl(id);
@@ -585,6 +598,11 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   }, []);
 
   useEffect(() => { if (mounted) loadPageArt(pageIndex); }, [pageIndex, mounted, loadPageArt]);
+  /* spread view shows the facing page too — bring its artwork in as well,
+     or the facing preview renders with the art missing after a fresh load */
+  useEffect(() => {
+    if (mounted && spread && facingIndex >= 0) loadPageArt(facingIndex);
+  }, [spread, facingIndex, mounted, loadPageArt]);
 
   /* fit zoom — read userZoomed through a ref so fitZoom's identity is stable;
      otherwise the page-change effect below re-fires on every zoom toggle and
@@ -731,10 +749,25 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
      to ./editor/useStartDrag (the 1500-line rule) */
   /* spread view cross-page drop — assigned before render when spread is on */
   const crossPageDropRef = useRef<((mainId: string, clientX: number, clientY: number) => boolean) | null>(null);
+  /* single-page mode: warn while dragging lettering across the spine-side
+     bleed line that the piece will continue on the facing page (in spread
+     view the split is visible live, so no warning needed there) */
+  const spineWarnRef = useRef<{ side: 1 | -1; trimX: number; facing: number } | null>(null);
   const startDrag = useStartDrag({
     pagePoint, commit, force, zoom,
-    docRef, pageIndexRef, selIdsRef, snapRef, dragTipRef, setSelIds, crossPageDropRef,
+    docRef, pageIndexRef, selIdsRef, snapRef, dragTipRef, setSelIds, crossPageDropRef, spineWarnRef,
   });
+  spineWarnRef.current = (() => {
+    const d = docRef.current;
+    if (!d || spread) return null;
+    const pn = pageIndex + 1;
+    const fi = pn === 1 ? -1 : pn % 2 === 0 ? pageIndex + 1 : pageIndex - 1;
+    if (fi < 0 || fi >= d.pages.length) return null;
+    const pg = d.pages[pageIndex];
+    return pn % 2 === 0
+      ? { side: 1, trimX: pg.w - pageBleed(pg), facing: fi + 1 }
+      : { side: -1, trimX: pageBleed(pg), facing: fi + 1 };
+  })();
 
 
   /* ---------------- hand-drawn balloon sketching ---------------- */
@@ -837,7 +870,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     setExportCropMarks, exportFrom, setExportFrom, exportTo, setExportTo,
     showFind, setShowFind, findText, setFindText, replaceText,
     setReplaceText, findCase, setFindCase, showSafe, setShowSafe, spread,
-    setSpread, spreadPrint, setSpreadPrint, showScript, setShowScript, scriptText, setScriptText,
+    setSpread, spreadPrint, setSpreadPrint, spineClip, showScript, setShowScript, scriptText, setScriptText,
     warping, setWarping,
     tiltConn, setTiltConn,
     stampOpen, setStampOpen, stampQuery, setStampQuery, showGradMaker,

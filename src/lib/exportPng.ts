@@ -558,10 +558,61 @@ function drawEl(
   ctx.restore();
 }
 
+/* Spread-spine handling for a page rendered next to a facing partner.
+   The spine-side BLEED LINE (trim) is a hard border for LETTERING: any
+   balloon, text box or SFX that crosses it stops dead at the trim on its
+   own page, and the cut-off part renders on the facing page starting at
+   ITS bleed line instead. Uploaded art (images, panels) is exempt — art
+   is meant to fill its bleed and never carries across.
+   `side` is the page edge the spine sits on (1 = right, -1 = left),
+   `trimX` that edge's bleed line. mode "clip" = the page's own pass
+   (cut crossing lettering at the trim); mode "only" = the partner pass
+   (draw JUST the partner's crossing lettering, from the trim join out). */
+export type SpineSpan = { side: 1 | -1; trimX: number; mode: "clip" | "only" };
+
+/* horizontal extent of an element's box, rotation included */
+function elXBounds(el: { x: number; y: number; w: number; h: number; rot: number }): [number, number] {
+  const cx = el.x + el.w / 2;
+  const r = deg2rad(el.rot || 0);
+  const hw = (Math.abs(Math.cos(r)) * el.w + Math.abs(Math.sin(r)) * el.h) / 2;
+  return [cx - hw, cx + hw];
+}
+
+/* is this a lettering element that crosses the spine-side bleed line?
+   (uploaded art — images and panels — never splits at the spine) */
+export function elCrossesSpine(
+  el: { type: string; x: number; y: number; w: number; h: number; rot: number },
+  trimX: number, side: 1 | -1,
+): boolean {
+  if (el.type === "image" || el.type === "panel") return false;
+  const [x0, x1] = elXBounds(el);
+  return side === 1 ? x1 > trimX + 0.5 : x0 < trimX - 0.5;
+}
+
 /* all of one page's elements, in order, with join bands interleaved */
-function drawPageEls(ctx: CanvasRenderingContext2D, page: Page, assets: Assets, letteringOnly: boolean) {
+function drawPageEls(
+  ctx: CanvasRenderingContext2D, page: Page, assets: Assets, letteringOnly: boolean,
+  span?: SpineSpan | null,
+) {
   const links = joinLinks(page);
+  const clipAtTrim = () => {
+    ctx.save();
+    const c = new Path2D();
+    if (span!.side === 1) c.rect(-page.w * 2, -page.h, span!.trimX + page.w * 2, page.h * 3);
+    else c.rect(span!.trimX, -page.h, page.w * 3, page.h * 3);
+    ctx.clip(c);
+  };
   page.els.forEach((el, i) => {
+    const crosses = span ? elCrossesSpine(el, span.trimX, span.side) : false;
+    if (span?.mode === "only" && !crosses) {
+      for (const l of links) {
+        if (l.afterIndex === i && (elCrossesSpine(l.child, span.trimX, span.side) || elCrossesSpine(l.base, span.trimX, span.side)))
+          drawJoinBand(ctx, page, l);
+      }
+      return;
+    }
+    const clip = span?.mode === "clip" && crosses;
+    if (clip) clipAtTrim();
     if (!(letteringOnly && (el.type === "panel" || el.type === "image"))) {
       if (el.type === "balloon") {
         const { el: bEl, base } = resolveBalloon(page, el);
@@ -587,9 +638,17 @@ function drawPageEls(ctx: CanvasRenderingContext2D, page: Page, assets: Assets, 
         drawEl(ctx, el, assets);
       }
     }
+    if (clip) ctx.restore();
     /* each join link's connector band paints right after the LATER of its
        two partners (same pass structure as the editor's renderJoinBands) */
-    for (const l of links) if (l.afterIndex === i) drawJoinBand(ctx, page, l);
+    for (const l of links) {
+      if (l.afterIndex !== i) continue;
+      const bandClip = span?.mode === "clip" &&
+        (elCrossesSpine(l.child, span.trimX, span.side) || elCrossesSpine(l.base, span.trimX, span.side));
+      if (bandClip) clipAtTrim();
+      drawJoinBand(ctx, page, l);
+      if (bandClip) ctx.restore();
+    }
   });
 }
 
@@ -632,22 +691,30 @@ export async function renderPageToCanvas(
   // lettering-only export: transparent background, no panels/artwork —
   // just balloons and lettering, for handing back to the artist/production
   if (!letteringOnly) paintFill(ctx, page.bg, page.w, page.h);
-  drawPageEls(ctx, page, assets, letteringOnly);
+  /* With a facing partner, this page's bleed border on the spine side is a
+     HARD split line: a spanning element stops dead at the trim here, and
+     everything past it (bleed sliver included) renders on the partner. */
+  const spineSide: 1 | -1 = neighbor ? (neighbor.dx > 0 ? 1 : -1) : 1;
+  const trimX = spineSide === 1 ? page.w - pageBleed(page) : pageBleed(page);
+  drawPageEls(ctx, page, assets, letteringOnly,
+    neighbor ? { side: spineSide, trimX, mode: "clip" } : null);
   if (neighbor) {
-    /* Spread partner: ONLY what extends past the partner's own page edge
-       carries over — content within the partner's page (including its
-       full-bleed art) is the partner's alone, and drawing it here doubled
-       a strip of the neighbouring page's bleed onto this one. The clip
-       boundary is exactly where the partner's page edge lands in THIS
-       page's coordinates. */
+    /* Spread partner pass: ONLY the partner's lettering that crosses ITS
+       spine-side bleed line carries over — the partner's art stays put.
+       It draws from the trim join outward, so the piece that sat past the
+       partner's bleed line lands on THIS page starting at our own bleed
+       line (the two trims coincide — also where Print View joins). */
     ctx.save();
-    const bound = neighbor.dx > 0 ? neighbor.dx : neighbor.page.w + neighbor.dx;
     const clip = new Path2D();
-    if (neighbor.dx > 0) clip.rect(-page.w, -page.h, bound + page.w, page.h * 3);
-    else clip.rect(bound, -page.h, page.w * 2, page.h * 3);
+    if (spineSide === 1) clip.rect(-page.w, -page.h, trimX + page.w, page.h * 3);
+    else clip.rect(trimX, -page.h, page.w * 2, page.h * 3);
     ctx.clip(clip);
     ctx.translate(neighbor.dx, 0);
-    drawPageEls(ctx, neighbor.page, assets, letteringOnly);
+    /* partner's spine is on its opposite side */
+    const nSide: 1 | -1 = spineSide === 1 ? -1 : 1;
+    const nTrim = nSide === -1 ? pageBleed(neighbor.page) : neighbor.page.w - pageBleed(neighbor.page);
+    drawPageEls(ctx, neighbor.page, assets, letteringOnly,
+      { side: nSide, trimX: nTrim, mode: "only" });
     ctx.restore();
     /* Tuck cutouts are foreground ART — they sit in front of any lettering,
        including the partner's overhang, so a cross-spine tuck reads as the

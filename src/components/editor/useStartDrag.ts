@@ -9,6 +9,7 @@ import {
   BalloonEl, Doc, El, TextEl, aabbOverlap, clamp, pageMargins, rotVec,
 } from "@/lib/model";
 import { FLAT } from "@/lib/warp";
+import { elCrossesSpine } from "@/lib/exportPng";
 
 export const MIN_SIZE = 24;
 
@@ -74,16 +75,20 @@ export interface DragDeps {
   pageIndexRef: Ref<number>;
   selIdsRef: Ref<string[]>;
   snapRef: Ref<{ x: number | null; y: number | null }>;
-  dragTipRef: Ref<{ x: number; y: number; w: number; h: number; mode: string; live: boolean } | null>;
+  dragTipRef: Ref<{ x: number; y: number; w: number; h: number; mode: string; live: boolean; warn?: string } | null>;
   setSelIds: (ids: string[]) => void;
   /* spread view: called on releasing a MOVE drag with the raw client point;
      returns true if the drop landed on the facing page and the elements
      were transferred there (the transfer commits for itself). */
   crossPageDropRef: Ref<((mainId: string, clientX: number, clientY: number) => boolean) | null>;
+  /* single-page view with a facing partner in the book: the spine-side
+     bleed line, so dragging lettering across it can warn that the piece
+     will continue on the facing page (null = no warning needed) */
+  spineWarnRef: Ref<{ side: 1 | -1; trimX: number; facing: number } | null>;
 }
 
 export function useStartDrag(deps: DragDeps) {
-  const { pagePoint, commit, force, zoom, docRef, pageIndexRef, selIdsRef, snapRef, dragTipRef, setSelIds, crossPageDropRef } = deps;
+  const { pagePoint, commit, force, zoom, docRef, pageIndexRef, selIdsRef, snapRef, dragTipRef, setSelIds, crossPageDropRef, spineWarnRef } = deps;
   return useCallback((
     e: React.PointerEvent, el: El, mode: DragMode, handle = ""
   ) => {
@@ -310,8 +315,13 @@ export function useStartDrag(deps: DragDeps) {
         const L = Math.hypot(vx, vy) || 1;
         cur.tail = { ...cur.tail, bx, by, tx: Math.round((vx / L) * 1000) / 1000, ty: Math.round((vy / L) * 1000) / 1000 };
       }
-      if (mode === "move" || mode === "resize")
-        dragTipRef.current = { x: cur.x, y: cur.y, w: cur.w, h: cur.h, mode, live: true };
+      if (mode === "move" || mode === "resize") {
+        const sw = spineWarnRef.current;
+        const warn = sw && elCrossesSpine(cur, sw.trimX, sw.side)
+          ? `Past the bleed — continues on page ${sw.facing} in spreads & print`
+          : undefined;
+        dragTipRef.current = { x: cur.x, y: cur.y, w: cur.w, h: cur.h, mode, live: true, warn };
+      }
       force();
     };
     const onUp = () => {

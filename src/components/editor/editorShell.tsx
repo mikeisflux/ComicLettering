@@ -23,7 +23,7 @@ import {
 export interface ShellProps {
   areaRef: React.RefObject<HTMLDivElement | null>;
   pageDivRef: React.RefObject<HTMLDivElement | null>;
-  dragTipRef: { current: { x: number; y: number; w: number; h: number; mode: string; live: boolean } | null };
+  dragTipRef: { current: { x: number; y: number; w: number; h: number; mode: string; live: boolean; warn?: string } | null };
   snapRef: { current: { x: number | null; y: number | null } };
   thumbs: Record<number, string>;
   askAddPage: boolean;
@@ -243,6 +243,11 @@ export function renderCanvasArea(ed: EditorCtx, sh: ShellProps) {
               {dragTipRef.current.mode === "resize"
                 ? `${(dragTipRef.current.w / DPI).toFixed(2)}×${(dragTipRef.current.h / DPI).toFixed(2)}"`
                 : `${(dragTipRef.current.x / DPI).toFixed(2)}, ${(dragTipRef.current.y / DPI).toFixed(2)}"`}
+              {dragTipRef.current.warn && (
+                <div style={{ color: "#ffb020", maxWidth: 230, whiteSpace: "normal" }}>
+                  {dragTipRef.current.warn}
+                </div>
+              )}
             </div>
           )}
         </div>
