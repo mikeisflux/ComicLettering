@@ -29,7 +29,21 @@
   (e.g. a directory of modules re-exported from the original path). Apply
   this to any file you touch that is already over the limit.
 
-## Every entry point for a behaviour
+## Two canvases (fix both, always)
+
+- The editor has TWO editing canvases: the SINGLE-PAGE canvas and the
+  SPREAD CANVAS used by Two-Page Spread View AND Two-Page Print View
+  (both pages live on one shared surface; print view additionally joins
+  the pages at their trims). They share the element renderers
+  (`renderEls.tsx`) but have separate shells in `editorShell.tsx`
+  (`renderCanvasArea`'s single-page stage vs `renderSpreadCanvas`/
+  `spreadHalf`) and different geometry (`spreadLayout`/`spreadOffX`,
+  page-local coords via `pagePoint`'s offset, `claimPage`).
+- When fixing or changing ANY editor behaviour — tools, overlays, drags,
+  guides, layers, hit-testing — check and apply the fix on BOTH canvases,
+  and in print view's trim-joined variant, before calling it done. A fix
+  that only touches the single-page stage ships half-broken in two-up,
+  and vice versa.
 
 - When fixing or changing a piece of editor functionality, find EVERY UI
   entry point that triggers it and fix them all: the same action commonly
