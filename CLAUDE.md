@@ -29,6 +29,18 @@
   (e.g. a directory of modules re-exported from the original path). Apply
   this to any file you touch that is already over the limit.
 
+## Every entry point for a behaviour
+
+- When fixing or changing a piece of editor functionality, find EVERY UI
+  entry point that triggers it and fix them all: the same action commonly
+  exists as a sidebar button, a toolbar `ToolBtn`, a menu-bar entry
+  (`renderMenuBar` in `chromeBars.tsx`), a context-menu item
+  (`dialogs.tsx`) and/or a keyboard shortcut (`Editor.tsx`). Grep for the
+  label and for the underlying op before calling a fix done — a "+ Page"
+  fix that misses the toolbar's "New Page" button ships half-broken.
+  Prefer routing every entry point through ONE shared op/handler so they
+  cannot drift apart again.
+
 ## Editor/export parity
 
 - The DOM editor and the canvas/PDF export must stay WYSIWYG: any change to

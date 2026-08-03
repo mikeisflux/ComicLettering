@@ -20,7 +20,7 @@ import {
   BALLOON_STYLES, BOX_STYLES, ShapeStyle, applyShapeStyle, captureShapeStyle,
 } from "@/lib/balloonStyles";
 import { loadImage } from "@/lib/exportPng";
-import { BalloonPreset, measureBlock, measureCharWidths, parseScript } from "./textHelpers";
+import { BalloonPreset, measureBlock, measureCharWidths, parseScript, toggleEmphasis } from "./textHelpers";
 import { EditorCtx } from "./ctx";
 
 
@@ -364,6 +364,22 @@ export function movePage(ed: EditorCtx, dir: -1 | 1) {
   rebuildThumbs();
 }
 
+
+/* B/I/U from ANY entry point (format bar, Format menu, Ctrl+B/I/U): while
+   lettering is open they act on the HIGHLIGHTED words, like a word
+   processor; with the box merely selected they restyle the whole element. */
+export function toggleSelEmphasis(ed: EditorCtx, kind: "bold" | "italic" | "underline") {
+  if (ed.editingId) {
+    const dom = document.querySelector(`.el[data-id="${ed.editingId}"] .txt`) as HTMLElement | null;
+    if (dom && toggleEmphasis(dom, kind)) { onLetteringInput(ed, ed.editingId, dom); return; }
+  }
+  ed.mutateSel<BalloonEl | TextEl>((x) => {
+    if (!x.ts) return;
+    if (kind === "bold") x.ts.bold = !x.ts.bold;
+    else if (kind === "italic") x.ts.italic = !x.ts.italic;
+    else x.ts.underline = !x.ts.underline;
+  });
+}
 
 /* Grow a balloon so its lettering fits. Balloons expand as you type rather
    than silently clipping; returns true if the size actually changed. */

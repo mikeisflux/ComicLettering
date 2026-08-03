@@ -2,7 +2,7 @@
    Plain exported render functions taking the EditorCtx bag. */
 import {
   BalloonEl, COLOR_PALETTE, DEFAULT_TEXT_SIZE, FONTS, GRADIENT_PRESETS,
-  MULTI_GRADIENTS, TextEl, clamp, newPage, reseedIds, starterDoc,
+  MULTI_GRADIENTS, TextEl, clamp, reseedIds, starterDoc,
 } from "@/lib/model";
 import { fillCss } from "@/lib/fills";
 import { NumField, ToolBtn } from "./chrome";
@@ -12,12 +12,11 @@ import { gradCss } from "./GradientMaker";
 import { BRUSHES } from "@/lib/brushes";
 import { GLOWS } from "@/lib/glows";
 import { EditorCtx } from "./ctx";
-import { toggleEmphasis } from "./textHelpers";
 import {
   addFromTray, alignSel, applyQuickFill, applyQuickStroke, balanceRag, clipboardText,
   copySel, copyStyle, cutSel, deleteCustomFont, deleteSel, duplicatePage,
-  duplicateSel, exportJSON, fitBalloonToText, onLetteringInput, pasteClip, pasteStyle,
-  printPage, reorder, rotateSel, runInstantAlpha, runProof, saveProject,
+  duplicateSel, exportJSON, fitBalloonToText, pasteClip, pasteStyle,
+  printPage, reorder, rotateSel, runInstantAlpha, runProof, saveProject, toggleSelEmphasis,
 } from "./ops";
 
 
@@ -76,7 +75,7 @@ export function renderMenuBar(ed: EditorCtx) {
         ["Library", () => setTab("library")],
       ]],
       ["Insert", [
-        ["New Page", () => { const d = docRef.current!; d.pages.splice(pageIndex + 1, 0, newPage(page.w, page.h, page.margin)); setPageIndex(pageIndex + 1); setSelId(null); commit(); ed.rebuildThumbs(); }],
+        ["New Page", () => ed.setAskAddPage(true)],
         ["Duplicate Page", () => duplicatePage(ed)],
         ["—", null],
         ["Panel", () => addFromTray(ed, "panel")],
@@ -94,9 +93,9 @@ export function renderMenuBar(ed: EditorCtx) {
         ["Import Script → Balloons…", () => setShowScript(true)],
       ]],
       ["Format", [
-        ["Bold", () => mutateSel<BalloonEl | TextEl>((x) => { if (x.ts) x.ts.bold = !x.ts.bold; })],
-        ["Italic", () => mutateSel<BalloonEl | TextEl>((x) => { if (x.ts) x.ts.italic = !x.ts.italic; })],
-        ["Underline", () => mutateSel<BalloonEl | TextEl>((x) => { if (x.ts) x.ts.underline = !x.ts.underline; })],
+        ["Bold", () => toggleSelEmphasis(ed, "bold")],
+        ["Italic", () => toggleSelEmphasis(ed, "italic")],
+        ["Underline", () => toggleSelEmphasis(ed, "underline")],
         ["—", null],
         ["Align Left", () => mutateSel<BalloonEl | TextEl>((x) => { if (x.ts) x.ts.align = "left"; })],
         ["Align Center", () => mutateSel<BalloonEl | TextEl>((x) => { if (x.ts) x.ts.align = "center"; })],
@@ -204,13 +203,7 @@ export function renderToolbar(ed: EditorCtx) {
     }} />
     <ToolBtn label="Save" icon="✔" accent onClick={() => saveProject(ed, false)} />
     <ToolBtn label="Library" icon="🗀" onClick={() => setTab("library")} />
-    <ToolBtn label="New Page" icon="🗎+" onClick={() => {
-      const d = docRef.current!;
-      d.pages.splice(pageIndex + 1, 0, newPage(page.w, page.h, page.margin));
-      setPageIndex(pageIndex + 1);
-      setSelId(null);
-      commit();
-    }} />
+    <ToolBtn label="New Page" icon="🗎+" onClick={() => ed.setAskAddPage(true)} />
     <span className="tbSep" />
     <ToolBtn label="Undo" icon="↶" disabled={hIndexRef.current <= 0} onClick={undo} />
     <ToolBtn label="Redo" icon="↷" disabled={hIndexRef.current >= histRef.current.length - 1} onClick={redo} />
@@ -251,21 +244,11 @@ export function renderFormatBar(ed: EditorCtx) {
     setShowGradMaker, myGrads, commit,
   } = ed;
   const selTs = selEl && (selEl.type === "balloon" || selEl.type === "text") ? selEl.ts : null;
-  /* B/I/U while lettering is open act on the HIGHLIGHTED words, like a word
-     processor; with the box merely selected they restyle the whole element.
-     (The buttons preventDefault on mousedown so clicking them doesn't blur
-     the contentEditable and collapse the text selection.) */
-  const emphasis = (kind: "bold" | "italic" | "underline") => {
-    if (ed.editingId) {
-      const dom = document.querySelector(`.el[data-id="${ed.editingId}"] .txt`) as HTMLElement | null;
-      if (dom && toggleEmphasis(dom, kind)) { onLetteringInput(ed, ed.editingId, dom); return; }
-    }
-    mutateSel<BalloonEl | TextEl>((x) => {
-      if (kind === "bold") x.ts.bold = !x.ts.bold;
-      else if (kind === "italic") x.ts.italic = !x.ts.italic;
-      else x.ts.underline = !x.ts.underline;
-    });
-  };
+  /* B/I/U act on highlighted words while editing (shared op — same
+     behaviour from the Format menu and Ctrl+B/I/U). The buttons
+     preventDefault on mousedown so clicking them doesn't blur the
+     contentEditable and collapse the text selection. */
+  const emphasis = (kind: "bold" | "italic" | "underline") => toggleSelEmphasis(ed, kind);
   return (
   <div className="formatBar">
     <span className="fbLabel">Stroke:</span>

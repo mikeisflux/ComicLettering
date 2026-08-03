@@ -1149,7 +1149,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     fileFontRef, fileStampRef,
     force, commit, autosave, undo, redo, setStatus, select, setSelId,
     setEditingId, finishEditing, mutateSel, startDrag, pagePoint, fitZoom, startTuck,
-    selectAllOnPage, installApp,
+    selectAllOnPage, installApp, setAskAddPage,
     tuckAsk, setTuckAsk, retuneTuck, runTuckAuto, applyTuck,
     autosaveSoon,
     rebuildThumbs, reseedAids, setThumbs, setPageIndex, setUserZoomed,
