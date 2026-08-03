@@ -47,6 +47,19 @@ export default function AccountPanel() {
     setNote("Your plan has been changed."); await load(); setBusy("");
   }
 
+  async function deleteAccount() {
+    if (!window.confirm("Permanently delete your account? Every saved project, imported font and stamp goes with it, and any active subscription is cancelled. This cannot be undone.")) return;
+    const password = window.prompt("Type your password to confirm deletion:");
+    if (!password) return;
+    setBusy("delete"); setNote("");
+    const res = await fetch("/api/account/delete", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) { setNote(d.error || "Could not delete the account."); setBusy(""); return; }
+    window.location.href = "/?deleted=1";
+  }
+
   if (!sub) return <div className="acctCard">Loading your account…</div>;
 
   const badge =
@@ -106,6 +119,18 @@ export default function AccountPanel() {
         <a className="acctBtn" href="/forgot">Change password</a>
         <button className="acctBtn" onClick={async () => { await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/"; }}>
           Sign out
+        </button>
+      </div>
+
+      <hr className="acctSep" />
+      <p className="acctHint">
+        Deleting your account permanently removes your profile, saved projects,
+        imported fonts and stamps, shared-book access and comments, and cancels
+        any active subscription. This cannot be undone.
+      </p>
+      <div className="acctActions">
+        <button className="acctBtn danger" disabled={!!busy} onClick={deleteAccount}>
+          {busy === "delete" ? "Deleting…" : "Delete my account"}
         </button>
       </div>
     </div>
