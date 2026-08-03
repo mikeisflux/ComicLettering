@@ -279,8 +279,12 @@ export interface BalloonEl extends BaseEl {
   /* dx/dy: tail tip relative to the balloon centre (local, unrotated).
      bx/by: optional bend point the tail curves through.
      tx/ty: optional tangent direction at the bend (the tilt axis of a
-     joined-balloon connector). */
-  tail: { dx: number; dy: number; bx?: number; by?: number; tx?: number; ty?: number } | null;
+     joined-balloon connector).
+     ax/ay: TRANSIENT (set by resolveBalloon on the rendered copy, never
+     saved) — where the band's opening aims on THIS balloon when bent:
+     overshot past the plain centre→bend ray so a wide curve wraps around
+     the bubble instead of meeting it head-on. */
+  tail: { dx: number; dy: number; bx?: number; by?: number; tx?: number; ty?: number; ax?: number; ay?: number } | null;
   /* id of a balloon this one is attached to: they render joined, with the
      connector tail aimed at the partner automatically */
   attachTo?: string | null;
@@ -327,17 +331,37 @@ function bandToward(from: BalloonEl, to: BalloonEl, keep?: BalloonEl["tail"]): B
     const reach = Math.max(len, (from.w + from.h) / 2, (to.w + to.h) / 2);
     if (along > -reach && along < len + reach && perp <= reach * 2.5) {
       t.bx = keep.bx; t.by = keep.by; t.tx = keep.tx; t.ty = keep.ty;
-      /* The tip must stay CONNECTED to the partner's edge as the curve sweeps:
-         seat it where the ray from the partner's centre toward the bend point
-         crosses the partner's outline (just inside), so the attach point walks
-         around the partner instead of staying pinned at the centre-to-centre
-         spot with the curve arriving somewhere else. */
+      /* Both openings must WALK AROUND their bubbles as the curve sweeps —
+         and slightly PAST the plain centre→bend ray (matching the Comic
+         Life 3 reference): at a wide extension the band should wrap around
+         each bubble and arrive hugging it, not meet it head-on. The
+         overshoot factor rotates each opening beyond the radial direction,
+         capped so it can never walk to the bubble's far side. */
+      const OVER = 1.35, CAP = 2.0;   // radians ≈ 115°
+      const swing = (base: number, toward: number) => {
+        let d = toward - base;
+        while (d > Math.PI) d -= 2 * Math.PI;
+        while (d < -Math.PI) d += 2 * Math.PI;
+        return base + Math.max(-CAP, Math.min(CAP, d * OVER));
+      };
+      /* THIS balloon's opening: overshot from the partner axis toward the
+         bend (local frame) — read by connectorBase via tail.ax/ay */
+      const aAim = swing(Math.atan2(dy, dx), Math.atan2(keep.by, keep.bx));
+      const aimLen = Math.max(100, Math.hypot(keep.bx, keep.by));
+      t.ax = Math.cos(aAim) * aimLen;
+      t.ay = Math.sin(aAim) * aimLen;
+      /* The tip must stay CONNECTED to the partner's edge as the curve
+         sweeps: seat it on the partner's outline along the overshot
+         direction (page frame), so the attach point walks around the
+         partner with the curve instead of staying pinned. */
       const [bpx, bpy] = rotVec(keep.bx, keep.by, from.rot);   // bend, page frame
       const bendPX = fcx + bpx, bendPY = fcy + bpy;
-      let ex = bendPX - pcx, ey = bendPY - pcy;
-      const eL = Math.hypot(ex, ey);
-      if (eL > 4) {
-        ex /= eL; ey /= eL;
+      const eLen = Math.hypot(bendPX - pcx, bendPY - pcy);
+      if (eLen > 4) {
+        const aSeat = swing(
+          Math.atan2(fcy - pcy, fcx - pcx),
+          Math.atan2(bendPY - pcy, bendPX - pcx));
+        const ex = Math.cos(aSeat), ey = Math.sin(aSeat);
         const rEdge = (prx * pry) / (Math.hypot(pry * ex, prx * ey) || 1);
         const r = Math.max(prx * 0.25, rEdge - seatIn);
         const tipPX = pcx + ex * r, tipPY = pcy + ey * r;

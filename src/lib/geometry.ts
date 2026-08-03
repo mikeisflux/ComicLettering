@@ -337,7 +337,12 @@ function connectorBase(el: BalloonEl): { A: number[]; B: number[]; E: number[] }
   const w = el.w, h = el.h, cx = w / 2, cy = h / 2;
   const tail = el.tail;
   if (!tail) return null;
-  const aim = tail.bx != null && tail.by != null ? [cx + tail.bx, cy + tail.by] : [cx + tail.dx, cy + tail.dy];
+  /* a bent band aims its opening at the OVERSHOT direction (tail.ax/ay,
+     set by bandToward) so the opening walks around the bubble with the
+     curve; plain bend point and straight tip are the fallbacks */
+  const aim = tail.ax != null && tail.ay != null ? [cx + tail.ax, cy + tail.ay]
+    : tail.bx != null && tail.by != null ? [cx + tail.bx, cy + tail.by]
+    : [cx + tail.dx, cy + tail.dy];
   let pts: number[][] | null = null;
   switch (el.kind) {
     case "caption": case "square": pts = [[0, 0], [w, 0], [w, h], [0, h]]; break;
