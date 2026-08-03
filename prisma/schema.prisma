@@ -27,6 +27,8 @@ model User {
   updatedAt    DateTime    @updatedAt
   projects     Project[]
   assets       UserAsset[]
+  shares       ProjectShare[] @relation("memberShares")
+  comments     PageComment[]  @relation("commentAuthor")
 }
 
 // Per-account custom assets: imported fonts and stamps.
@@ -51,8 +53,60 @@ model Project {
   user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  shares    ProjectShare[]
+  comments  PageComment[]
+  reviews   ReviewPass[]
 
   @@index([userId])
+}
+
+// Collaboration: a book shared with another account.
+//   letterer — full editing access (save over the book)
+//   editor   — review access: read, comment, approve/request changes
+model ProjectShare {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation("memberShares", fields: [userId], references: [id], onDelete: Cascade)
+  role      String   // letterer | editor
+  createdAt DateTime @default(now())
+
+  @@unique([projectId, userId])
+  @@index([userId])
+}
+
+// A note pinned to a point on a page — the review conversation.
+model PageComment {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation("commentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  pageIndex Int
+  x         Float    // page coords
+  y         Float
+  body      String
+  resolved  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([projectId, pageIndex])
+}
+
+// Letterer/editor review passes: the letterer requests a pass, the editor
+// closes it as approved or with changes requested.
+model ReviewPass {
+  id          String    @id @default(cuid())
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  requestedBy String    // user id
+  status      String    @default("open") // open | approved | changes
+  note        String?
+  closedBy    String?   // user id
+  createdAt   DateTime  @default(now())
+  closedAt    DateTime?
+
+  @@index([projectId, status])
 }
 
 // Admin-managed configuration (API keys etc.) — overrides .env values.

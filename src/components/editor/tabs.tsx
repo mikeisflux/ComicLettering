@@ -184,12 +184,12 @@ export function renderLibraryTab(ed: EditorCtx) {
           <div key={p.id} className={"projRow" + (current?.id === p.id ? " on" : "")}>
             {p.thumbnail ? <img src={p.thumbnail} alt="" /> : <div className="noThumb" />}
             <div className="projName">
-              <div>{p.name}</div>
-              <small>{new Date(p.updatedAt).toLocaleString()}</small>
+              <div>{p.name}{p.sharedBy ? <span title={`Shared by ${p.sharedBy} — ${p.role} access`}> 👥</span> : null}</div>
+              <small>{p.sharedBy ? `${p.sharedBy} · ${p.role}` : new Date(p.updatedAt).toLocaleString()}</small>
             </div>
             <div className="projActs">
               <button onClick={() => loadProject(ed, p.id)}>Open</button>
-              <button onClick={() => deleteProject(ed, p.id)}>✕</button>
+              {!p.sharedBy && <button onClick={() => deleteProject(ed, p.id)}>✕</button>}
             </div>
           </div>
         ))}

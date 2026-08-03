@@ -10,6 +10,7 @@ import { loadImage } from "@/lib/exportPng";
 import { Ruler, STAGE_MX, STAGE_MY } from "./chrome";
 import { EditorCtx } from "./ctx";
 import { renderCarriedLettering, renderEl, renderJoinBands, renderOverlay } from "./renderEls";
+import { renderCommentCatcher, renderCommentPins } from "./collab";
 import { StylesPanel } from "./stylesPanel";
 import { addPageAt } from "./spreadOps";
 import {
@@ -148,6 +149,7 @@ function spreadHalf(ed: EditorCtx, sh: ShellProps, idx: number, off: number) {
         </React.Fragment>
       ))}
       {renderCarriedLettering(edH)}
+      {renderCommentPins(ed, idx)}
       {pg.margin && (
         <div className="marginGuide" style={{
           left: pg.margin.l, top: pg.margin.t,
@@ -249,6 +251,7 @@ function renderSpreadCanvas(ed: EditorCtx, sh: ShellProps) {
           )}
         </div>
       )}
+      {renderCommentCatcher(ed)}
     </div>
   );
 }
@@ -306,6 +309,7 @@ export function renderCanvasArea(ed: EditorCtx, sh: ShellProps) {
             {/* autoclipping self-replication: lettering the facing page cut
                 off at its bleed line reappears here from ours */}
             {renderCarriedLettering(ed)}
+            {renderCommentPins(ed, ed.pageIndex)}
             {page.margin && (
               <div className="marginGuide" style={{
                 left: page.margin.l, top: page.margin.t,
@@ -377,6 +381,7 @@ export function renderCanvasArea(ed: EditorCtx, sh: ShellProps) {
               )}
             </div>
           )}
+          {renderCommentCatcher(ed)}
         </div>
         )}
       </div>

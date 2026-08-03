@@ -38,6 +38,7 @@ export function renderMenuBar(ed: EditorCtx) {
         ["Save As… (.lmc)", () => exportJSON(ed)],
         ["Save a Copy to Library…", () => saveProject(ed, true)],
         ["Open Project File…", () => fileOpenRef.current?.click()],
+        ["Share & Review…", () => ed.setShowTeam(true)],
         ["Install as App…", () => ed.installApp()],
         ["—", null],
         ["Page Setup…", () => setShowSetup(true)],
@@ -235,6 +236,13 @@ export function renderToolbar(ed: EditorCtx) {
       title="Tuck Back: select your sound-effect lettering, then draw around the part of the artwork that should come forward — it is cut out and placed in front, so the word sits behind it like hand-traced masking."
       disabled={!selEl || selEl.type !== "text"}
       onClick={() => ed.startTuck()} />
+    <ToolBtn label="Note" icon="📌"
+      title="Pin a review note to the page — teammates on the shared book see it (File → Share & Review)"
+      onClick={() => {
+        if (!ed.current?.id) { ed.setStatus("Save this book to the Library first — notes live with the cloud copy."); return; }
+        ed.setCommentMode(!ed.commentMode);
+        ed.setStatus(ed.commentMode ? "Note pinning cancelled." : "Click anywhere on a page to pin a note — Esc cancels.");
+      }} />
     <ToolBtn label="Page Setup" icon="📐" onClick={() => setShowSetup(true)} />
     <ToolBtn label="Print" icon="🖨" onClick={() => printPage(ed)} />
     <ToolBtn label="Export" icon="🖼⇩" accent onClick={() => demo ? setStatus("Export is off in the demo — subscribe to unlock.") : setShowExport(true)} />

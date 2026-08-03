@@ -33,7 +33,8 @@ import { useFontsStamps } from "./editor/useFontsStamps";
 import { useSketchDraw } from "./editor/useSketchDraw";
 import { ShellProps, renderCanvasArea, renderHiddenInputs, renderPagesPanel } from "./editor/editorShell";
 import { PageSetupDialog } from "./editor/chrome";
-import { EditorCtx } from "./editor/ctx";
+import { CollabState, EditorCtx } from "./editor/ctx";
+import { renderCommentComposer, renderTeamDialog } from "./editor/collab";
 import {
   addFromTray, alignSel, applyQuickFill, copySel, cutSel, deleteSel,
   duplicatePage, duplicateSel, growBalloonToFit, sizeTextToContent,
@@ -162,6 +163,14 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const [tuckMode, setTuckMode] = useState(false);
   const tuckPtsRef = useRef<number[][] | null>(null);
   const [tuckAsk, setTuckAsk] = useState<TuckAsk | null>(null);
+  /* collaboration (shared books): team, pinned notes, review passes */
+  const [collab, setCollab] = useState<CollabState | null>(null);
+  const [collabTick, setCollabTick] = useState(0);
+  const [commentMode, setCommentMode] = useState(false);
+  const [showTeam, setShowTeam] = useState(false);
+  const [openCommentId, setOpenCommentId] = useState<string | null>(null);
+  const [composer, setComposer] = useState<{ pageIdx: number; x: number; y: number } | null>(null);
+  const reloadCollab = useCallback(() => setCollabTick((t) => t + 1), []);
   /* the dialog's async detect pass needs the live value, not the one closed
      over when the button was rendered */
   const tuckAskRef = useRef<TuckAsk | null>(null);
@@ -336,6 +345,24 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       h: Math.max(...spreadLayout.map((s) => docRef.current!.pages[s.idx].h)),
     }
     : null;
+
+  /* collaboration state rides with the CLOUD copy of the book */
+  useEffect(() => {
+    let alive = true;
+    if (!current?.id) { setCollab(null); return; }
+    fetch(`/api/projects/${current.id}/collab`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (alive) setCollab(j); })
+      .catch(() => { /* offline — the book still edits */ });
+    return () => { alive = false; };
+  }, [current?.id, collabTick, showTeam]);
+  /* Esc backs out of note-pinning mode */
+  useEffect(() => {
+    if (!commentMode) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setCommentMode(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [commentMode]);
 
   /* auto-lock: newly placed items lock themselves once you click away */
   const settlePendingLock = useCallback((exceptId: string | null) => {
@@ -939,6 +966,8 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     setReplaceText, findCase, setFindCase, showSafe, setShowSafe, spread,
     setSpread, spreadPrint, setSpreadPrint, bleedClip, spreadLayout, spreadOffX, showScript, setShowScript, scriptText, setScriptText,
     warping, setWarping,
+    collab, reloadCollab, commentMode, setCommentMode, showTeam, setShowTeam,
+    openCommentId, setOpenCommentId, composer, setComposer,
     tiltConn, setTiltConn,
     stampOpen, setStampOpen, stampQuery, setStampQuery, showGradMaker,
     setShowGradMaker, myGrads, bumpGrads, showFill, setShowFill, showStroke,
@@ -1066,6 +1095,8 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
 
       {/* Tuck Back: traced cutout with live preview */}
       {renderTuckDialog(ed)}
+      {renderTeamDialog(ed)}
+      {renderCommentComposer(ed)}
 
       {/* smart contextual tip — one at a time, each shows once */}
       {tip && (

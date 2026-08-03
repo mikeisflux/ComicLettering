@@ -6,12 +6,35 @@ export async function GET() {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: "Sign in to use the project library." }, { status: 401 });
   try {
-    const projects = await prisma.project.findMany({
-      where: { userId: user.id },
-      select: { id: true, name: true, updatedAt: true, thumbnail: true },
-      orderBy: { updatedAt: "desc" },
-    });
-    return NextResponse.json(projects);
+    const [owned, shared] = await Promise.all([
+      prisma.project.findMany({
+        where: { userId: user.id },
+        select: { id: true, name: true, updatedAt: true, thumbnail: true },
+        orderBy: { updatedAt: "desc" },
+      }),
+      /* books shared WITH this account come along, marked with the role */
+      prisma.projectShare.findMany({
+        where: { userId: user.id },
+        select: {
+          role: true,
+          project: {
+            select: {
+              id: true, name: true, updatedAt: true, thumbnail: true,
+              user: { select: { name: true } },
+            },
+          },
+        },
+      }),
+    ]);
+    const all = [
+      ...owned,
+      ...shared.map((s) => ({
+        id: s.project.id, name: s.project.name, updatedAt: s.project.updatedAt,
+        thumbnail: s.project.thumbnail, sharedBy: s.project.user?.name ?? "another letterer",
+        role: s.role,
+      })),
+    ].sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt));
+    return NextResponse.json(all);
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }

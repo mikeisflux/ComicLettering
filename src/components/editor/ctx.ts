@@ -11,6 +11,25 @@ import type { TuckAsk } from "./tuck";
 type SetState<T> = React.Dispatch<React.SetStateAction<T>>;
 
 export type TabKey = "layouts" | "inspector" | "layers" | "photos" | "library" | "proof";
+
+/* collaboration on a shared book (see /api/projects/[id]/collab) */
+export interface CollabComment {
+  id: string; pageIndex: number; x: number; y: number; body: string;
+  resolved: boolean; createdAt: string; authorId: string;
+  author: { name: string };
+}
+export interface CollabReview {
+  id: string; requestedBy: string; status: string; note: string | null;
+  closedBy: string | null; createdAt: string; closedAt: string | null;
+}
+export interface CollabState {
+  role: "owner" | "letterer" | "editor";
+  me: string;
+  owner: { name: string; email: string } | null;
+  shares: { id: string; role: string; name: string; email: string }[];
+  comments: CollabComment[];
+  reviews: CollabReview[];
+}
 export type ExportFmt = ImageFormat | "pdf" | "cbz";
 export type ExportScope = "current" | "all" | "range";
 export type StyleClip = Partial<TextStyle> & { fill?: FillStyle; stroke?: string; strokeW?: number };
@@ -179,6 +198,18 @@ export interface EditorCtx {
      entry at offset 0 in single-page view. */
   spreadLayout: { idx: number; off: number }[];
   spreadOffX: (i: number) => number;
+  /* collaboration: the cloud book's team, comments and review passes
+     (null until the open project lives in the Library) */
+  collab: CollabState | null;
+  reloadCollab: () => void;
+  commentMode: boolean;
+  setCommentMode: SetState<boolean>;
+  showTeam: boolean;
+  setShowTeam: SetState<boolean>;
+  openCommentId: string | null;
+  setOpenCommentId: SetState<string | null>;
+  composer: { pageIdx: number; x: number; y: number } | null;
+  setComposer: SetState<{ pageIdx: number; x: number; y: number } | null>;
   showScript: boolean;
   setShowScript: SetState<boolean>;
   scriptText: string;

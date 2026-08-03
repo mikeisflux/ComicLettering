@@ -287,7 +287,11 @@ export function letterStyleCss(s: LetterStyle, size: number): CSSProperties {
   });
 }
 
-export interface ProjectMeta { id: string; name: string; updatedAt: string; thumbnail: string | null }
+export interface ProjectMeta {
+  id: string; name: string; updatedAt: string; thumbnail: string | null;
+  /* present on books shared WITH this account */
+  sharedBy?: string; role?: string;
+}
 export interface ProofMatch { elId: string; message: string; context: string; offset: number; length: number; reps: string[] }
 
 export const STAMPS = ["💥", "⚡", "🔥", "💫", "⭐", "💢", "💦", "💤", "❗", "❓", "🎯", "🏆", "❤️", "💀", "🤖", "👊", "🎵", "🎶"];

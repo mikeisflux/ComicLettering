@@ -49,6 +49,12 @@ let saveInFlight = false;
 export async function saveProject(ed: EditorCtx, saveAs: boolean) {
   const { demo, setStatus, current, setCurrent, docRef, assetsRef } = ed;
   if (demo) { setStatus("Saving is off in the demo — subscribe to save your comics to your library."); return; }
+  /* review access is read-only: editors comment and close review passes,
+     the letterer saves (Save a Copy still works — it makes a NEW book) */
+  if (!saveAs && current && ed.collab?.role === "editor") {
+    setStatus("You have review access on this book — pin notes and close review passes; the letterer saves.");
+    return;
+  }
   if (saveInFlight) return;
   const d = docRef.current!;
   let target = current;
