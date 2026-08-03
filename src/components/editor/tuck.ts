@@ -24,6 +24,10 @@ export type TuckMode = "trace" | "auto" | "level";
 export interface TuckAsk {
   src: TuckSource;
   artKey: string;              // asset id of the panel artwork (for the encoder cache)
+  /* page index the cutout lands on. Usually the current page — but a trace
+     that reaches across the spread's spine cuts the FACING page's art, and
+     the cutout belongs there (pageX/pageY are in THAT page's coordinates). */
+  targetPage: number;
   pageX: number; pageY: number; pageW: number; pageH: number;
   pts: number[][];             // traced outline, ELEMENT-local page units
   mode: TuckMode;

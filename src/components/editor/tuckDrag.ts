@@ -27,6 +27,13 @@ export interface TuckDragDeps {
   setStatus: (msg: string) => void;
   setTuckMode: (v: boolean) => void;
   setTuckAsk: (t: TuckAsk | null) => void;
+  /* spread view: the facing page and where its origin sits in CURRENT-page
+     units (screen mapping) — lets a trace sweep across the spine and cut the
+     facing page's artwork */
+  facing: { index: number; offX: number; offY: number } | null;
+  /* stamped on trace end so the facing page's click-to-switch can ignore the
+     click that ends a cross-spine trace */
+  justEndedRef?: { current: number };
 }
 
 /* Points closer than this add nothing but work — the outline is smoothed
@@ -91,7 +98,7 @@ function buildEdgeField(
 /* An edge weaker than this is noise — keep the hand's own line there. */
 const SNAP_FLOOR = 0.14;
 
-function snapToEdge(f: EdgeField, x: number, y: number, radiusPage: number): [number, number] {
+function snapToEdge(f: EdgeField, x: number, y: number, radiusPage: number): [number, number] | null {
   const fx = (x - f.ex) * f.scale, fy = (y - f.ey) * f.scale;
   const r = Math.min(28, Math.max(2, radiusPage * f.scale));
   const x0 = Math.max(1, Math.round(fx - r)), x1 = Math.min(f.w - 2, Math.round(fx + r));
@@ -106,18 +113,23 @@ function snapToEdge(f: EdgeField, x: number, y: number, radiusPage: number): [nu
       if (score > best) { best = score; bx = px; by = py; }
     }
   }
-  if (best < SNAP_FLOOR || bx < 0) return [x, y];
+  if (best < SNAP_FLOOR || bx < 0) return null;   // no edge here — caller keeps the hand line
   return [f.ex + bx / f.scale, f.ey + by / f.scale];
 }
 
-/* Topmost unrotated panel/image with artwork at a page point, skipping
-   cutouts this tool already placed (they sit on top, mostly transparent). */
-function artTargetAt(d: TuckDragDeps, x: number, y: number) {
-  const pg = d.docRef.current!.pages[d.pageIndexRef.current];
+/* Topmost unrotated panel/image with artwork at a point on the given page,
+   skipping cutouts this tool already placed (they sit on top, mostly
+   transparent). */
+function artAtOn(d: TuckDragDeps, pageIdx: number, x: number, y: number) {
+  const pg = d.docRef.current!.pages[pageIdx];
   return [...pg.els].reverse().find((el) =>
     (el.type === "panel" || el.type === "image") && el.img && !el.rot &&
     !(el.type === "image" && el.cut) &&
     x >= el.x && x <= el.x + el.w && y >= el.y && y <= el.y + el.h);
+}
+
+function artTargetAt(d: TuckDragDeps, x: number, y: number) {
+  return artAtOn(d, d.pageIndexRef.current, x, y);
 }
 
 export function beginTuckLasso(d: TuckDragDeps, e: React.PointerEvent) {
@@ -145,13 +157,35 @@ export function beginTuckLasso(d: TuckDragDeps, e: React.PointerEvent) {
   /* a comfortable magnet reach: ~10 screen px, expressed in page units */
   const snapRadius = Math.min(40, Math.max(6, 10 / Math.max(0.05, d.zoom)));
 
+  /* second magnetic field for the FACING page's art, built lazily the first
+     time the trace crosses the spine (spread view) */
+  let fieldF: EdgeField | null = null;
+  let fieldFStarted = false;
+  const maybeStartFacingField = (p: { x: number; y: number }) => {
+    const f = d.facing;
+    if (!f || fieldFStarted) return;
+    const tF = artAtOn(d, f.index, p.x - f.offX, p.y - f.offY);
+    if (!tF || !("img" in tF) || !tF.img) return;
+    fieldFStarted = true;
+    const url = d.assetsRef.current[tF.img];
+    if (!url) return;
+    loadImage(url).then((img) => {
+      /* field origin expressed in CURRENT-page units so snapping stays in
+         one coordinate space for the whole gesture */
+      fieldF = buildEdgeField(img, tF.x + f.offX, tF.y + f.offY, tF.w, tF.h);
+    }).catch(() => { /* freehand on the far side */ });
+  };
+
   const onMove = (ev: PointerEvent) => {
     const arr = d.ptsRef.current;
     if (!arr) return;
     let p = d.pagePoint(ev);
-    if (field && !ev.altKey) {
-      const [sx, sy] = snapToEdge(field, p.x, p.y, snapRadius);
-      p = { x: sx, y: sy };
+    maybeStartFacingField(p);
+    if (!ev.altKey) {
+      const s = (field && snapToEdge(field, p.x, p.y, snapRadius))
+        || (fieldF && snapToEdge(fieldF, p.x, p.y, snapRadius))
+        || null;
+      if (s) p = { x: s[0], y: s[1] };
     }
     const last = arr[arr.length - 1];
     if (Math.hypot(p.x - last[0], p.y - last[1]) < MIN_STEP) return;
@@ -163,6 +197,7 @@ export function beginTuckLasso(d: TuckDragDeps, e: React.PointerEvent) {
     window.removeEventListener("pointermove", onMove);
     window.removeEventListener("pointerup", onUp);
     window.removeEventListener("pointercancel", onUp);
+    if (d.justEndedRef) d.justEndedRef.current = Date.now();
     const raw = d.ptsRef.current;
     d.ptsRef.current = null;
     d.setTuckMode(false);
@@ -201,44 +236,61 @@ async function buildTuckAsk(d: TuckDragDeps, raw: number[][]): Promise<TuckAsk |
      skipping cutouts already placed by this tool. A word usually needs one
      pass per letter, and every pass has to read the ORIGINAL art: without
      this, the second trace lands on the first cutout (which is on top and
-     mostly transparent) and comes back with nothing. */
-  const pg = d.docRef.current!.pages[d.pageIndexRef.current];
-  const target = [...pg.els].reverse().find((el) =>
-    (el.type === "panel" || el.type === "image") && el.img && !el.rot &&
-    !(el.type === "image" && el.cut) &&
-    b.x < el.x + el.w && b.x + b.w > el.x &&
-    b.y < el.y + el.h && b.y + b.h > el.y);
-  if (!target || !("img" in target) || !target.img) {
+     mostly transparent) and comes back with nothing.
+
+     Tried on the CURRENT page first; in spread view a trace that swept
+     across the spine falls through to the FACING page's artwork, and the
+     cutout is built in (and destined for) THAT page's coordinates. */
+  const attempt = async (pageIdx: number, ringIn: number[][]) => {
+    const bb = pathBounds(ringIn);
+    const pg = d.docRef.current!.pages[pageIdx];
+    const target = [...pg.els].reverse().find((el) =>
+      (el.type === "panel" || el.type === "image") && el.img && !el.rot &&
+      !(el.type === "image" && el.cut) &&
+      bb.x < el.x + el.w && bb.x + bb.w > el.x &&
+      bb.y < el.y + el.h && bb.y + bb.h > el.y);
+    if (!target || !("img" in target) || !target.img) return null;
+    const url = d.assetsRef.current[target.img];
+    if (!url) return null;
+    const img = await loadImage(url);
+
+    /* clamp the traced area to the artwork element */
+    const x0 = Math.max(bb.x, target.x), y0 = Math.max(bb.y, target.y);
+    const x1 = Math.min(bb.x + bb.w, target.x + target.w);
+    const y1 = Math.min(bb.y + bb.h, target.y + target.h);
+    if (x1 - x0 < 10 || y1 - y0 < 10) return null;
+    const src: TuckSource = {
+      img, elW: target.w, elH: target.h,
+      regionX: x0 - target.x, regionY: y0 - target.y,
+      regionW: x1 - x0, regionH: y1 - y0,
+    };
+    /* the cutout works in element-local units, same space as regionX/regionY */
+    const pts = ringIn.map(([x, y]) => [x - target.x, y - target.y]);
+    const cut = makeCutoutFromPath(src, pts, 2);
+    const ask: TuckAsk = {
+      src, artKey: target.img, targetPage: pageIdx,
+      pageX: x0, pageY: y0, pageW: x1 - x0, pageH: y1 - y0,
+      pts, mode: "trace", feather: 2, threshold: 45, invert: false,
+      mask: null, auto: "idle", preview: cut?.url ?? null,
+    };
+    return ask;
+  };
+
+  let ask = await attempt(d.pageIndexRef.current, ring);
+  let crossed = false;
+  if (!ask && d.facing) {
+    const f = d.facing;
+    ask = await attempt(f.index, ring.map(([x, y]) => [x - f.offX, y - f.offY]));
+    crossed = !!ask;
+  }
+  if (!ask) {
     d.setStatus("No artwork there — draw over a panel or image (unrotated).");
     return null;
   }
-  const url = d.assetsRef.current[target.img];
-  if (!url) { d.setStatus("That panel's artwork isn't loaded."); return null; }
-  const img = await loadImage(url);
-
-  /* clamp the traced area to the artwork element */
-  const x0 = Math.max(b.x, target.x), y0 = Math.max(b.y, target.y);
-  const x1 = Math.min(b.x + b.w, target.x + target.w);
-  const y1 = Math.min(b.y + b.h, target.y + target.h);
-  if (x1 - x0 < 10 || y1 - y0 < 10) {
-    d.setStatus("The loop barely touches the artwork — try again.");
-    return null;
-  }
-  const src: TuckSource = {
-    img, elW: target.w, elH: target.h,
-    regionX: x0 - target.x, regionY: y0 - target.y,
-    regionW: x1 - x0, regionH: y1 - y0,
-  };
-  /* the cutout works in element-local units, same space as regionX/regionY */
-  const pts = ring.map(([x, y]) => [x - target.x, y - target.y]);
-  const cut = makeCutoutFromPath(src, pts, 2);
-  d.setStatus(cut
-    ? "Traced. Adjust the soft edge, or try auto-detect, then place it."
-    : "Could not read this artwork's pixels.");
-  return {
-    src, artKey: target.img,
-    pageX: x0, pageY: y0, pageW: x1 - x0, pageH: y1 - y0,
-    pts, mode: "trace", feather: 2, threshold: 45, invert: false,
-    mask: null, auto: "idle", preview: cut?.url ?? null,
-  };
+  d.setStatus(!ask.preview
+    ? "Could not read this artwork's pixels."
+    : crossed
+      ? `Traced across the spine — the cutout will land on page ${ask.targetPage + 1}. Adjust, then place it.`
+      : "Traced. Adjust the soft edge, or try auto-detect, then place it.");
+  return ask;
 }

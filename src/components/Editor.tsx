@@ -27,9 +27,9 @@ import {
 } from "./editor/textHelpers";
 import { closeSketchLoop, detectSketchTail, resampleRing, smoothSketchRing } from "./editor/sketch";
 import { SmartTip, pickTip } from "./editor/smartTips";
-import { TuckAsk, coverRect, tuckPreview } from "./editor/tuck";
-import { beginTuckLasso } from "./editor/tuckDrag";
-import { encodeImage, samError, segmentBox } from "@/lib/sam";
+import { TuckAsk } from "./editor/tuck";
+import { makeTuckHandlers } from "./editor/tuckOps";
+import { addPageAt, makeCrossPageDrop } from "./editor/spreadOps";
 import { PageSetupDialog, Ruler, STAGE_MX, STAGE_MY } from "./editor/chrome";
 import { EditorCtx } from "./editor/ctx";
 import {
@@ -811,84 +811,16 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
 
   /* ---------------- Tuck Back (traced clipping mask) ---------------- */
 
-  const startTuck = useCallback(() => {
-    const s = docRef.current?.pages[pageIndexRef.current].els.find((x) => x.id === selId);
-    if (!s || s.type !== "text") {
-      setStatus("Select your SFX lettering first, then Tuck Back.");
-      return;
-    }
-    setTuckMode(true);
-    setStatus("Draw around the art the SFX should hide behind — Esc cancels.");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selId, setStatus]);
-
-  const startTuckDrag = useCallback((e: React.PointerEvent) => {
-    beginTuckLasso({
-      docRef, assetsRef, pageIndexRef, ptsRef: tuckPtsRef,
-      pagePoint, zoom, force, setStatus, setTuckMode, setTuckAsk,
-    }, e);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pagePoint, zoom, setStatus]);
-
-  const retuneTuck = useCallback((patch: Partial<TuckAsk>) => {
-    setTuckAsk((t) => {
-      if (!t) return t;
-      const next = { ...t, ...patch };
-      return { ...next, preview: tuckPreview(next) };
-    });
-  }, []);
-
-  /* The model route, on demand — it costs seconds on the first page, so it is
-     no longer run behind the reader's back for every trace. */
-  const runTuckAuto = useCallback(() => {
-    setTuckAsk((t) => t && { ...t, auto: "busy", preview: null });
-    (async () => {
-      const t = tuckAskRef.current;
-      if (!t) return;
-      setStatus("Reading the artwork…");
-      const emb = await encodeImage(t.artKey, t.src.img, (_, note) => setStatus(note));
-      /* the trace is in element-local page units; the mask wants source pixels */
-      const cm = coverRect(t.src);
-      const mask = emb && await segmentBox(emb, cm.sx, cm.sy, cm.sx + cm.sw, cm.sy + cm.sh);
-      if (!mask) {
-        setStatus(samError()
-          ? "Auto-detect isn't available in this browser — use your outline."
-          : "Auto-detect found nothing there — use your outline.");
-        setTuckAsk((p) => p && { ...p, auto: "fail" });
-        return;
-      }
-      setStatus("Foreground detected — place it, or go back to your outline.");
-      setTuckAsk((p) => {
-        if (!p) return p;
-        const next: TuckAsk = { ...p, mask, auto: "done" };
-        return { ...next, preview: tuckPreview(next) };
-      });
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setStatus]);
-
-  /* side effects OUTSIDE the state updater — React StrictMode double-invokes
-     updaters, which would place the cutout twice */
-  const applyTuck = useCallback((t: TuckAsk | null) => {
-    setTuckAsk(null);
-    if (!t || !t.preview) return;
-    const aid = nextAid(ed);
-    /* show it at once, and put it in the artwork store so the tuck is still
-       there after a refresh — assetsRef alone is not persisted */
-    assetsRef.current[aid] = t.preview;
-    keepGenerated(aid, t.preview);
-    const el = makeImage(t.pageX, t.pageY, t.pageW, t.pageH, aid);
-    el.borderW = 0;
-    el.cut = true;              // so the next pass traces the art, not this
-    docRef.current!.pages[pageIndexRef.current].els.push(el); // topmost → art in front
-    commit();
-    /* A word is normally tucked a letter at a time, so stay armed: the reader
-       traces the next letter straight away instead of going back to the
-       toolbar between every one. */
-    setTuckMode(true);
-    setStatus("Cutout placed — draw around the next letter, or press Esc when the word is done.");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [commit, setStatus]);
+  /* plain per-render closures — they travel in the EditorCtx bag, so
+     callback identity doesn't matter (see tuckOps.ts) */
+  const tuckJustEndedRef = useRef(0);
+  const { startTuck, startTuckDrag, retuneTuck, runTuckAuto, applyTuck } = makeTuckHandlers({
+    docRef, assetsRef, pageIndexRef, pageDivRef,
+    tuckPtsRef, tuckAskRef, tuckJustEndedRef,
+    selId, zoom, pagePoint, force, commit, rebuildThumbs,
+    setStatus, setTuckMode, setTuckAsk, keepGenerated,
+    getEd: () => ed,
+  });
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -1206,61 +1138,11 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   /* .lmc file-open bridge (installed app + desktop wrapper) — usePlatform.ts */
   useOpenFileBridge(ed);
 
-  /* Two-up: releasing a move-drag over the facing page hands the whole
-     selection to that page, keeping it under the cursor. Joins never span
-     pages, so any link the move would cut is detached; locked items stay. */
-  crossPageDropRef.current = !spread || facingIndex < 0 ? null : (mainId, cx, cy) => {
-    const d = docRef.current;
-    const pgEl = pageDivRef.current;
-    const fpDiv = document.querySelector(".facingPage") as HTMLElement | null;
-    if (!d || !pgEl || !fpDiv) return false;
-    const hit = fpDiv.getBoundingClientRect();
-    if (cx < hit.left || cx > hit.right || cy < hit.top || cy > hit.bottom) return false;
-    /* the img spans the FULL facing page even when the print view crops the
-       inner bleed — its rect gives the true facing-page origin */
-    const fr = (fpDiv.querySelector("img") ?? fpDiv).getBoundingClientRect();
-    const pr = pgEl.getBoundingClientRect();
-    const offX = (fr.left - pr.left) / zoom;
-    const offY = (fr.top - pr.top) / zoom;
-    const cur = d.pages[pageIndexRef.current];
-    const target = d.pages[facingIndex];
-    const ids = new Set(selIdsRef.current.length ? selIdsRef.current : [mainId]);
-    const moving = cur.els.filter((e) => ids.has(e.id) && !e.locked);
-    if (!moving.length) return false;
-    const movingIds = new Set(moving.map((m) => m.id));
-    for (const m of moving) {
-      if (m.type === "balloon" && m.attachTo && !movingIds.has(m.attachTo)) m.attachTo = null;
-    }
-    for (const e2 of cur.els) {
-      if (e2.type === "balloon" && e2.attachTo && movingIds.has(e2.attachTo) && !movingIds.has(e2.id)) e2.attachTo = null;
-    }
-    cur.els = cur.els.filter((e2) => !movingIds.has(e2.id));
-    for (const m of moving) {
-      m.x = Math.round(m.x - offX);
-      m.y = Math.round(m.y - offY);
-      target.els.push(m);
-    }
-    setSelIds([]);
-    commit();
-    rebuildThumbs();
-    setStatus(`Moved ${moving.length > 1 ? `${moving.length} items` : "1 item"} to page ${facingIndex + 1}.`);
-    return true;
-  };
-
-  /* insert a blank page (same size/margins as the current one) at `at`,
-     jump to it, and refresh every thumbnail — inserting shifts the pages
-     after it, so the index-keyed thumbs must all re-render or the list
-     shows stale previews until a reload */
-  const addPageAt = (at: number) => {
-    const d = docRef.current!;
-    const cur = d.pages[pageIndexRef.current];
-    d.pages.splice(at, 0, newPage(cur.w, cur.h, cur.margin));
-    setAskAddPage(false);
-    setPageIndex(at);
-    setSelId(null);
-    commit();
-    rebuildThumbs();
-  };
+  /* Two-up: drop-on-facing-page transfer — see spreadOps.ts */
+  crossPageDropRef.current = !spread || facingIndex < 0 ? null : makeCrossPageDrop({
+    docRef, pageIndexRef, selIdsRef, pageDivRef, zoom, facingIndex,
+    setSelIds, commit, rebuildThumbs, setStatus,
+  });
 
   /* ---------------- top-level render ---------------- */
 
@@ -1315,10 +1197,10 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
                 <div className="setupTitle">Add a new page</div>
                 <div className="setupBody" style={{ flexDirection: "column", gap: 8 }}>
                   <div className="tailChoices">
-                    <button onClick={() => { addPageAt(pageIndex); }}>
+                    <button onClick={() => { addPageAt(ed, pageIndex); }}>
                       Before page {pageIndex + 1}
                     </button>
-                    <button onClick={() => { addPageAt(pageIndex + 1); }}>
+                    <button onClick={() => { addPageAt(ed, pageIndex + 1); }}>
                       After page {pageIndex + 1}
                     </button>
                   </div>
@@ -1351,12 +1233,17 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
               const fp = doc.pages[facingIndex];
               const crop = spreadPrint ? pageBleed(fp) * zoom : 0;
               return (
-                <div className="facingPage"
+                <div className="facingPage" data-page-index={facingIndex}
                   title={spreadPrint
                     ? `Facing page ${facingIndex + 1} — print view joins the pages at the spine; the bleed between them is dropped`
                     : `Facing page ${facingIndex + 1}`}
                   style={{ width: fp.w * zoom - crop, height: fp.h * zoom, overflow: "hidden" }}
-                  onClick={() => { setPageIndex(facingIndex); setSelId(null); }}>
+                  onClick={() => {
+                    /* not while tucking — a trace that ends over this page
+                       must not switch pages under the dialog */
+                    if (tuckMode || Date.now() - tuckJustEndedRef.current < 500) return;
+                    setPageIndex(facingIndex); setSelId(null);
+                  }}>
                   {spreadUrl && <img src={spreadUrl} alt="" style={{ width: fp.w * zoom, height: fp.h * zoom }} />}
                   <span className="facingNum">{facingIndex + 1}</span>
                 </div>
@@ -1384,6 +1271,9 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
                      stage; when the spine is on our left, shift so the
                      cropped strip is the left bleed */
                   left: spreadPrint && facingIndex >= 0 && !currentOnLeft ? -pageBleed(page) * zoom : undefined,
+                  /* while the tuck lasso is armed the page unclips, so a
+                     trace sweeping across the spine stays visible */
+                  overflow: tuckMode ? "visible" : undefined,
                   ...fillCss(page.bg),
                 }}
                 onPointerDown={(e) => { if (e.target === e.currentTarget) select(null); }}
@@ -1469,12 +1359,15 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
               const fp = doc.pages[facingIndex];
               const crop = spreadPrint ? pageBleed(fp) * zoom : 0;
               return (
-                <div className="facingPage"
+                <div className="facingPage" data-page-index={facingIndex}
                   title={spreadPrint
                     ? `Facing page ${facingIndex + 1} — print view joins the pages at the spine; the bleed between them is dropped`
                     : `Facing page ${facingIndex + 1}`}
                   style={{ width: fp.w * zoom - crop, height: fp.h * zoom, overflow: "hidden" }}
-                  onClick={() => { setPageIndex(facingIndex); setSelId(null); }}>
+                  onClick={() => {
+                    if (tuckMode || Date.now() - tuckJustEndedRef.current < 500) return;
+                    setPageIndex(facingIndex); setSelId(null);
+                  }}>
                   {spreadUrl && <img src={spreadUrl} alt=""
                     style={{ width: fp.w * zoom, height: fp.h * zoom, marginLeft: -crop }} />}
                   <span className="facingNum">{facingIndex + 1}</span>

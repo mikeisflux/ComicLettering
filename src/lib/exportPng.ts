@@ -641,6 +641,14 @@ export async function renderPageToCanvas(
     ctx.translate(neighbor.dx, 0);
     drawPageEls(ctx, neighbor.page, assets, letteringOnly);
     ctx.restore();
+    /* Tuck cutouts are foreground ART — they sit in front of any lettering,
+       including the partner's overhang, so a cross-spine tuck reads as the
+       art passing in front of the double-page SFX. */
+    if (!letteringOnly) {
+      for (const el of page.els) {
+        if (el.type === "image" && el.cut) drawEl(ctx, el, assets);
+      }
+    }
   }
   clearShadow(ctx);
   return canvas;
