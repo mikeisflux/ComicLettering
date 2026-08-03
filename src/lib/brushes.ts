@@ -9,6 +9,7 @@
 
    Everything is generated at runtime from a seeded RNG — no bitmaps ship with
    the app, and a given brush always renders the same way. */
+import { withBlur } from "./canvasCompat";
 
 export type BrushKey =
   | "none" | "chalk" | "pastel" | "dry" | "rough" | "spatter"
@@ -102,14 +103,19 @@ export function brushTile(kind: BrushKey): HTMLCanvasElement | null {
     ctx.globalAlpha = 1;
   };
   const patches = (count: number, rMin: number, rMax: number, blur: number, alpha: number) => {
-    ctx.filter = `blur(${blur}px)`;
-    for (let i = 0; i < count; i++) {
-      ctx.globalAlpha = alpha * (0.3 + r() * 0.7);
-      ctx.beginPath();
-      ctx.arc(r() * S, r() * S, rMin + r() * (rMax - rMin), 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.filter = "none";
+    /* withBlur: Safari has no ctx.filter — the fallback draws the patches
+       on a scratch canvas, blurs it, and composites it once (under the
+       tile's destination-out, so it still knocks holes) */
+    withBlur(ctx, S, S, blur, (c) => {
+      c.fillStyle = "#000";
+      for (let i = 0; i < count; i++) {
+        c.globalAlpha = alpha * (0.3 + r() * 0.7);
+        c.beginPath();
+        c.arc(r() * S, r() * S, rMin + r() * (rMax - rMin), 0, Math.PI * 2);
+        c.fill();
+      }
+      c.globalAlpha = 1;
+    });
     ctx.globalAlpha = 1;
   };
 

@@ -7,6 +7,7 @@
    so it stays sharp in print export. */
 
 import { SamMask } from "@/lib/sam";
+import { withBlur } from "@/lib/canvasCompat";
 
 export interface TuckSource {
   img: HTMLImageElement;   // the panel/image element's artwork (already loaded)
@@ -149,17 +150,19 @@ export function makeCutoutFromPath(
      Midpoint-quadratic all the way round the ring — a smooth closed outline
      rather than the polygon the pointer actually emitted. */
   const n = P.length;
-  ctx.beginPath();
-  ctx.moveTo((P[n - 1][0] + P[0][0]) / 2, (P[n - 1][1] + P[0][1]) / 2);
-  for (let i = 0; i < n; i++) {
-    const c = P[i], q = P[(i + 1) % n];
-    ctx.quadraticCurveTo(c[0], c[1], (c[0] + q[0]) / 2, (c[1] + q[1]) / 2);
-  }
-  ctx.closePath();
-  if (feather > 0) { ctx.filter = `blur(${feather}px)`; }
-  ctx.fillStyle = "#fff";
-  ctx.fill();
-  ctx.filter = "none";
+  /* withBlur handles the feathered edge on engines without ctx.filter
+     (Safari): the mask is drawn on a scratch canvas, blurred, composited */
+  withBlur(ctx, pxW, pxH, feather, (c) => {
+    c.beginPath();
+    c.moveTo((P[n - 1][0] + P[0][0]) / 2, (P[n - 1][1] + P[0][1]) / 2);
+    for (let i = 0; i < n; i++) {
+      const cp = P[i], q = P[(i + 1) % n];
+      c.quadraticCurveTo(cp[0], cp[1], (cp[0] + q[0]) / 2, (cp[1] + q[1]) / 2);
+    }
+    c.closePath();
+    c.fillStyle = "#fff";
+    c.fill();
+  });
   ctx.globalCompositeOperation = "source-in";
   ctx.drawImage(s.img, m.sx, m.sy, m.sw, m.sh, 0, 0, pxW, pxH);
   ctx.globalCompositeOperation = "source-over";

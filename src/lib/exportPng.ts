@@ -8,6 +8,7 @@ import { paintFill } from "./fills";
 import { BrushKey, brushScale, brushTile } from "./brushes";
 import { glowPasses } from "./glows";
 import { Warp, drawWarped, isWarped, warpBounds } from "./warp";
+import { canvasFilterSupported, pixelFilter } from "./canvasCompat";
 
 interface MergeInfo { d: string; bodyD?: string; color: string; cx: number; cy: number; rot: number; bw: number; bh: number; stroke?: string; strokeW?: number }
 
@@ -498,12 +499,39 @@ function drawCover(ctx: CanvasRenderingContext2D, img: HTMLImageElement, w: numb
 
 function withFilter(ctx: CanvasRenderingContext2D, filterKey: string, fn: () => void) {
   const css = FILTERS[filterKey as keyof typeof FILTERS]?.css;
-  let applied = false;
-  if (css && "filter" in ctx) {
-    try { (ctx as CanvasRenderingContext2D).filter = css; applied = true; } catch { /* unsupported */ }
-  }
-  fn();
-  if (applied) (ctx as CanvasRenderingContext2D).filter = "none";
+  if (css && canvasFilterSupported()) {
+    ctx.filter = css;
+    fn();
+    ctx.filter = "none";
+  } else fn();
+}
+
+/* cover-draw with a filter on engines that have no ctx.filter (Safari):
+   render to a scratch canvas, run the per-pixel filter, composite once */
+function drawCoverFiltered(
+  ctx: CanvasRenderingContext2D, img: HTMLImageElement, w: number, h: number, filterKey: string,
+) {
+  const pw = Math.max(1, Math.round(w)), ph = Math.max(1, Math.round(h));
+  const t = document.createElement("canvas");
+  t.width = pw; t.height = ph;
+  const tc = t.getContext("2d");
+  if (!tc) { drawCover(ctx, img, w, h); return; }
+  drawCover(tc, img, pw, ph);
+  try {
+    const id = tc.getImageData(0, 0, pw, ph);
+    pixelFilter(id.data, filterKey);
+    tc.putImageData(id, 0, 0);
+  } catch { /* tainted canvas — draw unfiltered */ }
+  ctx.drawImage(t, 0, 0, w, h);
+}
+
+/* one entry point for filtered artwork: native filter, or pixel fallback */
+function drawCoverWithFilter(
+  ctx: CanvasRenderingContext2D, img: HTMLImageElement, w: number, h: number, filterKey: string,
+) {
+  const css = FILTERS[filterKey as keyof typeof FILTERS]?.css;
+  if (css && !canvasFilterSupported()) drawCoverFiltered(ctx, img, w, h, filterKey);
+  else withFilter(ctx, filterKey, () => drawCover(ctx, img, w, h));
 }
 
 function shapeShadow(ctx: CanvasRenderingContext2D, on: boolean, size: number) {
@@ -546,7 +574,7 @@ function drawEl(
     if (img) {
       ctx.save();
       ctx.clip(rectPath);
-      withFilter(ctx, el.filter, () => drawCover(ctx, img, el.w, el.h));
+      drawCoverWithFilter(ctx, img, el.w, el.h, el.filter);
       ctx.restore();
     }
     if (el.borderW > 0) {

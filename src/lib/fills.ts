@@ -5,6 +5,7 @@ import type { CSSProperties } from "react";
 import {
   FillStyle, HalftoneVariant, PatternVariant, SpeedlineVariant, TextureVariant,
 } from "./model";
+import { withBlur } from "./canvasCompat";
 
 /* deterministic PRNG so every render/export of a variant looks identical */
 function mulberry32(seed: number) {
@@ -256,16 +257,19 @@ function textureTile(fg: string, variant: TextureVariant): HTMLCanvasElement {
     ctx.putImageData(img, 0, 0);
   };
   const blobs = (count: number, rMin: number, rMax: number, alpha: number, blur: number) => {
-    ctx.filter = `blur(${blur}px)`;
-    ctx.fillStyle = fg;
-    for (let i = 0; i < count; i++) {
-      ctx.globalAlpha = alpha * (0.4 + rnd() * 0.6);
-      const r = rMin + rnd() * (rMax - rMin);
-      ctx.beginPath();
-      ctx.arc(rnd() * S, rnd() * S, r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.filter = "none";
+    /* withBlur: native ctx.filter where the engine has one, scratch-canvas
+       blur where it doesn't (Safari) */
+    withBlur(ctx, S, S, blur, (c) => {
+      c.fillStyle = fg;
+      for (let i = 0; i < count; i++) {
+        c.globalAlpha = alpha * (0.4 + rnd() * 0.6);
+        const r = rMin + rnd() * (rMax - rMin);
+        c.beginPath();
+        c.arc(rnd() * S, rnd() * S, r, 0, Math.PI * 2);
+        c.fill();
+      }
+      c.globalAlpha = 1;
+    });
     ctx.globalAlpha = 1;
   };
 
