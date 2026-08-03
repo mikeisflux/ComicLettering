@@ -517,9 +517,39 @@ export function renderOverlay(ed: EditorCtx) {
   const by = eb ? el.y + eb.y0 * el.h : el.y;
   const bw = eb ? Math.max(1, (eb.x1 - eb.x0) * el.w) : el.w;
   const bh = eb ? Math.max(1, (eb.y1 - eb.y0) * el.h) : el.h;
-  /* element-box units → a fraction of the selection rect */
-  const fx = (u: number) => eb ? (u - eb.x0) / (eb.x1 - eb.x0) : u;
-  const fy = (v: number) => eb ? (v - eb.y0) / (eb.y1 - eb.y0) : v;
+  /* Autoclipping self-replication for the TOOLS: when the selected
+     lettering crosses the spine-side bleed line, the overlay splits with
+     it — the box and every handle stop at the bleed line here and continue
+     on the facing page over the carried ink, using the same trim-join
+     mapping the renderers use. Drags stay correct because every drag mode
+     works on pointer DELTAS, not absolute positions. */
+  const carry = (() => {
+    if (el.rot) return null;
+    const d = ed.doc;
+    if (!d || typeof document === "undefined") return null;
+    const pn = ed.pageIndex + 1;
+    const fi = pn === 1 ? -1 : pn % 2 === 0 ? ed.pageIndex + 1 : ed.pageIndex - 1;
+    if (fi < 0 || fi >= d.pages.length) return null;
+    const onto = spreadNeighbor(d, fi);      // current content → facing coords
+    if (!onto) return null;
+    const pg = d.pages[ed.pageIndex];
+    const b = pageBleed(pg);
+    const side: 1 | -1 = pn % 2 === 0 ? 1 : -1;
+    const trimX = side === 1 ? pg.w - b : b;
+    if (!elCrossesSpine(el, trimX, side)) return null;
+    const fpDiv = document.querySelector(".facingPage") as HTMLElement | null;
+    const pgDiv = document.querySelector(".page") as HTMLElement | null;
+    if (!fpDiv || !pgDiv || parseInt(fpDiv.dataset.pageIndex ?? "-1", 10) !== fi) return null;
+    const fr = (fpDiv.querySelector(".facingLive") ?? fpDiv).getBoundingClientRect();
+    const pr = pgDiv.getBoundingClientRect();
+    return { side, trimX, dx: onto.dx, offX: (fr.left - pr.left) / z, offY: (fr.top - pr.top) / z };
+  })();
+  /* a point in PAGE coords → where it visually appears (overlay coords) */
+  const vis = (px: number, py: number): [number, number] =>
+    carry && (carry.side === 1 ? px > carry.trimX : px < carry.trimX)
+      ? [carry.offX + px + carry.dx, carry.offY + py]
+      : [px, py];
+  const boxSplit = carry && bx < carry.trimX && bx + bw > carry.trimX;
   return (
     <div
       className={"overlay" + (editingId === el.id ? " editing" : "")}
@@ -533,7 +563,28 @@ export function renderOverlay(ed: EditorCtx) {
           : undefined,
       }}
     >
-      <div className="box" />
+      {boxSplit && carry ? (
+        /* the box splits like the lettering: it stops at the bleed line
+           here and continues on the facing page over the carried ink */
+        (() => {
+          const t = carry.trimX;
+          const cur: [number, number] = carry.side === 1 ? [bx, t] : [t, bx + bw];
+          const far: [number, number] = carry.side === 1 ? [t, bx + bw] : [bx, t];
+          const farLeft = carry.offX + far[0] + carry.dx;
+          return (
+            <>
+              <div className="box" style={{
+                left: (cur[0] - bx) * z, top: 0,
+                width: (cur[1] - cur[0]) * z, height: bh * z,
+              }} />
+              <div className="box" style={{
+                left: (farLeft - bx) * z, top: carry.offY * z,
+                width: (far[1] - far[0]) * z, height: bh * z,
+              }} />
+            </>
+          );
+        })()
+      ) : <div className="box" />}
       {warping === el.id && el.type === "text" ? (
         /* envelope mode: corners pin the patch, edge midpoints bow their
            side. Autoclipping self-replication applies to the TOOL too: a
@@ -541,61 +592,43 @@ export function renderOverlay(ed: EditorCtx) {
            carried lettering on the facing page (same trim-join mapping the
            renderers use), so every handle sits on the ink it bends. The
            drag itself is delta-based, so a carried handle edits normally. */
-        (() => {
-          const carry = (() => {
-            if (el.rot) return null;
-            const d = ed.doc;
-            if (!d || typeof document === "undefined") return null;
-            const pn = ed.pageIndex + 1;
-            const fi = pn === 1 ? -1 : pn % 2 === 0 ? ed.pageIndex + 1 : ed.pageIndex - 1;
-            if (fi < 0 || fi >= d.pages.length) return null;
-            const onto = spreadNeighbor(d, fi);      // current content → facing coords
-            if (!onto) return null;
-            const pg = d.pages[ed.pageIndex];
-            const b = pageBleed(pg);
-            const side: 1 | -1 = pn % 2 === 0 ? 1 : -1;
-            const fpDiv = document.querySelector(".facingPage") as HTMLElement | null;
-            const pgDiv = document.querySelector(".page") as HTMLElement | null;
-            if (!fpDiv || !pgDiv || parseInt(fpDiv.dataset.pageIndex ?? "-1", 10) !== fi) return null;
-            const fr = (fpDiv.querySelector(".facingLive") ?? fpDiv).getBoundingClientRect();
-            const pr = pgDiv.getBoundingClientRect();
-            return {
-              side, trimX: side === 1 ? pg.w - b : b, dx: onto.dx,
-              offX: (fr.left - pr.left) / z, offY: (fr.top - pr.top) / z,
-            };
-          })();
-          return (el.ts.env as Warp | undefined ?? FLAT).map((p, i) => {
-            let px = el.x + p[0] * el.w, py = el.y + p[1] * el.h;
-            if (carry && (carry.side === 1 ? px > carry.trimX : px < carry.trimX)) {
-              px = carry.offX + px + carry.dx;
-              py = carry.offY + py;
-            }
-            return (
-              <div key={i} className="handle warpDot"
-                title={i < 4 ? "Drag to pin this corner" : "Drag to bow this edge"}
-                style={{ left: (px - bx) * z - 5, top: (py - by) * z - 5 }}
-                onPointerDown={(e) => startDrag(e, el, "envelope", String(i))}
-                onDoubleClick={(e) => { e.stopPropagation(); setWarping(null); }} />
-            );
-          });
-        })()
-      ) : handles.map(([k, hx, hy]) => (
+        (el.ts.env as Warp | undefined ?? FLAT).map((p, i) => {
+          const [px, py] = vis(el.x + p[0] * el.w, el.y + p[1] * el.h);
+          return (
+            <div key={i} className="handle warpDot"
+              title={i < 4 ? "Drag to pin this corner" : "Drag to bow this edge"}
+              style={{ left: (px - bx) * z - 5, top: (py - by) * z - 5 }}
+              onPointerDown={(e) => startDrag(e, el, "envelope", String(i))}
+              onDoubleClick={(e) => { e.stopPropagation(); setWarping(null); }} />
+          );
+        })
+      ) : handles.map(([k, hx, hy]) => {
         /* handles sit on the (possibly ink-hugged) selection rect itself —
            remapping them back into layout-box corners flung them far off the
-           letters whenever the box was bigger than the ink */
-        <div key={k} className={`handle h-${k}`}
-          title={el.type === "text" ? "Drag to resize · double-click to warp" : "Drag to resize"}
-          style={{ left: `calc(${hx * 100}% - 6px)`, top: `calc(${hy * 100}% - 6px)` }}
-          onPointerDown={(e) => startDrag(e, el, "resize", k)}
-          onDoubleClick={(e) => {
-            if (el.type !== "text") return;
-            e.stopPropagation();
-            setWarping(el.id);
-          }} />
-      ))}
-      <div className="handle rot" title="Rotate (Shift snaps to 15°)"
-        style={{ left: "calc(50% - 6px)", top: -28 }}
-        onPointerDown={(e) => startDrag(e, el, "rotate")} />
+           letters whenever the box was bigger than the ink. Handles past the
+           spine-side bleed line follow the carried ink to the facing page
+           (resize drags are delta-based, so they keep working there). */
+        const [vx, vy] = vis(bx + hx * bw, by + hy * bh);
+        return (
+          <div key={k} className={`handle h-${k}`}
+            title={el.type === "text" ? "Drag to resize · double-click to warp" : "Drag to resize"}
+            style={{ left: (vx - bx) * z - 6, top: (vy - by) * z - 6 }}
+            onPointerDown={(e) => startDrag(e, el, "resize", k)}
+            onDoubleClick={(e) => {
+              if (el.type !== "text") return;
+              e.stopPropagation();
+              setWarping(el.id);
+            }} />
+        );
+      })}
+      {(() => {
+        const [rx, ry] = vis(bx + bw / 2, by);
+        return (
+          <div className="handle rot" title="Rotate (Shift snaps to 15°)"
+            style={{ left: (rx - bx) * z - 6, top: (ry - by) * z - 28 }}
+            onPointerDown={(e) => startDrag(e, el, "rotate")} />
+        );
+      })()}
       {/* The tail TIP handle only makes sense on a free balloon aiming its
           speaker tail. On a JOINED bubble the connector runs between the two
           balloons and re-aims itself as you move either one — an orange tip
