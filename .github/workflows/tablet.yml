@@ -35,13 +35,17 @@ jobs:
       - name: Point bubblewrap at the runner's JDK and Android SDK
         run: |
           SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
-          # bubblewrap only accepts an SDK with cmdline-tools/latest; the
-          # runner image ships a VERSIONED cmdline-tools dir — alias it
+          # bubblewrap validates the OLD SDK layout — it wants $SDK/tools
+          # (running $SDK/tools/bin/sdkmanager) or $SDK/bin. The runner's
+          # modern SDK only has versioned cmdline-tools dirs, so alias both
+          # layouts onto the newest cmdline-tools.
           if [ ! -d "$SDK/cmdline-tools/latest" ]; then
             NEWEST=$(ls "$SDK/cmdline-tools" | sort -V | tail -1)
             sudo ln -sfn "$SDK/cmdline-tools/$NEWEST" "$SDK/cmdline-tools/latest"
           fi
-          echo "SDK=$SDK  cmdline-tools -> $(readlink -f "$SDK/cmdline-tools/latest")"
+          [ -e "$SDK/tools" ] || sudo ln -sfn "$SDK/cmdline-tools/latest" "$SDK/tools"
+          echo "SDK=$SDK  tools -> $(readlink -f "$SDK/tools")"
+          "$SDK/tools/bin/sdkmanager" --version
           mkdir -p ~/.bubblewrap
           printf '{"jdkPath": "%s", "androidSdkPath": "%s"}\n' "$JAVA_HOME" "$SDK" > ~/.bubblewrap/config.json
       - name: Keystore (from secret, or generate a fresh one)
