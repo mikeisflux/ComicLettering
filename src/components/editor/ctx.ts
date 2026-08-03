@@ -169,9 +169,10 @@ export interface EditorCtx {
   /* print view: facing pages join at the spine, inner bleeds dropped */
   spreadPrint: boolean;
   setSpreadPrint: SetState<boolean>;
-  /* spread view with a facing partner: the spine-side bleed border is a hard
-     split for spanning elements — side 1 = spine on this page's right edge */
-  spineClip: { side: 1 | -1; trimX: number } | null;
+  /* the page's trim rect — the bleed line is a hard border for word
+     balloons, text boxes, lettering and stamps in EVERY view (each item
+     kind runs its own crossing test in renderEls); art is exempt */
+  bleedClip: { x0: number; y0: number; x1: number; y1: number } | null;
   showScript: boolean;
   setShowScript: SetState<boolean>;
   scriptText: string;

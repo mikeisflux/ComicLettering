@@ -41,6 +41,24 @@
   Prefer routing every entry point through ONE shared op/handler so they
   cannot drift apart again.
 
+## Testing
+
+- Do NOT run browser/Playwright test harnesses or screenshot verification
+  runs unless the user explicitly asks for them. The user tests changes
+  themselves on the deployed site. Type-check (`npx tsc --noEmit`) and
+  `npx next build` before pushing — that is the only required verification.
+
+## The bleed line (do not regress)
+
+- The bleed line (trim) is a HARD border for word balloons, text boxes,
+  lettering and stamps in EVERY view and export: no part of them may be
+  visible past it. Only page art (images/panels) may live in the bleed.
+- Whatever part of those items crosses the SPINE-side bleed line continues
+  on the facing page, starting at that page's bleed line.
+- Each item kind has its OWN crossing test (`balloonCrossesTrim`,
+  `textCrossesTrim`, `stampCrossesTrim` in `src/lib/exportPng.ts`) — never
+  collapse them into one catch-all, and never apply them to page art.
+
 ## Editor/export parity
 
 - The DOM editor and the canvas/PDF export must stay WYSIWYG: any change to

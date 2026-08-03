@@ -294,16 +294,14 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     return fi >= 0 && fi < d.pages.length ? fi : -1;
   })();
   const currentOnLeft = spread && (pageIndex + 1) % 2 === 0;
-  /* spread with a facing partner: the spine-side bleed border is a HARD
-     split — spanning elements clip at the trim here and their overhang
-     (bleed sliver included) renders on the facing preview instead */
-  const spineClip = (() => {
-    const d = docRef.current;
-    if (!spread || facingIndex < 0 || !d) return null;
-    const pg = d.pages[pageIndex];
-    return currentOnLeft
-      ? { side: 1 as const, trimX: pg.w - pageBleed(pg) }
-      : { side: -1 as const, trimX: pageBleed(pg) };
+  /* the bleed line is a HARD border for balloons/text/lettering/stamps in
+     every view — each renders clipped to this trim rect (art is exempt);
+     whatever crosses the spine side continues on the facing page */
+  const bleedClip = (() => {
+    const pg = docRef.current?.pages[pageIndex];
+    if (!pg) return null;
+    const b = pageBleed(pg);
+    return { x0: b, y0: b, x1: pg.w - b, y1: pg.h - b };
   })();
   useEffect(() => {
     let alive = true;
@@ -870,7 +868,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     setExportCropMarks, exportFrom, setExportFrom, exportTo, setExportTo,
     showFind, setShowFind, findText, setFindText, replaceText,
     setReplaceText, findCase, setFindCase, showSafe, setShowSafe, spread,
-    setSpread, spreadPrint, setSpreadPrint, spineClip, showScript, setShowScript, scriptText, setScriptText,
+    setSpread, spreadPrint, setSpreadPrint, bleedClip, showScript, setShowScript, scriptText, setScriptText,
     warping, setWarping,
     tiltConn, setTiltConn,
     stampOpen, setStampOpen, stampQuery, setStampQuery, showGradMaker,

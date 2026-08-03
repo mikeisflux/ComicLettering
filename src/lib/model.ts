@@ -268,6 +268,10 @@ export interface ImageEl extends BaseEl {
      above the lettering, so it would otherwise be the first thing the next
      trace lands on — and tracing a cutout of a cutout gets you nowhere. */
   cut?: boolean;
+  /* an SFX/lettering stamp rather than page artwork: stamps follow the
+     LETTERING rules at the bleed line (clipped at the trim, carried across
+     the spread spine) — only real art may live past the bleed. */
+  stamp?: boolean;
 }
 export interface BalloonEl extends BaseEl {
   type: "balloon";

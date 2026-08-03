@@ -13,18 +13,19 @@ import { BalloonShape, JoinBandShape, MergeBaseInfo } from "./BalloonShape";
 import { EditorCtx } from "./ctx";
 import { WarpedText } from "./WarpedText";
 import { FLAT, Warp, isWarped, warpBounds, warpPoint } from "@/lib/warp";
-import { elCrossesSpine } from "@/lib/exportPng";
+import { TrimRect, balloonCrossesTrim, stampCrossesTrim, textCrossesTrim } from "@/lib/exportPng";
 import { onLetteringInput } from "./ops";
 
-/* Spread view: the spine-side bleed line is a HARD border for lettering.
-   Any balloon/text crossing it clips at the trim here — the cut-off part
-   renders on the facing preview instead (same rule as the canvas/export
-   side; uploaded art is exempt and keeps filling its bleed). The clip line
-   is mapped into the element's local box so it survives rotation and
-   flips (clip-path applies before the wrapper's transform). */
-function spineClipPath(
+/* The bleed line is a HARD border for word balloons, text boxes, lettering
+   and stamps — in the live editor page too, whatever the view. Each of
+   those item kinds runs its OWN crossing test (balloonCrossesTrim /
+   textCrossesTrim / stampCrossesTrim) in its own render branch below; page
+   art and panels are exempt and keep filling the bleed. The clip is the
+   page's trim rect mapped into the element's local box, so it survives
+   rotation and flips (clip-path applies before the wrapper's transform). */
+function bleedClipPath(
   el: { x: number; y: number; w: number; h: number; rot: number; flipH?: boolean; flipV?: boolean },
-  sc: { side: 1 | -1; trimX: number },
+  r: TrimRect,
 ): string {
   const th = ((el.rot || 0) * Math.PI) / 180;
   const fx = el.flipH ? -1 : 1, fy = el.flipV ? -1 : 1;
@@ -35,15 +36,8 @@ function spineClipPath(
     const ry = -dx * Math.sin(th) + dy * Math.cos(th);
     return [el.w / 2 + rx * fx, el.h / 2 + ry * fy];
   };
-  const BIG = 20000;
-  const [ax, ay] = inv(sc.trimX, pcy - BIG);
-  const [bx, by] = inv(sc.trimX, pcy + BIG);
-  /* direction pointing to the KEEP side of the line, in local coords */
-  const [ox, oy] = inv(sc.trimX - sc.side, pcy);
-  const [lx, ly] = inv(sc.trimX, pcy);
-  const nx = (ox - lx) * BIG, ny = (oy - ly) * BIG;
-  const p = (x: number, y: number) => `${Math.round(x)}px ${Math.round(y)}px`;
-  return `polygon(${p(ax, ay)}, ${p(bx, by)}, ${p(bx + nx, by + ny)}, ${p(ax + nx, ay + ny)})`;
+  const c = [inv(r.x0, r.y0), inv(r.x1, r.y0), inv(r.x1, r.y1), inv(r.x0, r.y1)];
+  return `polygon(${c.map(([x, y]) => `${Math.round(x)}px ${Math.round(y)}px`).join(", ")})`;
 }
 
 
@@ -83,9 +77,9 @@ export function renderJoinBands(ed: EditorCtx, index: number) {
             width: l.child.w, height: l.child.h,
             transform: tf || undefined, opacity: l.child.opacity ?? 1,
             pointerEvents: "none",
-            clipPath: ed.spineClip &&
-              (elCrossesSpine(l.child, ed.spineClip.trimX, ed.spineClip.side) || elCrossesSpine(base, ed.spineClip.trimX, ed.spineClip.side))
-              ? spineClipPath(l.child, ed.spineClip) : undefined,
+            clipPath: ed.bleedClip &&
+              (balloonCrossesTrim(l.child, ed.bleedClip) || balloonCrossesTrim(base, ed.bleedClip))
+              ? bleedClipPath(l.child, ed.bleedClip) : undefined,
           }}>
           <JoinBandShape el={bEl} mergeBase={mergeBase} joinRect={joinRect} />
         </div>
@@ -104,9 +98,16 @@ export function renderEl(ed: EditorCtx, el: El) {
     left: el.x, top: el.y, width: el.w, height: el.h,
     transform: tf || undefined,
     opacity: el.opacity ?? 1,
-    clipPath: ed.spineClip && elCrossesSpine(el, ed.spineClip.trimX, ed.spineClip.side)
-      ? spineClipPath(el, ed.spineClip) : undefined,
   };
+  /* the bleed line is a hard border — each item kind runs its OWN test:
+     word balloons (tail included), text boxes/lettering (warp included),
+     stamps. Page art and panels are exempt on purpose. */
+  const bc = ed.bleedClip;
+  if (bc) {
+    if (el.type === "balloon" && balloonCrossesTrim(el, bc)) style.clipPath = bleedClipPath(el, bc);
+    else if (el.type === "text" && textCrossesTrim(el, bc)) style.clipPath = bleedClipPath(el, bc);
+    else if (el.type === "image" && stampCrossesTrim(el, bc)) style.clipPath = bleedClipPath(el, bc);
+  }
   const common = {
     key: el.id,
     "data-id": el.id,

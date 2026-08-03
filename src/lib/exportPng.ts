@@ -1,6 +1,6 @@
 /* Full-resolution canvas renderer — used for PNG export and page thumbnails. */
 import {
-  Assets, BalloonEl, Doc, El, FILTERS, FONTS, JoinLink, Page, TextRun, TextStyle,
+  Assets, BalloonEl, Doc, El, FILTERS, FONTS, ImageEl, JoinLink, Page, TextEl, TextRun, TextStyle,
   aabbOverlap, applyCrossbarI, deg2rad, joinGroupRect, joinLinks, lightenHex, pageBleed, resolveBalloon, rotVec,
 } from "./model";
 import { balloonGeom, arcTextLayout } from "./geometry";
@@ -558,60 +558,126 @@ function drawEl(
   ctx.restore();
 }
 
-/* Spread-spine handling for a page rendered next to a facing partner.
-   The spine-side BLEED LINE (trim) is a hard border for LETTERING: any
-   balloon, text box or SFX that crosses it stops dead at the trim on its
-   own page, and the cut-off part renders on the facing page starting at
-   ITS bleed line instead. Uploaded art (images, panels) is exempt — art
-   is meant to fill its bleed and never carries across.
-   `side` is the page edge the spine sits on (1 = right, -1 = left),
-   `trimX` that edge's bleed line. mode "clip" = the page's own pass
-   (cut crossing lettering at the trim); mode "only" = the partner pass
-   (draw JUST the partner's crossing lettering, from the trim join out). */
-export type SpineSpan = { side: 1 | -1; trimX: number; mode: "clip" | "only" };
+/* ---------------- the bleed line, item by item ----------------
+   The bleed line is a HARD border in EVERY view and export: no part of a
+   word balloon, text box, piece of lettering or stamp may show past the
+   trim — only the page ART is allowed to live in the bleed. Whatever one
+   of them carries past the SPINE-side bleed line continues on the facing
+   page, starting at THAT page's bleed line (the trims meet in Print View,
+   so the halves connect seamlessly there).
 
-/* horizontal extent of an element's box, rotation included */
-function elXBounds(el: { x: number; y: number; w: number; h: number; rot: number }): [number, number] {
-  const cx = el.x + el.w / 2;
-  const r = deg2rad(el.rot || 0);
-  const hw = (Math.abs(Math.cos(r)) * el.w + Math.abs(Math.sin(r)) * el.h) / 2;
-  return [cx - hw, cx + hw];
+   Each item kind owns its OWN crossing test — deliberately not one
+   catch-all — so each can account for its own anatomy and a fix to one
+   can never regress another:
+   - word balloons:  body box + speaker tail tip + bend point
+   - text boxes:     the box as-is
+   - SFX lettering:  the box widened by its envelope-warped ink
+   - stamps:         their image box (marked `stamp` — page art is not)
+   Panels and uploaded artwork have NO rule on purpose. */
+
+export type TrimRect = { x0: number; y0: number; x1: number; y1: number };
+
+/* mode "clip" = a page's own pass: cut items at its trim rect.
+   mode "only" = the spread-partner pass: draw JUST the partner items that
+   cross the spine, from the trim join outward. */
+export type LetterClip =
+  | ({ mode: "clip" } & TrimRect)
+  | { mode: "only"; side: 1 | -1; trimX: number };
+
+function rotBox(cx: number, cy: number, w: number, h: number, rot: number): TrimRect {
+  const r = deg2rad(rot || 0);
+  const hw = (Math.abs(Math.cos(r)) * w + Math.abs(Math.sin(r)) * h) / 2;
+  const hh = (Math.abs(Math.sin(r)) * w + Math.abs(Math.cos(r)) * h) / 2;
+  return { x0: cx - hw, x1: cx + hw, y0: cy - hh, y1: cy + hh };
 }
 
-/* is this a lettering element that crosses the spine-side bleed line?
-   (uploaded art — images and panels — never splits at the spine) */
-export function elCrossesSpine(
-  el: { type: string; x: number; y: number; w: number; h: number; rot: number },
-  trimX: number, side: 1 | -1,
-): boolean {
-  if (el.type === "image" || el.type === "panel") return false;
-  const [x0, x1] = elXBounds(el);
-  return side === 1 ? x1 > trimX + 0.5 : x0 < trimX - 0.5;
+/* WORD BALLOONS: the body, plus the speaker tail — a tail aimed at a
+   character near the spine pokes out even when the body doesn't */
+export function balloonInkBounds(el: BalloonEl): TrimRect {
+  const cx = el.x + el.w / 2, cy = el.y + el.h / 2;
+  const b = rotBox(cx, cy, el.w, el.h, el.rot);
+  if (el.tail) {
+    const pts: [number, number][] = [[el.tail.dx, el.tail.dy]];
+    if (el.tail.bx != null && el.tail.by != null) pts.push([el.tail.bx, el.tail.by]);
+    for (const [dx, dy] of pts) {
+      const [px, py] = rotVec(dx, dy, el.rot);
+      b.x0 = Math.min(b.x0, cx + px); b.x1 = Math.max(b.x1, cx + px);
+      b.y0 = Math.min(b.y0, cy + py); b.y1 = Math.max(b.y1, cy + py);
+    }
+  }
+  return b;
+}
+
+/* TEXT BOXES & SFX LETTERING: the box — widened by the envelope warp when
+   the ink has been bent outside it */
+export function textInkBounds(el: TextEl): TrimRect {
+  let { x, y } = el, w = el.w, h = el.h;
+  const env = el.ts.env;
+  if (env && isWarped(env as Warp)) {
+    const wb = warpBounds(env as Warp);           // in units of the box
+    x = el.x + wb.x0 * el.w; w = (wb.x1 - wb.x0) * el.w;
+    y = el.y + wb.y0 * el.h; h = (wb.y1 - wb.y0) * el.h;
+  }
+  return rotBox(x + w / 2, y + h / 2, w, h, el.rot);
+}
+
+/* STAMPS: dropped SFX art follows the lettering rules — its `stamp` mark
+   is what distinguishes it from page artwork */
+export function stampInkBounds(el: ImageEl): TrimRect {
+  return rotBox(el.x + el.w / 2, el.y + el.h / 2, el.w, el.h, el.rot);
+}
+
+const pastTrim = (b: TrimRect, r: TrimRect) =>
+  b.x0 < r.x0 - 0.5 || b.x1 > r.x1 + 0.5 || b.y0 < r.y0 - 0.5 || b.y1 > r.y1 + 0.5;
+const pastSpine = (b: TrimRect, trimX: number, side: 1 | -1) =>
+  side === 1 ? b.x1 > trimX + 0.5 : b.x0 < trimX - 0.5;
+
+export function balloonCrossesTrim(el: BalloonEl, r: TrimRect) { return pastTrim(balloonInkBounds(el), r); }
+export function textCrossesTrim(el: TextEl, r: TrimRect) { return pastTrim(textInkBounds(el), r); }
+export function stampCrossesTrim(el: ImageEl, r: TrimRect) { return !!el.stamp && pastTrim(stampInkBounds(el), r); }
+
+export function balloonCrossesSpine(el: BalloonEl, trimX: number, side: 1 | -1) { return pastSpine(balloonInkBounds(el), trimX, side); }
+export function textCrossesSpine(el: TextEl, trimX: number, side: 1 | -1) { return pastSpine(textInkBounds(el), trimX, side); }
+export function stampCrossesSpine(el: ImageEl, trimX: number, side: 1 | -1) { return !!el.stamp && pastSpine(stampInkBounds(el), trimX, side); }
+
+/* dispatch to each item's own test; anything else (art, panels) is exempt */
+export function elCrossesTrim(el: El, r: TrimRect): boolean {
+  if (el.type === "balloon") return balloonCrossesTrim(el, r);
+  if (el.type === "text") return textCrossesTrim(el, r);
+  if (el.type === "image") return stampCrossesTrim(el, r);
+  return false;
+}
+export function elCrossesSpine(el: El, trimX: number, side: 1 | -1): boolean {
+  if (el.type === "balloon") return balloonCrossesSpine(el, trimX, side);
+  if (el.type === "text") return textCrossesSpine(el, trimX, side);
+  if (el.type === "image") return stampCrossesSpine(el, trimX, side);
+  return false;
 }
 
 /* all of one page's elements, in order, with join bands interleaved */
 function drawPageEls(
   ctx: CanvasRenderingContext2D, page: Page, assets: Assets, letteringOnly: boolean,
-  span?: SpineSpan | null,
+  lc?: LetterClip | null,
 ) {
   const links = joinLinks(page);
   const clipAtTrim = () => {
+    const c = lc as { x0: number; y0: number; x1: number; y1: number };
     ctx.save();
-    const c = new Path2D();
-    if (span!.side === 1) c.rect(-page.w * 2, -page.h, span!.trimX + page.w * 2, page.h * 3);
-    else c.rect(span!.trimX, -page.h, page.w * 3, page.h * 3);
-    ctx.clip(c);
+    const p = new Path2D();
+    p.rect(c.x0, c.y0, c.x1 - c.x0, c.y1 - c.y0);
+    ctx.clip(p);
   };
   page.els.forEach((el, i) => {
-    const crosses = span ? elCrossesSpine(el, span.trimX, span.side) : false;
-    if (span?.mode === "only" && !crosses) {
-      for (const l of links) {
-        if (l.afterIndex === i && (elCrossesSpine(l.child, span.trimX, span.side) || elCrossesSpine(l.base, span.trimX, span.side)))
-          drawJoinBand(ctx, page, l);
+    if (lc?.mode === "only") {
+      if (!elCrossesSpine(el, lc.trimX, lc.side)) {
+        for (const l of links) {
+          if (l.afterIndex === i && (elCrossesSpine(l.child, lc.trimX, lc.side) || elCrossesSpine(l.base, lc.trimX, lc.side)))
+            drawJoinBand(ctx, page, l);
+        }
+        return;
       }
-      return;
     }
-    const clip = span?.mode === "clip" && crosses;
+    const clip = lc?.mode === "clip" && elCrossesTrim(el, lc);
     if (clip) clipAtTrim();
     if (!(letteringOnly && (el.type === "panel" || el.type === "image"))) {
       if (el.type === "balloon") {
@@ -643,8 +709,8 @@ function drawPageEls(
        two partners (same pass structure as the editor's renderJoinBands) */
     for (const l of links) {
       if (l.afterIndex !== i) continue;
-      const bandClip = span?.mode === "clip" &&
-        (elCrossesSpine(l.child, span.trimX, span.side) || elCrossesSpine(l.base, span.trimX, span.side));
+      const bandClip = lc?.mode === "clip" &&
+        (elCrossesTrim(l.child, lc) || elCrossesTrim(l.base, lc));
       if (bandClip) clipAtTrim();
       drawJoinBand(ctx, page, l);
       if (bandClip) ctx.restore();
@@ -691,30 +757,29 @@ export async function renderPageToCanvas(
   // lettering-only export: transparent background, no panels/artwork —
   // just balloons and lettering, for handing back to the artist/production
   if (!letteringOnly) paintFill(ctx, page.bg, page.w, page.h);
-  /* With a facing partner, this page's bleed border on the spine side is a
-     HARD split line: a spanning element stops dead at the trim here, and
-     everything past it (bleed sliver included) renders on the partner. */
-  const spineSide: 1 | -1 = neighbor ? (neighbor.dx > 0 ? 1 : -1) : 1;
-  const trimX = spineSide === 1 ? page.w - pageBleed(page) : pageBleed(page);
-  drawPageEls(ctx, page, assets, letteringOnly,
-    neighbor ? { side: spineSide, trimX, mode: "clip" } : null);
+  /* The bleed line is a hard border for balloons/text/lettering/stamps in
+     every render — each is cut at this page's trim rect (art is exempt) */
+  const b = pageBleed(page);
+  const trim: TrimRect = { x0: b, y0: b, x1: page.w - b, y1: page.h - b };
+  drawPageEls(ctx, page, assets, letteringOnly, { mode: "clip", ...trim });
   if (neighbor) {
-    /* Spread partner pass: ONLY the partner's lettering that crosses ITS
-       spine-side bleed line carries over — the partner's art stays put.
-       It draws from the trim join outward, so the piece that sat past the
-       partner's bleed line lands on THIS page starting at our own bleed
-       line (the two trims coincide — also where Print View joins). */
+    /* Spread partner pass: ONLY the partner's balloons/text/stamps that
+       cross ITS spine-side bleed line carry over — the partner's art stays
+       put. They draw from the trim join outward, so the piece that sat
+       past the partner's bleed line lands on THIS page starting at our own
+       bleed line (the two trims coincide — also where Print View joins). */
+    const spineSide: 1 | -1 = neighbor.dx > 0 ? 1 : -1;
     ctx.save();
     const clip = new Path2D();
-    if (spineSide === 1) clip.rect(-page.w, -page.h, trimX + page.w, page.h * 3);
-    else clip.rect(trimX, -page.h, page.w * 2, page.h * 3);
+    if (spineSide === 1) clip.rect(-page.w, trim.y0, trim.x1 + page.w, trim.y1 - trim.y0);
+    else clip.rect(trim.x0, trim.y0, page.w * 2, trim.y1 - trim.y0);
     ctx.clip(clip);
     ctx.translate(neighbor.dx, 0);
     /* partner's spine is on its opposite side */
     const nSide: 1 | -1 = spineSide === 1 ? -1 : 1;
     const nTrim = nSide === -1 ? pageBleed(neighbor.page) : neighbor.page.w - pageBleed(neighbor.page);
     drawPageEls(ctx, neighbor.page, assets, letteringOnly,
-      { side: nSide, trimX: nTrim, mode: "only" });
+      { mode: "only", side: nSide, trimX: nTrim });
     ctx.restore();
     /* Tuck cutouts are foreground ART — they sit in front of any lettering,
        including the partner's overhang, so a cross-spine tuck reads as the

@@ -953,7 +953,7 @@ export async function insertSfxStamp(ed: EditorCtx, slug: string, label: string)
     const aid = nextAid(ed);
     const url = await stashArt(ed, aid, blob);
     const img = await loadImage(url);
-    placeAsset(ed, aid, img.naturalWidth, img.naturalHeight);
+    placeAsset(ed, aid, img.naturalWidth, img.naturalHeight, undefined, undefined, true);
   } catch {
     setStatus(`Could not load the “${label}” stamp.`);
   }
@@ -964,7 +964,7 @@ export async function insertCustomStamp(ed: EditorCtx, url: string) {
   const img = await loadImage(url);
   const aid = nextAid(ed);
   await stashDataUrl(ed, aid, url);
-  placeAsset(ed, aid, img.naturalWidth, img.naturalHeight);
+  placeAsset(ed, aid, img.naturalWidth, img.naturalHeight, undefined, undefined, true);
   setStampOpen(false);
 }
 
@@ -1035,13 +1035,14 @@ export async function normalizeArtFile(f: File): Promise<Blob> {
   return blob;
 }
 
-export function placeAsset(ed: EditorCtx, aid: string, natW: number, natH: number, x?: number, y?: number) {
+export function placeAsset(ed: EditorCtx, aid: string, natW: number, natH: number, x?: number, y?: number, stamp = false) {
   const { docRef, pageIndexRef, pendingLockRef, commit, setSelId } = ed;
   const d = docRef.current!;
   const p = d.pages[pageIndexRef.current];
   const w = Math.min(Math.round(p.w * 0.45), natW);
   const h = Math.round(w * (natH / natW));
   const el = makeImage(Math.round((x ?? p.w / 2) - w / 2), Math.round((y ?? p.h / 2) - h / 2), w, h, aid);
+  if (stamp) el.stamp = true;
   p.els.push(el);
   pendingLockRef.current.add(el.id);
   commit();
