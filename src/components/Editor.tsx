@@ -9,38 +9,37 @@ import React, {
   useCallback, useEffect, useReducer, useRef, useState,
 } from "react";
 import {
-  Assets, BalloonEl, DPI, Doc, El, FONTS, FillStyle, GradStop, Page, TextEl,
-  TextStyle, aabbOverlap, clamp, makeBalloon, makeImage, newPage, normalizeDoc, normalizeRuns,
-  pageBleed, pageGuides, pageMargins, registerFont, reseedIds, rotVec, runsToText, starterDoc,
+  Assets, BalloonEl, Doc, El, FillStyle, GradStop, Page, TextEl,
+  TextStyle, aabbOverlap, clamp, newPage, normalizeDoc, normalizeRuns,
+  pageMargins, reseedIds, rotVec, runsToText, starterDoc,
 } from "@/lib/model";
 import { LETTER_STYLES } from "@/lib/presets";
 import { BALLOON_STYLES, BOX_STYLES } from "@/lib/balloonStyles";
-import { StylesPanel, StyleTab, tabForSelection } from "./editor/stylesPanel";
+import { StyleTab, tabForSelection } from "./editor/stylesPanel";
 import { GradientMaker, loadCustomGrads } from "./editor/GradientMaker";
 import { FLAT } from "@/lib/warp";
-import { fillCss } from "@/lib/fills";
-import { ImageFormat, loadImage, pageThumbnail, spreadNeighbor } from "@/lib/exportPng";
+import { ImageFormat, pageThumbnail, spreadNeighbor } from "@/lib/exportPng";
 import { artUrl, ensureArt, holdArt, listArtIds, primeArtIds, putArt, requestPersistence } from "@/lib/assetStore";
 import {
   BalloonPreset, HINT, PRESET_KEY, ProjectMeta, ProofMatch, domToRuns,
-  letterStyleCss, runsToHtml, toggleEmphasis,
+  letterStyleCss, runsToHtml,
 } from "./editor/textHelpers";
-import { closeSketchLoop, detectSketchTail, resampleRing, smoothSketchRing } from "./editor/sketch";
 import { SmartTip, pickTip } from "./editor/smartTips";
 import { TuckAsk } from "./editor/tuck";
 import { makeTuckHandlers } from "./editor/tuckOps";
-import { addPageAt, makeCrossPageDrop } from "./editor/spreadOps";
-import { PageSetupDialog, Ruler, STAGE_MX, STAGE_MY } from "./editor/chrome";
+import { makeCrossPageDrop } from "./editor/spreadOps";
+import { KeyFns, useEditorKeys } from "./editor/useEditorKeys";
+import { useFontsStamps } from "./editor/useFontsStamps";
+import { useSketchDraw } from "./editor/useSketchDraw";
+import { ShellProps, renderCanvasArea, renderHiddenInputs, renderPagesPanel } from "./editor/editorShell";
+import { PageSetupDialog } from "./editor/chrome";
 import { EditorCtx } from "./editor/ctx";
 import {
-  ART_ACCEPT, ART_FORMATS_LABEL, addFromTray, alignSel, applyQuickFill, assignImageToPanel,
-  copySel, cutSel, deleteSel,
-  duplicatePage, duplicateSel, growBalloonToFit, importFontFiles, importImageFile, importJSON,
-  isSupportedArtFile, normalizeArtFile, sizeTextToContent,
-  fitBalloonToText, importStampFiles, movePage, nextAid, onDrop, pasteClip,
-  printPage, readAsDataURL, refitLegacyLettering, refreshProjects, reorder, saveProject,
+  addFromTray, alignSel, applyQuickFill, copySel, cutSel, deleteSel,
+  duplicatePage, duplicateSel, growBalloonToFit, sizeTextToContent,
+  fitBalloonToText, pasteClip,
+  printPage, refitLegacyLettering, refreshProjects, reorder, saveProject,
 } from "./editor/ops";
-import { renderEl, renderJoinBands, renderOverlay } from "./editor/renderEls";
 import { useInstallPrompt, useOpenFileBridge, usePinchZoom } from "./editor/usePlatform";
 import { useStartDrag } from "./editor/useStartDrag";
 import { renderInspector } from "./editor/inspector";
@@ -68,16 +67,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const aidRef = useRef(1);
   /* latest keyboard-shortcut handlers — refreshed every render so the
      long-lived keydown listener never runs a stale closure */
-  const keyFnsRef = useRef<{
-    duplicateSel: () => void; saveProject: (b: boolean) => void;
-    copySel: () => void; cutSel: () => void; pasteClip: () => void;
-    alignSel: (m: "left" | "hcenter" | "right" | "top" | "vcenter" | "bottom") => void;
-    addFromTray: (k: string) => void; deleteSel: () => void;
-    setLocked: (v: boolean) => void;
-    finishEditing: () => void; reorder: (d: number) => void;
-    fitBalloonToText: () => void; printPage: () => void;
-    duplicatePage: () => void;
-  }>(null as never);
+  const keyFnsRef = useRef<KeyFns>(null as never);
   /* re-seed the asset id counter from whatever assets are loaded — MUST run
      after any wholesale assets replacement (boot, project load, JSON import)
      or new images silently overwrite existing artwork ids */
@@ -749,68 +739,22 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
 
   /* ---------------- hand-drawn balloon sketching ---------------- */
 
-  const startSketch = useCallback((e: React.PointerEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const pt = pagePoint(e);
-    drawPtsRef.current = [[pt.x, pt.y]];
-    force();
-    const onMove = (ev: PointerEvent) => {
-      const arr = drawPtsRef.current;
-      if (!arr) return;
-      const p = pagePoint(ev);
-      const last = arr[arr.length - 1];
-      if (Math.hypot(p.x - last[0], p.y - last[1]) > 6) { arr.push([p.x, p.y]); force(); }
-    };
-    const onUp = () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", onUp);
-      const arr = drawPtsRef.current;
-      drawPtsRef.current = null;
-      setDrawMode(false);
-      if (!arr || arr.length < 8) { setStatus("Sketch cancelled — drag a full outline in one stroke."); force(); return; }
-      /* clean seam → even spacing → pull out a drawn tail → round out */
-      let ring = closeSketchLoop(arr);
-      if (ring.length < 8) { setStatus("Sketch cancelled — drag a full outline in one stroke."); force(); return; }
-      ring = resampleRing(ring, 96);
-      const tailInfo = detectSketchTail(ring);
-      const body = smoothSketchRing(tailInfo ? resampleRing(tailInfo.body, 80) : ring);
-      const xs = body.map((q) => q[0]), ys = body.map((q) => q[1]);
-      const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
-      const bw = x1 - x0, bh = y1 - y0;
-      if (bw < 40 || bh < 40) { setStatus("Sketch cancelled — draw a bigger outline."); force(); return; }
-      const pts = body.map(([qx, qy]) => [(qx - x0) / bw, (qy - y0) / bh] as [number, number]);
-      const d = docRef.current!;
-      const pg = d.pages[pageIndexRef.current];
-      const el = makeBalloon("custom", Math.round(x0), Math.round(y0), Math.round(bw), Math.round(bh));
-      el.pts = pts;
-      if (tailInfo) {
-        /* they drew the tail — aim the real one at its tip */
-        el.tail = {
-          dx: Math.round(tailInfo.tip[0] - (x0 + bw / 2)),
-          dy: Math.round(tailInfo.tip[1] - (y0 + bh / 2)),
-        };
-        el.tailStyle = "speech";
-      } else {
-        el.tail = null;
-      }
-      pg.els.push(el);
-      pendingLockRef.current.add(el.id);
-      commit();
-      setSelId(el.id);
-      if (tailInfo) setStatus("Custom balloon created with your drawn tail — double-click to type.");
-      else setTailAsk(el.id);
-    };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", onUp);
-  }, [pagePoint, commit]);
+  const startSketch = useSketchDraw({
+    docRef, pageIndexRef, drawPtsRef, pendingLockRef,
+    pagePoint, force, commit, setDrawMode, setStatus, setSelId, setTailAsk,
+  });
 
-  /* ---------------- keyboard ---------------- */
+  /* ---------------- keyboard (see useEditorKeys) ---------------- */
+
+  useEditorKeys({
+    demo, selId, editingId, docRef, pageIndexRef, selIdsRef, keyFnsRef,
+    modalOpenRef, drawPtsRef, tuckPtsRef, dragTipRef, thumbTimer,
+    setDrawMode, setTuckMode, setTuckAsk, setSelId, setPageIndex,
+    setUserZoomed, setZoom, setShowFind, setShowExport, setStatus,
+    select, selectAllOnPage, finishEditing, undo, redo, fitZoom, force, commit,
+  });
 
   /* ---------------- Tuck Back (traced clipping mask) ---------------- */
-
   /* plain per-render closures — they travel in the EditorCtx bag, so
      callback identity doesn't matter (see tuckOps.ts) */
   const tuckJustEndedRef = useRef(0);
@@ -821,152 +765,6 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     setStatus, setTuckMode, setTuckAsk, keepGenerated,
     getEd: () => ed,
   });
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement;
-      const inField = t.closest?.("input, select, textarea") || t.isContentEditable;
-      if (e.key === "Escape") {
-        setDrawMode(false);
-        drawPtsRef.current = null;
-        setTuckMode(false);
-        tuckPtsRef.current = null;
-        setTuckAsk(null);
-        if (editingId) finishEditing();
-        else setSelId(null);
-        return;
-      }
-      /* take Ctrl+B / Ctrl+I over from the browser while lettering is being
-         edited — its own handling strands the caret inside the run it just
-         closed (see toggleEmphasis) */
-      if ((e.ctrlKey || e.metaKey) && !e.altKey && t.isContentEditable &&
-          ["b", "i", "u"].includes(e.key.toLowerCase())) {
-        const kind = e.key.toLowerCase() === "b" ? "bold" : e.key.toLowerCase() === "i" ? "italic" : "underline";
-        if (toggleEmphasis(t, kind)) e.preventDefault();
-        return;
-      }
-      if (inField) return;
-      /* A modal is open (Export, Find, Script, Page Setup, gradient maker,
-         the tuck dialog, the tail chooser). Its own inputs are covered by
-         `inField` above, but with focus on the backdrop the canvas
-         shortcuts below would still fire — Delete would remove the element
-         behind the dialog, B/T/L/P would add one. Block them. */
-      if (modalOpenRef.current) return;
-      /* call through keyFnsRef so shortcuts always see the CURRENT render's
-         closures — the effect deliberately doesn't resubscribe every render,
-         and stale closures here caused Ctrl+S to re-create projects and
-         Ctrl+V to paste onto a previously viewed page */
-      const fns = keyFnsRef.current;
-      const mod = e.ctrlKey || e.metaKey;
-      if (mod && e.key.toLowerCase() === "z" && !e.shiftKey) { e.preventDefault(); undo(); return; }
-      if (mod && (e.key.toLowerCase() === "y" || (e.key.toLowerCase() === "z" && e.shiftKey))) { e.preventDefault(); redo(); return; }
-      if (mod && e.key.toLowerCase() === "d") { e.preventDefault(); fns.duplicateSel(); return; }
-      if (mod && e.key.toLowerCase() === "s") { e.preventDefault(); fns.saveProject(false); return; }
-      if (mod && e.key.toLowerCase() === "c") { e.preventDefault(); fns.copySel(); return; }
-      if (mod && e.key.toLowerCase() === "x") { e.preventDefault(); fns.cutSel(); return; }
-      if (mod && e.key.toLowerCase() === "v") { e.preventDefault(); fns.pasteClip(); return; }
-      if (mod && e.key === "[" && !e.shiftKey) { e.preventDefault(); fns.alignSel("hcenter"); return; }
-      if (mod && e.key === "]" && !e.shiftKey) { e.preventDefault(); fns.alignSel("vcenter"); return; }
-      /* selection */
-      if (mod && e.key.toLowerCase() === "a") {
-        e.preventDefault();
-        if (e.shiftKey) setSelId(null); else selectAllOnPage();
-        return;
-      }
-      /* stacking order — Shift with the bracket keys, as everywhere else */
-      if (mod && e.shiftKey && (e.key === "]" || e.key === "}")) { e.preventDefault(); fns.reorder(1e9); return; }
-      if (mod && e.shiftKey && (e.key === "[" || e.key === "{")) { e.preventDefault(); fns.reorder(-1e9); return; }
-      if (mod && !e.shiftKey && e.key.toLowerCase() === "l") {
-        e.preventDefault(); fns.setLocked(true);
-        setStatus("Locked. Ctrl+Shift+L unlocks."); return;
-      }
-      if (mod && e.shiftKey && e.key.toLowerCase() === "l") {
-        e.preventDefault(); fns.setLocked(false);
-        setStatus("Unlocked."); return;
-      }
-      /* view */
-      if (mod && (e.key === "=" || e.key === "+")) { e.preventDefault(); setUserZoomed(true); setZoom((z) => clamp(z * 1.2, 0.05, 4)); return; }
-      if (mod && e.key === "-") { e.preventDefault(); setUserZoomed(true); setZoom((z) => clamp(z / 1.2, 0.05, 4)); return; }
-      if (mod && e.key === "0") { e.preventDefault(); setUserZoomed(false); fitZoom(true); return; }
-      /* document */
-      if (mod && e.shiftKey && e.key.toLowerCase() === "s") { e.preventDefault(); fns.saveProject(true); return; }
-      if (mod && e.key.toLowerCase() === "f") { e.preventDefault(); setShowFind(true); return; }
-      if (mod && e.key.toLowerCase() === "p") { e.preventDefault(); fns.printPage(); return; }
-      if (mod && e.key.toLowerCase() === "e") { e.preventDefault(); if (!demo) setShowExport(true); return; }
-      if (mod && e.shiftKey && e.key.toLowerCase() === "n") { e.preventDefault(); fns.duplicatePage(); return; }
-      /* page navigation */
-      if (!mod && (e.key === "PageDown" || e.key === "PageUp")) {
-        e.preventDefault();
-        const n = docRef.current!.pages.length;
-        setPageIndex((i) => clamp(e.key === "PageDown" ? i + 1 : i - 1, 0, n - 1));
-        setSelId(null);
-        return;
-      }
-      /* step through what is on the page — faster than hunting with the mouse
-         for something buried under artwork */
-      if (!mod && e.key === "Tab") {
-        /* only cycle page elements when focus is loose on the canvas — if a
-           toolbar button or link has focus, leave Tab to move between them */
-        if (t.closest("button, a, select, [tabindex]")) return;
-        e.preventDefault();
-        const els = docRef.current!.pages[pageIndexRef.current].els;
-        if (!els.length) return;
-        const at = els.findIndex((x) => x.id === selId);
-        const next = e.shiftKey
-          ? (at <= 0 ? els.length - 1 : at - 1)
-          : (at < 0 || at === els.length - 1 ? 0 : at + 1);
-        select(els[next].id);
-        return;
-      }
-      /* letterer hotkeys: B balloon, T text, L lettering, P panel */
-      if (!mod && !e.altKey) {
-        const k = e.key.toLowerCase();
-        if (k === "b") { e.preventDefault(); fns.addFromTray("speech"); return; }
-        if (k === "t") { e.preventDefault(); fns.addFromTray("text"); return; }
-        if (k === "l") { e.preventDefault(); fns.addFromTray("sfx"); return; }
-        if (k === "p") { e.preventDefault(); fns.addFromTray("panel"); return; }
-      }
-      const d = docRef.current!;
-      const p = d.pages[pageIndexRef.current];
-      const el = p.els.find((x) => x.id === selId);
-      if (!el) return;
-      if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); fns.deleteSel(); return; }
-      /* micro-nudge: 1 page unit per press (~0.1mm in print), Shift = 10.
-         At a fit zoom a single unit is sub-pixel on screen, which used to
-         read as "arrows do nothing" — so the drag's coordinate tip pops up
-         as visible confirmation of every nudge. */
-      const step = e.shiftKey ? 10 : 1;
-      const dxy: Record<string, [number, number]> = {
-        ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step],
-      };
-      if (dxy[e.key]) {
-        e.preventDefault();
-        /* nudges the whole selection, skipping anything locked */
-        let any = false;
-        for (const id of selIdsRef.current) {
-          const t2 = p.els.find((x) => x.id === id);
-          if (!t2 || t2.locked) continue;
-          t2.x += dxy[e.key][0]; t2.y += dxy[e.key][1];
-          any = true;
-        }
-        if (!any) return;
-        const lead = p.els.find((x) => x.id === selId);
-        if (lead) {
-          const tip = { x: lead.x, y: lead.y, w: lead.w, h: lead.h, mode: "move", live: true };
-          dragTipRef.current = tip;
-          setTimeout(() => {
-            if (dragTipRef.current === tip) { dragTipRef.current = null; force(); }
-          }, 900);
-        }
-        force();
-        if (thumbTimer.current) clearTimeout(thumbTimer.current);
-        thumbTimer.current = setTimeout(commit, 400);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selId, editingId, undo, redo, finishEditing]);
 
   /* ---------------- element ops ---------------- */
 
@@ -1004,72 +802,8 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const fileOpenRef = useRef<HTMLInputElement>(null);
   const fileFontRef = useRef<HTMLInputElement>(null);
   const fileStampRef = useRef<HTMLInputElement>(null);
-  const [customStamps, setCustomStamps] = useState<{ id: string; url: string; serverId?: string }[]>([]);
-  const [, bumpFonts] = useReducer((c: number) => c + 1, 0);
-  const customFontIdsRef = useRef<Record<string, string>>({}); // font key -> server asset id
-
-  /* ---------------- custom fonts & stamps (persisted in this browser) ---------------- */
-
-  const registerRuntimeFont = useCallback(async (rec: { key: string; label: string; family: string; data: string }) => {
-    try {
-      const face = new FontFace(rec.family, `url(${rec.data})`);
-      await face.load();
-      document.fonts.add(face);
-      registerFont(rec.key, rec.label, rec.family);
-      bumpFonts();
-    } catch { /* corrupt font file — skip */ }
-  }, []);
-
-  useEffect(() => {
-    /* local cache first (instant), then the account library from SQL */
-    try {
-      const stamps = JSON.parse(localStorage.getItem("lmc.stamps") || "[]");
-      if (Array.isArray(stamps)) setCustomStamps(stamps);
-    } catch { /* ignore */ }
-    try {
-      const fonts = JSON.parse(localStorage.getItem("lmc.fonts") || "[]");
-      if (Array.isArray(fonts)) fonts.forEach((f) => registerRuntimeFont(f));
-    } catch { /* ignore */ }
-    /* site-wide fonts installed by the site owner on the server */
-    (async () => {
-      try {
-        const res = await fetch("/api/site-fonts");
-        if (!res.ok) return;
-        const fonts: { name: string; url: string }[] = await res.json();
-        for (const f of fonts) {
-          const key = "site_" + f.name.toLowerCase().replace(/\W+/g, "");
-          if (FONTS[key]) continue;
-          try {
-            const face = new FontFace("Site " + f.name, `url(${f.url})`);
-            await face.load();
-            document.fonts.add(face);
-            registerFont(key, f.name, "Site " + f.name, "Site Fonts");
-          } catch { /* bad font file — skip */ }
-        }
-        bumpFonts();
-      } catch { /* none */ }
-    })();
-    (async () => {
-      try {
-        const res = await fetch("/api/assets");
-        if (!res.ok) return;
-        const assets: { id: string; kind: string; name: string; data: string }[] = await res.json();
-        const stamps = assets.filter((a) => a.kind === "stamp")
-          .map((a) => ({ id: a.id, url: a.data, serverId: a.id }));
-        setCustomStamps((prev) => [
-          ...stamps,
-          ...prev.filter((p) => !p.serverId && !stamps.some((s) => s.url === p.url)),
-        ]);
-        for (const a of assets.filter((x) => x.kind === "font")) {
-          const key = "custom_" + a.name.toLowerCase().replace(/\W+/g, "");
-          customFontIdsRef.current[key] = a.id;
-          if (!FONTS[key]) {
-            await registerRuntimeFont({ key, label: a.name, family: "LMC " + a.name, data: a.data });
-          }
-        }
-      } catch { /* offline — local cache still works */ }
-    })();
-  }, [registerRuntimeFont]);
+  /* custom fonts & stamps — see useFontsStamps */
+  const { customStamps, setCustomStamps, bumpFonts, customFontIdsRef, registerRuntimeFont } = useFontsStamps();
 
   /* Tablet pinch-zoom and the PWA install prompt — see usePlatform.ts */
   usePinchZoom(areaRef, zoom, setZoom, setUserZoomed);
@@ -1130,6 +864,13 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     duplicatePage: () => duplicatePage(ed),
   };
 
+  /* Editor-local render plumbing handed to the shell (see editorShell) */
+  const sh: ShellProps = {
+    areaRef, pageDivRef, dragTipRef, snapRef, thumbs, askAddPage,
+    spreadUrl, facingIndex, currentOnLeft, tuckMode, tuckPtsRef,
+    tuckJustEndedRef, drawPtsRef, startSketch, startTuckDrag,
+  };
+
   useEffect(() => {
     if (tab === "library" && projects === null) refreshProjects(ed);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1164,228 +905,9 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
 
       {/* ---------- main ---------- */}
       <div className="main">
-        <aside className="leftbar">
-          <div className="sideTitle">Pages</div>
-          <div className="pageList">
-            {doc.pages.map((p, i) => (
-              <button key={i} className={"pageThumb" + (i === pageIndex ? " on" : "")}
-                style={{ aspectRatio: `${p.w} / ${p.h}` }}
-                onClick={() => { setPageIndex(i); setSelId(null); }}>
-                {thumbs[i] ? <img src={thumbs[i]} alt="" /> : null}
-                <span>{i + 1}</span>
-              </button>
-            ))}
-          </div>
-          <div className="pageActs">
-            <button onClick={() => setAskAddPage(true)}>+ Page</button>
-            <button onClick={() => {
-              const d = docRef.current!;
-              if (d.pages.length <= 1) { setStatus("A document needs at least one page."); return; }
-              if (!window.confirm(`Delete page ${pageIndex + 1}?`)) return;
-              d.pages.splice(pageIndex, 1);
-              setPageIndex((p) => clamp(p, 0, d.pages.length - 1));
-              setSelId(null);
-              commit();
-              rebuildThumbs();
-            }}>Delete</button>
-          </div>
-          {askAddPage && (
-            /* where should the new page go? Inserting shifts every later
-               page, so ask rather than guess. */
-            <div className="setupOverlay" onPointerDown={(e) => { if (e.target === e.currentTarget) setAskAddPage(false); }}>
-              <div className="setupDlg" style={{ width: 330 }}>
-                <div className="setupTitle">Add a new page</div>
-                <div className="setupBody" style={{ flexDirection: "column", gap: 8 }}>
-                  <div className="tailChoices">
-                    <button onClick={() => { addPageAt(ed, pageIndex); }}>
-                      Before page {pageIndex + 1}
-                    </button>
-                    <button onClick={() => { addPageAt(ed, pageIndex + 1); }}>
-                      After page {pageIndex + 1}
-                    </button>
-                  </div>
-                  <div className="tips">The new page uses this page&apos;s size and margins.</div>
-                </div>
-              </div>
-            </div>
-          )}
-          <div className="pageActs">
-            <button onClick={() => duplicatePage(ed)} title="Duplicate this page">Duplicate</button>
-            <button onClick={() => movePage(ed, -1)} disabled={pageIndex === 0} title="Move page up">↑</button>
-            <button onClick={() => movePage(ed, 1)} disabled={pageIndex >= doc.pages.length - 1} title="Move page down">↓</button>
-          </div>
-          <StylesPanel ed={ed} />
-        </aside>
+        {renderPagesPanel(ed, sh)}
 
-        <div className="canvasArea" ref={areaRef}
-          onDragOver={(e) => e.preventDefault()} onDrop={(e) => onDrop(ed, e)}>
-          <div className="rulerRow">
-            <div className="rulerCorner" />
-            <Ruler length={page.w} zoom={zoom} vertical={false} offset={STAGE_MX}
-              hi={dragTipRef.current?.live ? [dragTipRef.current.x, dragTipRef.current.x + dragTipRef.current.w] : null} />
-          </div>
-          <div className="canvasRow">
-            <Ruler length={page.h} zoom={zoom} vertical offset={STAGE_MY}
-              hi={dragTipRef.current?.live ? [dragTipRef.current.y, dragTipRef.current.y + dragTipRef.current.h] : null} />
-            {spread && facingIndex >= 0 && !currentOnLeft && (() => {
-              /* facing page on the LEFT; print view crops its inner (right)
-                 bleed so the two pages join at the spine */
-              const fp = doc.pages[facingIndex];
-              const crop = spreadPrint ? pageBleed(fp) * zoom : 0;
-              return (
-                <div className="facingPage" data-page-index={facingIndex}
-                  title={spreadPrint
-                    ? `Facing page ${facingIndex + 1} — print view joins the pages at the spine; the bleed between them is dropped`
-                    : `Facing page ${facingIndex + 1}`}
-                  style={{ width: fp.w * zoom - crop, height: fp.h * zoom, overflow: "hidden" }}
-                  onClick={() => {
-                    /* not while tucking — a trace that ends over this page
-                       must not switch pages under the dialog */
-                    if (tuckMode || Date.now() - tuckJustEndedRef.current < 500) return;
-                    setPageIndex(facingIndex); setSelId(null);
-                  }}>
-                  {spreadUrl && <img src={spreadUrl} alt="" style={{ width: fp.w * zoom, height: fp.h * zoom }} />}
-                  <span className="facingNum">{facingIndex + 1}</span>
-                </div>
-              );
-            })()}
-            <div className="stage" style={(() => {
-              const bl = pageBleed(page) * zoom;
-              const cropL = spreadPrint && facingIndex >= 0 && !currentOnLeft;
-              const cropR = spreadPrint && facingIndex >= 0 && currentOnLeft;
-              return {
-                width: page.w * zoom - (cropL || cropR ? bl : 0),
-                height: page.h * zoom,
-                overflow: cropL || cropR ? ("hidden" as const) : undefined,
-                marginLeft: cropL ? 0 : undefined,
-                marginRight: cropR ? 0 : undefined,
-              };
-            })()}>
-              <div
-                ref={pageDivRef}
-                className="page"
-                style={{
-                  width: page.w, height: page.h,
-                  transform: `scale(${zoom})`, transformOrigin: "0 0",
-                  /* print view: this page's INNER bleed is clipped by the
-                     stage; when the spine is on our left, shift so the
-                     cropped strip is the left bleed */
-                  left: spreadPrint && facingIndex >= 0 && !currentOnLeft ? -pageBleed(page) * zoom : undefined,
-                  /* while the tuck lasso is armed the page unclips, so a
-                     trace sweeping across the spine stays visible */
-                  overflow: tuckMode ? "visible" : undefined,
-                  ...fillCss(page.bg),
-                }}
-                onPointerDown={(e) => { if (e.target === e.currentTarget) select(null); }}
-              >
-                {/* each join link's connector band paints right after the
-                    later of its two partners — links stay independent */}
-                {page.els.map((el, i) => (
-                  <React.Fragment key={el.id}>
-                    {renderEl(ed, el)}
-                    {renderJoinBands(ed, i)}
-                  </React.Fragment>
-                ))}
-                {page.margin && (
-                  <div className="marginGuide" style={{
-                    left: page.margin.l, top: page.margin.t,
-                    width: page.w - page.margin.l - page.margin.r,
-                    height: page.h - page.margin.t - page.margin.b,
-                    borderWidth: Math.max(2, 1.5 / zoom),
-                  }} />
-                )}
-                {(() => {
-                  /* Comic page sizes are quoted WITH bleed, so the page edge
-                     is not where the book ends — the blade lands on the trim,
-                     an eighth of an inch in. That line is always on: it is a
-                     real edge of the printed book, not an optional overlay,
-                     and every crop decision on the page depends on it.
-                     Show Safe Area adds the lettering line inside it. */
-                  const g = pageGuides(page);
-                  const bw = Math.max(2, 1.5 / zoom);
-                  return (
-                    <>
-                      <div className="trimGuide" style={{
-                        left: g.trim.x, top: g.trim.y,
-                        width: g.trim.w, height: g.trim.h, borderWidth: bw,
-                      }} />
-                      {showSafe && (
-                        <div className="safeGuide" style={{
-                          left: g.safe.x, top: g.safe.y,
-                          width: g.safe.w, height: g.safe.h, borderWidth: bw,
-                        }} />
-                      )}
-                    </>
-                  );
-                })()}
-                {demo && <div className="demoWatermark" aria-hidden style={{ width: page.w, height: page.h }} />}
-              </div>
-              {!tuckMode && renderOverlay(ed)}
-              {snapRef.current.x != null && <div className="snapLineV" style={{ left: snapRef.current.x * zoom }} />}
-              {snapRef.current.y != null && <div className="snapLineH" style={{ top: snapRef.current.y * zoom }} />}
-              {tuckMode && (
-                <div className="drawLayer tuckLayer" onPointerDown={startTuckDrag}>
-                  {tuckPtsRef.current && tuckPtsRef.current.length > 1 && (
-                    <svg>
-                      <path className="tuckTrace"
-                        d={"M " + tuckPtsRef.current.map(([qx, qy]) => `${Math.round(qx * zoom)} ${Math.round(qy * zoom)}`).join(" L ") + " Z"} />
-                    </svg>
-                  )}
-                </div>
-              )}
-              {drawMode && (
-                <div className="drawLayer" onPointerDown={startSketch}>
-                  {drawPtsRef.current && drawPtsRef.current.length > 1 && (
-                    <svg>
-                      <path d={"M " + drawPtsRef.current.map(([qx, qy]) => `${Math.round(qx * zoom)} ${Math.round(qy * zoom)}`).join(" L ")} />
-                    </svg>
-                  )}
-                </div>
-              )}
-              {dragTipRef.current && (
-                <div className="dragTip" style={{
-                  left: (dragTipRef.current.x + dragTipRef.current.w) * zoom + 6,
-                  top: dragTipRef.current.y * zoom - 4,
-                }}>
-                  {dragTipRef.current.mode === "resize"
-                    ? `${(dragTipRef.current.w / DPI).toFixed(2)}×${(dragTipRef.current.h / DPI).toFixed(2)}"`
-                    : `${(dragTipRef.current.x / DPI).toFixed(2)}, ${(dragTipRef.current.y / DPI).toFixed(2)}"`}
-                </div>
-              )}
-            </div>
-            {spread && facingIndex >= 0 && currentOnLeft && (() => {
-              /* facing page on the RIGHT; print view crops its inner (left)
-                 bleed so the two pages join at the spine */
-              const fp = doc.pages[facingIndex];
-              const crop = spreadPrint ? pageBleed(fp) * zoom : 0;
-              return (
-                <div className="facingPage" data-page-index={facingIndex}
-                  title={spreadPrint
-                    ? `Facing page ${facingIndex + 1} — print view joins the pages at the spine; the bleed between them is dropped`
-                    : `Facing page ${facingIndex + 1}`}
-                  style={{ width: fp.w * zoom - crop, height: fp.h * zoom, overflow: "hidden" }}
-                  onClick={() => {
-                    if (tuckMode || Date.now() - tuckJustEndedRef.current < 500) return;
-                    setPageIndex(facingIndex); setSelId(null);
-                  }}>
-                  {spreadUrl && <img src={spreadUrl} alt=""
-                    style={{ width: fp.w * zoom, height: fp.h * zoom, marginLeft: -crop }} />}
-                  <span className="facingNum">{facingIndex + 1}</span>
-                </div>
-              );
-            })()}
-          </div>
-          <div className="zoomCtl">
-            <select value={String(Math.round(zoom * 100))} onChange={(e) => {
-              setUserZoomed(true);
-              setZoom(clamp((+e.target.value || 100) / 100, 0.05, 4));
-            }}>
-              {[10, 25, 50, 75, 100, 125, 150, 200].map((z) => <option key={z} value={z}>{z}%</option>)}
-              {![10, 25, 50, 75, 100, 125, 150, 200].includes(Math.round(zoom * 100)) &&
-                <option value={Math.round(zoom * 100)}>{Math.round(zoom * 100)}%</option>}
-            </select>
-          </div>
-        </div>
+        {renderCanvasArea(ed, sh)}
 
         <aside className="rightbar">
           <div className="tabs">
@@ -1440,42 +962,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
           }}
         />
       )}
-      {/* hidden inputs */}
-      <input ref={fileImageRef} type="file" accept={ART_ACCEPT} multiple hidden
-        onChange={async (e) => {
-          for (const f of Array.from(e.target.files || [])) await importImageFile(ed, f);
-          e.target.value = "";
-        }} />
-      <input ref={filePanelImageRef} type="file" accept={ART_ACCEPT.replace(/,?application\/pdf|,?\.pdf/g, "")} hidden
-        onChange={async (e) => {
-          const f = e.target.files?.[0];
-          e.target.value = "";
-          const targetId = panelImageTarget.current;
-          panelImageTarget.current = null;
-          if (!f || !targetId) return;
-          if (!isSupportedArtFile(f) || f.type === "application/pdf" || /\.pdf$/i.test(f.name)) {
-            setStatus(`"${f.name}" isn't a supported image — use ${ART_FORMATS_LABEL.replace(" or PDF", "")}.`);
-            return;
-          }
-          let blob: Blob = f;
-          try { blob = await normalizeArtFile(f); }
-          catch { setStatus(`Could not read "${f.name}" — save that TIFF as PNG first.`); return; }
-          const url = await readAsDataURL(blob);
-          await loadImage(url);
-          const aid = nextAid(ed);
-          assetsRef.current[aid] = url;
-          await assignImageToPanel(ed, targetId, aid);
-        }} />
-      <input ref={fileFontRef} type="file" accept=".ttf,.otf,.woff,.woff2" multiple hidden
-        onChange={async (e) => { await importFontFiles(ed, Array.from(e.target.files || [])); e.target.value = ""; }} />
-      <input ref={fileStampRef} type="file" accept="image/*" multiple hidden
-        onChange={async (e) => { await importStampFiles(ed, Array.from(e.target.files || [])); e.target.value = ""; }} />
-      <input ref={fileOpenRef} type="file" accept=".lmc,.json,application/json,application/x-lettermycomic" hidden
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          e.target.value = "";
-          if (f) importJSON(ed, f);
-        }} />
+      {renderHiddenInputs(ed)}
 
       {/* Tuck Back: traced cutout with live preview */}
       {renderTuckDialog(ed)}
