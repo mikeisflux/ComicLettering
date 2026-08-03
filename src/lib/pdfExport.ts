@@ -1,6 +1,6 @@
 /* Dependency-free multi-page PDF export: each page rendered to JPEG and
    embedded via DCTDecode. Output sized in points from the page's DPI. */
-import { Assets, DPI, Doc, pageBleed } from "./model";
+import { Assets, DPI, Doc, Page, pageBleed } from "./model";
 import { renderPageToCanvas } from "./exportPng";
 
 const enc = new TextEncoder();
@@ -16,12 +16,15 @@ function cornerMarks(x: number, y: number, sx: number, sy: number): string {
 
 export async function exportPdf(
   doc: Doc, assets: Assets, filename: string,
-  onProgress?: (i: number, n: number) => void, dpi = 225, cropMarks = false
+  onProgress?: (i: number, n: number) => void, dpi = 225, cropMarks = false,
+  /* spread partners aligned with doc.pages — callers exporting a page RANGE
+     compute these against the FULL document so pairing stays correct */
+  neighbors?: ({ page: Page; dx: number } | null)[],
 ) {
   const images: { bytes: Uint8Array; w: number; h: number }[] = [];
   for (let i = 0; i < doc.pages.length; i++) {
     onProgress?.(i + 1, doc.pages.length);
-    const canvas = await renderPageToCanvas(doc.pages[i], assets, dpi / DPI);
+    const canvas = await renderPageToCanvas(doc.pages[i], assets, dpi / DPI, false, neighbors?.[i] ?? null);
     const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", 0.92));
     if (!blob) throw new Error("page render failed");
     images.push({ bytes: new Uint8Array(await blob.arrayBuffer()), w: canvas.width, h: canvas.height });

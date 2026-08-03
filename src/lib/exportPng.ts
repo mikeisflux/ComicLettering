@@ -1,7 +1,7 @@
 /* Full-resolution canvas renderer — used for PNG export and page thumbnails. */
 import {
   Assets, BalloonEl, Doc, El, FILTERS, FONTS, JoinLink, Page, TextRun, TextStyle,
-  aabbOverlap, applyCrossbarI, deg2rad, joinGroupRect, joinLinks, lightenHex, resolveBalloon, rotVec,
+  aabbOverlap, applyCrossbarI, deg2rad, joinGroupRect, joinLinks, lightenHex, pageBleed, resolveBalloon, rotVec,
 } from "./model";
 import { balloonGeom, arcTextLayout } from "./geometry";
 import { paintFill } from "./fills";
@@ -558,26 +558,8 @@ function drawEl(
   ctx.restore();
 }
 
-export async function renderPageToCanvas(
-  page: Page, assets: Assets, scale = 1, letteringOnly = false
-): Promise<HTMLCanvasElement> {
-  const srcs: string[] = [];
-  for (const el of page.els) {
-    if ((el.type === "panel" || el.type === "image" || el.type === "balloon") && el.img && assets[el.img]) srcs.push(assets[el.img]);
-  }
-  await Promise.all(srcs.map((s) => loadImage(s).catch(() => null)));
-  if (typeof document !== "undefined" && document.fonts?.ready) {
-    try { await document.fonts.ready; } catch { /* ignore */ }
-  }
-
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round(page.w * scale));
-  canvas.height = Math.max(1, Math.round(page.h * scale));
-  const ctx = canvas.getContext("2d")!;
-  ctx.scale(scale, scale);
-  // lettering-only export: transparent background, no panels/artwork —
-  // just balloons and lettering, for handing back to the artist/production
-  if (!letteringOnly) paintFill(ctx, page.bg, page.w, page.h);
+/* all of one page's elements, in order, with join bands interleaved */
+function drawPageEls(ctx: CanvasRenderingContext2D, page: Page, assets: Assets, letteringOnly: boolean) {
   const links = joinLinks(page);
   page.els.forEach((el, i) => {
     if (!(letteringOnly && (el.type === "panel" || el.type === "image"))) {
@@ -609,6 +591,57 @@ export async function renderPageToCanvas(
        two partners (same pass structure as the editor's renderJoinBands) */
     for (const l of links) if (l.afterIndex === i) drawJoinBand(ctx, page, l);
   });
+}
+
+/* The spread partner whose overhang continues onto page i, with the
+   translation that joins the two at the SPINE: facing pages meet at their
+   trim lines, so the partner's origin sits a page-width minus BOTH inner
+   bleeds away. An element spanning the spread (a double-page KABLAAAM)
+   therefore stops at one page's trim and resumes at the partner's — and in
+   Two-Page Print View, where the inner bleeds are dropped, the two halves
+   connect seamlessly. */
+export function spreadNeighbor(doc: Doc, i: number): { page: Page; dx: number } | null {
+  const pn = i + 1;
+  if (pn === 1) return null;                     // page 1 is a cover — no partner
+  const j = pn % 2 === 0 ? i + 1 : i - 1;
+  if (j < 0 || j >= doc.pages.length) return null;
+  const a = doc.pages[i], b = doc.pages[j];
+  return j === i + 1
+    ? { page: b, dx: a.w - pageBleed(a) - pageBleed(b) }
+    : { page: b, dx: -(b.w - pageBleed(b) - pageBleed(a)) };
+}
+
+export async function renderPageToCanvas(
+  page: Page, assets: Assets, scale = 1, letteringOnly = false,
+  neighbor?: { page: Page; dx: number } | null,
+): Promise<HTMLCanvasElement> {
+  const srcs: string[] = [];
+  for (const el of [...page.els, ...(neighbor?.page.els ?? [])]) {
+    if ((el.type === "panel" || el.type === "image" || el.type === "balloon") && el.img && assets[el.img]) srcs.push(assets[el.img]);
+  }
+  await Promise.all(srcs.map((s) => loadImage(s).catch(() => null)));
+  if (typeof document !== "undefined" && document.fonts?.ready) {
+    try { await document.fonts.ready; } catch { /* ignore */ }
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(page.w * scale));
+  canvas.height = Math.max(1, Math.round(page.h * scale));
+  const ctx = canvas.getContext("2d")!;
+  ctx.scale(scale, scale);
+  // lettering-only export: transparent background, no panels/artwork —
+  // just balloons and lettering, for handing back to the artist/production
+  if (!letteringOnly) paintFill(ctx, page.bg, page.w, page.h);
+  drawPageEls(ctx, page, assets, letteringOnly);
+  if (neighbor) {
+    /* spread partner: whatever overhangs the spine continues onto this
+       page, drawn ON TOP — double-page lettering sits above both pages'
+       art. The canvas clips it to this page's bounds. */
+    ctx.save();
+    ctx.translate(neighbor.dx, 0);
+    drawPageEls(ctx, neighbor.page, assets, letteringOnly);
+    ctx.restore();
+  }
   clearShadow(ctx);
   return canvas;
 }
@@ -749,8 +782,8 @@ function encodeTiff(img: ImageData, dpi: number): Uint8Array {
 export type ImageFormat = "png" | "jpg" | "tiff";
 
 /* dpi controls output resolution: scale = dpi / 225 (the native page dpi). */
-export async function exportPageImage(page: Page, assets: Assets, filename: string, format: ImageFormat, dpi = 225, letteringOnly = false) {
-  const canvas = await renderPageToCanvas(page, assets, dpi / 225, letteringOnly);
+export async function exportPageImage(page: Page, assets: Assets, filename: string, format: ImageFormat, dpi = 225, letteringOnly = false, neighbor?: { page: Page; dx: number } | null) {
+  const canvas = await renderPageToCanvas(page, assets, dpi / 225, letteringOnly, neighbor);
   if (format === "tiff") {
     const ctx = canvas.getContext("2d")!;
     const tiff = encodeTiff(ctx.getImageData(0, 0, canvas.width, canvas.height), dpi);
@@ -766,8 +799,8 @@ export async function exportPageImage(page: Page, assets: Assets, filename: stri
   });
 }
 
-export async function pageJpegBytes(page: Page, assets: Assets, dpi = 225): Promise<Uint8Array> {
-  const canvas = await renderPageToCanvas(page, assets, dpi / 225);
+export async function pageJpegBytes(page: Page, assets: Assets, dpi = 225, neighbor?: { page: Page; dx: number } | null): Promise<Uint8Array> {
+  const canvas = await renderPageToCanvas(page, assets, dpi / 225, false, neighbor);
   const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", 0.9));
   if (!blob) throw new Error("render failed");
   return new Uint8Array(await blob.arrayBuffer());
@@ -775,12 +808,12 @@ export async function pageJpegBytes(page: Page, assets: Assets, dpi = 225): Prom
 
 export { download };
 
-export async function exportPagePNG(page: Page, assets: Assets, filename: string) {
-  return exportPageImage(page, assets, filename, "png");
+export async function exportPagePNG(page: Page, assets: Assets, filename: string, neighbor?: { page: Page; dx: number } | null) {
+  return exportPageImage(page, assets, filename, "png", 225, false, neighbor);
 }
 
-export async function pageThumbnail(page: Page, assets: Assets, maxW = 160): Promise<string> {
-  const canvas = await renderPageToCanvas(page, assets, Math.min(1, maxW / page.w));
+export async function pageThumbnail(page: Page, assets: Assets, maxW = 160, neighbor?: { page: Page; dx: number } | null): Promise<string> {
+  const canvas = await renderPageToCanvas(page, assets, Math.min(1, maxW / page.w), false, neighbor);
   return canvas.toDataURL("image/jpeg", 0.75);
 }
 

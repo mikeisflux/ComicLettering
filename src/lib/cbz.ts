@@ -1,7 +1,7 @@
 /* CBZ (comic book archive) export: a stored (uncompressed) ZIP of page
    images — no dependencies. JPEGs are already compressed, so store is fine. */
 import { Assets, Doc } from "./model";
-import { download, pageJpegBytes } from "./exportPng";
+import { download, pageJpegBytes, spreadNeighbor } from "./exportPng";
 
 const enc = new TextEncoder();
 
@@ -28,7 +28,7 @@ export async function exportCbz(
   const files: { name: Uint8Array; data: Uint8Array; crc: number }[] = [];
   for (let i = 0; i < idxs.length; i++) {
     onProgress?.(i + 1, idxs.length);
-    const data = await pageJpegBytes(doc.pages[idxs[i]], assets, dpi);
+    const data = await pageJpegBytes(doc.pages[idxs[i]], assets, dpi, spreadNeighbor(doc, idxs[i]));
     files.push({
       name: enc.encode(`page-${String(idxs[i] + 1).padStart(3, "0")}.jpg`),
       data, crc: crc32(data),

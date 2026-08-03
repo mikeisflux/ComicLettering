@@ -76,10 +76,14 @@ export interface DragDeps {
   snapRef: Ref<{ x: number | null; y: number | null }>;
   dragTipRef: Ref<{ x: number; y: number; w: number; h: number; mode: string; live: boolean } | null>;
   setSelIds: (ids: string[]) => void;
+  /* spread view: called on releasing a MOVE drag with the raw client point;
+     returns true if the drop landed on the facing page and the elements
+     were transferred there (the transfer commits for itself). */
+  crossPageDropRef: Ref<((mainId: string, clientX: number, clientY: number) => boolean) | null>;
 }
 
 export function useStartDrag(deps: DragDeps) {
-  const { pagePoint, commit, force, zoom, docRef, pageIndexRef, selIdsRef, snapRef, dragTipRef, setSelIds } = deps;
+  const { pagePoint, commit, force, zoom, docRef, pageIndexRef, selIdsRef, snapRef, dragTipRef, setSelIds, crossPageDropRef } = deps;
   return useCallback((
     e: React.PointerEvent, el: El, mode: DragMode, handle = ""
   ) => {
@@ -101,6 +105,7 @@ export function useStartDrag(deps: DragDeps) {
       : [];
     let moved = false;
     let lastPt = start;   // where the pointer ends up — drop-to-join reads it
+    let lastClient = { x: e.clientX, y: e.clientY };  // for cross-page drops
     const onMove = (ev: PointerEvent) => {
       const d = docRef.current!;
       const p = d.pages[pageIndexRef.current];
@@ -108,6 +113,7 @@ export function useStartDrag(deps: DragDeps) {
       if (!cur) return;
       const pt = pagePoint(ev);
       lastPt = pt;
+      lastClient = { x: ev.clientX, y: ev.clientY };
       const dx = pt.x - start.x, dy = pt.y - start.y;
       if (Math.abs(dx) + Math.abs(dy) > 1) moved = true;
       if (mode === "envelope") {
@@ -333,6 +339,9 @@ export function useStartDrag(deps: DragDeps) {
           if (hit) joinTo(p, cur, hit);
         }
       }
+      /* spread view: releasing a move over the FACING page hands the whole
+         selection to that page (the transfer commits for itself) */
+      if (moved && mode === "move" && crossPageDropRef.current?.(el.id, lastClient.x, lastClient.y)) return;
       if (moved) commit();
       /* A multi-selection is KEPT at pointerdown so a body-drag moves the
          whole convoy (see renderEl). If the pointer never actually moved,

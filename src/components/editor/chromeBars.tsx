@@ -66,7 +66,14 @@ export function renderMenuBar(ed: EditorCtx) {
         ["Fit Page", () => { setUserZoomed(false); fitZoom(true); }],
         ["—", null],
         [showSafe ? "Hide Safe Area" : "Show Safe Area", () => setShowSafe((s) => !s)],
-        [spread ? "Single Page View" : "Two-Page Spread View", () => setSpread((s) => !s)],
+        ["Single Page View", () => { setSpread(false); ed.setSpreadPrint(false); }],
+        ["Two-Page Spread View", () => { setSpread(true); ed.setSpreadPrint(false); }],
+        /* print view: facing pages join at the spine, inner bleeds dropped */
+        ["Two-Page Print View", () => {
+          setSpread(true);
+          ed.setSpreadPrint(true);
+          setStatus("Print view joins facing pages at the spine — the bleed between them is dropped.");
+        }],
         ["—", null],
         ["Panel Layouts", () => setTab("layouts")],
         ["Inspector", () => setTab("inspector")],

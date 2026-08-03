@@ -6,7 +6,7 @@ import {
 } from "@/lib/model";
 import { clearArt, releaseAllArt } from "@/lib/assetStore";
 import {
-  ImageFormat, docThumbnail, exportPageImage, exportPagePNG,
+  ImageFormat, docThumbnail, exportPageImage, exportPagePNG, spreadNeighbor,
 } from "@/lib/exportPng";
 import { LT_URL, ProofMatch } from "./textHelpers";
 import { EditorCtx } from "./ctx";
@@ -212,7 +212,7 @@ export async function exportAllPages(ed: EditorCtx) {
   await ensureAllArt(ed);
   for (let i = 0; i < d.pages.length; i++) {
     setStatus(`Exporting page ${i + 1}/${d.pages.length}…`);
-    await exportPagePNG(d.pages[i], assetsRef.current, `comic-page-${i + 1}.png`);
+    await exportPagePNG(d.pages[i], assetsRef.current, `comic-page-${i + 1}.png`, spreadNeighbor(d, i));
   }
   setStatus(`Exported ${d.pages.length} page${d.pages.length > 1 ? "s" : ""}.`);
 }
@@ -239,7 +239,10 @@ export async function runExport(
     if (format === "pdf") {
       const sub = { ...d, pages: idxs.map((i) => d.pages[i]) };
       const { exportPdf } = await import("@/lib/pdfExport");
-      await exportPdf(sub, assetsRef.current, `${nameBase}.pdf`, (i, n) => setStatus(`Rendering PDF page ${i}/${n}…`), dpi, exportCropMarks);
+      /* spread partners resolved against the FULL document, so exporting a
+         page range keeps double-page lettering intact */
+      await exportPdf(sub, assetsRef.current, `${nameBase}.pdf`, (i, n) => setStatus(`Rendering PDF page ${i}/${n}…`), dpi, exportCropMarks,
+        idxs.map((i) => spreadNeighbor(d, i)));
     } else if (format === "cbz") {
       const { exportCbz } = await import("@/lib/cbz");
       await exportCbz(d, assetsRef.current, `${nameBase}.cbz`, dpi, idxs, (i, n) => setStatus(`Packing CBZ page ${i}/${n}…`));
@@ -248,7 +251,7 @@ export async function runExport(
       for (const pi of idxs) {
         setStatus(`Exporting page ${pi + 1} (${fmt.toUpperCase()} @ ${dpi} dpi${letteringOnly ? ", lettering only" : ""})…`);
         const suffix = letteringOnly ? "-lettering" : "";
-        await exportPageImage(d.pages[pi], assetsRef.current, `${nameBase}-page-${pi + 1}${suffix}.${fmt}`, fmt, dpi, letteringOnly);
+        await exportPageImage(d.pages[pi], assetsRef.current, `${nameBase}-page-${pi + 1}${suffix}.${fmt}`, fmt, dpi, letteringOnly, spreadNeighbor(d, pi));
       }
     }
     setStatus("Export complete.");

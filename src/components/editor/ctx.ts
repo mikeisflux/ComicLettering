@@ -166,6 +166,9 @@ export interface EditorCtx {
   setShowSafe: SetState<boolean>;
   spread: boolean;
   setSpread: SetState<boolean>;
+  /* print view: facing pages join at the spine, inner bleeds dropped */
+  spreadPrint: boolean;
+  setSpreadPrint: SetState<boolean>;
   showScript: boolean;
   setShowScript: SetState<boolean>;
   scriptText: string;

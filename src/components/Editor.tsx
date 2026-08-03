@@ -11,7 +11,7 @@ import React, {
 import {
   Assets, BalloonEl, DPI, Doc, El, FONTS, FillStyle, GradStop, Page, TextEl,
   TextStyle, aabbOverlap, clamp, makeBalloon, makeImage, newPage, normalizeDoc, normalizeRuns,
-  pageGuides, pageMargins, registerFont, reseedIds, rotVec, runsToText, starterDoc,
+  pageBleed, pageGuides, pageMargins, registerFont, reseedIds, rotVec, runsToText, starterDoc,
 } from "@/lib/model";
 import { LETTER_STYLES } from "@/lib/presets";
 import { BALLOON_STYLES, BOX_STYLES } from "@/lib/balloonStyles";
@@ -19,7 +19,7 @@ import { StylesPanel, StyleTab, tabForSelection } from "./editor/stylesPanel";
 import { GradientMaker, loadCustomGrads } from "./editor/GradientMaker";
 import { FLAT } from "@/lib/warp";
 import { fillCss } from "@/lib/fills";
-import { ImageFormat, loadImage, pageThumbnail } from "@/lib/exportPng";
+import { ImageFormat, loadImage, pageThumbnail, spreadNeighbor } from "@/lib/exportPng";
 import { artUrl, ensureArt, holdArt, listArtIds, primeArtIds, putArt, requestPersistence } from "@/lib/assetStore";
 import {
   BalloonPreset, HINT, PRESET_KEY, ProjectMeta, ProofMatch, domToRuns,
@@ -212,6 +212,8 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const [showScript, setShowScript] = useState(false);
   const [scriptText, setScriptText] = useState("");
   const [spread, setSpread] = useState(false);
+  /* print view: facing pages join at the spine, inner bleeds dropped */
+  const [spreadPrint, setSpreadPrint] = useState(false);
   const [spreadUrl, setSpreadUrl] = useState<string | null>(null);
   const [exportFrom, setExportFrom] = useState(1);
   const [exportTo, setExportTo] = useState(1);
@@ -307,7 +309,9 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     const d = docRef.current;
     if (!spread || facingIndex < 0 || !d) { setSpreadUrl(null); return; }
     const fp = d.pages[facingIndex];
-    pageThumbnail(fp, assetsRef.current, Math.min(fp.w, 800))
+    /* neighbor = the CURRENT page, so lettering overhanging the spine shows
+       its continuation on the facing preview */
+    pageThumbnail(fp, assetsRef.current, Math.min(fp.w, 800), spreadNeighbor(d, facingIndex))
       .then((u) => { if (alive) setSpreadUrl(u); }).catch(() => { });
     return () => { alive = false; };
   }, [spread, facingIndex, thumbs]);
@@ -387,7 +391,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       if (!d || !d.pages[pi]) return;
       const gen = thumbGenRef.current;
       try {
-        const url = await pageThumbnail(d.pages[pi], assetsRef.current, 220);
+        const url = await pageThumbnail(d.pages[pi], assetsRef.current, 220, spreadNeighbor(d, pi));
         if (thumbGenRef.current !== gen) return; // pages changed mid-render
         setThumbs((t) => ({ ...t, [pi]: url }));
       } catch { /* ignore */ }
@@ -404,7 +408,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       const next: Record<number, string> = {};
       for (let i = 0; i < d.pages.length; i++) {
         if (thumbGenRef.current !== gen) return; // superseded by a newer rebuild
-        try { next[i] = await pageThumbnail(d.pages[i], assetsRef.current, 220); } catch { /* ignore */ }
+        try { next[i] = await pageThumbnail(d.pages[i], assetsRef.current, 220, spreadNeighbor(d, i)); } catch { /* ignore */ }
       }
       if (thumbGenRef.current !== gen) return;
       setThumbs(next);
@@ -581,7 +585,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       for (let i = 0; i < d.pages.length; i++) {
         if (thumbGenRef.current !== gen) return; // doc replaced during boot render
         try {
-          const url = await pageThumbnail(d.pages[i], assetsRef.current, 220);
+          const url = await pageThumbnail(d.pages[i], assetsRef.current, 220, spreadNeighbor(d, i));
           if (thumbGenRef.current !== gen) return;
           setThumbs((t) => ({ ...t, [i]: url }));
         } catch { /* ignore */ }
@@ -735,9 +739,11 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
 
   /* move/resize/rotate + balloon levers + envelope drags — extracted verbatim
      to ./editor/useStartDrag (the 1500-line rule) */
+  /* spread view cross-page drop — assigned before render when spread is on */
+  const crossPageDropRef = useRef<((mainId: string, clientX: number, clientY: number) => boolean) | null>(null);
   const startDrag = useStartDrag({
     pagePoint, commit, force, zoom,
-    docRef, pageIndexRef, selIdsRef, snapRef, dragTipRef, setSelIds,
+    docRef, pageIndexRef, selIdsRef, snapRef, dragTipRef, setSelIds, crossPageDropRef,
   });
 
 
@@ -1165,7 +1171,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     setExportCropMarks, exportFrom, setExportFrom, exportTo, setExportTo,
     showFind, setShowFind, findText, setFindText, replaceText,
     setReplaceText, findCase, setFindCase, showSafe, setShowSafe, spread,
-    setSpread, showScript, setShowScript, scriptText, setScriptText,
+    setSpread, spreadPrint, setSpreadPrint, showScript, setShowScript, scriptText, setScriptText,
     warping, setWarping,
     tiltConn, setTiltConn,
     stampOpen, setStampOpen, stampQuery, setStampQuery, showGradMaker,
@@ -1199,6 +1205,47 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
 
   /* .lmc file-open bridge (installed app + desktop wrapper) — usePlatform.ts */
   useOpenFileBridge(ed);
+
+  /* Two-up: releasing a move-drag over the facing page hands the whole
+     selection to that page, keeping it under the cursor. Joins never span
+     pages, so any link the move would cut is detached; locked items stay. */
+  crossPageDropRef.current = !spread || facingIndex < 0 ? null : (mainId, cx, cy) => {
+    const d = docRef.current;
+    const pgEl = pageDivRef.current;
+    const fpDiv = document.querySelector(".facingPage") as HTMLElement | null;
+    if (!d || !pgEl || !fpDiv) return false;
+    const hit = fpDiv.getBoundingClientRect();
+    if (cx < hit.left || cx > hit.right || cy < hit.top || cy > hit.bottom) return false;
+    /* the img spans the FULL facing page even when the print view crops the
+       inner bleed — its rect gives the true facing-page origin */
+    const fr = (fpDiv.querySelector("img") ?? fpDiv).getBoundingClientRect();
+    const pr = pgEl.getBoundingClientRect();
+    const offX = (fr.left - pr.left) / zoom;
+    const offY = (fr.top - pr.top) / zoom;
+    const cur = d.pages[pageIndexRef.current];
+    const target = d.pages[facingIndex];
+    const ids = new Set(selIdsRef.current.length ? selIdsRef.current : [mainId]);
+    const moving = cur.els.filter((e) => ids.has(e.id) && !e.locked);
+    if (!moving.length) return false;
+    const movingIds = new Set(moving.map((m) => m.id));
+    for (const m of moving) {
+      if (m.type === "balloon" && m.attachTo && !movingIds.has(m.attachTo)) m.attachTo = null;
+    }
+    for (const e2 of cur.els) {
+      if (e2.type === "balloon" && e2.attachTo && movingIds.has(e2.attachTo) && !movingIds.has(e2.id)) e2.attachTo = null;
+    }
+    cur.els = cur.els.filter((e2) => !movingIds.has(e2.id));
+    for (const m of moving) {
+      m.x = Math.round(m.x - offX);
+      m.y = Math.round(m.y - offY);
+      target.els.push(m);
+    }
+    setSelIds([]);
+    commit();
+    rebuildThumbs();
+    setStatus(`Moved ${moving.length > 1 ? `${moving.length} items` : "1 item"} to page ${facingIndex + 1}.`);
+    return true;
+  };
 
   /* insert a blank page (same size/margins as the current one) at `at`,
      jump to it, and refresh every thumbnail — inserting shifts the pages
@@ -1298,21 +1345,45 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
           <div className="canvasRow">
             <Ruler length={page.h} zoom={zoom} vertical offset={STAGE_MY}
               hi={dragTipRef.current?.live ? [dragTipRef.current.y, dragTipRef.current.y + dragTipRef.current.h] : null} />
-            {spread && facingIndex >= 0 && !currentOnLeft && (
-              <div className="facingPage" title={`Facing page ${facingIndex + 1}`}
-                style={{ width: doc.pages[facingIndex].w * zoom, height: doc.pages[facingIndex].h * zoom }}
-                onClick={() => { setPageIndex(facingIndex); setSelId(null); }}>
-                {spreadUrl && <img src={spreadUrl} alt="" />}
-                <span className="facingNum">{facingIndex + 1}</span>
-              </div>
-            )}
-            <div className="stage" style={{ width: page.w * zoom, height: page.h * zoom }}>
+            {spread && facingIndex >= 0 && !currentOnLeft && (() => {
+              /* facing page on the LEFT; print view crops its inner (right)
+                 bleed so the two pages join at the spine */
+              const fp = doc.pages[facingIndex];
+              const crop = spreadPrint ? pageBleed(fp) * zoom : 0;
+              return (
+                <div className="facingPage"
+                  title={spreadPrint
+                    ? `Facing page ${facingIndex + 1} — print view joins the pages at the spine; the bleed between them is dropped`
+                    : `Facing page ${facingIndex + 1}`}
+                  style={{ width: fp.w * zoom - crop, height: fp.h * zoom, overflow: "hidden" }}
+                  onClick={() => { setPageIndex(facingIndex); setSelId(null); }}>
+                  {spreadUrl && <img src={spreadUrl} alt="" style={{ width: fp.w * zoom, height: fp.h * zoom }} />}
+                  <span className="facingNum">{facingIndex + 1}</span>
+                </div>
+              );
+            })()}
+            <div className="stage" style={(() => {
+              const bl = pageBleed(page) * zoom;
+              const cropL = spreadPrint && facingIndex >= 0 && !currentOnLeft;
+              const cropR = spreadPrint && facingIndex >= 0 && currentOnLeft;
+              return {
+                width: page.w * zoom - (cropL || cropR ? bl : 0),
+                height: page.h * zoom,
+                overflow: cropL || cropR ? ("hidden" as const) : undefined,
+                marginLeft: cropL ? 0 : undefined,
+                marginRight: cropR ? 0 : undefined,
+              };
+            })()}>
               <div
                 ref={pageDivRef}
                 className="page"
                 style={{
                   width: page.w, height: page.h,
                   transform: `scale(${zoom})`, transformOrigin: "0 0",
+                  /* print view: this page's INNER bleed is clipped by the
+                     stage; when the spine is on our left, shift so the
+                     cropped strip is the left bleed */
+                  left: spreadPrint && facingIndex >= 0 && !currentOnLeft ? -pageBleed(page) * zoom : undefined,
                   ...fillCss(page.bg),
                 }}
                 onPointerDown={(e) => { if (e.target === e.currentTarget) select(null); }}
@@ -1392,14 +1463,24 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
                 </div>
               )}
             </div>
-            {spread && facingIndex >= 0 && currentOnLeft && (
-              <div className="facingPage" title={`Facing page ${facingIndex + 1}`}
-                style={{ width: doc.pages[facingIndex].w * zoom, height: doc.pages[facingIndex].h * zoom }}
-                onClick={() => { setPageIndex(facingIndex); setSelId(null); }}>
-                {spreadUrl && <img src={spreadUrl} alt="" />}
-                <span className="facingNum">{facingIndex + 1}</span>
-              </div>
-            )}
+            {spread && facingIndex >= 0 && currentOnLeft && (() => {
+              /* facing page on the RIGHT; print view crops its inner (left)
+                 bleed so the two pages join at the spine */
+              const fp = doc.pages[facingIndex];
+              const crop = spreadPrint ? pageBleed(fp) * zoom : 0;
+              return (
+                <div className="facingPage"
+                  title={spreadPrint
+                    ? `Facing page ${facingIndex + 1} — print view joins the pages at the spine; the bleed between them is dropped`
+                    : `Facing page ${facingIndex + 1}`}
+                  style={{ width: fp.w * zoom - crop, height: fp.h * zoom, overflow: "hidden" }}
+                  onClick={() => { setPageIndex(facingIndex); setSelId(null); }}>
+                  {spreadUrl && <img src={spreadUrl} alt=""
+                    style={{ width: fp.w * zoom, height: fp.h * zoom, marginLeft: -crop }} />}
+                  <span className="facingNum">{facingIndex + 1}</span>
+                </div>
+              );
+            })()}
           </div>
           <div className="zoomCtl">
             <select value={String(Math.round(zoom * 100))} onChange={(e) => {
