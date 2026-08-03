@@ -34,8 +34,16 @@ jobs:
       - run: npm install -g @bubblewrap/cli
       - name: Point bubblewrap at the runner's JDK and Android SDK
         run: |
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          # bubblewrap only accepts an SDK with cmdline-tools/latest; the
+          # runner image ships a VERSIONED cmdline-tools dir — alias it
+          if [ ! -d "$SDK/cmdline-tools/latest" ]; then
+            NEWEST=$(ls "$SDK/cmdline-tools" | sort -V | tail -1)
+            sudo ln -sfn "$SDK/cmdline-tools/$NEWEST" "$SDK/cmdline-tools/latest"
+          fi
+          echo "SDK=$SDK  cmdline-tools -> $(readlink -f "$SDK/cmdline-tools/latest")"
           mkdir -p ~/.bubblewrap
-          printf '{"jdkPath": "%s", "androidSdkPath": "%s"}\n' "$JAVA_HOME" "$ANDROID_HOME" > ~/.bubblewrap/config.json
+          printf '{"jdkPath": "%s", "androidSdkPath": "%s"}\n' "$JAVA_HOME" "$SDK" > ~/.bubblewrap/config.json
       - name: Keystore (from secret, or generate a fresh one)
         run: |
           if [ -n "${{ secrets.ANDROID_KEYSTORE_B64 }}" ]; then
