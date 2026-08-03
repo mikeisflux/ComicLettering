@@ -76,7 +76,7 @@ export function renderMenuBar(ed: EditorCtx) {
         ["Library", () => setTab("library")],
       ]],
       ["Insert", [
-        ["New Page", () => { const d = docRef.current!; d.pages.splice(pageIndex + 1, 0, newPage(page.w, page.h, page.margin)); setPageIndex(pageIndex + 1); setSelId(null); commit(); }],
+        ["New Page", () => { const d = docRef.current!; d.pages.splice(pageIndex + 1, 0, newPage(page.w, page.h, page.margin)); setPageIndex(pageIndex + 1); setSelId(null); commit(); ed.rebuildThumbs(); }],
         ["Duplicate Page", () => duplicatePage(ed)],
         ["—", null],
         ["Panel", () => addFromTray(ed, "panel")],

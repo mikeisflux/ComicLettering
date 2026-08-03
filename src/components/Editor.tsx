@@ -157,6 +157,8 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const drawPtsRef = useRef<number[][] | null>(null);
   /* id of a freshly sketched balloon awaiting a tail choice */
   const [tailAsk, setTailAsk] = useState<string | null>(null);
+  /* "+ Page" asks where the new page goes (before/after the current one) */
+  const [askAddPage, setAskAddPage] = useState(false);
   /* Tuck Back: draw around the artwork that should sit in front of the
      selected SFX; the enclosed art becomes a transparent cutout above it */
   const [tuckMode, setTuckMode] = useState(false);
@@ -1198,6 +1200,21 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   /* .lmc file-open bridge (installed app + desktop wrapper) — usePlatform.ts */
   useOpenFileBridge(ed);
 
+  /* insert a blank page (same size/margins as the current one) at `at`,
+     jump to it, and refresh every thumbnail — inserting shifts the pages
+     after it, so the index-keyed thumbs must all re-render or the list
+     shows stale previews until a reload */
+  const addPageAt = (at: number) => {
+    const d = docRef.current!;
+    const cur = d.pages[pageIndexRef.current];
+    d.pages.splice(at, 0, newPage(cur.w, cur.h, cur.margin));
+    setAskAddPage(false);
+    setPageIndex(at);
+    setSelId(null);
+    commit();
+    rebuildThumbs();
+  };
+
   /* ---------------- top-level render ---------------- */
 
   if (!mounted || !doc || !page) {
@@ -1231,26 +1248,38 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
             ))}
           </div>
           <div className="pageActs">
-            <button onClick={() => {
-              const d = docRef.current!;
-              d.pages.splice(pageIndex + 1, 0, newPage(page.w, page.h));
-              setPageIndex(pageIndex + 1);
-              setSelId(null);
-              commit();
-            }}>+ Page</button>
+            <button onClick={() => setAskAddPage(true)}>+ Page</button>
             <button onClick={() => {
               const d = docRef.current!;
               if (d.pages.length <= 1) { setStatus("A document needs at least one page."); return; }
               if (!window.confirm(`Delete page ${pageIndex + 1}?`)) return;
               d.pages.splice(pageIndex, 1);
-              setThumbs({});
               setPageIndex((p) => clamp(p, 0, d.pages.length - 1));
               setSelId(null);
               commit();
-              d.pages.forEach((pg, i) =>
-                pageThumbnail(pg, assetsRef.current, 220).then((u) => setThumbs((t) => ({ ...t, [i]: u }))).catch(() => { }));
+              rebuildThumbs();
             }}>Delete</button>
           </div>
+          {askAddPage && (
+            /* where should the new page go? Inserting shifts every later
+               page, so ask rather than guess. */
+            <div className="setupOverlay" onPointerDown={(e) => { if (e.target === e.currentTarget) setAskAddPage(false); }}>
+              <div className="setupDlg" style={{ width: 330 }}>
+                <div className="setupTitle">Add a new page</div>
+                <div className="setupBody" style={{ flexDirection: "column", gap: 8 }}>
+                  <div className="tailChoices">
+                    <button onClick={() => { addPageAt(pageIndex); }}>
+                      Before page {pageIndex + 1}
+                    </button>
+                    <button onClick={() => { addPageAt(pageIndex + 1); }}>
+                      After page {pageIndex + 1}
+                    </button>
+                  </div>
+                  <div className="tips">The new page uses this page&apos;s size and margins.</div>
+                </div>
+              </div>
+            </div>
+          )}
           <div className="pageActs">
             <button onClick={() => duplicatePage(ed)} title="Duplicate this page">Duplicate</button>
             <button onClick={() => movePage(ed, -1)} disabled={pageIndex === 0} title="Move page up">↑</button>
