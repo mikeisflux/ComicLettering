@@ -1020,3 +1020,20 @@ input[type="range"] { width: 110px; }
   border: 1px solid var(--edge2); border-radius: 6px; overflow: hidden; margin-bottom: 8px;
 }
 .tuckPreview img { max-width: 100%; max-height: 250px; display: block; }
+
+/* ---------------- pen-first tablet pass ----------------
+   On coarse pointers (tablets, phones) the desktop 10-14px handles are
+   smaller than a fingertip. Grow every handle by 8px each way, shifted
+   -4px so each stays centred on the exact spot its inline style aimed
+   at (offsets there assume the desktop sizes). Applies to both canvases
+   automatically — single-page and spread share these handle classes. */
+@media (pointer: coarse) {
+  .handle { width: 20px; height: 20px; margin: -4px 0 0 -4px; }
+  .handle.tail { width: 22px; height: 22px; }
+  .handle.tailBow { width: 20px; height: 20px; }
+  .handle.warpDot, .handle.tiltDot { width: 18px; height: 18px; }
+  /* the rotation stalk sits above the box — keep it reachable, not doubled */
+  .handle.rot { width: 20px; height: 20px; }
+  /* layer-list and tray buttons get fingertip padding too */
+  .layerBtn { min-width: 34px; min-height: 34px; }
+}

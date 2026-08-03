@@ -10,6 +10,7 @@ import {
 } from "@/lib/model";
 import { FLAT } from "@/lib/warp";
 import { elCrossesSpine } from "@/lib/exportPng";
+import { rejectPalm } from "./penInput";
 
 export const MIN_SIZE = 24;
 
@@ -92,8 +93,10 @@ export function useStartDrag(deps: DragDeps) {
   return useCallback((
     e: React.PointerEvent, el: El, mode: DragMode, handle = ""
   ) => {
+    if (rejectPalm(e)) return;   // palm resting near the pen
     e.preventDefault();
     e.stopPropagation();
+    const pid = e.pointerId;     // the drag belongs to this pointer only
     const start = pagePoint(e);
     const orig = JSON.parse(JSON.stringify(el)) as El;
     /* Everything else in the selection travels with the one being dragged.
@@ -112,6 +115,7 @@ export function useStartDrag(deps: DragDeps) {
     let lastPt = start;   // where the pointer ends up — drop-to-join reads it
     let lastClient = { x: e.clientX, y: e.clientY };  // for cross-page drops
     const onMove = (ev: PointerEvent) => {
+      if (ev.pointerId !== pid) return;
       const d = docRef.current!;
       const p = d.pages[pageIndexRef.current];
       const cur = p.els.find((x) => x.id === el.id);
@@ -342,7 +346,8 @@ export function useStartDrag(deps: DragDeps) {
       }
       force();
     };
-    const onUp = () => {
+    const onUp = (ev: PointerEvent) => {
+      if (ev.pointerId !== pid) return;   // a palm lifting must not drop the drag
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);

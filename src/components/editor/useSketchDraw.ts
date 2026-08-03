@@ -5,6 +5,7 @@
 import React, { useRef } from "react";
 import { Doc, makeBalloon } from "@/lib/model";
 import { closeSketchLoop, detectSketchTail, resampleRing, smoothSketchRing } from "./sketch";
+import { rejectPalm } from "./penInput";
 
 interface Ref<T> { current: T }
 
@@ -31,13 +32,16 @@ export function useSketchDraw(deps: SketchDeps) {
   const ref = useRef(deps);
   ref.current = deps;
   return (e: React.PointerEvent) => {
+    if (rejectPalm(e)) return;   // palm resting near the pen
     e.preventDefault();
     e.stopPropagation();
     const d0 = ref.current;
+    const pid = e.pointerId;     // the stroke belongs to this pointer only
     const pt = d0.pagePoint(e);
     d0.drawPtsRef.current = [[pt.x, pt.y]];
     d0.force();
     const onMove = (ev: PointerEvent) => {
+      if (ev.pointerId !== pid) return;
       const d = ref.current;
       const arr = d.drawPtsRef.current;
       if (!arr) return;
@@ -45,7 +49,8 @@ export function useSketchDraw(deps: SketchDeps) {
       const last = arr[arr.length - 1];
       if (Math.hypot(p.x - last[0], p.y - last[1]) > 6) { arr.push([p.x, p.y]); d.force(); }
     };
-    const onUp = () => {
+    const onUp = (ev: PointerEvent) => {
+      if (ev.pointerId !== pid) return;   // a palm lifting must not end the stroke
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);

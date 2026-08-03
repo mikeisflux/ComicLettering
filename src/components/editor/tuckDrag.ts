@@ -15,6 +15,7 @@ import type { Assets, Doc } from "@/lib/model";
 import { loadImage } from "@/lib/exportPng";
 import { closeSketchLoop, resampleRing, smoothSketchRing } from "./sketch";
 import { TuckAsk, TuckSource, makeCutoutFromPath, pathBounds } from "./tuck";
+import { rejectPalm } from "./penInput";
 
 export interface TuckDragDeps {
   docRef: React.RefObject<Doc | null>;
@@ -130,8 +131,10 @@ function artTargetAt(d: TuckDragDeps, x: number, y: number) {
 }
 
 export function beginTuckLasso(d: TuckDragDeps, e: React.PointerEvent) {
+  if (rejectPalm(e)) return;   // palm resting near the pen
   e.preventDefault();
   e.stopPropagation();
+  const pid = e.pointerId;     // the lasso belongs to this pointer only
   const p0 = d.pagePoint(e);
   d.ptsRef.current = [[p0.x, p0.y]];
   d.force();
@@ -177,6 +180,7 @@ export function beginTuckLasso(d: TuckDragDeps, e: React.PointerEvent) {
   maybeStartFacingField(p0);
 
   const onMove = (ev: PointerEvent) => {
+    if (ev.pointerId !== pid) return;
     const arr = d.ptsRef.current;
     if (!arr) return;
     let p = d.pagePoint(ev);
@@ -193,7 +197,8 @@ export function beginTuckLasso(d: TuckDragDeps, e: React.PointerEvent) {
     d.force();
   };
 
-  const onUp = async () => {
+  const onUp = async (ev: PointerEvent) => {
+    if (ev.pointerId !== pid) return;   // a palm lifting must not end the lasso
     window.removeEventListener("pointermove", onMove);
     window.removeEventListener("pointerup", onUp);
     window.removeEventListener("pointercancel", onUp);
