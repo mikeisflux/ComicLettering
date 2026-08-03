@@ -30,7 +30,9 @@ export function facingOffset(
   const fpDiv = document.querySelector(".facingPage") as HTMLElement | null;
   const idx = fpDiv ? parseInt(fpDiv.dataset.pageIndex ?? "-1", 10) : -1;
   if (!fpDiv || !pageDiv || idx < 0) return null;
-  const fr = (fpDiv.querySelector("img") ?? fpDiv).getBoundingClientRect();
+  /* the live facing render (scaled div) is the content origin; its rect
+     already includes the print-view crop shift */
+  const fr = (fpDiv.querySelector(".facingLive") ?? fpDiv).getBoundingClientRect();
   const pr = pageDiv.getBoundingClientRect();
   return { index: idx, offX: (fr.left - pr.left) / zoom, offY: (fr.top - pr.top) / zoom };
 }

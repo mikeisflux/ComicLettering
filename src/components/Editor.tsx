@@ -204,7 +204,6 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const [spread, setSpread] = useState(false);
   /* print view: facing pages join at the spine, inner bleeds dropped */
   const [spreadPrint, setSpreadPrint] = useState(false);
-  const [spreadUrl, setSpreadUrl] = useState<string | null>(null);
   const [exportFrom, setExportFrom] = useState(1);
   const [exportTo, setExportTo] = useState(1);
   const [stampOpen, setStampOpen] = useState(false);
@@ -303,19 +302,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     const b = pageBleed(pg);
     return { x0: b, y0: b, x1: pg.w - b, y1: pg.h - b };
   })();
-  useEffect(() => {
-    let alive = true;
-    const d = docRef.current;
-    if (!spread || facingIndex < 0 || !d) { setSpreadUrl(null); return; }
-    const fp = d.pages[facingIndex];
-    /* neighbor = the CURRENT page, so lettering overhanging the spine shows
-       its continuation on the facing preview. Rendered with a generous
-       buffer (1280px) so carried lettering stays crisp next to the live
-       page — the canvas is GPU-composited, the extra memory is worth it. */
-    pageThumbnail(fp, assetsRef.current, Math.min(fp.w, 1280), spreadNeighbor(d, facingIndex))
-      .then((u) => { if (alive) setSpreadUrl(u); }).catch(() => { });
-    return () => { alive = false; };
-  }, [spread, facingIndex, thumbs]);
+  /* (the facing page renders LIVE in the shell — no preview pipeline) */
 
   /* auto-lock: newly placed items lock themselves once you click away */
   const settlePendingLock = useCallback((exceptId: string | null) => {
@@ -907,7 +894,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   /* Editor-local render plumbing handed to the shell (see editorShell) */
   const sh: ShellProps = {
     areaRef, pageDivRef, dragTipRef, snapRef, thumbs, askAddPage,
-    spreadUrl, facingIndex, currentOnLeft, tuckMode, tuckPtsRef,
+    facingIndex, currentOnLeft, tuckMode, tuckPtsRef,
     tuckJustEndedRef, drawPtsRef, startSketch, startTuckDrag,
   };
 

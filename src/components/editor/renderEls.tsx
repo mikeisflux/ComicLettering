@@ -523,14 +523,50 @@ export function renderOverlay(ed: EditorCtx) {
     >
       <div className="box" />
       {warping === el.id && el.type === "text" ? (
-        /* envelope mode: corners pin the patch, edge midpoints bow their side */
-        (el.ts.env as Warp | undefined ?? FLAT).map((p, i) => (
-          <div key={i} className="handle warpDot"
-            title={i < 4 ? "Drag to pin this corner" : "Drag to bow this edge"}
-            style={{ left: `calc(${fx(p[0]) * 100}% - 5px)`, top: `calc(${fy(p[1]) * 100}% - 5px)` }}
-            onPointerDown={(e) => startDrag(e, el, "envelope", String(i))}
-            onDoubleClick={(e) => { e.stopPropagation(); setWarping(null); }} />
-        ))
+        /* envelope mode: corners pin the patch, edge midpoints bow their
+           side. Autoclipping self-replication applies to the TOOL too: a
+           control point past the spine-side bleed line is shown on the
+           carried lettering on the facing page (same trim-join mapping the
+           renderers use), so every handle sits on the ink it bends. The
+           drag itself is delta-based, so a carried handle edits normally. */
+        (() => {
+          const carry = (() => {
+            if (el.rot) return null;
+            const d = ed.doc;
+            if (!d || typeof document === "undefined") return null;
+            const pn = ed.pageIndex + 1;
+            const fi = pn === 1 ? -1 : pn % 2 === 0 ? ed.pageIndex + 1 : ed.pageIndex - 1;
+            if (fi < 0 || fi >= d.pages.length) return null;
+            const onto = spreadNeighbor(d, fi);      // current content → facing coords
+            if (!onto) return null;
+            const pg = d.pages[ed.pageIndex];
+            const b = pageBleed(pg);
+            const side: 1 | -1 = pn % 2 === 0 ? 1 : -1;
+            const fpDiv = document.querySelector(".facingPage") as HTMLElement | null;
+            const pgDiv = document.querySelector(".page") as HTMLElement | null;
+            if (!fpDiv || !pgDiv || parseInt(fpDiv.dataset.pageIndex ?? "-1", 10) !== fi) return null;
+            const fr = (fpDiv.querySelector(".facingLive") ?? fpDiv).getBoundingClientRect();
+            const pr = pgDiv.getBoundingClientRect();
+            return {
+              side, trimX: side === 1 ? pg.w - b : b, dx: onto.dx,
+              offX: (fr.left - pr.left) / z, offY: (fr.top - pr.top) / z,
+            };
+          })();
+          return (el.ts.env as Warp | undefined ?? FLAT).map((p, i) => {
+            let px = el.x + p[0] * el.w, py = el.y + p[1] * el.h;
+            if (carry && (carry.side === 1 ? px > carry.trimX : px < carry.trimX)) {
+              px = carry.offX + px + carry.dx;
+              py = carry.offY + py;
+            }
+            return (
+              <div key={i} className="handle warpDot"
+                title={i < 4 ? "Drag to pin this corner" : "Drag to bow this edge"}
+                style={{ left: (px - bx) * z - 5, top: (py - by) * z - 5 }}
+                onPointerDown={(e) => startDrag(e, el, "envelope", String(i))}
+                onDoubleClick={(e) => { e.stopPropagation(); setWarping(null); }} />
+            );
+          });
+        })()
       ) : handles.map(([k, hx, hy]) => (
         /* handles sit on the (possibly ink-hugged) selection rect itself —
            remapping them back into layout-box corners flung them far off the

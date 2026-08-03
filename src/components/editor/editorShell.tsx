@@ -27,7 +27,6 @@ export interface ShellProps {
   snapRef: { current: { x: number | null; y: number | null } };
   thumbs: Record<number, string>;
   askAddPage: boolean;
-  spreadUrl: string | null;
   facingIndex: number;
   currentOnLeft: boolean;
   tuckMode: boolean;
@@ -102,6 +101,16 @@ function facingPage(ed: EditorCtx, sh: ShellProps, innerCropSide: "left" | "righ
   const { setPageIndex, setSelId, spreadPrint, zoom } = ed;
   const fp = ed.doc!.pages[sh.facingIndex];
   const crop = spreadPrint ? pageBleed(fp) * zoom : 0;
+  /* The facing page is a LIVE page, not a rendered preview: both pages of
+     the spread load at once and share the editing canvas, drawn by the SAME
+     DOM renderer — so they always match, and anything spanning the spine
+     (lettering, warp edits mid-drag) updates on both pages in the same
+     frame. It stays one click from editable: clicking it makes it the
+     current page, exactly where you left off. */
+  const edF: EditorCtx = {
+    ...ed, page: fp, pageIndex: sh.facingIndex,
+    selIds: [], selId: null, editingId: null, warping: null,
+  };
   return (
     <div className="facingPage" data-page-index={sh.facingIndex}
       title={spreadPrint
@@ -114,14 +123,21 @@ function facingPage(ed: EditorCtx, sh: ShellProps, innerCropSide: "left" | "righ
         if (sh.tuckMode || Date.now() - sh.tuckJustEndedRef.current < 500) return;
         setPageIndex(sh.facingIndex); setSelId(null);
       }}>
-      {sh.spreadUrl && <img src={sh.spreadUrl} alt=""
-        style={{
-          width: fp.w * zoom, height: fp.h * zoom,
-          marginLeft: innerCropSide === "left" ? -crop : undefined,
-          /* own GPU layer: the preview swaps on every thumb refresh — keep
-             those repaints off the editing page's layer */
-          transform: "translateZ(0)",
-        }} />}
+      <div className="facingLive" style={{
+        position: "absolute", left: innerCropSide === "left" ? -crop : 0, top: 0,
+        width: fp.w, height: fp.h,
+        transform: `scale(${zoom})`, transformOrigin: "0 0",
+        pointerEvents: "none",
+        ...fillCss(fp.bg),
+      }}>
+        {fp.els.map((el, i) => (
+          <React.Fragment key={el.id}>
+            {renderEl(edF, el)}
+            {renderJoinBands(edF, i)}
+          </React.Fragment>
+        ))}
+        {renderCarriedLettering(edF)}
+      </div>
       <span className="facingNum">{sh.facingIndex + 1}</span>
     </div>
   );
