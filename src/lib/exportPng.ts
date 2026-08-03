@@ -158,6 +158,11 @@ function drawRichText(
   }
   ctx.lineJoin = "round";
   ctx.textAlign = "left";
+  /* CSS baseline (strut = the block's base font) — bold/italic spans share
+     the line's baseline in the DOM, so one shift serves the whole block */
+  const bshift = cssBaselineShift(fontFor(false, false), lineH);
+  if (bshift != null) ctx.textBaseline = "alphabetic";
+  const yGlyph = (cy: number) => (bshift != null ? cy + bshift : cy);
   let y = y0;
   for (let li = 0; li < lines.length; li++) {
     const line = lines[li];
@@ -180,11 +185,11 @@ function drawRichText(
           ctx.save();
           ctx.shadowColor = ts.shadowC || "#00000088";
           ctx.shadowOffsetX = ts.size * 0.05; ctx.shadowOffsetY = ts.size * 0.05; ctx.shadowBlur = ts.size * 0.06;
-          ctx.fillStyle = fill; ctx.fillText(cl.ch, x, y);
+          ctx.fillStyle = fill; ctx.fillText(cl.ch, x, yGlyph(y));
           ctx.restore();
         }
-        if (ts.outlineW > 0) { ctx.lineWidth = ts.outlineW; ctx.strokeStyle = ts.outlineC; ctx.strokeText(cl.ch, x, y); }
-        ctx.fillStyle = fill; ctx.fillText(cl.ch, x, y);
+        if (ts.outlineW > 0) { ctx.lineWidth = ts.outlineW; ctx.strokeStyle = ts.outlineC; ctx.strokeText(cl.ch, x, yGlyph(y)); }
+        ctx.fillStyle = fill; ctx.fillText(cl.ch, x, yGlyph(y));
         if (cl.u && !ts.underline) {
           /* run-level underline — same constants as the block underline */
           ctx.save();
@@ -386,6 +391,10 @@ export function drawStyledText(
   };
 
   ctx.lineJoin = "round";
+  /* draw on the CSS baseline so the canvas and the DOM agree vertically */
+  const bshift = cssBaselineShift(fontString(ts), lineH);
+  if (bshift != null) ctx.textBaseline = "alphabetic";
+  const by = (cy: number) => (bshift != null ? cy + bshift : cy);
   let y = y0;
   for (let li = 0; li < lines.length; li++) {
     const line = lines[li];
@@ -402,20 +411,20 @@ export function drawStyledText(
       if (ts.outlineW > 0) {
         ctx.lineWidth = ts.outlineW;
         ctx.strokeStyle = ts.outlineC;
-        drawLine(line, x, y, "stroke", justifyThis);
+        drawLine(line, x, by(y), "stroke", justifyThis);
       } else {
         ctx.fillStyle = fill;
-        drawLine(line, x, y, "fill", justifyThis);
+        drawLine(line, x, by(y), "fill", justifyThis);
       }
       ctx.restore();
     }
     if (ts.outlineW > 0) {
       ctx.lineWidth = ts.outlineW;
       ctx.strokeStyle = ts.outlineC;
-      drawLine(line, x, y, "stroke", justifyThis);
+      drawLine(line, x, by(y), "stroke", justifyThis);
     }
     ctx.fillStyle = fill;
-    drawLine(line, x, y, "fill", justifyThis);
+    drawLine(line, x, by(y), "fill", justifyThis);
     if (ts.underline && line.trim()) {
       const lw = justifyThis ? rw : ctx.measureText(line).width;
       const ux = ts.align === "right" ? rx + rw - lw
@@ -431,6 +440,40 @@ export function drawStyledText(
     }
     y += lineH;
   }
+}
+
+/* CSS lays glyphs on a baseline computed from the font's real ascent and
+   descent (the half-leading model); canvas textBaseline "middle" divides
+   the em box instead, and on display faces the two disagree by whole
+   pixels at SFX sizes — enough to visibly shift lettering between the
+   live page and any canvas render (facing previews, thumbnails, exports).
+   measureText's fontBoundingBox metrics are NOT what line layout uses
+   (Chromium reports a plain em split for many faces), so ask CSS itself:
+   a hidden line of the same font, with a zero-size inline-block whose
+   bottom edge sits exactly on the text baseline. Returns the baseline's
+   offset from the line-box CENTER; cached per font+leading. */
+const baselineCache = new Map<string, number>();
+function cssBaselineShift(fontCss: string, lineHPx: number): number | null {
+  if (typeof document === "undefined") return null;
+  const key = `${fontCss}@${lineHPx}`;
+  const hit = baselineCache.get(key);
+  if (hit !== undefined) return hit;
+  const host = document.createElement("div");
+  host.style.cssText =
+    `position:absolute;left:-99999px;top:0;visibility:hidden;white-space:nowrap;` +
+    `font:${fontCss};line-height:${lineHPx}px;`;
+  host.textContent = "Hg";
+  const probe = document.createElement("span");
+  probe.style.cssText = "display:inline-block;width:0;height:0;overflow:hidden;";
+  host.appendChild(probe);
+  document.body.appendChild(host);
+  const hr = host.getBoundingClientRect();
+  const pr = probe.getBoundingClientRect();
+  document.body.removeChild(host);
+  if (!hr.height) return null;
+  const shift = pr.bottom - (hr.top + hr.height / 2);
+  baselineCache.set(key, shift);
+  return shift;
 }
 
 function drawCover(ctx: CanvasRenderingContext2D, img: HTMLImageElement, w: number, h: number) {
