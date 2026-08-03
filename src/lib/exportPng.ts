@@ -453,6 +453,11 @@ export function drawStyledText(
    bottom edge sits exactly on the text baseline. Returns the baseline's
    offset from the line-box CENTER; cached per font+leading. */
 const baselineCache = new Map<string, number>();
+/* fonts that arrive AFTER a measurement was cached would leave stale
+   fallback-font baselines behind — drop the cache whenever a font loads */
+if (typeof document !== "undefined" && document.fonts?.addEventListener) {
+  document.fonts.addEventListener("loadingdone", () => baselineCache.clear());
+}
 function cssBaselineShift(fontCss: string, lineHPx: number): number | null {
   if (typeof document === "undefined") return null;
   const key = `${fontCss}@${lineHPx}`;
@@ -472,7 +477,15 @@ function cssBaselineShift(fontCss: string, lineHPx: number): number | null {
   document.body.removeChild(host);
   if (!hr.height) return null;
   const shift = pr.bottom - (hr.top + hr.height / 2);
-  baselineCache.set(key, shift);
+  /* cache only measurements taken with the REAL font — a shift measured
+     while the font was still loading is the fallback's, not this font's.
+     (fonts.check throws on some malformed shorthands — treat as unloaded) */
+  let loaded = false;
+  try { loaded = document.fonts?.check?.(fontCss) ?? true; } catch { /* keep unloaded */ }
+  if (loaded) {
+    if (baselineCache.size > 400) baselineCache.clear();   // bounded, tiny entries
+    baselineCache.set(key, shift);
+  }
   return shift;
 }
 
@@ -658,7 +671,9 @@ export function balloonInkBounds(el: BalloonEl): TrimRect {
 }
 
 /* TEXT BOXES & SFX LETTERING: the box — widened by the envelope warp when
-   the ink has been bent outside it */
+   the ink has been bent outside it. Rotation happens about the ELEMENT's
+   centre (that is what CSS and the canvas both do), so the warped sub-rect
+   must orbit that point — not its own centre. */
 export function textInkBounds(el: TextEl): TrimRect {
   let { x, y } = el, w = el.w, h = el.h;
   const env = el.ts.env;
@@ -667,7 +682,15 @@ export function textInkBounds(el: TextEl): TrimRect {
     x = el.x + wb.x0 * el.w; w = (wb.x1 - wb.x0) * el.w;
     y = el.y + wb.y0 * el.h; h = (wb.y1 - wb.y0) * el.h;
   }
-  return rotBox(x + w / 2, y + h / 2, w, h, el.rot);
+  if (!el.rot) return { x0: x, x1: x + w, y0: y, y1: y + h };
+  const cx = el.x + el.w / 2, cy = el.y + el.h / 2;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const [px, py] of [[x, y], [x + w, y], [x + w, y + h], [x, y + h]]) {
+    const [rx, ry] = rotVec(px - cx, py - cy, el.rot);
+    x0 = Math.min(x0, cx + rx); x1 = Math.max(x1, cx + rx);
+    y0 = Math.min(y0, cy + ry); y1 = Math.max(y1, cy + ry);
+  }
+  return { x0, x1, y0, y1 };
 }
 
 /* STAMPS: dropped SFX art follows the lettering rules — its `stamp` mark

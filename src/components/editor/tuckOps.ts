@@ -19,7 +19,6 @@ export interface TuckDeps {
   pageDivRef: React.RefObject<HTMLDivElement | null>;
   tuckPtsRef: React.RefObject<number[][] | null>;
   tuckAskRef: React.RefObject<TuckAsk | null>;
-  tuckJustEndedRef: React.RefObject<number>;
   selId: string | null;
   zoom: number;
   pagePoint: (e: { clientX: number; clientY: number }) => { x: number; y: number };
@@ -56,7 +55,6 @@ export function makeTuckHandlers(d: TuckDeps) {
       pagePoint: d.pagePoint, zoom: d.zoom, force: d.force,
       setStatus: d.setStatus, setTuckMode: d.setTuckMode, setTuckAsk: d.setTuckAsk,
       facing: facingOffset(d.pageDivRef.current, d.zoom),
-      justEndedRef: d.tuckJustEndedRef,
     }, e);
   };
 

@@ -69,6 +69,9 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   /* the current page's x-offset on the spread canvas — read by pagePoint at
      event time, assigned fresh every render (0 in single view) */
   const spreadOffXRef = useRef<(i: number) => number>(() => 0);
+  /* the spread canvas's total extent (null in single view) — fit-to-window
+     fits BOTH pages when the spread is up */
+  const spreadExtentRef = useRef<{ w: number; h: number } | null>(null);
   const aidRef = useRef(1);
   /* latest keyboard-shortcut handlers — refreshed every render so the
      long-lived keydown listener never runs a stale closure */
@@ -326,6 +329,13 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   })();
   const spreadOffX = (i: number) => spreadLayout.find((s) => s.idx === i)?.off ?? 0;
   spreadOffXRef.current = spreadOffX;
+  /* the spread canvas's full extent — what fit-to-window must fit */
+  spreadExtentRef.current = spreadLayout.length === 2 && docRef.current
+    ? {
+      w: Math.max(...spreadLayout.map((s) => s.off + docRef.current!.pages[s.idx].w)),
+      h: Math.max(...spreadLayout.map((s) => docRef.current!.pages[s.idx].h)),
+    }
+    : null;
 
   /* auto-lock: newly placed items lock themselves once you click away */
   const settlePendingLock = useCallback((exceptId: string | null) => {
@@ -632,7 +642,10 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     if (!d || !area) return;
     if (userZoomedRef.current && !forceFit) return;
     const p = d.pages[Math.min(pageIndexRef.current, d.pages.length - 1)];
-    const z = Math.min((area.clientWidth - 110) / p.w, (area.clientHeight - 90) / p.h);
+    /* on the spread canvas, fit BOTH pages */
+    const ext = spreadExtentRef.current;
+    const w = ext?.w ?? p.w, h = ext?.h ?? p.h;
+    const z = Math.min((area.clientWidth - 110) / w, (area.clientHeight - 90) / h);
     setZoom(clamp(z, 0.05, 2));
   }, []);
 
@@ -650,6 +663,12 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     if (p) lastFitDimsRef.current = { w: p.w, h: p.h };
     fitZoom(!sameSize);
   }, [mounted, pageIndex, fitZoom]);
+  /* switching between single, spread and print views changes the canvas
+     extent — refit so both pages (or the one page) come into view */
+  useEffect(() => {
+    if (mounted) fitZoom(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spread, spreadPrint]);
   useEffect(() => {
     const onR = () => fitZoom(false);
     window.addEventListener("resize", onR);
@@ -812,6 +831,18 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const startSketch = useSketchDraw({
     docRef, pageIndexRef, drawPtsRef, pendingLockRef,
     pagePoint, force, commit, setDrawMode, setStatus, setSelId, setTailAsk,
+    setPageIndex,
+    /* spread canvas: map a current-page-local x to the page it falls on */
+    resolveTarget: (cx: number) => {
+      const d = docRef.current;
+      if (!d) return { idx: pageIndex, shift: 0 };
+      const curOff = spreadOffX(pageIndex);
+      for (const s of spreadLayout) {
+        const local = cx + curOff - s.off;
+        if (local >= 0 && local <= d.pages[s.idx].w) return { idx: s.idx, shift: curOff - s.off };
+      }
+      return { idx: pageIndex, shift: 0 };
+    },
   });
 
   /* ---------------- keyboard (see useEditorKeys) ---------------- */
@@ -827,10 +858,9 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   /* ---------------- Tuck Back (traced clipping mask) ---------------- */
   /* plain per-render closures — they travel in the EditorCtx bag, so
      callback identity doesn't matter (see tuckOps.ts) */
-  const tuckJustEndedRef = useRef(0);
   const { startTuck, startTuckDrag, retuneTuck, runTuckAuto, applyTuck } = makeTuckHandlers({
     docRef, assetsRef, pageIndexRef, pageDivRef,
-    tuckPtsRef, tuckAskRef, tuckJustEndedRef,
+    tuckPtsRef, tuckAskRef,
     selId, zoom, pagePoint, force, commit, rebuildThumbs,
     setStatus, setTuckMode, setTuckAsk, keepGenerated,
     getEd: () => ed,
@@ -937,8 +967,8 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   /* Editor-local render plumbing handed to the shell (see editorShell) */
   const sh: ShellProps = {
     areaRef, pageDivRef, dragTipRef, snapRef, thumbs, askAddPage,
-    facingIndex, currentOnLeft, tuckMode, tuckPtsRef,
-    tuckJustEndedRef, drawPtsRef, startSketch, startTuckDrag,
+    tuckMode, tuckPtsRef,
+    drawPtsRef, startSketch, startTuckDrag,
   };
 
   useEffect(() => {
@@ -951,7 +981,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
 
   /* Two-up: drop-on-facing-page transfer — see spreadOps.ts */
   crossPageDropRef.current = !spread || facingIndex < 0 ? null : makeCrossPageDrop({
-    docRef, pageIndexRef, selIdsRef, pageDivRef, zoom, facingIndex,
+    docRef, pageIndexRef, selIdsRef, pageDivRef, zoom, spreadPrint,
     setSelIds, commit, rebuildThumbs, setStatus,
   });
 

@@ -221,6 +221,23 @@ export function renderContextMenu(ed: EditorCtx) {
               <div className="ctxSep" />
             </>
           )}
+          {el.type === "image" && !el.cut && (
+            /* stamps follow the LETTERING rules at the bleed line (clip at
+               the trim, carry across the spine); artwork may fill the bleed.
+               Stamps placed before the flag existed default to artwork —
+               this is where they get flipped. */
+            <>
+              <button onClick={() => {
+                el.stamp = !el.stamp;
+                commit();
+                setStatus(el.stamp
+                  ? "Now a STAMP — it clips at the bleed line like lettering."
+                  : "Now ARTWORK — it may fill the bleed.");
+                close();
+              }}>{el.stamp ? "✓ Clip At Bleed (Stamp)" : "Clip At Bleed (Stamp)"}</button>
+              <div className="ctxSep" />
+            </>
+          )}
           <button disabled={el.locked} onClick={() => { reorder(ed, 1); close(); }}>Bring Forward</button>
           <button disabled={el.locked} onClick={() => { reorder(ed, 1e9); close(); }}>Bring To Front</button>
           <button disabled={el.locked} onClick={() => { reorder(ed, -1); close(); }}>Send Backward</button>

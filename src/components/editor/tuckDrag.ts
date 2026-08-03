@@ -31,9 +31,6 @@ export interface TuckDragDeps {
      units (screen mapping) — lets a trace sweep across the spine and cut the
      facing page's artwork */
   facing: { index: number; offX: number; offY: number } | null;
-  /* stamped on trace end so the facing page's click-to-switch can ignore the
-     click that ends a cross-spine trace */
-  justEndedRef?: { current: number };
 }
 
 /* Points closer than this add nothing but work — the outline is smoothed
@@ -200,7 +197,6 @@ export function beginTuckLasso(d: TuckDragDeps, e: React.PointerEvent) {
     window.removeEventListener("pointermove", onMove);
     window.removeEventListener("pointerup", onUp);
     window.removeEventListener("pointercancel", onUp);
-    if (d.justEndedRef) d.justEndedRef.current = Date.now();
     const raw = d.ptsRef.current;
     d.ptsRef.current = null;
     d.setTuckMode(false);
@@ -279,12 +275,29 @@ async function buildTuckAsk(d: TuckDragDeps, raw: number[][]): Promise<TuckAsk |
     return ask;
   };
 
-  let ask = await attempt(d.pageIndexRef.current, ring);
-  let crossed = false;
-  if (!ask && d.facing) {
+  /* Try the page the trace mostly COVERS first — plain "current page
+     first" let artwork hanging slightly off the current page's edge steal
+     a trace that was clearly aimed at the facing page's art. */
+  const curIdx = d.pageIndexRef.current;
+  const doc = d.docRef.current!;
+  const cands: { idx: number; ring: number[][] }[] = [{ idx: curIdx, ring }];
+  if (d.facing) {
     const f = d.facing;
-    ask = await attempt(f.index, ring.map(([x, y]) => [x - f.offX, y - f.offY]));
-    crossed = !!ask;
+    cands.push({ idx: f.index, ring: ring.map(([x, y]) => [x - f.offX, y - f.offY]) });
+  }
+  const overlapArea = (ringIn: number[][], pgIdx: number) => {
+    const bb2 = pathBounds(ringIn);
+    const pg = doc.pages[pgIdx];
+    const w = Math.min(bb2.x + bb2.w, pg.w) - Math.max(bb2.x, 0);
+    const h = Math.min(bb2.y + bb2.h, pg.h) - Math.max(bb2.y, 0);
+    return Math.max(0, w) * Math.max(0, h);
+  };
+  cands.sort((a, b2) => overlapArea(b2.ring, b2.idx) - overlapArea(a.ring, a.idx));
+  let ask: TuckAsk | null = null;
+  let crossed = false;
+  for (const cand of cands) {
+    ask = await attempt(cand.idx, cand.ring);
+    if (ask) { crossed = cand.idx !== curIdx; break; }
   }
   if (!ask) {
     d.setStatus("No artwork there — draw over a panel or image (unrotated).");

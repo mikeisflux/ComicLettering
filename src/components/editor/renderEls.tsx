@@ -164,11 +164,13 @@ export function renderJoinBands(
    claims ITS page as the ops target — synchronously (the ref first), so the
    very same pointerdown's drag/selection machinery already sees the right
    page. Invisible to the user: nothing changes on screen. */
-export function claimPage(ed: EditorCtx) {
+export function claimPage(ed: EditorCtx): boolean {
   if (ed.pageIndexRef.current !== ed.pageIndex) {
     (ed.pageIndexRef as React.RefObject<number>).current = ed.pageIndex;
     ed.setPageIndex(ed.pageIndex);
+    return true;
   }
+  return false;
 }
 
 export function renderEl(ed: EditorCtx, el: El) {
@@ -197,7 +199,7 @@ export function renderEl(ed: EditorCtx, el: El) {
     "data-id": el.id,
     onPointerDown: (e: React.PointerEvent) => {
       if (editingId === el.id) return;
-      claimPage(ed);
+      const switched = claimPage(ed);
       /* A right-click fires pointerdown first. Left alone it collapsed the
          selection to one element before the context menu could open, so
          "select all, right-click, lock" locked exactly one thing — and it
@@ -206,8 +208,11 @@ export function renderEl(ed: EditorCtx, el: El) {
         if (!ed.selIds.includes(el.id)) select(el.id);
         return;
       }
-      /* ctrl/cmd (or shift) adds to the selection instead of replacing it */
-      const add = e.ctrlKey || e.metaKey || e.shiftKey;
+      /* ctrl/cmd (or shift) adds to the selection instead of replacing it —
+         but never ACROSS pages: the previous ids live on the other page,
+         and ops on a mixed set would silently skip them. Claiming a new
+         page makes this press a fresh selection. */
+      const add = (e.ctrlKey || e.metaKey || e.shiftKey) && !switched;
       /* grabbing a member of a MULTI-selection keeps the whole set — the
          drag moves the convoy together. Collapsing here made a group drag
          silently move only the grabbed one; the collapse now happens on
@@ -551,7 +556,6 @@ export function renderOverlay(ed: EditorCtx) {
      mapping the renderers use. Drags stay correct because every drag mode
      works on pointer DELTAS, not absolute positions. */
   const carry = (() => {
-    if (el.rot) return null;
     const d = ed.doc;
     if (!d) return null;
     const pn = ed.pageIndex + 1;
@@ -571,12 +575,23 @@ export function renderOverlay(ed: EditorCtx) {
       offX: ed.spreadOffX(fi) - ed.spreadOffX(ed.pageIndex), offY: 0,
     };
   })();
-  /* a point in PAGE coords → where it visually appears (overlay coords) */
-  const vis = (px: number, py: number): [number, number] =>
-    carry && (carry.side === 1 ? px > carry.trimX : px < carry.trimX)
-      ? [carry.offX + px + carry.dx, carry.offY + py]
-      : [px, py];
-  const boxSplit = carry && bx < carry.trimX && bx + bw > carry.trimX;
+  /* A point in this overlay's local frame → where it visually appears.
+     The overlay may be ROTATED (CSS transform about the element centre), so
+     the crossing test uses the point's true PAGE position, and the carry
+     displacement — a page-space translation — is rotated back into the
+     overlay's local frame before it is applied. */
+  const vis = (px: number, py: number): [number, number] => {
+    if (!carry) return [px, py];
+    const ecx = el.x + el.w / 2, ecy = el.y + el.h / 2;
+    const pageX = el.rot ? ecx + rotVec(px - ecx, py - ecy, el.rot)[0] : px;
+    if (!(carry.side === 1 ? pageX > carry.trimX : pageX < carry.trimX)) return [px, py];
+    const [tx, ty] = el.rot
+      ? rotVec(carry.offX + carry.dx, carry.offY, -el.rot)
+      : [carry.offX + carry.dx, carry.offY];
+    return [px + tx, py + ty];
+  };
+  /* the split box stays axis-aligned — only meaningful unrotated */
+  const boxSplit = carry && !el.rot && bx < carry.trimX && bx + bw > carry.trimX;
   return (
     <div
       className={"overlay" + (editingId === el.id ? " editing" : "")}
@@ -662,11 +677,16 @@ export function renderOverlay(ed: EditorCtx) {
           there does nothing but detach the pair when grabbed, so hide it.
           Reposition a joined bubble by dragging its body; bend/tilt the band
           with the handles below. */}
-      {el.type === "balloon" && el.tail && !el.attachTo && (
-        <div className="handle tail" title="Drag to aim the tail tip · drop it inside another bubble to join them"
-          style={{ left: (el.w / 2 + el.tail.dx) * z - 7, top: (el.h / 2 + el.tail.dy) * z - 7 }}
-          onPointerDown={(e) => startDrag(e, el, "tail")} />
-      )}
+      {el.type === "balloon" && el.tail && !el.attachTo && (() => {
+        /* tail handles ride the carried mapping too — a tail aimed past the
+           spine-side bleed line shows its controls on the facing page */
+        const [vx, vy] = vis(el.x + el.w / 2 + el.tail.dx, el.y + el.h / 2 + el.tail.dy);
+        return (
+          <div className="handle tail" title="Drag to aim the tail tip · drop it inside another bubble to join them"
+            style={{ left: (vx - el.x) * z - 7, top: (vy - el.y) * z - 7 }}
+            onPointerDown={(e) => startDrag(e, el, "tail")} />
+        );
+      })()}
       {/* single-tail bend handle — NOT on joined bubbles, which get the
           dedicated three-point connector axis below instead */}
       {el.type === "balloon" && el.tail && !el.attachTo &&
@@ -676,9 +696,10 @@ export function renderOverlay(ed: EditorCtx) {
         const ey = el.h / 2 + (el.h / 2) * Math.sin(t);
         const bx = el.tail.bx ?? (ex + el.w / 2 + el.tail.dx) / 2 - el.w / 2;
         const by = el.tail.by ?? (ey + el.h / 2 + el.tail.dy) / 2 - el.h / 2;
+        const [vx, vy] = vis(el.x + el.w / 2 + bx, el.y + el.h / 2 + by);
         return (
           <div className="handle tailBow" title="Drag to bend the tail"
-            style={{ left: (el.w / 2 + bx) * z - 6, top: (el.h / 2 + by) * z - 6 }}
+            style={{ left: (vx - el.x) * z - 6, top: (vy - el.y) * z - 6 }}
             onPointerDown={(e) => startDrag(e, el, "bow")} />
         );
       })()}
@@ -703,26 +724,31 @@ export function renderOverlay(ed: EditorCtx) {
         const h1 = [M[0] + T[0] * L, M[1] + T[1] * L];
         const h2 = [M[0] - T[0] * L, M[1] - T[1] * L];
         const showTilt = tiltConn === el.id;
+        /* connector controls follow the carried mapping across the spine */
+        const vM = vis(el.x + M[0], el.y + M[1]);
+        const v1 = vis(el.x + h1[0], el.y + h1[1]);
+        const v2 = vis(el.x + h2[0], el.y + h2[1]);
         return (
           <>
             {showTilt && (
               <svg style={{ position: "absolute", left: 0, top: 0, width: 1, height: 1, overflow: "visible", pointerEvents: "none" }}>
-                <line x1={h1[0] * z} y1={h1[1] * z} x2={h2[0] * z} y2={h2[1] * z} stroke="#777" strokeWidth={1} />
+                <line x1={(v1[0] - el.x) * z} y1={(v1[1] - el.y) * z}
+                  x2={(v2[0] - el.x) * z} y2={(v2[1] - el.y) * z} stroke="#777" strokeWidth={1} />
               </svg>
             )}
             {showTilt && (
               <div className="handle tiltDot" title="Tilt the connector"
-                style={{ left: h1[0] * z - 5, top: h1[1] * z - 5 }}
+                style={{ left: (v1[0] - el.x) * z - 5, top: (v1[1] - el.y) * z - 5 }}
                 onPointerDown={(e) => startDrag(e, el, "tilt", "t1")} />
             )}
             {showTilt && (
               <div className="handle tiltDot" title="Tilt the connector"
-                style={{ left: h2[0] * z - 5, top: h2[1] * z - 5 }}
+                style={{ left: (v2[0] - el.x) * z - 5, top: (v2[1] - el.y) * z - 5 }}
                 onPointerDown={(e) => startDrag(e, el, "tilt", "t2")} />
             )}
             <div className="handle connMove"
               title="Drag to curve the connecting tail — drop it inside another bubble to join that one instead · double-click to tilt"
-              style={{ left: M[0] * z - 7, top: M[1] * z - 7 }}
+              style={{ left: (vM[0] - el.x) * z - 7, top: (vM[1] - el.y) * z - 7 }}
               onPointerDown={(e) => startDrag(e, el, "bow")}
               onDoubleClick={(e) => {
                 e.stopPropagation();

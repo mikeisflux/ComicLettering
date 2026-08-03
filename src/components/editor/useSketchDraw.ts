@@ -20,6 +20,11 @@ export interface SketchDeps {
   setStatus: (s: string) => void;
   setSelId: (id: string | null) => void;
   setTailAsk: (id: string | null) => void;
+  /* spread canvas: which page a current-page-local x really falls on, and
+     the shift that converts the coordinate into that page's local space
+     (identity in single view) */
+  resolveTarget: (cx: number) => { idx: number; shift: number };
+  setPageIndex: (i: number) => void;
 }
 
 export function useSketchDraw(deps: SketchDeps) {
@@ -61,8 +66,15 @@ export function useSketchDraw(deps: SketchDeps) {
       if (bw < 40 || bh < 40) { d.setStatus("Sketch cancelled — draw a bigger outline."); d.force(); return; }
       const pts = body.map(([qx, qy]) => [(qx - x0) / bw, (qy - y0) / bh] as [number, number]);
       const doc = d.docRef.current!;
-      const pg = doc.pages[d.pageIndexRef.current];
-      const el = makeBalloon("custom", Math.round(x0), Math.round(y0), Math.round(bw), Math.round(bh));
+      /* the balloon lands on whichever page of the spread it was drawn
+         over, in that page's own coordinates */
+      const t = d.resolveTarget(x0 + bw / 2);
+      const pg = doc.pages[t.idx];
+      if (t.idx !== d.pageIndexRef.current) {
+        (d.pageIndexRef as { current: number }).current = t.idx;
+        d.setPageIndex(t.idx);
+      }
+      const el = makeBalloon("custom", Math.round(x0 + t.shift), Math.round(y0), Math.round(bw), Math.round(bh));
       el.pts = pts;
       if (tailInfo) {
         /* they drew the tail — aim the real one at its tip */

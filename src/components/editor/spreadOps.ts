@@ -45,7 +45,9 @@ export interface CrossPageDropDeps {
   selIdsRef: React.RefObject<string[]>;
   pageDivRef: React.RefObject<HTMLDivElement | null>;
   zoom: number;
-  facingIndex: number;
+  /* print view: the halves' spine-side bleed strips are cropped away, so
+     the drop hit-test must stop at the visible seam, not the layout rect */
+  spreadPrint: boolean;
   setSelIds: (ids: string[]) => void;
   commit: () => void;
   rebuildThumbs: () => void;
@@ -61,22 +63,25 @@ export function makeCrossPageDrop(d: CrossPageDropDeps) {
     const pgEl = d.pageDivRef.current;
     const fpDiv = document.querySelector(".pageHalf:not(.cur)") as HTMLElement | null;
     if (!doc || !pgEl || !fpDiv) return false;
-    const hit = fpDiv.getBoundingClientRect();
-    if (cx < hit.left || cx > hit.right || cy < hit.top || cy > hit.bottom) return false;
     const off = facingOffset(pgEl, d.zoom);
     if (!off) return false;
+    const target0 = doc.pages[off.index];
+    const hit = { ...fpDiv.getBoundingClientRect().toJSON() } as
+      { left: number; right: number; top: number; bottom: number };
+    if (d.spreadPrint) {
+      /* the half's rect includes its CLIPPED spine-side bleed strip (rects
+         ignore clip-path) — pull the hit edge in to the visible seam, or a
+         release just past the seam on the CURRENT page counts as a drop */
+      const inset = pageBleed(target0) * d.zoom;
+      if (off.offX > 0) hit.left += inset; else hit.right -= inset;
+    }
+    if (cx < hit.left || cx > hit.right || cy < hit.top || cy > hit.bottom) return false;
     const cur = doc.pages[d.pageIndexRef.current];
     const target = doc.pages[off.index];
     const ids = new Set(d.selIdsRef.current.length ? d.selIdsRef.current : [mainId]);
     const moving = cur.els.filter((e) => ids.has(e.id) && !e.locked);
     if (!moving.length) return false;
     const movingIds = new Set(moving.map((m) => m.id));
-    for (const m of moving) {
-      if (m.type === "balloon" && m.attachTo && !movingIds.has(m.attachTo)) m.attachTo = null;
-    }
-    for (const e2 of cur.els) {
-      if (e2.type === "balloon" && e2.attachTo && movingIds.has(e2.attachTo) && !movingIds.has(e2.id)) e2.attachTo = null;
-    }
     /* Two content spaces exist between facing pages: the CANVAS (with the
        gutter and both bleed strips between the pages) and the TRIM JOIN
        (where the pages' printed content is glued edge to edge — what the
@@ -94,6 +99,23 @@ export function makeCrossPageDrop(d: CrossPageDropDeps) {
       return elCrossesSpine(mainEl, side === 1 ? cur.w - b : b, side);
     })();
     const join = spreadNeighbor(doc, off.index);   // source content → target coords
+    if (spanning && join && mainEl) {
+      /* a SPLIT element already lives on both pages — flipping its owner on
+         every release only churns pages (and spams status). Hand it over
+         only when the drop leaves it clearly on the target side: after the
+         join-preserving move it must no longer cross back over the spine.
+         (Checked BEFORE any mutation — bailing out must leave joins alone.) */
+      const bT = pageBleed(target);
+      const sideT: 1 | -1 = (off.index + 1) % 2 === 0 ? 1 : -1;
+      const moved = { ...mainEl, x: mainEl.x + join.dx };
+      if (elCrossesSpine(moved, sideT === 1 ? target.w - bT : bT, sideT)) return false;
+    }
+    for (const m of moving) {
+      if (m.type === "balloon" && m.attachTo && !movingIds.has(m.attachTo)) m.attachTo = null;
+    }
+    for (const e2 of cur.els) {
+      if (e2.type === "balloon" && e2.attachTo && movingIds.has(e2.attachTo) && !movingIds.has(e2.id)) e2.attachTo = null;
+    }
     const tx = spanning && join ? join.dx : -off.offX;
     const ty = spanning ? 0 : -off.offY;
     cur.els = cur.els.filter((e2: El) => !movingIds.has(e2.id));
@@ -105,7 +127,7 @@ export function makeCrossPageDrop(d: CrossPageDropDeps) {
     d.setSelIds([]);
     d.commit();
     d.rebuildThumbs();
-    d.setStatus(`Moved ${moving.length > 1 ? `${moving.length} items` : "1 item"} to page ${d.facingIndex + 1}.`);
+    d.setStatus(`Moved ${moving.length > 1 ? `${moving.length} items` : "1 item"} to page ${off.index + 1}.`);
     return true;
   };
 }

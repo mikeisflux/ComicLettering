@@ -27,11 +27,8 @@ export interface ShellProps {
   snapRef: { current: { x: number | null; y: number | null } };
   thumbs: Record<number, string>;
   askAddPage: boolean;
-  facingIndex: number;
-  currentOnLeft: boolean;
   tuckMode: boolean;
   tuckPtsRef: { current: number[][] | null };
-  tuckJustEndedRef: { current: number };
   drawPtsRef: { current: number[][] | null };
   startSketch: (e: React.PointerEvent) => void;
   startTuckDrag: (e: React.PointerEvent) => void;
@@ -127,6 +124,10 @@ function spreadHalf(ed: EditorCtx, sh: ShellProps, idx: number, off: number) {
         overflow: isCur && sh.tuckMode ? "visible" : "hidden",
         clipPath: spineCrop,
         boxShadow: "0 4px 26px #00000066",
+        /* own stacking context: a half's z-indexed children (tuck cutouts,
+           carried lettering) must never paint over the OTHER half — print
+           view's halves overlap by their clipped bleed strips */
+        isolation: "isolate",
         ...fillCss(pg.bg),
       }}
       onPointerDown={(e) => {
@@ -220,11 +221,15 @@ function renderSpreadCanvas(ed: EditorCtx, sh: ShellProps) {
         </div>
       )}
       {drawMode && (
+        /* sketching covers the whole spread too — the finished balloon
+           lands on whichever page the outline was drawn over */
         <div className="drawLayer" onPointerDown={sh.startSketch}
-          style={{ left: curOff * zoom, top: 0, width: page.w * zoom, height: page.h * zoom }}>
+          style={{ left: 0, top: 0, width: totalW * zoom, height: totalH * zoom }}>
           {sh.drawPtsRef.current && sh.drawPtsRef.current.length > 1 && (
-            <svg>
-              <path d={"M " + sh.drawPtsRef.current.map(([qx, qy]) => `${Math.round(qx * zoom)} ${Math.round(qy * zoom)}`).join(" L ")} />
+            <svg style={{ width: "100%", height: "100%" }}>
+              <g transform={`translate(${curOff * zoom} 0)`}>
+                <path d={"M " + sh.drawPtsRef.current.map(([qx, qy]) => `${Math.round(qx * zoom)} ${Math.round(qy * zoom)}`).join(" L ")} />
+              </g>
             </svg>
           )}
         </div>
