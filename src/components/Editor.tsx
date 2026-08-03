@@ -309,8 +309,10 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     if (!spread || facingIndex < 0 || !d) { setSpreadUrl(null); return; }
     const fp = d.pages[facingIndex];
     /* neighbor = the CURRENT page, so lettering overhanging the spine shows
-       its continuation on the facing preview */
-    pageThumbnail(fp, assetsRef.current, Math.min(fp.w, 800), spreadNeighbor(d, facingIndex))
+       its continuation on the facing preview. Rendered with a generous
+       buffer (1280px) so carried lettering stays crisp next to the live
+       page — the canvas is GPU-composited, the extra memory is worth it. */
+    pageThumbnail(fp, assetsRef.current, Math.min(fp.w, 1280), spreadNeighbor(d, facingIndex))
       .then((u) => { if (alive) setSpreadUrl(u); }).catch(() => { });
     return () => { alive = false; };
   }, [spread, facingIndex, thumbs]);

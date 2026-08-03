@@ -55,7 +55,10 @@ export function renderCarriedLettering(ed: EditorCtx) {
     <div className="carriedLettering" style={{
       position: "absolute", left: nb.dx, top: 0,
       width: nb.page.w, height: nb.page.h,
-      pointerEvents: "none", clipPath: clip,
+      pointerEvents: "none", clipPath: clip, zIndex: 1,
+      /* own compositor layer: the copy repaints live while its source is
+         dragged on the other page — keep that off the main page layer */
+      transform: "translateZ(0)", willChange: "transform",
     }}>
       {carried.map((el) => (
         <React.Fragment key={`carry-${el.id}`}>{renderEl(edP, el)}</React.Fragment>
@@ -213,6 +216,12 @@ export function renderEl(ed: EditorCtx, el: El) {
       border: el.borderW > 0 ? `${el.borderW}px solid ${el.borderC}` : "none",
       overflow: "hidden",
       boxShadow: el.shadow ? "8px 8px 12px #00000059" : undefined,
+      /* Tuck cutouts are foreground ART: with a facing partner they sit
+         above the carried lettering too (zIndex 1), exactly like the
+         canvas renderer's final cutout pass — a cross-spine tuck reads as
+         the art passing in front of the double-page SFX */
+      zIndex: el.type === "image" && el.cut && ed.doc && spreadNeighbor(ed.doc, ed.pageIndex)
+        ? 2 : undefined,
     };
     return (
       <div {...common} className={"el " + el.type} style={st}>

@@ -115,7 +115,13 @@ function facingPage(ed: EditorCtx, sh: ShellProps, innerCropSide: "left" | "righ
         setPageIndex(sh.facingIndex); setSelId(null);
       }}>
       {sh.spreadUrl && <img src={sh.spreadUrl} alt=""
-        style={{ width: fp.w * zoom, height: fp.h * zoom, marginLeft: innerCropSide === "left" ? -crop : undefined }} />}
+        style={{
+          width: fp.w * zoom, height: fp.h * zoom,
+          marginLeft: innerCropSide === "left" ? -crop : undefined,
+          /* own GPU layer: the preview swaps on every thumb refresh — keep
+             those repaints off the editing page's layer */
+          transform: "translateZ(0)",
+        }} />}
       <span className="facingNum">{sh.facingIndex + 1}</span>
     </div>
   );

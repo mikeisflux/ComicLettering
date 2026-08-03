@@ -146,7 +146,11 @@ function drawRichText(
   const y0 = ry + rh / 2 - blockH / 2 + lineH / 2;
   let fill: string | CanvasGradient = ts.fillA;
   if (ts.fillB) {
-    const g = ctx.createLinearGradient(0, y0 - lineH / 2, 0, y0 - lineH / 2 + blockH);
+    /* the DOM paints this gradient across the whole text BOX
+       (background-clip: text on the .txt div) — span the same rect here
+       or the two renderers disagree on how much of the ramp the glyphs
+       actually receive */
+    const g = ctx.createLinearGradient(0, ry, 0, ry + rh);
     g.addColorStop(0, lightenHex(ts.fillA, 0.55));
     g.addColorStop(0.38, ts.fillA);
     g.addColorStop(1, ts.fillB);
@@ -352,7 +356,9 @@ export function drawStyledText(
 
   let fill: string | CanvasGradient = ts.fillA;
   if (ts.fillB) {
-    const g = ctx.createLinearGradient(0, y0 - lineH / 2, 0, y0 - lineH / 2 + blockH);
+    /* match the DOM: the gradient spans the whole text box, not just the
+       glyph block (see drawRichText above) */
+    const g = ctx.createLinearGradient(0, ry, 0, ry + rh);
     g.addColorStop(0, lightenHex(ts.fillA, 0.55));
     g.addColorStop(0.38, ts.fillA);
     g.addColorStop(1, ts.fillB);
