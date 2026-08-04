@@ -11,8 +11,11 @@ export const dynamic = "force-dynamic";
 
 /* The promise on the Lifetime tier: your name on the credits page. */
 export default async function CreditsPage() {
+  /* genuine lifetime SUPPORTERS only: admins and internal accounts never
+     list here — grant staff/test/reviewer accounts the "comp" plan (same
+     full access, no credits listing) instead of "lifetime" */
   const supporters = await prisma.user.findMany({
-    where: { subPlan: "lifetime" },
+    where: { subPlan: "lifetime", isAdmin: false },
     select: { name: true },
     orderBy: { createdAt: "asc" },
   }).catch(() => [] as { name: string }[]);
