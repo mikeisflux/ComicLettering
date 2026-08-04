@@ -19,7 +19,7 @@ import {
 } from "@/lib/exportPng";
 import { pageBleed } from "@/lib/model";
 import { onLetteringInput } from "./ops";
-import { dragInProgress } from "./penInput";
+import { dragInProgress, isDoubleTap } from "./penInput";
 
 /* ---------- autoclipping self-replication ----------
    Lettering cut off at the facing page's spine-side bleed line REAPPEARS
@@ -223,6 +223,14 @@ export function renderEl(ed: EditorCtx, el: El) {
          pointer-up when nothing moved (see useStartDrag's onUp). */
       const inGroup = !add && !el.locked && ed.selIds.length > 1 && ed.selIds.includes(el.id);
       if (!inGroup) select(el.id, add);
+      /* touch double-tap = double-click (browsers synthesize dblclick from
+         taps too unevenly to rely on): edit the words */
+      if (!el.locked && isDoubleTap("el:" + el.id, e) &&
+        (el.type === "balloon" || el.type === "text")) {
+        e.preventDefault();   // suppress compat mouse events re-firing on the new UI
+        setEditingId(el.id);
+        return;
+      }
       /* an additive click is picking, not dragging — starting a drag here
          would nudge the set every time you add one more to it */
       if (!el.locked && !add) startDrag(e, el, "move");
@@ -648,7 +656,11 @@ export function renderOverlay(ed: EditorCtx) {
             <div key={i} className="handle warpDot"
               title={i < 4 ? "Drag to pin this corner" : "Drag to bow this edge"}
               style={{ left: (px - bx) * z - 5, top: (py - by) * z - 5 }}
-              onPointerDown={(e) => startDrag(e, el, "envelope", String(i))}
+              onPointerDown={(e) => {
+                /* touch double-tap on a dot = leave warp mode */
+                if (isDoubleTap("wd:" + el.id, e)) { e.preventDefault(); setWarping(null); return; }
+                startDrag(e, el, "envelope", String(i));
+              }}
               onDoubleClick={(e) => { e.stopPropagation(); setWarping(null); }} />
           );
         })
@@ -663,7 +675,13 @@ export function renderOverlay(ed: EditorCtx) {
           <div key={k} className={`handle h-${k}`}
             title={el.type === "text" ? "Drag to resize · double-click to warp" : "Drag to resize"}
             style={{ left: (vx - bx) * z - 6, top: (vy - by) * z - 6 }}
-            onPointerDown={(e) => startDrag(e, el, "resize", k)}
+            onPointerDown={(e) => {
+              /* touch double-tap on a lettering handle = enter warp mode */
+              /* preventDefault, or the tap's compat dblclick lands on the
+                 warp dot that just rendered here and exits warp instantly */
+              if (el.type === "text" && isDoubleTap("h:" + el.id, e)) { e.preventDefault(); setWarping(el.id); return; }
+              startDrag(e, el, "resize", k);
+            }}
             onDoubleClick={(e) => {
               if (el.type !== "text") return;
               e.stopPropagation();

@@ -42,6 +42,21 @@ export function rejectPalm(e: { pointerType?: string }): boolean {
   return e.pointerType === "touch" && performance.now() < penUntil;
 }
 
+/* ---- double-tap detection ----
+   Touch double-taps are supposed to synthesize dblclick, but browsers
+   swallow them unevenly (double-tap-zoom heuristics, Safari). Tools that
+   open on double-click call this from pointerdown as a reliable fallback:
+   same key, two touch taps within 350ms and 30px = a double tap. */
+const lastTap = new Map<string, { t: number; x: number; y: number }>();
+export function isDoubleTap(key: string, e: { pointerType?: string; clientX: number; clientY: number }): boolean {
+  if (e.pointerType !== "touch") return false;
+  const now = performance.now();
+  const prev = lastTap.get(key);
+  lastTap.set(key, { t: now, x: e.clientX, y: e.clientY });
+  if (lastTap.size > 40) lastTap.delete(lastTap.keys().next().value!);
+  return !!prev && now - prev.t < 350 && Math.hypot(e.clientX - prev.x, e.clientY - prev.y) < 30;
+}
+
 /* ---- drag exclusivity ----
    One gesture at a time: while a drag (move/resize/tail/warp/lasso/sketch)
    is running, no other pointer may start a second drag or a pinch-zoom.

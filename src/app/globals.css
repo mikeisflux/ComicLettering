@@ -20,7 +20,15 @@ body {
   color: var(--text);
   font: 13px/1.4 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
-.app { user-select: none; overflow: hidden; }
+.app { user-select: none; -webkit-user-select: none; overflow: hidden; }
+/* touch: a swipe-down at the top must never pull-to-refresh mid-edit, and a
+   horizontal overscroll must never trigger the browser's back gesture */
+.app { overscroll-behavior: none; }
+.canvasArea { overscroll-behavior: contain; }
+/* iPad Safari: no long-press callout/selection on the working surfaces, and
+   instant taps (no double-tap-zoom heuristics) on the editor chrome */
+.el, .overlay, .handle, .drawLayer { -webkit-touch-callout: none; }
+.menuBar, .toolbar, .formatBar, .tray, .tabs { touch-action: manipulation; }
 .booting {
   display: flex; align-items: center; justify-content: center;
   height: 100vh; color: var(--dim); font-size: 15px;
