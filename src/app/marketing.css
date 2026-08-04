@@ -376,3 +376,17 @@
   .mktFooter .cols { grid-template-columns: 1fr; gap: 18px; }
   .faqItem summary, .faqList summary { font-size: 15px; }
 }
+
+/* ============== installed-app mode ==============
+   Inside the Android/iPad app (and any installed PWA) the display-mode is
+   standalone. There, the site must read as an APP, not a website: no
+   marketing nav, no SEO footer — just the logo, the way into the studio,
+   and the page content. */
+@media all and (display-mode: standalone) {
+  .mktNav, .mktBurger { display: none; }
+  .mktHeader .mktLogo { margin-right: auto; }
+  .mktFooter .cols { display: none; }
+  .mktFooter { padding: 14px 5vw; }
+  /* marketing hero sells the product; in the app you already have it */
+  .heroNote, .relatedLinks { display: none; }
+}
