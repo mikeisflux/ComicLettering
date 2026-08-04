@@ -103,6 +103,8 @@ export interface EditorCtx {
   selectAllOnPage: () => void;
   /* prompt the browser's PWA install (or explain how, per platform) */
   installApp: () => void;
+  /* already installed on this machine → the install button hides */
+  appInstalled: boolean;
   /* open the "+ Page" chooser (before/after the current page) — every
      add-page affordance (sidebar button, toolbar, Insert menu) uses it */
   setAskAddPage: (v: boolean) => void;

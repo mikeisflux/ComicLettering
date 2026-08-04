@@ -114,6 +114,7 @@ input[type="range"] { width: 110px; }
   display: flex; align-items: stretch;
   background: #1a222d; border-bottom: 1px solid #0d1117;
   padding: 0 8px; flex: 0 0 auto;
+  position: relative;   /* anchors the centred install button */
 }
 .menuWrap { position: relative; }
 .menuTop {
@@ -166,15 +167,15 @@ input[type="range"] { width: 110px; }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 /* the loud install entry point — File → Install as App… goes unnoticed.
-   STICKY at the toolbar's right edge: the toolbar scrolls horizontally on
-   narrow windows, and a button that scrolls out of view sells nothing. */
+   Dead-centre of the MENU BAR (the File/Edit/View bar), floating above it
+   so the slim bar keeps its height and the menus keep their places. */
 .installBtn {
-  align-self: center;
-  position: sticky; right: 8px;
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  z-index: 5;
   background: #d3382c; color: #fff;
   font-weight: 700; font-size: 12px; letter-spacing: .2px;
-  border: 1px solid #a52a20; border-radius: 6px;
-  padding: 8px 14px; white-space: nowrap;
+  border: 1px solid #a52a20; border-radius: 5px;
+  padding: 3px 14px; white-space: nowrap;
   box-shadow: 0 1px 4px #000a;
 }
 .installBtn:hover { background: #e2493c; }
@@ -182,8 +183,8 @@ input[type="range"] { width: 110px; }
 /* phones/tablets get the app from /get-the-app (Play Store / home screen);
    this button is the DESKTOP path and only shows there */
 @media (pointer: coarse) { .installBtn { display: none; } }
-/* the long wording only where the toolbar has room for it */
-@media (max-width: 1750px) { .installBtn .ibLong { display: none; } }
+/* the long wording only where the bar's centre has room for it */
+@media (max-width: 1500px) { .installBtn .ibLong { display: none; } }
 
 /* ---------------- format bar ---------------- */
 .formatBar {

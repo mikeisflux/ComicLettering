@@ -935,6 +935,22 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   /* Tablet pinch-zoom and the PWA install prompt — see usePlatform.ts */
   usePinchZoom(areaRef, zoom, setZoom, setUserZoomed, mounted && !!doc && !!page);
   const installApp = useInstallPrompt(setStatus);
+  /* is LetterMyComic ALREADY installed on this machine? The menu-bar
+     install button hides then, even in a plain browser tab. Chromium
+     reports it via getInstalledRelatedApps (the manifest lists itself as
+     a related webapp); the appinstalled event hides it the moment the
+     user installs without waiting for a reload. */
+  const [appInstalled, setAppInstalled] = useState(false);
+  useEffect(() => {
+    (navigator as unknown as {
+      getInstalledRelatedApps?: () => Promise<{ platform: string }[]>;
+    }).getInstalledRelatedApps?.()
+      .then((apps) => { if (apps?.some((a) => a.platform === "webapp")) setAppInstalled(true); })
+      .catch(() => { /* unsupported — the display-mode check still applies */ });
+    const onInstalled = () => setAppInstalled(true);
+    window.addEventListener("appinstalled", onInstalled);
+    return () => window.removeEventListener("appinstalled", onInstalled);
+  }, []);
 
   /* ---------------- shared context bag ---------------- */
   /* One plain object per render; extracted modules receive it as `ed`.
@@ -948,7 +964,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     fileFontRef, fileStampRef,
     force, commit, autosave, undo, redo, setStatus, select, setSelId,
     setEditingId, finishEditing, mutateSel, startDrag, pagePoint, fitZoom, startTuck,
-    selectAllOnPage, installApp, setAskAddPage,
+    selectAllOnPage, installApp, appInstalled, setAskAddPage,
     tuckAsk, setTuckAsk, retuneTuck, runTuckAuto, applyTuck,
     autosaveSoon,
     rebuildThumbs, reseedAids, setThumbs, setPageIndex, setUserZoomed,

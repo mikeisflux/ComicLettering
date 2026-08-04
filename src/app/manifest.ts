@@ -21,6 +21,12 @@ export default function manifest(): MetadataRoute.Manifest {
       { src: "/icons/icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
       { src: "/icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
     ],
+    /* the manifest lists ITSELF as a related webapp so
+       getInstalledRelatedApps() can report "already installed" — the
+       editor's install button hides then, even in a plain browser tab */
+    related_applications: [
+      { platform: "webapp", url: "https://lettermycomic.com/manifest.webmanifest" },
+    ],
     /* not yet in Next's Manifest type — supported by Chromium's installed-app
        file handling; harmless extra JSON everywhere else */
     file_handlers: [
