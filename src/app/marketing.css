@@ -269,3 +269,110 @@
 .mktFooter a { color: #cdd6e2; display: block; margin-bottom: 6px; }
 .mktFooter .foot-brand { font-family: "Bangers", cursive; font-size: 22px; color: #fff; }
 .mktFooter .legal { margin-top: 18px; text-align: center; color: #6d7b8d; font-size: 12px; }
+
+/* ============== responsive: hamburger + tablet/phone layouts ==============
+   Three tiers below desktop: tablet (<=1024), phone (<=860), small (<=430).
+   The inline header nav collapses into the hamburger drawer on phone. */
+
+/* hamburger button (hidden on desktop) */
+.mktBurger {
+  display: none; flex-direction: column; justify-content: center; gap: 5px;
+  width: 44px; height: 44px; padding: 10px; margin-left: 4px;
+  background: transparent; border: none; cursor: pointer; z-index: 201;
+}
+.mktBurger span {
+  display: block; height: 3px; border-radius: 2px; background: #e8edf4;
+  transition: transform .22s ease, opacity .22s ease;
+}
+.mktBurger.open span:nth-child(1) { transform: translateY(8px) rotate(45deg); }
+.mktBurger.open span:nth-child(2) { opacity: 0; }
+.mktBurger.open span:nth-child(3) { transform: translateY(-8px) rotate(-45deg); }
+
+/* slide-in drawer */
+.mktMenuBackdrop { position: fixed; inset: 0; background: #000a; z-index: 199; }
+.mktMenu {
+  position: fixed; top: 0; right: 0; bottom: 0; z-index: 200;
+  width: min(320px, 84vw);
+  background: linear-gradient(var(--navy2), var(--navy) 30%);
+  padding: 74px 24px 24px; overflow-y: auto;
+  display: flex; flex-direction: column;
+  transform: translateX(105%); transition: transform .25s ease;
+  box-shadow: -8px 0 30px #0006;
+}
+.mktMenu.open { transform: none; }
+.mktMenu a {
+  color: #e8edf4; font-weight: 700; font-size: 17px; text-decoration: none;
+  padding: 13px 8px; border-bottom: 1px solid #ffffff14;
+}
+.mktMenu a:hover { color: #fff; text-decoration: none; }
+.mktMenuSep { height: 14px; }
+.mktMenu .mktMenuCta {
+  margin-top: 14px; background: var(--orange); color: #1d1105; text-align: center;
+  border-radius: 8px; border-bottom: none; font-weight: 800;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mktMenu, .mktBurger span { transition: none; }
+}
+
+/* ---------- tablet (<=1024px) ---------- */
+@media (max-width: 1024px) {
+  .mktHeader { gap: 16px; padding: 12px 4vw; }
+  .mktNav { gap: 14px; }
+  .mktNav a { font-size: 13.5px; }
+  .hero { padding: 56px 5vw 50px; }
+  .mktSection { padding: 48px 5vw; }
+  .featGrid { grid-template-columns: repeat(2, 1fr); }
+  .shotRow { gap: 20px; }
+  .mktFooter .cols { gap: 28px; }
+}
+
+/* ---------- phone (<=860px): nav lives in the drawer ---------- */
+@media (max-width: 860px) {
+  .mktNav, .mktHeader .ghost { display: none; }
+  .mktBurger { display: flex; }
+  .mktHeader { gap: 10px; }
+  .mktHeader .mktLogo { margin-right: auto; font-size: 24px; }
+  .mktHeader .cta { padding: 8px 14px; font-size: 14px; white-space: nowrap; }
+
+  .hero { padding: 44px 6vw 40px; }
+  .hero h1 { font-size: clamp(32px, 9vw, 48px); }
+  .hero p.lead { font-size: 16px; }
+  .heroSlide { font-size: 16px; }
+  .heroBtns { flex-direction: column; align-items: stretch; max-width: 340px; margin: 0 auto; }
+  .btnBig { text-align: center; padding: 14px 20px; }
+
+  .mktSection { padding: 40px 6vw; }
+  .mktSection .sub { margin-bottom: 24px; }
+  .featGrid { grid-template-columns: 1fr; gap: 16px; }
+  .featCard { box-shadow: 4px 4px 0 #d8dde4; padding: 18px; }
+
+  .priceGrid { gap: 18px; }
+  .priceCard { padding: 22px; box-shadow: 6px 6px 0 #d8dde4; }
+  .priceCard .amount { font-size: 46px; }
+
+  .shotHero img { box-shadow: 6px 6px 0 #d8dde4; }
+  .shotRow figure:last-child img { max-width: 100%; }
+
+  .formCard { margin: 28px auto; padding: 22px; box-shadow: 5px 5px 0 #d8dde4; }
+  .acctCard { padding: 18px; box-shadow: 5px 5px 0 #d8dde4; }
+  .acctRow { flex-wrap: wrap; }
+  .acctActions { flex-direction: column; align-items: stretch; }
+  .acctBtn { text-align: center; }
+
+  .blogPost p, .blogPost li, .prose p, .prose li { font-size: 15.5px; }
+
+  .mktFooter { padding: 28px 6vw; }
+  .mktFooter .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+}
+
+/* ---------- small phones (<=430px) ---------- */
+@media (max-width: 430px) {
+  .mktHeader { padding: 10px 4vw; }
+  .mktHeader .mktLogo { font-size: 21px; }
+  .mktHeader .cta { padding: 7px 11px; font-size: 13px; }
+  .hero h1 { font-size: clamp(28px, 10vw, 38px); text-shadow: 2px 2px 0 #ffffff, 3px 3px 0 var(--orange); }
+  .mktSection h2 { font-size: 26px; }
+  .priceCard .amount { font-size: 40px; }
+  .mktFooter .cols { grid-template-columns: 1fr; gap: 18px; }
+  .faqItem summary, .faqList summary { font-size: 15px; }
+}

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import "../marketing.css";
 import { getSessionUser } from "@/lib/auth";
+import MobileNav from "./_components/MobileNav";
 
 export default async function MarketingLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
@@ -28,6 +29,7 @@ export default async function MarketingLayout({ children }: { children: React.Re
             <Link href="/signup" className="cta">Get Started</Link>
           </>
         )}
+        <MobileNav signedIn={!!user} isAdmin={!!user?.isAdmin} />
       </header>
       {children}
       <footer className="mktFooter">
