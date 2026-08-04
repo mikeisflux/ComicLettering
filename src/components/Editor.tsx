@@ -933,7 +933,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const { customStamps, setCustomStamps, bumpFonts, customFontIdsRef, registerRuntimeFont } = useFontsStamps();
 
   /* Tablet pinch-zoom and the PWA install prompt — see usePlatform.ts */
-  usePinchZoom(areaRef, zoom, setZoom, setUserZoomed);
+  usePinchZoom(areaRef, zoom, setZoom, setUserZoomed, mounted && !!doc && !!page);
   const installApp = useInstallPrompt(setStatus);
 
   /* ---------------- shared context bag ---------------- */

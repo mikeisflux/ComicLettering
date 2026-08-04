@@ -19,6 +19,7 @@ import {
 } from "@/lib/exportPng";
 import { pageBleed } from "@/lib/model";
 import { onLetteringInput } from "./ops";
+import { dragInProgress } from "./penInput";
 
 /* ---------- autoclipping self-replication ----------
    Lettering cut off at the facing page's spine-side bleed line REAPPEARS
@@ -199,6 +200,9 @@ export function renderEl(ed: EditorCtx, el: El) {
     "data-id": el.id,
     onPointerDown: (e: React.PointerEvent) => {
       if (editingId === el.id) return;
+      /* a second finger landing mid-drag must not re-select, switch the
+         ops-target page, or start a competing drag */
+      if (dragInProgress()) return;
       const switched = claimPage(ed);
       /* A right-click fires pointerdown first. Left alone it collapsed the
          selection to one element before the context menu could open, so

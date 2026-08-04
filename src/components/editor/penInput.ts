@@ -23,6 +23,17 @@ const note = (e: PointerEvent) => {
 if (typeof window !== "undefined") {
   window.addEventListener("pointerdown", note, true);
   window.addEventListener("pointermove", note, true);
+  /* backstop: if the owning pointer ends and its tool somehow never
+     released the claim (listener leak, thrown handler), release it here
+     so input can never get stuck dead. Bubble phase — the tools' own
+     handlers run first. */
+  window.addEventListener("pointerup", (e) => releaseDrag(e.pointerId));
+  window.addEventListener("pointercancel", (e) => releaseDrag(e.pointerId));
+  /* Android long-press fires contextmenu — mid-drag that popped the menu
+     under a held finger. Ignore it while any drag is running. */
+  window.addEventListener("contextmenu", (e) => {
+    if (dragOwner !== null) e.preventDefault();
+  }, true);
 }
 
 /* true → this pointerdown is a palm resting near the pen; ignore it */

@@ -20,6 +20,11 @@ export function usePinchZoom(
   zoom: number,
   setZoom: (z: number) => void,
   setUserZoomed: (v: boolean) => void,
+  /* the editor's FIRST render is the loading screen, so a run-once effect
+     fires while areaRef is still null and the listeners never attach —
+     pinch was dead everywhere. The caller flips this once the canvas is
+     really mounted and the effect re-runs against the live element. */
+  ready = true,
 ) {
   const zoomRef = useRef(zoom);
   useEffect(() => { zoomRef.current = zoom; }, [zoom]);
@@ -69,18 +74,26 @@ export function usePinchZoom(
       });
     };
     const up = (e: PointerEvent) => { pts.delete(e.pointerId); if (pts.size < 2) baseDist = 0; };
+    /* with two fingers down, the browser must NOT claim the gesture as a
+       scroll (touch-action pan-x pan-y invites it) — that fires
+       pointercancel and kills the pinch before it can zoom. A non-passive
+       touchmove preventDefault keeps the pointer stream alive; one-finger
+       scrolling is untouched. */
+    const tm = (e: TouchEvent) => { if (pts.size === 2) e.preventDefault(); };
     area.addEventListener("pointerdown", down);
     area.addEventListener("pointermove", move);
     area.addEventListener("pointerup", up);
     area.addEventListener("pointercancel", up);
+    area.addEventListener("touchmove", tm, { passive: false });
     return () => {
       area.removeEventListener("pointerdown", down);
       area.removeEventListener("pointermove", move);
       area.removeEventListener("pointerup", up);
       area.removeEventListener("pointercancel", up);
+      area.removeEventListener("touchmove", tm);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [ready]);
 }
 
 /* Browsers only offer "Install app" quietly (an address-bar icon or a

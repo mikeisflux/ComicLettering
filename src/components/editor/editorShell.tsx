@@ -13,6 +13,7 @@ import { renderCarriedLettering, renderEl, renderJoinBands, renderOverlay } from
 import { renderCommentCatcher, renderCommentPins } from "./collab";
 import { StylesPanel } from "./stylesPanel";
 import { addPageAt } from "./spreadOps";
+import { dragInProgress } from "./penInput";
 import {
   ART_ACCEPT, ART_FORMATS_LABEL, assignImageToPanel, duplicatePage, importFontFiles,
   importImageFile, importJSON, importStampFiles, isSupportedArtFile, movePage,
@@ -133,6 +134,9 @@ function spreadHalf(ed: EditorCtx, sh: ShellProps, idx: number, off: number) {
       }}
       onPointerDown={(e) => {
         if (e.target !== e.currentTarget) return;
+        /* a palm or second finger landing on empty page mid-drag must not
+           deselect or retarget the ops page under a running gesture */
+        if (dragInProgress()) return;
         /* empty press on either page: it becomes the ops target (tray
            inserts, paste, page setup) and the selection clears */
         if (ed.pageIndexRef.current !== idx) {
@@ -296,7 +300,7 @@ export function renderCanvasArea(ed: EditorCtx, sh: ShellProps) {
               overflow: tuckMode ? "visible" : undefined,
               ...fillCss(page.bg),
             }}
-            onPointerDown={(e) => { if (e.target === e.currentTarget) select(null); }}
+            onPointerDown={(e) => { if (e.target === e.currentTarget && !dragInProgress()) select(null); }}
           >
             {/* each join link's connector band paints right after the later
                 of its two partners — links stay independent */}
