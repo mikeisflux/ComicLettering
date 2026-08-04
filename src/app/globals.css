@@ -387,6 +387,9 @@ input[type="range"] { width: 110px; }
   position: absolute; width: 12px; height: 12px;
   background: #fff; border: 1.5px solid var(--sel); border-radius: 2px;
   pointer-events: auto;
+  /* without this, pen/finger drags on a handle become browser pan/scroll
+     gestures — the tail handle "wouldn't drag" on tablets */
+  touch-action: none;
 }
 .handle.rot { border-radius: 50%; background: var(--sel); border-color: #fff; cursor: grab; }
 .handle.tail { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border-color: #fff; cursor: crosshair; }
@@ -624,7 +627,7 @@ input[type="range"] { width: 110px; }
 }
 
 /* hand-drawn balloon sketching */
-.drawLayer { position: absolute; inset: 0; z-index: 55; cursor: crosshair; }
+.drawLayer { position: absolute; inset: 0; z-index: 55; cursor: crosshair; touch-action: none; }
 .drawLayer svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
 .drawLayer path { fill: rgba(30, 136, 229, 0.08); stroke: #1e88e5; stroke-width: 2; stroke-dasharray: 6 4; }
 .trayBtn.on { background: #dcebfb; box-shadow: inset 0 0 0 1.5px var(--sel); border-radius: 6px; }
@@ -1022,18 +1025,14 @@ input[type="range"] { width: 110px; }
 .tuckPreview img { max-width: 100%; max-height: 250px; display: block; }
 
 /* ---------------- pen-first tablet pass ----------------
-   On coarse pointers (tablets, phones) the desktop 10-14px handles are
-   smaller than a fingertip. Grow every handle by 8px each way, shifted
-   -4px so each stays centred on the exact spot its inline style aimed
-   at (offsets there assume the desktop sizes). Applies to both canvases
-   automatically — single-page and spread share these handle classes. */
+   On coarse pointers (tablets, phones) the handles stay DESKTOP-SIZED —
+   big visible handles swallowed small balloons and overlapped each other,
+   making fine adjustment impossible. Instead each handle gets an
+   invisible touch halo (a ::before overhanging every side), so a
+   fingertip or pen lands easily while the visual dot stays small and the
+   artwork stays visible. Both canvases share these classes. */
 @media (pointer: coarse) {
-  .handle { width: 20px; height: 20px; margin: -4px 0 0 -4px; }
-  .handle.tail { width: 22px; height: 22px; }
-  .handle.tailBow { width: 20px; height: 20px; }
-  .handle.warpDot, .handle.tiltDot { width: 18px; height: 18px; }
-  /* the rotation stalk sits above the box — keep it reachable, not doubled */
-  .handle.rot { width: 20px; height: 20px; }
-  /* layer-list and tray buttons get fingertip padding too */
+  .handle::before { content: ""; position: absolute; inset: -9px; }
+  /* layer-list buttons keep fingertip padding */
   .layerBtn { min-width: 34px; min-height: 34px; }
 }
