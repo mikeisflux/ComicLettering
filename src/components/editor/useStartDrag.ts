@@ -6,7 +6,7 @@
    behaviour is unchanged. */
 import React, { useCallback } from "react";
 import {
-  BalloonEl, Doc, El, TextEl, aabbOverlap, clamp, pageMargins, rotVec,
+  BalloonEl, Doc, El, GRAB_MARGIN, TextEl, aabbOverlap, clamp, pageMargins, rotVec,
 } from "@/lib/model";
 import { FLAT } from "@/lib/warp";
 import { elCrossesSpine } from "@/lib/exportPng";
@@ -418,6 +418,35 @@ export function useStartDrag(deps: DragDeps) {
       /* spread view: releasing a move over the FACING page hands the whole
          selection to that page (the transfer commits for itself) */
       if (moved && mode === "move" && crossPageDropRef.current?.(el.id, lastClient.x, lastClient.y)) return;
+      /* drop rescue: the page CLIPS its elements, and a clipped region is
+         not hit-testable — something dropped (almost) entirely past the
+         edge leaves only an un-grabbable sliver (near-impossible to drag
+         back by finger, a reported tablet bug). Nudge the drop so a
+         fingertip's worth stays on the page; the convoy shifts with it so
+         group spacing is preserved. */
+      if (moved && mode === "move") {
+        const p = docRef.current!.pages[pageIndexRef.current];
+        const cur = p.els.find((x) => x.id === el.id);
+        if (cur) {
+          /* the sliver must be a fingertip in SCREEN pixels — a doc-space
+             constant shrinks to nothing zoomed out, and the first ~20px are
+             covered by the selection handles' touch halos, so grabbing a
+             thin sliver starts a RESIZE instead of the move back */
+          const grab = Math.max(GRAB_MARGIN, Math.round(72 / zoom));
+          const gw = Math.min(grab, cur.w), gh = Math.min(grab, cur.h);
+          const ddx = clamp(cur.x, gw - cur.w, p.w - gw) - cur.x;
+          const ddy = clamp(cur.y, gh - cur.h, p.h - gh) - cur.y;
+          if (ddx || ddy) {
+            cur.x += ddx;
+            cur.y += ddy;
+            for (const o of convoy) {
+              const oe = p.els.find((x) => x.id === o.id);
+              if (oe) { oe.x += ddx; oe.y += ddy; }
+            }
+            force();
+          }
+        }
+      }
       if (moved) commit();
       /* A multi-selection is KEPT at pointerdown so a body-drag moves the
          whole convoy (see renderEl). If the pointer never actually moved,

@@ -513,9 +513,22 @@ export function normalizeDoc(doc: Doc): Doc {
         n = up;
       }
     }
+    /* an element stranded (almost) entirely past the page edge is clipped
+       invisible and un-hittable — nothing left to grab, especially by
+       finger. Pull strays back so a fingertip's worth stays on the page.
+       Full-bleed page art is untouched: it overlaps the page plenty. */
+    for (const el of p.els ?? []) {
+      const gw = Math.min(GRAB_MARGIN, el.w), gh = Math.min(GRAB_MARGIN, el.h);
+      el.x = clamp(el.x, gw - el.w, p.w - gw);
+      el.y = clamp(el.y, gh - el.h, p.h - gh);
+    }
   }
   return doc;
 }
+
+/* the minimum sliver of an element that must remain on its page — enough
+   to land a fingertip on (see the drop rescue in useStartDrag too) */
+export const GRAB_MARGIN = 28;
 
 /* The balloon underneath `el` that overlaps it (candidate to attach to). */
 export function findMergeBase(page: Page, el: BalloonEl): BalloonEl | null {
