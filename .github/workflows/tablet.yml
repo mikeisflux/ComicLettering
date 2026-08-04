@@ -14,6 +14,10 @@ on:
   push:
     tags: ["tablet-v*"]
 
+# the release step publishes the APK to the android-latest release
+permissions:
+  contents: write
+
 jobs:
   android:
     runs-on: ubuntu-latest
