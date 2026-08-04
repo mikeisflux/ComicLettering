@@ -1,5 +1,10 @@
 import type { Metadata } from "next";
 import PayPalButtons, { PayPalOrderButton } from "./PayPalButtons";
+import { prisma } from "@/lib/db";
+import { LIFETIME_CAP } from "@/lib/paypal";
+
+/* the lifetime tile shows a LIVE spots-left count */
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Pricing — $20/month, $160/year, passes & lifetime",
@@ -16,7 +21,11 @@ const FEATURES = [
   "All future features included",
 ];
 
-export default function Pricing() {
+export default async function Pricing() {
+  const lifetimeSold = await prisma.user
+    .count({ where: { subPlan: "lifetime" } })
+    .catch(() => 0);
+  const lifetimeLeft = Math.max(0, LIFETIME_CAP - lifetimeSold);
   return (
     <main className="mktSection">
       <h2 style={{ textAlign: "center" }}>Simple, Honest Pricing</h2>
@@ -56,16 +65,22 @@ export default function Pricing() {
           <ul>{FEATURES.map((f) => <li key={f}>{f}</li>)}</ul>
           <PayPalOrderButton tier="pass6" />
         </div>
-        <div className="priceCard">
-          <div className="plan">Lifetime</div>
+        <div className="priceCard best">
+          <div className="plan">Lifetime — Limited Time</div>
           <div className="amount">$500</div>
           <div className="per">one payment — yours forever</div>
-          <div className="save">Pay once, letter forever</div>
+          {lifetimeLeft > 0 ? (
+            <div className="save">Pay once, letter forever. Only {LIFETIME_CAP} ever — {lifetimeLeft} left.</div>
+          ) : (
+            <div className="save" style={{ color: "#b02020" }}>SOLD OUT — all {LIFETIME_CAP} spots are taken.</div>
+          )}
           <ul>
             {FEATURES.map((f) => <li key={f}>{f}</li>)}
             <li><b>Your name on the <a href="/credits">credits page</a></b></li>
           </ul>
-          <PayPalOrderButton tier="lifetime" />
+          {lifetimeLeft > 0
+            ? <PayPalOrderButton tier="lifetime" />
+            : <p className="ppNote">The <b>Yearly</b> plan is the next best thing.</p>}
         </div>
       </div>
       <p className="ppNote">

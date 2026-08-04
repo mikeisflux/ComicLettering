@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
-import { PASSES, createPassOrder, paypalConfigured } from "@/lib/paypal";
+import { prisma } from "@/lib/db";
+import { LIFETIME_CAP, PASSES, createPassOrder, paypalConfigured } from "@/lib/paypal";
 
 /* Create a one-time pass order server-side (3-month, 6-month, lifetime) —
    the client never chooses the amount. */
@@ -16,6 +17,13 @@ export async function POST(req: Request) {
     return NextResponse.json(
       { error: "You already have an active subscription — cancel it first, or choose Lifetime (which replaces it)." },
       { status: 409 });
+  }
+  /* only 200 lifetime spots exist — enforced here, not just in the copy */
+  if (String(tier) === "lifetime") {
+    const sold = await prisma.user.count({ where: { subPlan: "lifetime" } });
+    if (sold >= LIFETIME_CAP) {
+      return NextResponse.json({ error: "All 200 lifetime spots are taken." }, { status: 410 });
+    }
   }
   const order = await createPassOrder(String(tier));
   if ("error" in order) return NextResponse.json({ error: order.error }, { status: 502 });

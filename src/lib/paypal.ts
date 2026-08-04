@@ -4,6 +4,7 @@ import { getSetting, setSetting } from "./settings";
 export const PRICES = { monthly: "20.00", yearly: "160.00" };
 
 /* One-time passes (Orders v2, no recurring billing). */
+export const LIFETIME_CAP = 200;   // only 200 lifetime spots, ever
 export const PASSES: Record<string, { price: string; label: string; months: number | null }> = {
   pass3: { price: "40.00", label: "LetterMyComic — 3-month pass", months: 3 },
   pass6: { price: "80.00", label: "LetterMyComic — 6-month pass", months: 6 },
