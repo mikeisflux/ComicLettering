@@ -18,8 +18,9 @@ model User {
   passwordHash String
   isAdmin      Boolean   @default(false)
   subStatus    String    @default("none") // none | active | cancelled | suspended
-  subPlan      String?   // monthly | yearly
+  subPlan      String?   // monthly | yearly | pass3 | pass6 | lifetime | comp
   subId        String?   // PayPal subscription id
+  subUntil     DateTime? // one-time passes: access ends here (null = not time-limited)
   subUpdatedAt DateTime? // event time of the last applied subscription-status write (webhook ordering guard)
   resetToken   String?   // sha256 of the password-reset token
   resetExpiry  DateTime? // when the reset token expires

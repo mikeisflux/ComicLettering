@@ -3,6 +3,13 @@ import { getSetting, setSetting } from "./settings";
 
 export const PRICES = { monthly: "20.00", yearly: "160.00" };
 
+/* One-time passes (Orders v2, no recurring billing). */
+export const PASSES: Record<string, { price: string; label: string; months: number | null }> = {
+  pass3: { price: "40.00", label: "LetterMyComic — 3-month pass", months: 3 },
+  pass6: { price: "80.00", label: "LetterMyComic — 6-month pass", months: 6 },
+  lifetime: { price: "500.00", label: "LetterMyComic — lifetime access", months: null },
+};
+
 async function apiBase(): Promise<string> {
   const mode = (await getSetting("PAYPAL_MODE")) || "sandbox";
   return mode === "live" ? "https://api-m.paypal.com" : "https://api-m.sandbox.paypal.com";
@@ -146,4 +153,44 @@ export async function verifyWebhook(headers: Headers, rawBody: string): Promise<
     if (!res.ok) return false;
     return (await res.json()).verification_status === "SUCCESS";
   } catch { return false; }
+}
+
+/* ---------------- one-time passes (Orders v2) ----------------
+   The server creates the order (so the amount can never be tampered with
+   client-side) and captures it after approval. An order captures exactly
+   once at PayPal, which also makes the activation replay-safe. */
+
+export async function createPassOrder(tier: keyof typeof PASSES): Promise<{ id: string } | { error: string }> {
+  const pass = PASSES[tier];
+  if (!pass) return { error: "Unknown pass." };
+  const res = await pp("/v2/checkout/orders", {
+    method: "POST",
+    body: JSON.stringify({
+      intent: "CAPTURE",
+      purchase_units: [{
+        amount: { currency_code: "USD", value: pass.price },
+        description: pass.label,
+        custom_id: tier,
+      }],
+    }),
+  });
+  if (!res.ok) return { error: `PayPal order failed: ${(await res.text()).slice(0, 200)}` };
+  const data = await res.json();
+  return { id: data.id as string };
+}
+
+export async function capturePassOrder(orderId: string): Promise<
+  { ok: true; tier: string; amount: string } | { ok: false; error: string }
+> {
+  const res = await pp(`/v2/checkout/orders/${encodeURIComponent(orderId)}/capture`, { method: "POST" });
+  if (!res.ok) return { ok: false, error: `Capture failed: ${(await res.text()).slice(0, 200)}` };
+  const data = await res.json();
+  if (data.status !== "COMPLETED") return { ok: false, error: `Order is ${data.status}, not completed.` };
+  const unit = (data.purchase_units || [])[0] || {};
+  const cap = ((unit.payments || {}).captures || [])[0] || {};
+  return {
+    ok: true,
+    tier: String(unit.custom_id || cap.custom_id || ""),
+    amount: String(cap.amount?.value ?? ""),
+  };
 }

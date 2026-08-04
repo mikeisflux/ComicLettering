@@ -53,6 +53,7 @@ export default async function MarketingLayout({ children }: { children: React.Re
             <Link href="/manga-lettering">Manga lettering</Link>
             <Link href="/comic-book-lettering">Comic book lettering</Link>
             <Link href="/comic-book-fonts">Comic book fonts</Link>
+            <Link href="/credits">Credits</Link>
           </div>
           <div>
             <Link href="/login">Sign in</Link>

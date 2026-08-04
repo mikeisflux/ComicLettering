@@ -103,4 +103,5 @@ export async function getSessionUser(): Promise<User | null> {
 }
 
 export const hasAccess = (u: User | null) =>
-  !!u && (u.isAdmin || u.subStatus === "active");
+  !!u && (u.isAdmin ||
+    (u.subStatus === "active" && (!u.subUntil || u.subUntil.getTime() > Date.now())));

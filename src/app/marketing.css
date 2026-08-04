@@ -195,6 +195,8 @@
 
 /* pricing */
 .priceGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 26px; max-width: 720px; margin: 0 auto; }
+/* five-plan layout: three across on desktop, then two */
+.priceGrid.wide { max-width: 1120px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
 .priceCard {
   background: #fff; border: 3px solid var(--ink); border-radius: 12px;
   padding: 30px; text-align: center; box-shadow: 8px 8px 0 #d8dde4;

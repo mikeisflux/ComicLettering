@@ -4,14 +4,22 @@ import { useCallback, useEffect, useState } from "react";
 interface Sub {
   email: string;
   isAdmin: boolean;
-  plan: "monthly" | "yearly" | "comp" | "lifetime" | null;
+  plan: "monthly" | "yearly" | "comp" | "lifetime" | "pass3" | "pass6" | null;
   status: string;
   price: string | null;
   nextBilling: string | null;
+  accessUntil: string | null;
   hasSubscription: boolean;
   managed: "manual" | "paypal";
   active: boolean;
 }
+
+const PLAN_LABELS: Record<string, string> = {
+  lifetime: "Lifetime — full access forever",
+  comp: "Complimentary",
+  pass3: "3-Month Pass",
+  pass6: "6-Month Pass",
+};
 
 export default function AccountPanel() {
   const [sub, setSub] = useState<Sub | null>(null);
@@ -79,8 +87,22 @@ export default function AccountPanel() {
 
       {sub.isAdmin || sub.managed === "manual" ? (
         <>
-          <div className="acctRow"><span>Plan</span><b>{sub.isAdmin ? "Admin — full access" : "Complimentary / lifetime"}</b></div>
-          <p className="acctHint">Your access is granted manually and isn’t billed through PayPal.</p>
+          <div className="acctRow"><span>Plan</span>
+            <b>{sub.isAdmin ? "Admin — full access" : PLAN_LABELS[sub.plan ?? ""] ?? "Complimentary / lifetime"}</b></div>
+          {sub.accessUntil && (
+            <div className="acctRow"><span>Access until</span>
+              <b>{new Date(sub.accessUntil).toLocaleDateString()}</b></div>
+          )}
+          {sub.plan?.startsWith("pass") ? (
+            <p className="acctHint">
+              One-time pass — nothing renews automatically.{" "}
+              {sub.status === "cancelled"
+                ? <>It has ended — grab a new pass or subscription on the <a href="/pricing">pricing page</a>.</>
+                : <>Buying another pass from the <a href="/pricing">pricing page</a> stacks onto your remaining time.</>}
+            </p>
+          ) : (
+            <p className="acctHint">Your access is granted manually and isn’t billed through PayPal.</p>
+          )}
         </>
       ) : sub.hasSubscription && (sub.status === "active" || sub.status === "suspended") ? (
         <>

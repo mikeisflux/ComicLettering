@@ -41,13 +41,23 @@ export async function GET() {
     }
   }
 
-  const price = plan === "monthly" ? "$20 / month" : plan === "yearly" ? "$160 / year" : null;
+  /* one-time passes expire by date, not by PayPal state */
+  const passExpired = !!user.subUntil && user.subUntil.getTime() <= Date.now();
+  if (plan?.startsWith("pass") && passExpired) status = "cancelled";
+
+  const price =
+    plan === "monthly" ? "$20 / month" :
+    plan === "yearly" ? "$160 / year" :
+    plan === "pass3" ? "$40 one-time" :
+    plan === "pass6" ? "$80 one-time" :
+    plan === "lifetime" ? "$500 one-time" : null;
   return NextResponse.json({
     email: user.email,
     isAdmin: user.isAdmin,
     plan, status, price, nextBilling,
+    accessUntil: user.subUntil ? user.subUntil.toISOString() : null,
     hasSubscription: !!user.subId,
-    managed: user.subPlan === "comp" || user.subPlan === "lifetime" ? "manual" : "paypal",
-    active: user.isAdmin || status === "active",
+    managed: plan === "comp" || plan === "lifetime" || plan?.startsWith("pass") ? "manual" : "paypal",
+    active: user.isAdmin || (status === "active" && !passExpired),
   });
 }
