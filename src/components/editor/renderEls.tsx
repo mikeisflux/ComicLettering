@@ -635,7 +635,11 @@ export function renderOverlay(ed: EditorCtx) {
            renderers use), so every handle sits on the ink it bends. The
            drag itself is delta-based, so a carried handle edits normally. */
         (el.ts.env as Warp | undefined ?? FLAT).map((p, i) => {
-          const [px, py] = vis(el.x + p[0] * el.w, el.y + p[1] * el.h);
+          /* dots sit on the INK-HUGGED selection rect, same as the resize
+             handles — mapping them to the layout box flung them far off the
+             letters whenever the box was bigger than the ink (drags are
+             delta-based, so the visual anchor is free to hug the word) */
+          const [px, py] = vis(bx + p[0] * bw, by + p[1] * bh);
           return (
             <div key={i} className="handle warpDot"
               title={i < 4 ? "Drag to pin this corner" : "Drag to bow this edge"}
