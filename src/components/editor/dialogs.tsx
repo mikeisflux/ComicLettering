@@ -371,6 +371,60 @@ export function renderTailAsk(ed: EditorCtx) {
   );
 }
 
+/* Install-as-app instructions — shown when the browser gives us no native
+   install prompt to fire (Firefox, Safari, or Chromium withholding it).
+   The steps match the browser actually being used; every path ends with a
+   real installed app where the platform supports one. */
+export function renderInstallHelp(ed: EditorCtx) {
+  if (!ed.showInstallHelp) return null;
+  const close = () => ed.setShowInstallHelp(false);
+  const ua = navigator.userAgent;
+  const isEdge = /Edg\//.test(ua);
+  const isOpera = /OPR\//.test(ua);
+  const isFirefox = /Firefox\//.test(ua) && !/Seamonkey/.test(ua);
+  const isSafari = /Safari\//.test(ua) && !/Chrome|Chromium|Edg\/|OPR\//.test(ua);
+  const browser = isEdge ? "Edge" : isOpera ? "Opera" : isFirefox ? "Firefox" : isSafari ? "Safari" : "Chrome";
+  const steps: string[] =
+    isEdge ? [
+      "Look at the RIGHT end of the address bar for the install icon (a little screen with a ↓ arrow) and click it — then click Install.",
+      "No icon? Open the ⋯ menu → Apps → “Install LetterMyComic”.",
+      "Edge adds LetterMyComic to your Start menu and taskbar; .lmc project files open straight into it.",
+    ] : isFirefox ? [
+      "Firefox doesn't fully support installing web apps on desktop yet.",
+      "On Windows, newer Firefox versions can pin the studio like an app: open the ≡ menu and look for “Add to taskbar” — if it's there, that's it.",
+      "Otherwise: open lettermycomic.com once in Chrome or Edge and click Install there — that gives you the real desktop app. Your account, cloud library and files are exactly the same either way.",
+    ] : isSafari ? [
+      "In Safari's menu bar choose File → “Add to Dock…” and confirm.",
+      "LetterMyComic then lives in your Dock and opens in its own window like any Mac app.",
+    ] : isOpera ? [
+      "Look at the right end of the address bar for the install icon and click it, then confirm.",
+      "No icon? Open the Opera menu and pick “Install LetterMyComic…”.",
+    ] : [
+      "Look at the RIGHT end of the address bar for the install icon (a little screen with a ↓ arrow) and click it — then click Install.",
+      "No icon? Open the ⋮ menu → “Cast, save and share” → “Install page as app…” (older Chrome: just “Install LetterMyComic”).",
+      "Chrome adds LetterMyComic to your desktop and Start menu; .lmc project files open straight into it.",
+    ];
+  return (
+    <div className="setupOverlay" onPointerDown={(e) => { if (e.target === e.currentTarget) close(); }}>
+      <div className="setupDlg" style={{ width: 460 }}>
+        <div className="setupTitle">Install LetterMyComic — {browser}</div>
+        <div className="setupBody" style={{ flexDirection: "column", gap: 10 }}>
+          <ol style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 8, fontSize: 13.5, lineHeight: 1.45 }}>
+            {steps.map((s, i) => <li key={i}>{s}</li>)}
+          </ol>
+          <div style={{ fontSize: 12, color: "#667" }}>
+            Installed, the studio runs in its own window with its own icon, works like a desktop
+            app, and gives your .lmc project files the LetterMyComic icon.
+          </div>
+        </div>
+        <div className="setupFoot">
+          <button className="okBtn" onClick={close}>Got it</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* export dialog */
 export function renderExportDialog(ed: EditorCtx) {
   const { showExport, setShowExport, exportFmt, setExportFmt, exportDpi, setExportDpi, exportScope, setExportScope, exportFrom, setExportFrom, exportTo, setExportTo, letteringOnly, setLetteringOnly, exportCropMarks, setExportCropMarks } = ed;

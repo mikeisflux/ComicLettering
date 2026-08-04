@@ -50,7 +50,7 @@ import {
 } from "./editor/tabs";
 import { renderFormatBar, renderMenuBar, renderToolbar } from "./editor/chromeBars";
 import {
-  renderContextMenu, renderExportDialog, renderFindDialog,
+  renderContextMenu, renderExportDialog, renderFindDialog, renderInstallHelp,
   renderScriptDialog, renderTailAsk, renderTray, renderTuckDialog,
 } from "./editor/dialogs";
 
@@ -934,7 +934,9 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
 
   /* Tablet pinch-zoom and the PWA install prompt — see usePlatform.ts */
   usePinchZoom(areaRef, zoom, setZoom, setUserZoomed, mounted && !!doc && !!page);
-  const installApp = useInstallPrompt(setStatus);
+  /* no native prompt available → a visible how-to-install dialog opens */
+  const [showInstallHelp, setShowInstallHelp] = useState(false);
+  const installApp = useInstallPrompt(setStatus, () => setShowInstallHelp(true));
   /* is LetterMyComic ALREADY installed on this machine? The menu-bar
      install button hides then, even in a plain browser tab. Chromium
      reports it via getInstalledRelatedApps (the manifest lists itself as
@@ -964,7 +966,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     fileFontRef, fileStampRef,
     force, commit, autosave, undo, redo, setStatus, select, setSelId,
     setEditingId, finishEditing, mutateSel, startDrag, pagePoint, fitZoom, startTuck,
-    selectAllOnPage, installApp, appInstalled, setAskAddPage,
+    selectAllOnPage, installApp, appInstalled, showInstallHelp, setShowInstallHelp, setAskAddPage,
     tuckAsk, setTuckAsk, retuneTuck, runTuckAuto, applyTuck,
     autosaveSoon,
     rebuildThumbs, reseedAids, setThumbs, setPageIndex, setUserZoomed,
@@ -1073,6 +1075,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       {renderTailAsk(ed)}
       {renderExportDialog(ed)}
       {renderFindDialog(ed)}
+      {renderInstallHelp(ed)}
       {renderScriptDialog(ed)}
 
       {showGradMaker && (

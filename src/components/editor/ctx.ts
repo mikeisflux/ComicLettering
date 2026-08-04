@@ -105,6 +105,9 @@ export interface EditorCtx {
   installApp: () => void;
   /* already installed on this machine → the install button hides */
   appInstalled: boolean;
+  /* browser-specific install instructions (no native prompt available) */
+  showInstallHelp: boolean;
+  setShowInstallHelp: SetState<boolean>;
   /* open the "+ Page" chooser (before/after the current page) — every
      add-page affordance (sidebar button, toolbar, Insert menu) uses it */
   setAskAddPage: (v: boolean) => void;

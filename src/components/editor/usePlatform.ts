@@ -125,13 +125,21 @@ export function usePinchZoom(
 }
 
 /* Browsers only offer "Install app" quietly (an address-bar icon or a
-   buried menu item), so surface it: capture the install prompt and expose
-   it as File → Install as App…, with honest per-platform guidance where
-   the prompt API doesn't exist (Safari, Firefox). */
-export function useInstallPrompt(setStatus: (s: string) => void): () => void {
-  const installEvtRef = useRef<(Event & { prompt: () => Promise<void> }) | null>(null);
+   buried menu item), so surface it: capture the install prompt and fire it
+   from the Install button / File → Install as App…. Where no native prompt
+   exists (Firefox, Safari, or Chromium withholding it), the click opens a
+   VISIBLE step-by-step dialog — the old status-line hint sat unnoticed at
+   the bottom of the screen, which read as the button "doing nothing". */
+export function useInstallPrompt(setStatus: (s: string) => void, openHelp: () => void): () => void {
+  const installEvtRef = useRef<(Event & {
+    prompt: () => Promise<void>;
+    userChoice?: Promise<{ outcome: string }>;
+  }) | null>(null);
   useEffect(() => {
-    const onBip = (e: Event) => { e.preventDefault(); installEvtRef.current = e as Event & { prompt: () => Promise<void> }; };
+    const onBip = (e: Event) => {
+      e.preventDefault();
+      installEvtRef.current = e as Event & { prompt: () => Promise<void> };
+    };
     window.addEventListener("beforeinstallprompt", onBip);
     return () => window.removeEventListener("beforeinstallprompt", onBip);
   }, []);
@@ -141,13 +149,14 @@ export function useInstallPrompt(setStatus: (s: string) => void): () => void {
       return;
     }
     const ev = installEvtRef.current;
-    if (ev) { ev.prompt(); return; }
-    const ua = navigator.userAgent;
-    setStatus(/iPhone|iPad|iPod/.test(ua)
-      ? "On iPhone/iPad: tap Share, then “Add to Home Screen”."
-      : /Mac/.test(ua) && /Safari/.test(ua) && !/Chrome|Edg/.test(ua)
-        ? "In Safari: File → Add to Dock installs LetterMyComic as an app."
-        : "In Chrome or Edge: look for the install icon at the right end of the address bar, or the browser menu → “Install LetterMyComic”. Installing also gives .lmc project files the app's icon.");
+    if (ev) {
+      /* a captured prompt is single-use — clear it so a second click falls
+         through to the help dialog instead of failing silently */
+      installEvtRef.current = null;
+      ev.prompt().catch(() => openHelp());
+      return;
+    }
+    openHelp();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 }
