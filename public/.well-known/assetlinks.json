@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.lettermycomic.app",
+      "sha256_cert_fingerprints": [
+        "5B:BD:24:8F:B7:9C:E3:EA:EC:25:9C:42:27:0D:31:18:5E:4A:48:62:8B:DE:33:8F:43:FE:EB:60:B1:5F:39:37"
+      ]
+    }
+  }
+]
