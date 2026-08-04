@@ -4,7 +4,7 @@
 import {
   Assets, BalloonEl, Doc, TextEl, normalizeDoc, reseedIds,
 } from "@/lib/model";
-import { clearArt, releaseAllArt } from "@/lib/assetStore";
+import { clearArt, fmtBytes, holdArt, noteArtId, putArt, releaseAllArt } from "@/lib/assetStore";
 import {
   ImageFormat, docThumbnail, exportPageImage, exportPagePNG, spreadNeighbor,
 } from "@/lib/exportPng";
@@ -133,14 +133,52 @@ export async function deleteProject(ed: EditorCtx, id: string) {
    The format is our JSON payload under the .lmc extension; import accepts
    both .lmc and legacy .json. Where the browser offers a real save dialog
    (Chromium's File System Access API) we use it so the user picks the
-   location and filename; elsewhere it falls back to a download. */
+   location and filename; elsewhere it falls back to a download.
+
+   Unlike a LIBRARY save (which strips local page-art blobs — gigabytes
+   don't belong in a server POST), the project FILE is the portable copy
+   of the whole book: every piece of uploaded artwork is inlined as a data
+   URL so the .lmc opens complete on any machine. The file is assembled in
+   PARTS — one asset at a time — so a big book never needs the whole file
+   as a single string in memory. */
+async function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(blob);
+  });
+}
+
 export async function exportJSON(ed: EditorCtx) {
   const { demo, setStatus, docRef, assetsRef, current } = ed;
   if (demo) { setStatus("Saving project files is off in the demo — subscribe to unlock."); return; }
-  const blob = new Blob(
-    [JSON.stringify({ doc: docRef.current, assets: portableAssets(assetsRef.current).assets })],
-    { type: "application/x-lettermycomic" });
+  /* materialise every asset the document references before packing */
+  setStatus("Packing artwork…");
+  try { await ensureAllArt(ed); } catch { /* pack whatever is available */ }
+  const parts: string[] = ['{"doc":', JSON.stringify(docRef.current), ',"assets":{'];
+  let first = true;
+  let inlined = 0;
+  let skipped = 0;
+  for (const [id, url] of Object.entries(assetsRef.current)) {
+    if (typeof url !== "string") continue;
+    let out = url;
+    if (url.startsWith("blob:")) {
+      try {
+        const b = await fetch(url).then((r) => r.blob());
+        out = await blobToDataUrl(b);
+        inlined++;
+        setStatus(`Packing artwork… ${inlined}`);
+      } catch { skipped++; continue; }   // unreadable blob — skip, don't corrupt
+    }
+    parts.push((first ? "" : ",") + JSON.stringify(id) + ":", JSON.stringify(out));
+    first = false;
+  }
+  parts.push("}}");
+  const blob = new Blob(parts, { type: "application/x-lettermycomic" });
   const name = (current?.name || "comic-project") + ".lmc";
+  const doneMsg = (where: string) =>
+    `Saved “${name}”${where} — artwork included (${fmtBytes(blob.size)}${skipped ? `, ${skipped} image${skipped > 1 ? "s" : ""} unreadable and skipped` : ""}).`;
   const picker = (window as unknown as {
     showSaveFilePicker?: (opts: unknown) => Promise<{ createWritable: () => Promise<{ write: (b: Blob) => Promise<void>; close: () => Promise<void> }> }>;
   }).showSaveFilePicker;
@@ -153,7 +191,7 @@ export async function exportJSON(ed: EditorCtx) {
       const w = await handle.createWritable();
       await w.write(blob);
       await w.close();
-      setStatus(`Saved “${name}”.`);
+      setStatus(doneMsg(""));
       return;
     } catch (err) {
       if ((err as Error).name === "AbortError") return;   // user cancelled
@@ -165,7 +203,7 @@ export async function exportJSON(ed: EditorCtx) {
   a.download = name;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-  setStatus(`Saved “${name}” to your downloads.`);
+  setStatus(doneMsg(" to your downloads"));
 }
 
 export async function importJSON(ed: EditorCtx, f: File) {
@@ -183,6 +221,22 @@ export async function importJSON(ed: EditorCtx, f: File) {
     reseedIds(d);
     reseedAids();
     try { await refitLegacyLettering(d); } catch { /* best-effort */ }
+    /* a self-contained .lmc carries full-size page art inlined as data
+       URLs (exact original bytes). Move the big ones into the disk-backed
+       blob store this computer uses for everything else: base64 strings
+       live in the JS heap (a book of scans would sink the tab) and would
+       not survive a refresh via autosave. Small generated art stays as
+       data URLs, same as always. */
+    for (const [id, url] of Object.entries(assetsRef.current)) {
+      if (typeof url === "string" && url.startsWith("data:") && url.length > 500_000) {
+        try {
+          const blob = await fetch(url).then((r) => r.blob());
+          await putArt(id, blob);
+          noteArtId(id);
+          assetsRef.current[id] = holdArt(id, blob);
+        } catch { /* keep the data URL — it still renders */ }
+      }
+    }
     histRef.current = [JSON.stringify(d)];
     hIndexRef.current = 0;
     setCurrent(null);

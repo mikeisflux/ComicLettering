@@ -160,7 +160,30 @@ input[type="range"] { width: 110px; }
 .toolBtn .tLabel { font-size: 10px; }
 .tbSep { width: 1px; background: #ffffff22; margin: 4px 6px; }
 .tbSpacer { flex: 1; }
-.tbHint { align-self: center; color: #93a1b3; font-size: 11px; }
+.tbHint {
+  align-self: center; color: #93a1b3; font-size: 11px; margin-right: 10px;
+  /* squeezed by the install button it must ellipsize, not wrap into a column */
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* the loud install entry point — File → Install as App… goes unnoticed.
+   STICKY at the toolbar's right edge: the toolbar scrolls horizontally on
+   narrow windows, and a button that scrolls out of view sells nothing. */
+.installBtn {
+  align-self: center;
+  position: sticky; right: 8px;
+  background: #d3382c; color: #fff;
+  font-weight: 700; font-size: 12px; letter-spacing: .2px;
+  border: 1px solid #a52a20; border-radius: 6px;
+  padding: 8px 14px; white-space: nowrap;
+  box-shadow: 0 1px 4px #000a;
+}
+.installBtn:hover { background: #e2493c; }
+.installBtn:active { background: #b62f24; }
+/* phones/tablets get the app from /get-the-app (Play Store / home screen);
+   this button is the DESKTOP path and only shows there */
+@media (pointer: coarse) { .installBtn { display: none; } }
+/* the long wording only where the toolbar has room for it */
+@media (max-width: 1750px) { .installBtn .ibLong { display: none; } }
 
 /* ---------------- format bar ---------------- */
 .formatBar {

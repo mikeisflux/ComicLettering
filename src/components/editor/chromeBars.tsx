@@ -252,6 +252,16 @@ export function renderToolbar(ed: EditorCtx) {
     <ToolBtn label="Inspector" icon="ⓘ" onClick={() => setTab("inspector")} />
     <div className="tbSpacer" />
     <div className="tbHint">Runs entirely in your browser — nothing is uploaded.</div>
+    {/* loud install entry point — File → Install as App… was going unnoticed.
+        Hidden once the studio IS the installed app (standalone display). */}
+    {typeof window !== "undefined" && !window.matchMedia?.("(display-mode: standalone)").matches
+      && !/Electron/i.test(navigator.userAgent) && (
+      <button className="installBtn"
+        title="Install LetterMyComic as a desktop app — its own window, dock icon, and .lmc project files open straight into the studio"
+        onClick={() => ed.installApp()}>
+        ⬇ Install as App<span className="ibLong"> for Desktop</span>
+      </button>
+    )}
   </header>
   );
 }
