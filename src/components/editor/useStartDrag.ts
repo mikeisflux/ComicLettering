@@ -10,7 +10,7 @@ import {
 } from "@/lib/model";
 import { FLAT } from "@/lib/warp";
 import { elCrossesSpine } from "@/lib/exportPng";
-import { rejectPalm } from "./penInput";
+import { claimDrag, rejectPalm, releaseDrag } from "./penInput";
 
 export const MIN_SIZE = 24;
 
@@ -94,9 +94,10 @@ export function useStartDrag(deps: DragDeps) {
     e: React.PointerEvent, el: El, mode: DragMode, handle = ""
   ) => {
     if (rejectPalm(e)) return;   // palm resting near the pen
+    const pid = e.pointerId;     // the drag belongs to this pointer only
+    if (!claimDrag(pid)) return; // one gesture at a time — no second-finger drags
     e.preventDefault();
     e.stopPropagation();
-    const pid = e.pointerId;     // the drag belongs to this pointer only
     const start = pagePoint(e);
     const orig = JSON.parse(JSON.stringify(el)) as El;
     /* Everything else in the selection travels with the one being dragged.
@@ -348,6 +349,7 @@ export function useStartDrag(deps: DragDeps) {
     };
     const onUp = (ev: PointerEvent) => {
       if (ev.pointerId !== pid) return;   // a palm lifting must not drop the drag
+      releaseDrag(pid);
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);

@@ -30,3 +30,20 @@ export function rejectPalm(e: { pointerType?: string }): boolean {
   if (e.pointerType === "pen") { penUntil = performance.now() + PEN_LINGER_MS; return false; }
   return e.pointerType === "touch" && performance.now() < penUntil;
 }
+
+/* ---- drag exclusivity ----
+   One gesture at a time: while a drag (move/resize/tail/warp/lasso/sketch)
+   is running, no other pointer may start a second drag or a pinch-zoom.
+   Without this, a second fingertip or the heel of a hand resting on the
+   tablet starts its own move/pan DURING a resize — the element resizes
+   and slides at the same time. */
+let dragOwner: number | null = null;
+export function claimDrag(pointerId: number): boolean {
+  if (dragOwner !== null) return false;   // someone else is mid-drag
+  dragOwner = pointerId;
+  return true;
+}
+export function releaseDrag(pointerId: number) {
+  if (dragOwner === pointerId) dragOwner = null;
+}
+export const dragInProgress = () => dragOwner !== null;

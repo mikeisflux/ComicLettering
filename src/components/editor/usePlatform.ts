@@ -8,7 +8,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { clamp } from "@/lib/model";
 import { EditorCtx } from "./ctx";
 import { importJSON } from "./ops";
-import { rejectPalm } from "./penInput";
+import { dragInProgress, rejectPalm } from "./penInput";
 
 /* Two fingers on the workspace background pinch-zoom the page, anchored
    under the fingers (and panning with them). Single-finger touch still
@@ -37,6 +37,7 @@ export function usePinchZoom(
     const down = (e: PointerEvent) => {
       if (e.pointerType !== "touch" || !onBg(e.target)) return;
       if (rejectPalm(e)) return;   // no palm-pinch while the pen is working
+      if (dragInProgress()) return; // no pinch/pan while an element drag runs
       pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (pts.size === 2) {
         const [a, b] = [...pts.values()];
