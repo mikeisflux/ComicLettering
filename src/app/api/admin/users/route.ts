@@ -8,12 +8,12 @@ async function requireAdmin() {
 }
 
 const STATUSES = ["none", "active", "cancelled", "suspended"];
-const PLANS = ["", "monthly", "yearly", "lifetime", "comp"];
+const PLANS = ["", "monthly", "yearly", "lifetime", "comp", "pass3", "pass6"];
 
 export async function GET() {
   if (!(await requireAdmin())) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   const users = await prisma.user.findMany({
-    select: { id: true, email: true, name: true, isAdmin: true, subStatus: true, subPlan: true, subId: true, createdAt: true },
+    select: { id: true, email: true, name: true, isAdmin: true, subStatus: true, subPlan: true, subId: true, subUntil: true, createdAt: true },
     orderBy: { createdAt: "desc" },
     take: 500,
   });
@@ -47,7 +47,7 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ error: "forbidden" }, { status: 403 });
-  const { id, email, name, password, subStatus, subPlan, isAdmin } = await req.json();
+  const { id, email, name, password, subStatus, subPlan, subUntil, isAdmin } = await req.json();
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
   if (id === admin.id && isAdmin === false) {
     return NextResponse.json({ error: "You cannot remove your own admin role." }, { status: 400 });
@@ -71,6 +71,16 @@ export async function PUT(req: Request) {
     if (subStatus === "active" && subPlan === undefined) data.subPlan = "comp";
   }
   if (typeof subPlan === "string" && PLANS.includes(subPlan)) data.subPlan = subPlan;
+  /* access-until date for manually granted passes (Kickstarter rewards):
+     a date string sets it, empty string clears it */
+  if (typeof subUntil === "string") {
+    if (!subUntil.trim()) data.subUntil = null;
+    else {
+      const d = new Date(subUntil);
+      if (isNaN(d.getTime())) return NextResponse.json({ error: "Invalid access-until date." }, { status: 400 });
+      data.subUntil = d;
+    }
+  }
   if (typeof isAdmin === "boolean") data.isAdmin = isAdmin;
   await prisma.user.update({ where: { id: String(id) }, data });
   return NextResponse.json({ ok: true });

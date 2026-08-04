@@ -9,7 +9,7 @@ interface Msg {
 }
 interface UserRow {
   id: string; email: string; name: string; isAdmin: boolean;
-  subStatus: string; subPlan: string | null; subId: string | null; createdAt: string;
+  subStatus: string; subPlan: string | null; subId: string | null; subUntil: string | null; createdAt: string;
 }
 interface KnownSetting { key: string; label: string; hint?: string; secret?: boolean; value: string; set: boolean }
 
@@ -204,7 +204,7 @@ function Settings() {
 /* ---------------- Users ---------------- */
 
 const SUB_STATUSES = ["none", "active", "cancelled", "suspended"];
-const SUB_PLANS = ["", "monthly", "yearly", "lifetime", "comp"];
+const SUB_PLANS = ["", "monthly", "yearly", "lifetime", "comp", "pass3", "pass6"];
 
 function Users({ adminEmail }: { adminEmail: string }) {
   const [users, setUsers] = useState<UserRow[] | null>(null);
@@ -278,6 +278,7 @@ function Users({ adminEmail }: { adminEmail: string }) {
                     id: u.id, email: f.get("email"), name: f.get("name"),
                     password: f.get("password") || undefined,
                     subStatus: f.get("subStatus"), subPlan: f.get("subPlan"),
+                    subUntil: f.get("subUntil"),
                     isAdmin: f.get("isAdmin") === "on",
                   });
                   if (ok) setEditId(null);
@@ -291,6 +292,8 @@ function Users({ adminEmail }: { adminEmail: string }) {
                   <select className="admInput" name="subPlan" defaultValue={u.subPlan || ""}>
                     {SUB_PLANS.map((p) => <option key={p} value={p}>{p || "no plan"}</option>)}
                   </select>
+                  <input className="admInput" name="subUntil" type="date" title="Access until (for passes — blank = no expiry)"
+                    defaultValue={u.subUntil ? u.subUntil.slice(0, 10) : ""} />
                   <label style={{ fontSize: 13 }}>
                     <input type="checkbox" name="isAdmin" defaultChecked={u.isAdmin} disabled={u.email === adminEmail} /> admin
                   </label>
