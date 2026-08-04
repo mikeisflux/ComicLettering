@@ -19,10 +19,19 @@ const note = (e: PointerEvent) => {
   if (e.pointerType === "pen") penUntil = performance.now() + PEN_LINGER_MS;
 };
 
+/* every touch currently on the glass, tracked in the CAPTURE phase so the
+   count is correct before any tool's own handler runs */
+const touches = new Set<number>();
+
 /* module-level init: the tracker exists before any tool can fire */
 if (typeof window !== "undefined") {
   window.addEventListener("pointerdown", note, true);
   window.addEventListener("pointermove", note, true);
+  window.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "touch") touches.add(e.pointerId);
+  }, true);
+  window.addEventListener("pointerup", (e) => touches.delete(e.pointerId), true);
+  window.addEventListener("pointercancel", (e) => touches.delete(e.pointerId), true);
   /* backstop: if the owning pointer ends and its tool somehow never
      released the claim (listener leak, thrown handler), release it here
      so input can never get stuck dead. Bubble phase — the tools' own
@@ -66,6 +75,11 @@ export function isDoubleTap(key: string, e: { pointerType?: string; clientX: num
 let dragOwner: number | null = null;
 export function claimDrag(pointerId: number): boolean {
   if (dragOwner !== null) return false;   // someone else is mid-drag
+  /* two fingers on the glass = a pinch-zoom, never a fresh drag. The
+     second finger's pointerdown reaches the element's own handler AFTER
+     the pinch hook (a deeper native listener) already cancelled the first
+     drag — without this it would immediately claim a NEW drag and fight
+     the pinch it just enabled. */
   dragOwner = pointerId;
   return true;
 }
@@ -73,3 +87,9 @@ export function releaseDrag(pointerId: number) {
   if (dragOwner === pointerId) dragOwner = null;
 }
 export const dragInProgress = () => dragOwner !== null;
+
+/* The pointer that owns the running drag, so a second finger landing can
+   CONVERT the gesture into a pinch-zoom: the pinch hook dispatches a
+   pointercancel for this id, the owning tool reverts its partial edit and
+   releases, and the two fingers zoom instead. */
+export const dragOwnerId = () => dragOwner;

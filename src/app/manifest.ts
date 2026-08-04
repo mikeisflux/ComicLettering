@@ -24,7 +24,15 @@ export default function manifest(): MetadataRoute.Manifest {
     /* not yet in Next's Manifest type — supported by Chromium's installed-app
        file handling; harmless extra JSON everywhere else */
     file_handlers: [
-      { action: "/app", accept: { "application/x-lettermycomic": [".lmc"] } },
+      {
+        action: "/app",
+        accept: { "application/x-lettermycomic": [".lmc"] },
+        /* the icon Windows/ChromeOS stamp onto .lmc documents themselves */
+        icons: [
+          { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+          { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+        ],
+      },
     ],
-  } as MetadataRoute.Manifest;
+  } as unknown as MetadataRoute.Manifest;
 }

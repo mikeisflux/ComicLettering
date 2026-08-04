@@ -456,68 +456,76 @@ export async function refitLegacyLettering(doc: Doc): Promise<number> {
   let changed = 0;
   for (const p of doc.pages) {
     for (const el of p.els) {
-      if (el.type !== "text" || !el.text.trim() || el.w < 2 || el.h < 2) continue;
-      if (isWarped(el.ts.env as Warp)) continue;   // box = warp space, hands off
-      const ts = el.ts;
-      const padX = Math.round(ts.size * 0.18 + ts.outlineW * 1.2);
-      const padY = Math.round(ts.size * 0.14 + ts.outlineW * 1.2);
-
-      if (el.warp) {
-        /* arc-warped SFX lay glyphs out from the box CENTRE, independent of
-           box size — shrink symmetrically about the centre and nothing moves
-           (safe under rotation and flips too) */
-        let raw = (ts.caps ? el.text.toUpperCase() : el.text).replace(/\s*\n\s*/g, " ");
-        if (ts.crossbarI) raw = applyCrossbarI(raw);
-        const chars = raw.match(/\P{M}\p{M}*/gu) || [];
-        if (!chars.length) continue;
-        const widths = measureCharWidths(ts, chars);
-        const layout = arcTextLayout(widths, el.warp);
-        let ex = 0, ey = 0;   // max half-extents from the centre
-        for (let i = 0; i < chars.length; i++) {
-          if (chars[i] === " ") continue;
-          const hw = widths[i] / 2, hh = ts.size / 2;
-          const c = Math.abs(Math.cos(layout[i].rot)), s = Math.abs(Math.sin(layout[i].rot));
-          ex = Math.max(ex, Math.abs(layout[i].x) + c * hw + s * hh);
-          ey = Math.max(ey, Math.abs(layout[i].y) + s * hw + c * hh);
-        }
-        if (!ex || !ey) continue;
-        const w2 = Math.min(el.w, Math.ceil(ex) * 2 + padX * 2);
-        const h2 = Math.min(el.h, Math.ceil(ey) * 2 + padY * 2);
-        if (el.w - w2 < 3 && el.h - h2 < 3) continue;
-        el.x = Math.round(el.x + el.w / 2 - w2 / 2);
-        el.y = Math.round(el.y + el.h / 2 - h2 / 2);
-        el.w = w2; el.h = h2;
-        changed++;
-        continue;
-      }
-
-      /* straight lettering: shrink to the wrapped block. Measuring at the
-         CURRENT width keeps every line break exactly where it is. Justified
-         text spreads to the full box on purpose — leave it. Flips mirror
-         about the box centre, so a box change would shift them — skip. */
-      if (ts.align === "justify" || el.flipH || el.flipV) continue;
-      const m = measureBlock(ts, el.text, el.w);
-      if (m.w < 1 || m.h < 1) continue;
-      const w2 = Math.min(el.w, Math.max(24, Math.ceil(m.w) + padX * 2));
-      const h2 = Math.min(el.h, Math.max(20, Math.ceil(m.h) + padY * 2));
-      if (el.w - w2 < 3 && el.h - h2 < 3) continue;
-      /* the block sits vertically centred, horizontally by align — pin its
-         ink centre to the same page point through the resize (the element
-         rotates about its box centre, so go through page space) */
-      const inkCx = ts.align === "center" ? el.w / 2
-        : ts.align === "right" ? el.w - m.w / 2 : m.w / 2;
-      const [ox, oy] = rotVec(inkCx - el.w / 2, 0, el.rot);
-      const pcx = el.x + el.w / 2 + ox, pcy = el.y + el.h / 2 + oy;
-      const inkCx2 = ts.align === "center" ? w2 / 2
-        : ts.align === "right" ? w2 - m.w / 2 : m.w / 2;
-      const [ox2, oy2] = rotVec(inkCx2 - w2 / 2, 0, el.rot);
-      el.x = Math.round(pcx - ox2 - w2 / 2);
-      el.y = Math.round(pcy - oy2 - h2 / 2);
-      el.w = w2; el.h = h2;
-      changed++;
+      if (el.type === "text" && refitLetteringEl(el)) changed++;
     }
   }
   return changed;
+}
+
+/* Shrink ONE oversized lettering box to its measured ink, keeping the
+   letters at the exact same page position — the per-element core of
+   refitLegacyLettering, also run when the warp tool opens (envelope dots
+   live in box units, so an oversized box would put a fresh warp's dots far
+   from the letters). Returns whether the box changed. */
+export function refitLetteringEl(el: TextEl): boolean {
+  if (!el.text.trim() || el.w < 2 || el.h < 2) return false;
+  if (isWarped(el.ts.env as Warp)) return false;   // box = warp space, hands off
+  const ts = el.ts;
+  const padX = Math.round(ts.size * 0.18 + ts.outlineW * 1.2);
+  const padY = Math.round(ts.size * 0.14 + ts.outlineW * 1.2);
+
+  if (el.warp) {
+    /* arc-warped SFX lay glyphs out from the box CENTRE, independent of
+       box size — shrink symmetrically about the centre and nothing moves
+       (safe under rotation and flips too) */
+    let raw = (ts.caps ? el.text.toUpperCase() : el.text).replace(/\s*\n\s*/g, " ");
+    if (ts.crossbarI) raw = applyCrossbarI(raw);
+    const chars = raw.match(/\P{M}\p{M}*/gu) || [];
+    if (!chars.length) return false;
+    const widths = measureCharWidths(ts, chars);
+    const layout = arcTextLayout(widths, el.warp);
+    let ex = 0, ey = 0;   // max half-extents from the centre
+    for (let i = 0; i < chars.length; i++) {
+      if (chars[i] === " ") continue;
+      const hw = widths[i] / 2, hh = ts.size / 2;
+      const c = Math.abs(Math.cos(layout[i].rot)), s = Math.abs(Math.sin(layout[i].rot));
+      ex = Math.max(ex, Math.abs(layout[i].x) + c * hw + s * hh);
+      ey = Math.max(ey, Math.abs(layout[i].y) + s * hw + c * hh);
+    }
+    if (!ex || !ey) return false;
+    const w2 = Math.min(el.w, Math.ceil(ex) * 2 + padX * 2);
+    const h2 = Math.min(el.h, Math.ceil(ey) * 2 + padY * 2);
+    if (el.w - w2 < 3 && el.h - h2 < 3) return false;
+    el.x = Math.round(el.x + el.w / 2 - w2 / 2);
+    el.y = Math.round(el.y + el.h / 2 - h2 / 2);
+    el.w = w2; el.h = h2;
+    return true;
+  }
+
+  /* straight lettering: shrink to the wrapped block. Measuring at the
+     CURRENT width keeps every line break exactly where it is. Justified
+     text spreads to the full box on purpose — leave it. Flips mirror
+     about the box centre, so a box change would shift them — skip. */
+  if (ts.align === "justify" || el.flipH || el.flipV) return false;
+  const m = measureBlock(ts, el.text, el.w);
+  if (m.w < 1 || m.h < 1) return false;
+  const w2 = Math.min(el.w, Math.max(24, Math.ceil(m.w) + padX * 2));
+  const h2 = Math.min(el.h, Math.max(20, Math.ceil(m.h) + padY * 2));
+  if (el.w - w2 < 3 && el.h - h2 < 3) return false;
+  /* the block sits vertically centred, horizontally by align — pin its
+     ink centre to the same page point through the resize (the element
+     rotates about its box centre, so go through page space) */
+  const inkCx = ts.align === "center" ? el.w / 2
+    : ts.align === "right" ? el.w - m.w / 2 : m.w / 2;
+  const [ox, oy] = rotVec(inkCx - el.w / 2, 0, el.rot);
+  const pcx = el.x + el.w / 2 + ox, pcy = el.y + el.h / 2 + oy;
+  const inkCx2 = ts.align === "center" ? w2 / 2
+    : ts.align === "right" ? w2 - m.w / 2 : m.w / 2;
+  const [ox2, oy2] = rotVec(inkCx2 - w2 / 2, 0, el.rot);
+  el.x = Math.round(pcx - ox2 - w2 / 2);
+  el.y = Math.round(pcy - oy2 - h2 / 2);
+  el.w = w2; el.h = h2;
+  return true;
 }
 
 /** size a freshly created balloon so it just contains its placeholder text */

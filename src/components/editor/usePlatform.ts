@@ -8,13 +8,20 @@ import { useCallback, useEffect, useRef } from "react";
 import { clamp } from "@/lib/model";
 import { EditorCtx } from "./ctx";
 import { importJSON } from "./ops";
-import { dragInProgress, rejectPalm } from "./penInput";
+import { dragInProgress, dragOwnerId, rejectPalm } from "./penInput";
 
-/* Two fingers on the workspace background pinch-zoom the page, anchored
-   under the fingers (and panning with them). Single-finger touch still
-   scrolls the workspace natively (touch-action: pan-x pan-y in CSS), and
-   element drags are untouched — only pointers that start on empty
-   workspace count. */
+/* The editor owns every touch gesture on the workspace (the canvas is
+   touch-action: none — with native pan the browser scroll-claimed the
+   first finger and then SUPPRESSED the second finger's events entirely,
+   so a real two-finger pinch never reached this hook; that was the
+   reported "pinch doesn't work" bug):
+   - one finger on empty workspace PANS it (re-implemented here);
+   - one finger on an element drags it (the drag tools, untouched here);
+   - two fingers ANYWHERE pinch-zoom, anchored under the fingers. When the
+     first finger already started an element drag (on a zoomed-in tablet a
+     finger always lands on something), the second finger converts the
+     gesture: the drag is cancelled — the drag hook reverts the partial
+     move — and the two fingers zoom instead. */
 export function usePinchZoom(
   areaRef: { current: HTMLDivElement | null },
   zoom: number,
@@ -33,18 +40,28 @@ export function usePinchZoom(
     if (!area) return;
     const pts = new Map<number, { x: number; y: number }>();
     let baseDist = 0, baseZoom = 1, baseDoc = { x: 0, y: 0 };
-    const onBg = (t: EventTarget | null) =>
-      t instanceof Element && !t.closest(".el") && !t.closest(".overlay") && !t.closest(".bandOverlay");
+    let pan: { x: number; y: number } | null = null;
     const mid = () => {
       const [a, b] = [...pts.values()];
       return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
     };
     const down = (e: PointerEvent) => {
-      if (e.pointerType !== "touch" || !onBg(e.target)) return;
+      if (e.pointerType !== "touch") return;
       if (rejectPalm(e)) return;   // no palm-pinch while the pen is working
-      if (dragInProgress()) return; // no pinch/pan while an element drag runs
       pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (pts.size === 2) {
+      if (pts.size === 1) {
+        /* may become a one-finger pan — it only pans if no tool claims the
+           pointer (move() checks dragInProgress on every frame) */
+        pan = { x: e.clientX, y: e.clientY };
+      } else if (pts.size === 2) {
+        /* two fingers = pinch, no matter what they landed on. A drag the
+           first finger started hands the gesture over: cancelling it makes
+           the drag hook revert the element and release the claim. */
+        pan = null;
+        const owner = dragOwnerId();
+        if (owner !== null) {
+          window.dispatchEvent(new PointerEvent("pointercancel", { pointerId: owner }));
+        }
         const [a, b] = [...pts.values()];
         baseDist = Math.hypot(a.x - b.x, a.y - b.y) || 1;
         baseZoom = zoomRef.current;
@@ -59,7 +76,17 @@ export function usePinchZoom(
     };
     const move = (e: PointerEvent) => {
       if (!pts.has(e.pointerId)) return;
+      const prev = pts.get(e.pointerId)!;
       pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pts.size === 1) {
+        /* one finger on the workspace pans it — unless a tool owns the
+           pointer (element drag, sketch, lasso), which takes precedence */
+        if (pan && !dragInProgress()) {
+          area.scrollLeft -= e.clientX - prev.x;
+          area.scrollTop -= e.clientY - prev.y;
+        }
+        return;
+      }
       if (pts.size !== 2) return;
       const [a, b] = [...pts.values()];
       const z = clamp(baseZoom * (Math.hypot(a.x - b.x, a.y - b.y) / baseDist), 0.05, 4);
@@ -73,13 +100,14 @@ export function usePinchZoom(
         area.scrollTop = baseDoc.y * z - (m.y - r.top);
       });
     };
-    const up = (e: PointerEvent) => { pts.delete(e.pointerId); if (pts.size < 2) baseDist = 0; };
-    /* with two fingers down, the browser must NOT claim the gesture as a
-       scroll (touch-action pan-x pan-y invites it) — that fires
-       pointercancel and kills the pinch before it can zoom. A non-passive
-       touchmove preventDefault keeps the pointer stream alive; one-finger
-       scrolling is untouched. */
-    const tm = (e: TouchEvent) => { if (pts.size === 2) e.preventDefault(); };
+    const up = (e: PointerEvent) => {
+      pts.delete(e.pointerId);
+      if (pts.size < 2) baseDist = 0;
+      if (pts.size === 0) pan = null;
+    };
+    /* belt & braces: the canvas is touch-action none, but any browser that
+       still tries to claim a two-finger gesture (viewport pinch) is told no */
+    const tm = (e: TouchEvent) => { if (pts.size === 2 && e.cancelable) e.preventDefault(); };
     area.addEventListener("pointerdown", down);
     area.addEventListener("pointermove", move);
     area.addEventListener("pointerup", up);

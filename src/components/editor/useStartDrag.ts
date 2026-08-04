@@ -11,6 +11,7 @@ import {
 import { FLAT } from "@/lib/warp";
 import { elCrossesSpine } from "@/lib/exportPng";
 import { claimDrag, rejectPalm, releaseDrag } from "./penInput";
+import { selectionInkRect } from "./textInk";
 
 export const MIN_SIZE = 24;
 
@@ -241,9 +242,11 @@ export function useStartDrag(deps: DragDeps) {
           if (handle === "n" || handle === "s") cur.x = orig.x + Math.round((orig.w - cur.w) / 2);
         }
         /* dragged edges snap to the page border, margins, centre and other
-           elements' edges (Alt disables) */
+           elements' edges (Alt disables). NOT for lettering: its handles sit
+           on the ink rect, not the box edges, and the ink pinning below
+           repositions the box — snapping box edges would visibly fight it. */
         snapRef.current = { x: null, y: null };
-        if (!ev.altKey) {
+        if (!ev.altKey && cur.type !== "text") {
           const tol = Math.max(4, 8 / zoom);
           const m = pageMargins(p);
           const others = p.els.filter((o) => o.id !== cur.id);
@@ -287,11 +290,34 @@ export function useStartDrag(deps: DragDeps) {
            above — exact at rot 0 — lets the whole box drift around the page
            while resizing. Pin the ANCHOR (the corner/edge opposite the
            handle) to the page position it had when the drag started. */
-        if (orig.rot) {
+        if (orig.rot && cur.type !== "text") {
           const ax = handle.includes("w") ? 1 : handle.includes("e") ? 0 : 0.5;
           const ay = handle.includes("n") ? 1 : handle.includes("s") ? 0 : 0.5;
           const [oax, oay] = rotVec((ax - 0.5) * orig.w, (ay - 0.5) * orig.h, orig.rot);
           const [nax, nay] = rotVec((ax - 0.5) * cur.w, (ay - 0.5) * cur.h, orig.rot);
+          cur.x += Math.round((orig.x + orig.w / 2 + oax) - (cur.x + cur.w / 2 + nax));
+          cur.y += Math.round((orig.y + orig.h / 2 + oay) - (cur.y + cur.h / 2 + nay));
+        }
+        /* LETTERING locks in place the moment a handle is grabbed: the
+           resize handles sit on the measured INK rect (which is centred /
+           aligned inside the often-larger layout box), so anchoring the BOX
+           corner still let the letters drift toward the finger mid-resize —
+           a reported tablet bug. Pin the INK corner opposite the handle to
+           the page position it had at drag start instead. Uses the same
+           env-/arc-aware rect the handles are placed on, rotation included,
+           so it holds for the warp tool and on both canvases alike. */
+        if (cur.type === "text" && orig.type === "text") {
+          const ax = handle.includes("w") ? 1 : handle.includes("e") ? 0 : 0.5;
+          const ay = handle.includes("n") ? 1 : handle.includes("s") ? 0 : 0.5;
+          const oi = selectionInkRect(orig);
+          const ni = selectionInkRect(cur);
+          /* anchor offsets from each box's centre, rotated into page space */
+          const [oax, oay] = rotVec(
+            oi.x0 + ax * (oi.x1 - oi.x0) - orig.w / 2,
+            oi.y0 + ay * (oi.y1 - oi.y0) - orig.h / 2, orig.rot);
+          const [nax, nay] = rotVec(
+            ni.x0 + ax * (ni.x1 - ni.x0) - cur.w / 2,
+            ni.y0 + ay * (ni.y1 - ni.y0) - cur.h / 2, orig.rot);
           cur.x += Math.round((orig.x + orig.w / 2 + oax) - (cur.x + cur.w / 2 + nax));
           cur.y += Math.round((orig.y + orig.h / 2 + oay) - (cur.y + cur.h / 2 + nay));
         }
@@ -354,6 +380,21 @@ export function useStartDrag(deps: DragDeps) {
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
       snapRef.current = { x: null, y: null };
+      /* a CANCELLED gesture — browser scroll takeover, or a second finger
+         converting this drag into a pinch-zoom — is not an edit: put the
+         element (and any convoy) back exactly where the drag found it */
+      if (ev.type === "pointercancel") {
+        const p = docRef.current!.pages[pageIndexRef.current];
+        const i = p.els.findIndex((x) => x.id === el.id);
+        if (i >= 0) p.els[i] = orig;
+        for (const o of convoy) {
+          const oe = p.els.find((x) => x.id === o.id);
+          if (oe) { oe.x = o.x0; oe.y = o.y0; }
+        }
+        dragTipRef.current = null;
+        force();
+        return;
+      }
       /* keep the coordinates tooltip up briefly after release, like Comic Life */
       if (dragTipRef.current) {
         const tip = dragTipRef.current;

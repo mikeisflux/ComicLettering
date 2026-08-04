@@ -336,9 +336,13 @@ input[type="range"] { width: 110px; }
   flex: 1; min-width: 0; overflow: auto; position: relative;
   background: #9aa2ae;
   box-shadow: inset 0 2px 8px #0003;
-  /* tablets: one finger scrolls natively; the browser's own pinch-zoom is
-     suppressed so two fingers reach the editor's pinch-zoom handler */
-  touch-action: pan-x pan-y;
+  /* tablets: the editor owns EVERY touch gesture on the canvas. With
+     pan-x pan-y the browser scroll-claimed the first finger after a few
+     px of movement and then SUPPRESSED the second finger's events — so
+     two-finger pinches never reached the editor (the reported "pinch
+     doesn't work" bug). One-finger panning is re-implemented in
+     usePinchZoom; desktop wheel/trackpad scrolling is unaffected. */
+  touch-action: none;
   padding: 0 30px 40px 0;
 }
 .rulerRow { display: flex; position: sticky; top: 0; z-index: 30; }
@@ -1043,4 +1047,12 @@ input[type="range"] { width: 110px; }
   .handle::before { content: ""; position: absolute; inset: -9px; }
   /* layer-list buttons keep fingertip padding */
   .layerBtn { min-width: 34px; min-height: 34px; }
+  /* Touch devices get a WRAPPING toolbar, not a scrolling one: a hidden
+     horizontal scrollbar is undiscoverable by finger, so on tablets
+     (portrait AND landscape) the buttons that don't fit continue on the
+     next row instead of falling off the edge. Desktop keeps the scroll
+     (wrapping there trades artwork height for rarely-needed buttons). */
+  .toolbar { flex-wrap: wrap; row-gap: 2px; overflow-x: visible; overflow-y: visible; }
+  /* the spacer would blow an entire row apart mid-wrap — let it collapse */
+  .toolbar .tbSpacer { flex: 0 1 8px; }
 }

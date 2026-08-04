@@ -18,8 +18,9 @@ import {
   stampCrossesTrim, textCrossesTrim,
 } from "@/lib/exportPng";
 import { pageBleed } from "@/lib/model";
-import { onLetteringInput } from "./ops";
+import { onLetteringInput, refitLetteringEl } from "./ops";
 import { dragInProgress, isDoubleTap } from "./penInput";
+import { textInkFractions, warpInkBounds } from "./textInk";
 
 /* ---------- autoclipping self-replication ----------
    Lettering cut off at the facing page's spine-side bleed line REAPPEARS
@@ -398,91 +399,15 @@ export function renderEl(ed: EditorCtx, el: El) {
   );
 }
 
-/* Ink bounds of a lettering element, as FRACTIONS of its box. The layout box
-   is often larger than the letters themselves — arc warps lay glyphs out from
-   the centre, and a one-axis resize widens the box while the font size (which
-   follows the SMALLER ratio) stays put — so the manipulation box hugs the
-   measured ink instead of the box. Returns null when the box already fits. */
-function textInkFractions(el: TextEl): { x0: number; y0: number; x1: number; y1: number } | null {
-  if (!el.text || !el.text.trim() || el.w < 2 || el.h < 2) return null;
-  const ts = el.ts;
-  const pad = ts.outlineW / 2 + 2; // centred text-stroke spills half out, plus a hair
-  if (el.warp) {
-    /* arc-warped SFX: replicate the render layout and take the extents of the
-       rotated per-glyph boxes */
-    let raw = (ts.caps ? el.text.toUpperCase() : el.text).replace(/\s*\n\s*/g, " ");
-    if (ts.crossbarI) raw = applyCrossbarI(raw);
-    const chars = raw.match(/\P{M}\p{M}*/gu) || [];
-    if (!chars.length) return null;
-    const widths = measureCharWidths(ts, chars);
-    const layout = arcTextLayout(widths, el.warp);
-    const cx = el.w / 2, cy = el.h / 2;
-    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-    for (let i = 0; i < chars.length; i++) {
-      if (chars[i] === " ") continue;
-      const hw = widths[i] / 2, hh = ts.size / 2;
-      const c = Math.abs(Math.cos(layout[i].rot)), s = Math.abs(Math.sin(layout[i].rot));
-      const ex = c * hw + s * hh, ey = s * hw + c * hh;
-      const px = cx + layout[i].x, py = cy + layout[i].y;
-      if (px - ex < x0) x0 = px - ex;
-      if (px + ex > x1) x1 = px + ex;
-      if (py - ey < y0) y0 = py - ey;
-      if (py + ey > y1) y1 = py + ey;
-    }
-    if (x1 <= x0 || y1 <= y0) return null;
-    /* snug box → no re-hug (see the straight branch below) */
-    const fx = ts.size * 0.18 + ts.outlineW * 1.2 + 3;
-    const fy = ts.size * 0.14 + ts.outlineW * 1.2 + 3;
-    if (x0 <= fx && el.w - x1 <= fx && y0 <= fy && el.h - y1 <= fy) return null;
-    return {
-      x0: (x0 - pad) / el.w, y0: (y0 - pad) / el.h,
-      x1: (x1 + pad) / el.w, y1: (y1 + pad) / el.h,
-    };
-  }
-  /* straight lettering: the block is centred vertically (the .txt flex column)
-     and placed horizontally by ts.align inside the box */
-  const m = measureBlock(ts, el.text, el.w);
-  if (m.w < 1 || m.h < 1) return null;
-  const y0 = (el.h - m.h) / 2;
-  const x0 = ts.align === "center" ? (el.w - m.w) / 2
-    : ts.align === "right" ? el.w - m.w : 0;
-  /* a box that's already snug (what a fresh or migrated element gets) is NOT
-     re-hugged: the selection box, resize handles and warp dots then all sit
-     on the SAME rect instead of three subtly different ones */
-  const fitX = ts.size * 0.18 + ts.outlineW * 1.2 + 3;
-  const fitY = ts.size * 0.14 + ts.outlineW * 1.2 + 3;
-  if (x0 <= fitX && el.w - (x0 + m.w) <= fitX && y0 <= fitY && el.h - (y0 + m.h) <= fitY) return null;
-  return {
-    x0: (x0 - pad) / el.w, y0: (y0 - pad) / el.h,
-    x1: (x0 + m.w + pad) / el.w, y1: (y0 + m.h + pad) / el.h,
-  };
-}
-
-/* Ink bounds of an ENVELOPE-warped lettering element: measure the straight
-   ink, then push that rect through the warp — the patch bounds alone span the
-   whole (often oversized) layout box, which left the manipulation box far from
-   the letters on warped SFX. */
-function warpInkBounds(el: TextEl, env: Warp): { x0: number; y0: number; x1: number; y1: number } {
-  const ink = textInkFractions(el) ?? { x0: 0, y0: 0, x1: 1, y1: 1 };
-  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-  const take = (u: number, v: number) => {
-    const [x, y] = warpPoint(env, u, v);
-    if (x < x0) x0 = x;
-    if (x > x1) x1 = x;
-    if (y < y0) y0 = y;
-    if (y > y1) y1 = y;
-  };
-  /* sample the ink rect's boundary — every warp handle's influence peaks on
-     an edge or corner, so the boundary carries the extremes */
-  const N = 10;
-  for (let i = 0; i <= N; i++) {
-    const t = i / N;
-    take(ink.x0 + t * (ink.x1 - ink.x0), ink.y0);
-    take(ink.x0 + t * (ink.x1 - ink.x0), ink.y1);
-    take(ink.x0, ink.y0 + t * (ink.y1 - ink.y0));
-    take(ink.x1, ink.y0 + t * (ink.y1 - ink.y0));
-  }
-  return { x0, y0, x1, y1 };
+/* ONE way into warp mode (touch double-tap + mouse double-click both land
+   here): envelope coords are fractions of the LAYOUT box, so an oversized
+   box would open a fresh warp with its dots far from the letters — refit
+   the box snug to the ink first (a warped element's box is already the
+   warp's coordinate space and is left alone). */
+function enterWarp(ed: EditorCtx, el: El) {
+  if (el.type !== "text") return;
+  if (refitLetteringEl(el)) ed.commit();
+  ed.setWarping(el.id);
 }
 
 export function renderOverlay(ed: EditorCtx) {
@@ -647,11 +572,13 @@ export function renderOverlay(ed: EditorCtx) {
            renderers use), so every handle sits on the ink it bends. The
            drag itself is delta-based, so a carried handle edits normally. */
         (el.ts.env as Warp | undefined ?? FLAT).map((p, i) => {
-          /* dots sit on the INK-HUGGED selection rect, same as the resize
-             handles — mapping them to the layout box flung them far off the
-             letters whenever the box was bigger than the ink (drags are
-             delta-based, so the visual anchor is free to hug the word) */
-          const [px, py] = vis(bx + p[0] * bw, by + p[1] * bh);
+          /* each dot sits at its TRUE envelope position (env coords are
+             fractions of the LAYOUT box — the space the drag writes into).
+             Remapping dots into their own bounding rect made dragging one
+             dot visibly displace the others and outrun the finger (a
+             reported tablet bug). The box stays on the letters because
+             entering warp mode refits an oversized box to the ink first. */
+          const [px, py] = vis(el.x + p[0] * el.w, el.y + p[1] * el.h);
           return (
             <div key={i} className="handle warpDot"
               title={i < 4 ? "Drag to pin this corner" : "Drag to bow this edge"}
@@ -679,13 +606,13 @@ export function renderOverlay(ed: EditorCtx) {
               /* touch double-tap on a lettering handle = enter warp mode */
               /* preventDefault, or the tap's compat dblclick lands on the
                  warp dot that just rendered here and exits warp instantly */
-              if (el.type === "text" && isDoubleTap("h:" + el.id, e)) { e.preventDefault(); setWarping(el.id); return; }
+              if (el.type === "text" && isDoubleTap("h:" + el.id, e)) { e.preventDefault(); enterWarp(ed, el); return; }
               startDrag(e, el, "resize", k);
             }}
             onDoubleClick={(e) => {
               if (el.type !== "text") return;
               e.stopPropagation();
-              setWarping(el.id);
+              enterWarp(ed, el);
             }} />
         );
       })}
