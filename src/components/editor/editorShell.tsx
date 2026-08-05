@@ -36,6 +36,13 @@ export interface ShellProps {
   startTuckDrag: (e: React.PointerEvent) => void;
 }
 
+/* the add-page dialog's quantity field, read at click time (the panel is a
+   plain render function, so the input holds its own state) */
+const addPageQty = () => {
+  const v = (document.getElementById("addPageQty") as HTMLInputElement | null)?.valueAsNumber;
+  return Number.isFinite(v) ? Math.max(1, Math.min(200, Math.round(v!))) : 1;
+};
+
 export function renderPagesPanel(ed: EditorCtx, sh: ShellProps) {
   const { setPageIndex, setSelId, setStatus, commit, rebuildThumbs, setAskAddPage, docRef, pageIndex } = ed;
   const doc = ed.doc!;
@@ -70,17 +77,25 @@ export function renderPagesPanel(ed: EditorCtx, sh: ShellProps) {
            page, so ask rather than guess. */
         <div className="setupOverlay" onPointerDown={(e) => { if (e.target === e.currentTarget) setAskAddPage(false); }}>
           <div className="setupDlg" style={{ width: 330 }}>
-            <div className="setupTitle">Add a new page</div>
-            <div className="setupBody" style={{ flexDirection: "column", gap: 8 }}>
+            <div className="setupTitle">Add new pages</div>
+            <div className="setupBody" style={{ flexDirection: "column", gap: 10 }}>
+              {/* renderPagesPanel is a plain function (no hooks) — the
+                  quantity lives in the input itself and is read on click */}
+              <label style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, fontSize: 13.5 }}>
+                How many pages:
+                <input id="addPageQty" type="number" min={1} max={200} defaultValue={1}
+                  style={{ width: 64, padding: "4px 6px", fontSize: 14 }}
+                  onFocus={(e) => e.currentTarget.select()} />
+              </label>
               <div className="tailChoices">
-                <button onClick={() => { addPageAt(ed, pageIndex); }}>
+                <button onClick={() => { addPageAt(ed, pageIndex, addPageQty()); }}>
                   Before page {pageIndex + 1}
                 </button>
-                <button onClick={() => { addPageAt(ed, pageIndex + 1); }}>
+                <button onClick={() => { addPageAt(ed, pageIndex + 1, addPageQty()); }}>
                   After page {pageIndex + 1}
                 </button>
               </div>
-              <div className="tips">The new page uses this page&apos;s size and margins.</div>
+              <div className="tips">New pages use this page&apos;s size and margins.</div>
             </div>
           </div>
         </div>

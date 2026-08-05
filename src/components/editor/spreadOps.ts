@@ -10,15 +10,18 @@ import type { EditorCtx } from "./ctx";
    to it, and refresh every thumbnail — inserting shifts the pages after it,
    so the index-keyed thumbs must all re-render or the list shows stale
    previews until a reload. */
-export function addPageAt(ed: EditorCtx, at: number) {
+export function addPageAt(ed: EditorCtx, at: number, count = 1) {
   const d = ed.docRef.current!;
   const cur = d.pages[ed.pageIndexRef.current];
-  d.pages.splice(at, 0, newPage(cur.w, cur.h, cur.margin));
+  const n = Math.max(1, Math.min(200, Math.round(count) || 1));
+  /* one fresh page object each — a shared object would alias every copy */
+  d.pages.splice(at, 0, ...Array.from({ length: n }, () => newPage(cur.w, cur.h, cur.margin)));
   ed.setAskAddPage(false);
   ed.setPageIndex(at);
   ed.setSelId(null);
   ed.commit();
   ed.rebuildThumbs();
+  if (n > 1) ed.setStatus(`Added ${n} pages.`);
 }
 
 /* The facing page's index and where its origin sits in CURRENT-page units
