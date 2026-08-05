@@ -11,6 +11,47 @@ export const metadata: Metadata = {
 const PLAY_URL = "https://play.google.com/store/apps/details?id=com.lettermycomic.app";
 const APK_URL = "https://github.com/mikeisflux/ComicLettering/releases/download/android-latest/app-release-signed.apk";
 
+/* Store listing URLs — flip each from null to its live URL as the store
+   approves the listing (null renders an "In review — link coming soon"
+   badge, so the card ships before the store does). */
+const STORE_URLS: Record<string, string | null> = {
+  windows: null,   // Microsoft Store (submitted)
+  chrome: null,    // Chrome Web Store (submitted)
+  edge: null,      // Microsoft Edge Add-ons (submitted)
+  firefox: null,   // addons.mozilla.org (submitted)
+};
+
+/* one card per platform: the store path plus whatever works TODAY */
+const PLATFORMS: {
+  key: keyof typeof STORE_URLS; name: string; store: string; blurb: string;
+  now: React.ReactNode;
+}[] = [
+  {
+    key: "windows", name: "Windows", store: "Microsoft Store",
+    blurb: "The studio as a real Windows app — Start-menu icon, its own window, .lmc files open straight into it.",
+    now: <>Available right now without the store: open the <Link href="/app">Studio</Link> in
+      Chrome or Edge and click the red <b>Install as App</b> button — same app, one click.</>,
+  },
+  {
+    key: "chrome", name: "Chrome", store: "Chrome Web Store",
+    blurb: "A toolbar button that opens the studio in its own app window, no tabs or address bar.",
+    now: <>You don&apos;t have to wait to install: in Chrome, open the <Link href="/app">Studio</Link> and
+      click the red <b>Install as App</b> button (or the install icon in the address bar).</>,
+  },
+  {
+    key: "edge", name: "Edge", store: "Edge Add-ons",
+    blurb: "The same one-click launcher for Microsoft Edge.",
+    now: <>Install the full app today: open the <Link href="/app">Studio</Link> in Edge and click the
+      red <b>Install as App</b> button — Edge adds it to your Start menu and taskbar.</>,
+  },
+  {
+    key: "firefox", name: "Firefox", store: "Firefox Add-ons",
+    blurb: "Firefox can't install web apps, so our add-on fills the gap: a toolbar button that opens the studio in its own app window.",
+    now: <>Meanwhile the studio runs perfectly in a Firefox tab — just open the{" "}
+      <Link href="/app">Studio</Link>. The add-on adds the one-click app window.</>,
+  },
+];
+
 /* store-badge buttons: custom-styled (no remote badge art), swap hrefs as
    each store listing goes live */
 const badge: React.CSSProperties = {
@@ -57,6 +98,40 @@ export default function GetTheAppPage() {
             <Link href="/app">Studio</Link>.
           </p>
         </div>
+      </div>
+
+      {/* ---- every platform: the store path + what works today ---- */}
+      <h2 style={{ textAlign: "center", marginTop: 56 }}>On every desktop &amp; browser</h2>
+      <p className="sub" style={{ textAlign: "center", margin: "0 auto 26px", maxWidth: 640 }}>
+        LetterMyComic is coming to every major store — and you never have to wait
+        for one: every platform has a way to install or run the studio today.
+      </p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 18 }}>
+        {PLATFORMS.map((p) => {
+          const url = STORE_URLS[p.key];
+          return (
+            <div key={p.key} style={{
+              border: "1px solid #d8dce2", borderRadius: 14, padding: "18px 20px",
+              background: "#fff", boxShadow: "0 6px 22px #0000000f",
+              display: "flex", flexDirection: "column", gap: 10,
+            }}>
+              <div style={{ fontFamily: "Bangers, cursive", fontSize: 26, letterSpacing: 0.5 }}>{p.name}</div>
+              <p style={{ margin: 0, fontSize: 14, color: "#3c4654", flexGrow: 1 }}>{p.blurb}</p>
+              {url ? (
+                <a href={url} style={{ ...badge, alignSelf: "flex-start" }}>
+                  <small style={{ fontSize: 11, opacity: 0.8 }}>GET IT FROM THE</small>
+                  <b style={{ fontSize: 17 }}>{p.store}</b>
+                </a>
+              ) : (
+                <span style={{ ...badge, alignSelf: "flex-start", opacity: 0.55, cursor: "default" }} aria-disabled>
+                  <small style={{ fontSize: 11, opacity: 0.8 }}>IN REVIEW — LINK COMING SOON</small>
+                  <b style={{ fontSize: 17 }}>{p.store}</b>
+                </span>
+              )}
+              <p style={{ margin: 0, fontSize: 13, color: "#5a6472" }}>{p.now}</p>
+            </div>
+          );
+        })}
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 18, marginTop: 44 }}>
