@@ -936,6 +936,21 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   usePinchZoom(areaRef, zoom, setZoom, setUserZoomed, mounted && !!doc && !!page);
   /* no native prompt available → a visible how-to-install dialog opens */
   const [showInstallHelp, setShowInstallHelp] = useState(false);
+  /* Window menu: per-panel visibility, remembered on this browser */
+  const [winHide, setWinHide] = useState<{ left: boolean; right: boolean; tray: boolean; format: boolean }>(() => {
+    try {
+      return { left: false, right: false, tray: false, format: false, ...JSON.parse(localStorage.getItem("lmc-window") || "{}") };
+    } catch { return { left: false, right: false, tray: false, format: false }; }
+  });
+  const toggleWindow = useCallback((k: "left" | "right" | "tray" | "format" | "all") => {
+    setWinHide((w) => {
+      const next = k === "all"
+        ? { left: false, right: false, tray: false, format: false }
+        : { ...w, [k]: !w[k] };
+      try { localStorage.setItem("lmc-window", JSON.stringify(next)); } catch { /* private mode */ }
+      return next;
+    });
+  }, []);
   const installApp = useInstallPrompt(setStatus, () => setShowInstallHelp(true));
   /* is LetterMyComic ALREADY installed on this machine? The menu-bar
      install button hides then, even in a plain browser tab. Chromium
@@ -966,7 +981,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     fileFontRef, fileStampRef,
     force, commit, autosave, undo, redo, setStatus, select, setSelId,
     setEditingId, finishEditing, mutateSel, startDrag, pagePoint, fitZoom, startTuck,
-    selectAllOnPage, installApp, appInstalled, showInstallHelp, setShowInstallHelp, setAskAddPage,
+    selectAllOnPage, installApp, appInstalled, showInstallHelp, setShowInstallHelp, winHide, toggleWindow, setAskAddPage,
     tuckAsk, setTuckAsk, retuneTuck, runTuckAuto, applyTuck,
     autosaveSoon,
     rebuildThumbs, reseedAids, setThumbs, setPageIndex, setUserZoomed,
@@ -1048,15 +1063,15 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       )}
       {renderMenuBar(ed)}
       {renderToolbar(ed)}
-      {renderFormatBar(ed)}
+      {!winHide.format && renderFormatBar(ed)}
 
       {/* ---------- main ---------- */}
       <div className="main">
-        {renderPagesPanel(ed, sh)}
+        {!winHide.left && renderPagesPanel(ed, sh)}
 
         {renderCanvasArea(ed, sh)}
 
-        <aside className="rightbar">
+        {!winHide.right && <aside className="rightbar">
           <div className="tabs">
             {([["layouts", "Layouts"], ["inspector", "Inspect"], ["layers", "Layers"], ["photos", "Photos"], ["library", "Library"], ["proof", "Proof"]] as const).map(([k, label]) => (
               <button key={k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{label}</button>
@@ -1068,9 +1083,9 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
           {tab === "photos" && renderPhotosTab(ed)}
           {tab === "library" && renderLibraryTab(ed)}
           {tab === "proof" && renderProofTab(ed)}
-        </aside>
+        </aside>}
       </div>
-      {renderTray(ed)}
+      {!winHide.tray && renderTray(ed)}
       {renderContextMenu(ed)}
       {renderTailAsk(ed)}
       {renderExportDialog(ed)}

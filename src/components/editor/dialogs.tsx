@@ -390,9 +390,9 @@ export function renderInstallHelp(ed: EditorCtx) {
       "No icon? Open the ⋯ menu → Apps → “Install LetterMyComic”.",
       "Edge adds LetterMyComic to your Start menu and taskbar; .lmc project files open straight into it.",
     ] : isFirefox ? [
-      "Firefox doesn't fully support installing web apps on desktop yet.",
-      "On Windows, newer Firefox versions can pin the studio like an app: open the ≡ menu and look for “Add to taskbar” — if it's there, that's it.",
-      "Otherwise: open lettermycomic.com once in Chrome or Edge and click Install there — that gives you the real desktop app. Your account, cloud library and files are exactly the same either way.",
+      "Firefox doesn't support installing web apps on desktop — so we made a Firefox add-on instead.",
+      "Click “Get the Firefox Add-on” below: it adds a LetterMyComic button to your toolbar that opens the studio in its own app window (no tabs, no address bar). Clicking it again focuses your studio window.",
+      "Prefer a full desktop install — Start-menu icon and .lmc files opening straight into the studio? Chrome or Edge installs do that; your account and cloud library are the same everywhere.",
     ] : isSafari ? [
       "In Safari's menu bar choose File → “Add to Dock…” and confirm.",
       "LetterMyComic then lives in your Dock and opens in its own window like any Mac app.",
@@ -418,6 +418,13 @@ export function renderInstallHelp(ed: EditorCtx) {
           </div>
         </div>
         <div className="setupFoot">
+          {isFirefox && (
+            <a className="okBtn" style={{ textDecoration: "none" }}
+              href="https://addons.mozilla.org/en-US/firefox/addon/lettermycomic-comic-lettering-studio/"
+              target="_blank" rel="noreferrer">
+              Get the Firefox Add-on
+            </a>
+          )}
           <button className="okBtn" onClick={close}>Got it</button>
         </div>
       </div>

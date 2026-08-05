@@ -166,6 +166,9 @@ input[type="range"] { width: 110px; }
   /* squeezed by the install button it must ellipsize, not wrap into a column */
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+/* the hint is ADVICE, not a control — on anything but very wide screens it
+   ends up half-clipped at the toolbar's scroll edge, which reads as broken */
+@media (max-width: 2100px) { .tbHint { display: none; } }
 /* the loud install entry point — File → Install as App… goes unnoticed.
    Dead-centre of the MENU BAR (the File/Edit/View bar), floating above it
    so the slim bar keeps its height and the menus keep their places. */

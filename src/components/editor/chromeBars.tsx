@@ -137,6 +137,16 @@ export function renderMenuBar(ed: EditorCtx) {
         ["Lock", () => mutateSel((x) => { x.locked = true; })],
         ["Unlock", () => mutateSel((x) => { x.locked = false; })],
       ]],
+      /* per-panel visibility — each section hides on its own, so the
+         artwork can take the whole window a piece at a time */
+      ["Window", [
+        [(ed.winHide.left ? "Show" : "Hide") + " Pages & Styles Panel", () => ed.toggleWindow("left")],
+        [(ed.winHide.right ? "Show" : "Hide") + " Inspector Panel", () => ed.toggleWindow("right")],
+        [(ed.winHide.format ? "Show" : "Hide") + " Format Bar", () => ed.toggleWindow("format")],
+        [(ed.winHide.tray ? "Show" : "Hide") + " Balloon Tray", () => ed.toggleWindow("tray")],
+        ["—", null],
+        ["Show All Panels", () => ed.toggleWindow("all")],
+      ]],
       ["Help", [
         ["User Guide", () => window.open("/guide", "_blank")],
         ["Keyboard Shortcuts", () => window.alert([

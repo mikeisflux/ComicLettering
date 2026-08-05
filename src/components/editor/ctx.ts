@@ -108,6 +108,9 @@ export interface EditorCtx {
   /* browser-specific install instructions (no native prompt available) */
   showInstallHelp: boolean;
   setShowInstallHelp: SetState<boolean>;
+  /* Window menu: per-panel visibility (persisted per browser) */
+  winHide: { left: boolean; right: boolean; tray: boolean; format: boolean };
+  toggleWindow: (k: "left" | "right" | "tray" | "format" | "all") => void;
   /* open the "+ Page" chooser (before/after the current page) — every
      add-page affordance (sidebar button, toolbar, Insert menu) uses it */
   setAskAddPage: (v: boolean) => void;
