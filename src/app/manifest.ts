@@ -7,14 +7,27 @@ import type { MetadataRoute } from "next";
    launchQueue consumer in Editor.tsx). */
 export default function manifest(): MetadataRoute.Manifest {
   return {
+    /* a stable identity that survives URL changes (PWABuilder/Chromium) */
+    id: "/app",
     name: "LetterMyComic",
     short_name: "LetterMyComic",
     description: "Professional comic lettering — word balloons, SFX and print-ready pages, right in your browser.",
     start_url: "/app",
     scope: "/",
     display: "standalone",
+    /* the studio works in both orientations — never lock the device */
+    orientation: "any",
+    categories: ["photo", "productivity", "entertainment"],
     background_color: "#ffffff",
     theme_color: "#24303f",
+    /* store-style install previews (Chromium install dialog, PWABuilder) */
+    screenshots: [
+      { src: "/shots/app/studio.webp", sizes: "1400x788", type: "image/webp", form_factor: "wide", label: "The lettering studio" },
+      { src: "/shots/app/pages.webp", sizes: "1400x788", type: "image/webp", form_factor: "wide", label: "Pages and layouts" },
+      { src: "/shots/app/pen.webp", sizes: "1400x788", type: "image/webp", form_factor: "wide", label: "Pen-first tablet lettering" },
+      { src: "/shots/app/hero.webp", sizes: "720x1280", type: "image/webp", form_factor: "narrow", label: "Word balloons on your art" },
+      { src: "/shots/app/type.webp", sizes: "720x1280", type: "image/webp", form_factor: "narrow", label: "600+ comic fonts" },
+    ],
     icons: [
       { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
       { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
