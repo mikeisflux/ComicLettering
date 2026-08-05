@@ -1,4 +1,4 @@
-# LetterMyComic Firefox add-on
+# LetterMyComic browser add-on (Firefox + Chrome + Edge)
 
 Firefox has no desktop PWA install, so this add-on is the Firefox way to run
 the studio like an app: a toolbar button that opens lettermycomic.com/app in
@@ -11,10 +11,15 @@ installs and the Play Store app cover those.
 
 ## Build
 
-    ./scripts/build-firefox-addon.sh
+    ./scripts/build-addons.sh
 
-writes `public/lettermycomic-firefox.zip` (the AMO upload — files at the
-zip root, per WebExtension packaging rules) so the deployed site serves it.
+writes BOTH store packages (files at the zip root, per WebExtension
+packaging rules), served by the deployed site too:
+
+* `public/lettermycomic-firefox.zip` — addons.mozilla.org upload
+* `public/lettermycomic-chrome.zip` — Chrome Web Store AND Edge Add-ons
+  upload (Chromium needs a service-worker background instead of Firefox's
+  event page; the build derives that manifest from this one)
 
 ## Test locally in Firefox
 
@@ -34,3 +39,18 @@ immediately (temporary add-ons vanish when Firefox closes).
 
 Version bumps: raise `version` in manifest.json, rebuild, upload the new
 zip as a Version on the same listing.
+
+## Publish (Chrome Web Store)
+
+1. chrome.google.com/webstore/devconsole — one-time $5 developer fee.
+2. New item → upload `lettermycomic-chrome.zip`.
+3. Listing: same name/summary/description as AMO; category Photos;
+   privacy tab → declare NO data collected; single purpose: "opens
+   lettermycomic.com in an app window". Screenshots: reuse docs/playstore.
+4. Review typically 1–3 days.
+
+## Publish (Edge Add-ons)
+
+1. partner.microsoft.com/dashboard/microsoftedge — free account.
+2. New extension → upload the SAME `lettermycomic-chrome.zip`.
+3. Same listing copy; review typically a few days.
