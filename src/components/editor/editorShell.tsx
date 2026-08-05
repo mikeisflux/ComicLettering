@@ -48,6 +48,8 @@ export function renderPagesPanel(ed: EditorCtx, sh: ShellProps) {
   const doc = ed.doc!;
   return (
     <aside className="leftbar">
+      {/* phone drawer: the rail floats over the canvas and needs a way out */}
+      <button className="railClose" onClick={() => ed.toggleWindow("left")}>✕ Close</button>
       <div className="sideTitle">Pages</div>
       <div className="pageList">
         {doc.pages.map((p, i) => (

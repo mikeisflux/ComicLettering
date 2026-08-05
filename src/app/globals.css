@@ -1074,12 +1074,58 @@ input[type="range"] { width: 110px; }
   .handle::before { content: ""; position: absolute; inset: -9px; }
   /* layer-list buttons keep fingertip padding */
   .layerBtn { min-width: 34px; min-height: 34px; }
-  /* Touch devices get a WRAPPING toolbar, not a scrolling one: a hidden
-     horizontal scrollbar is undiscoverable by finger, so on tablets
-     (portrait AND landscape) the buttons that don't fit continue on the
-     next row instead of falling off the edge. Desktop keeps the scroll
-     (wrapping there trades artwork height for rarely-needed buttons). */
+}
+/* TABLETS (coarse, 700px+) get a WRAPPING toolbar, not a scrolling one: a
+   hidden horizontal scrollbar is undiscoverable by finger. PHONES do not —
+   wrapped bars ate half a phone screen; they get thin scroll strips below. */
+@media (pointer: coarse) and (min-width: 700px) {
   .toolbar { flex-wrap: wrap; row-gap: 2px; overflow-x: visible; overflow-y: visible; }
   /* the spacer would blow an entire row apart mid-wrap — let it collapse */
   .toolbar .tbSpacer { flex: 0 1 8px; }
 }
+
+/* ---------------- PHONE LAYOUT (<700px): canvas first ----------------
+   The desktop chrome squeezed the page to a sliver on phones. Here every
+   bar is a thin swipeable strip, the format bar and both side rails start
+   hidden (Window menu / toolbar buttons bring them back), and the rails
+   open as slide-over DRAWERS above the canvas instead of beside it. */
+@media (max-width: 700px) {
+  .menuBar { padding: 0 2px; }
+  .menuTop { padding: 5px 7px; font-size: 12px; }
+  /* one thin scrollable toolbar strip */
+  .toolbar { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; padding: 2px 4px; scrollbar-width: none; }
+  .toolbar::-webkit-scrollbar { display: none; }
+  .toolbar .brand { display: none; }
+  .toolBtn { min-width: 40px; padding: 2px 3px; }
+  .toolBtn .tIcon { font-size: 14px; }
+  .toolBtn .tLabel { font-size: 8px; }
+  .tbSpacer, .tbHint { display: none; }
+  /* format bar (when shown): compact controls */
+  .formatBar { gap: 3px; padding: 3px 4px; }
+  .formatBar select, .formatBar input { font-size: 12px; }
+  /* side rails float OVER the canvas as drawers */
+  .leftbar, .rightbar {
+    position: fixed; top: 0; bottom: 0; z-index: 160;
+    width: min(300px, 86vw);
+    box-shadow: 0 0 46px #0008;
+    overflow-y: auto;
+  }
+  .leftbar { left: 0; border-right: none; }
+  .rightbar { right: 0; border-left: none; }
+  /* one thin scrollable tray strip */
+  .tray { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; padding: 3px 5px; scrollbar-width: none; }
+  .tray::-webkit-scrollbar { display: none; }
+  .trayBtn svg { width: 30px; height: 24px; }
+  .trayBtn span { font-size: 8px; }
+  .tray > .statusbar { display: none; }
+  /* the stamps popup anchors inside the (now scrolling) tray, which would
+     clip it — pin it above the tray, full width */
+  .stampPop { position: fixed; left: 8px; right: 8px; bottom: 60px; width: auto; }
+}
+/* drawer close button — phone only */
+.railClose {
+  display: none; margin: 8px 8px 0; padding: 9px 16px; align-self: flex-end;
+  background: #24303f; color: #fff; border: none; border-radius: 7px;
+  font-size: 13px; font-weight: 600;
+}
+@media (max-width: 700px) { .railClose { display: block; } }

@@ -936,11 +936,15 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   usePinchZoom(areaRef, zoom, setZoom, setUserZoomed, mounted && !!doc && !!page);
   /* no native prompt available → a visible how-to-install dialog opens */
   const [showInstallHelp, setShowInstallHelp] = useState(false);
-  /* Window menu: per-panel visibility, remembered on this browser */
+  /* Window menu: per-panel visibility, remembered on this browser.
+     PHONES start with the format bar and both side rails hidden — the
+     canvas gets the screen; saved choices still win. */
   const [winHide, setWinHide] = useState<{ left: boolean; right: boolean; tray: boolean; format: boolean }>(() => {
+    const phone = typeof window !== "undefined" && window.innerWidth < 700;
+    const base = { left: phone, right: phone, tray: false, format: phone };
     try {
-      return { left: false, right: false, tray: false, format: false, ...JSON.parse(localStorage.getItem("lmc-window") || "{}") };
-    } catch { return { left: false, right: false, tray: false, format: false }; }
+      return { ...base, ...JSON.parse(localStorage.getItem("lmc-window") || "{}") };
+    } catch { return base; }
   });
   const toggleWindow = useCallback((k: "left" | "right" | "tray" | "format" | "all") => {
     setWinHide((w) => {
@@ -1072,6 +1076,8 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
         {renderCanvasArea(ed, sh)}
 
         {!winHide.right && <aside className="rightbar">
+          {/* phone drawer: the rail floats over the canvas and needs a way out */}
+          <button className="railClose" onClick={() => toggleWindow("right")}>✕ Close</button>
           <div className="tabs">
             {([["layouts", "Layouts"], ["inspector", "Inspect"], ["layers", "Layers"], ["photos", "Photos"], ["library", "Library"], ["proof", "Proof"]] as const).map(([k, label]) => (
               <button key={k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{label}</button>

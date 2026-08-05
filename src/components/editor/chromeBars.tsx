@@ -235,7 +235,10 @@ export function renderToolbar(ed: EditorCtx) {
       autosave(); force(); fitZoom(true);
     }} />
     <ToolBtn label="Save" icon="✔" accent onClick={() => saveProject(ed, false)} />
-    <ToolBtn label="Library" icon="🗀" onClick={() => setTab("library")} />
+    <ToolBtn label="Library" icon="🗀" onClick={() => {
+      setTab("library");
+      if (ed.winHide.right) ed.toggleWindow("right");   // panel hidden = show it
+    }} />
     <ToolBtn label="New Page" icon="🗎+" onClick={() => ed.setAskAddPage(true)} />
     <span className="tbSep" />
     <ToolBtn label="Undo" icon="↶" disabled={hIndexRef.current <= 0} onClick={undo} />
@@ -271,7 +274,10 @@ export function renderToolbar(ed: EditorCtx) {
     <ToolBtn label="Page Setup" icon="📐" onClick={() => setShowSetup(true)} />
     <ToolBtn label="Print" icon="🖨" onClick={() => printPage(ed)} />
     <ToolBtn label="Export" icon="🖼⇩" accent onClick={() => demo ? setStatus("Export is off in the demo — subscribe to unlock.") : setShowExport(true)} />
-    <ToolBtn label="Inspector" icon="ⓘ" onClick={() => setTab("inspector")} />
+    <ToolBtn label="Inspector" icon="ⓘ" onClick={() => {
+      setTab("inspector");
+      if (ed.winHide.right) ed.toggleWindow("right");   // panel hidden = show it
+    }} />
     <div className="tbSpacer" />
     <div className="tbHint">Runs entirely in your browser — nothing is uploaded.</div>
   </header>
