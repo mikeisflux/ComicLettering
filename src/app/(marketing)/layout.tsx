@@ -62,7 +62,11 @@ export default async function MarketingLayout({ children }: { children: React.Re
             <Link href="/app">Open the studio</Link>
           </div>
         </div>
-        <div className="legal">© {new Date().getFullYear()} LetterMyComic. All rights reserved.</div>
+        <div className="legal">
+          © {new Date().getFullYear()} LetterMyComic. All rights reserved.
+          {" · "}<Link href="/privacy">Privacy Policy</Link>
+          {" · "}<Link href="/terms">Terms of Service</Link>
+        </div>
       </footer>
     </div>
   );

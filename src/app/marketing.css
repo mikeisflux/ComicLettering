@@ -271,6 +271,8 @@
 .mktFooter a { color: #cdd6e2; display: block; margin-bottom: 6px; }
 .mktFooter .foot-brand { font-family: "Bangers", cursive; font-size: 22px; color: #fff; }
 .mktFooter .legal { margin-top: 18px; text-align: center; color: #6d7b8d; font-size: 12px; }
+/* the legal links sit INLINE in the copyright line, unlike the column links */
+.mktFooter .legal a { display: inline; margin: 0; color: #93a1b3; }
 
 /* ============== responsive: hamburger + tablet/phone layouts ==============
    Three tiers below desktop: tablet (<=1024), phone (<=860), small (<=430).
