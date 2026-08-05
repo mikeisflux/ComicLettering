@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "LetterMyComic — Comic Lettering Studio",
   "version": "1.0.0",
-  "description": "One click opens the LetterMyComic studio in its own app window — word balloons, SFX lettering and print-ready comic pages, right in your browser.",
+  "description": "One click opens the LetterMyComic studio in its own app window — comic lettering, word balloons and print-ready pages.",
   "homepage_url": "https://lettermycomic.com",
   "icons": {
     "48": "icons/icon-48.png",
