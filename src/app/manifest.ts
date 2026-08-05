@@ -9,12 +9,16 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     /* a stable identity that survives URL changes (PWABuilder/Chromium) */
     id: "/app",
+    lang: "en",
+    dir: "ltr",
     name: "LetterMyComic",
     short_name: "LetterMyComic",
     description: "Professional comic lettering — word balloons, SFX and print-ready pages, right in your browser.",
     start_url: "/app",
     scope: "/",
     display: "standalone",
+    /* graceful fallback chain for browsers that honour display_override */
+    display_override: ["standalone", "minimal-ui", "browser"],
     /* the studio works in both orientations — never lock the device */
     orientation: "any",
     categories: ["photo", "productivity", "entertainment"],
@@ -40,6 +44,17 @@ export default function manifest(): MetadataRoute.Manifest {
     related_applications: [
       { platform: "webapp", url: "https://lettermycomic.com/manifest.webmanifest" },
     ],
+    /* the PWA IS the app — never steer installs to a native package */
+    prefer_related_applications: false,
+    /* right-click-the-app-icon jump list (Windows taskbar, Android) */
+    shortcuts: [
+      { name: "Open the Studio", url: "/app", description: "Jump straight into lettering" },
+      { name: "User Guide", url: "/guide", description: "Learn the tools" },
+      { name: "My Account", url: "/account", description: "Subscription & settings" },
+    ],
+    /* launching (app icon, .lmc file, shortcut) FOCUSES an already-open
+       studio window instead of stacking duplicates */
+    launch_handler: { client_mode: ["navigate-existing", "auto"] },
     /* not yet in Next's Manifest type — supported by Chromium's installed-app
        file handling; harmless extra JSON everywhere else */
     file_handlers: [

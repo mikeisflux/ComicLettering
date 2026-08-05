@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./fonts.css";
 import "./globals.css";
-import RegisterSW from "@/components/RegisterSW";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://lettermycomic.com"),
@@ -45,8 +44,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
+        {/* register the (cache-free) service worker the moment the HTML
+            parses — a post-hydration useEffect registered too late for
+            store scanners' detection windows (PWABuilder gave up waiting) */}
+        <script dangerouslySetInnerHTML={{ __html:
+          "if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(function(){})}",
+        }} />
         {children}
-        <RegisterSW />
       </body>
     </html>
   );
