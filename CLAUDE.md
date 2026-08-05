@@ -29,6 +29,23 @@
   (e.g. a directory of modules re-exported from the original path). Apply
   this to any file you touch that is already over the limit.
 
+## One codebase, many app forms (fix every form, always)
+
+- The SAME code ships as: the website in a browser tab, the installed
+  desktop app (Chrome/Edge PWA window), the Android/Play TWA app, and the
+  Windows Store MSIX — plus three layout modes (desktop, tablet ≥700px
+  coarse-pointer, phone <700px with drawers) and the Window-menu panel
+  toggles. There are no separate app codebases.
+- When ANY problem is reported (in whichever form the user saw it),
+  verify the fix — and hunt the same problem in other guises — across
+  EVERY form and layout mode before calling it done: desktop widths down
+  to ~1200px, tablet, phone, installed-app window sizes (often narrower
+  than a maximized browser), and hidden/shown panel states.
+- Recurring shape of this bug: content that overflows into a hidden
+  horizontal scroll (toolbar hint, right-panel tabs) reads as "cut off".
+  Bars and tab strips must either WRAP or visibly fit — never rely on an
+  undiscoverable scroll for primary controls.
+
 ## Two canvases (fix both, always)
 
 - The editor has TWO editing canvases: the SINGLE-PAGE canvas and the
