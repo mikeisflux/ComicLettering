@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "LetterMyComic — Comic Lettering Studio",
+  "version": "1.0.0",
+  "description": "One click opens the LetterMyComic studio in its own app window — word balloons, SFX lettering and print-ready comic pages, right in your browser.",
+  "homepage_url": "https://lettermycomic.com",
+  "icons": {
+    "48": "icons/icon-48.png",
+    "96": "icons/icon-96.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_title": "Open LetterMyComic",
+    "default_icon": {
+      "48": "icons/icon-48.png",
+      "96": "icons/icon-96.png"
+    }
+  },
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "host_permissions": ["https://lettermycomic.com/*"],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "addon@lettermycomic.com",
+      "strict_min_version": "115.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
+  }
+}
