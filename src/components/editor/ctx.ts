@@ -132,8 +132,12 @@ export interface EditorCtx {
   ) => void;
   pagePoint: (e: { clientX: number; clientY: number }) => { x: number; y: number };
   fitZoom: (forceFit: boolean) => void;
-  /* enter Tuck Back lasso mode (requires SFX selected) */
+  /* enter Tuck Back trace mode (requires SFX selected) */
   startTuck: () => void;
+  /* which Tuck Back trace tool is armed: magnetic lasso or pen path
+     (picked by press-and-holding the toolbar's Tuck Back button) */
+  tuckTool: "lasso" | "pen";
+  setTuckTool: (t: "lasso" | "pen") => void;
   /* the traced cutout awaiting confirmation, and its controls */
   tuckAsk: TuckAsk | null;
   setTuckAsk: SetState<TuckAsk | null>;

@@ -918,8 +918,24 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const [shapeMode, setShapeMode] = useState<ShapeKind | null>(null);
   const penPtsRef = useRef<PenPt[] | null>(null);
   const penBoxRef = useRef<ShapeBox | null>(null);
+  /* Tuck Back's trace tool — press-and-hold the toolbar button to switch;
+     the choice is remembered on this browser */
+  const [tuckTool, setTuckToolState] = useState<"lasso" | "pen">(() => {
+    try { return typeof window !== "undefined" && localStorage.getItem("lmc.tucktool") === "pen" ? "pen" : "lasso"; }
+    catch { return "lasso"; }
+  });
+  const tuckToolRef = useRef(tuckTool);
+  tuckToolRef.current = tuckTool;
+  const setTuckTool = useCallback((t: "lasso" | "pen") => {
+    setTuckToolState(t);
+    try { localStorage.setItem("lmc.tucktool", t); } catch { /* private mode */ }
+  }, []);
+  /* the tuck-pen completion lives in makeTuckHandlers (created below) */
+  const finishTuckPenRef = useRef<((body: number[][]) => void) | null>(null);
   const { startPenDown, startShapeDown, penUndoPoint, penClose, penCancel } = usePenPanel({
     docRef, pageIndexRef, penMode, penPtsRef, shapeMode, penBoxRef, zoom, pendingLockRef,
+    tuckMode, tuckTool, setTuckMode,
+    completeTuck: (body) => finishTuckPenRef.current?.(body),
     pagePoint, force, commit, setPenMode, setShapeMode, setStatus, setSelId,
     resolveTarget: resolveSpreadTarget, setPageIndex,
   });
@@ -937,13 +953,15 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   /* ---------------- Tuck Back (traced clipping mask) ---------------- */
   /* plain per-render closures — they travel in the EditorCtx bag, so
      callback identity doesn't matter (see tuckOps.ts) */
-  const { startTuck, startTuckDrag, retuneTuck, runTuckAuto, applyTuck } = makeTuckHandlers({
+  const { startTuck, startTuckDrag, finishTuckPen, retuneTuck, runTuckAuto, applyTuck } = makeTuckHandlers({
     docRef, assetsRef, pageIndexRef, pageDivRef,
     tuckPtsRef, tuckAskRef,
     selId, zoom, pagePoint, force, commit, rebuildThumbs,
     setStatus, setTuckMode, setTuckAsk, keepGenerated,
+    getTool: () => tuckToolRef.current,
     getEd: () => ed,
   });
+  finishTuckPenRef.current = finishTuckPen;
 
   /* ---------------- element ops ---------------- */
 
@@ -1038,7 +1056,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     force, commit, autosave, undo, redo, setStatus, select, setSelId,
     setEditingId, finishEditing, mutateSel, startDrag, pagePoint, fitZoom, startTuck,
     selectAllOnPage, installApp, appInstalled, showInstallHelp, setShowInstallHelp, winHide, toggleWindow, setAskAddPage,
-    tuckAsk, setTuckAsk, retuneTuck, runTuckAuto, applyTuck,
+    tuckAsk, setTuckAsk, retuneTuck, runTuckAuto, applyTuck, tuckTool, setTuckTool,
     autosaveSoon,
     rebuildThumbs, reseedAids, setThumbs, setPageIndex, setUserZoomed,
     setZoom, bumpFonts, registerRuntimeFont, savePresets,

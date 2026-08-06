@@ -53,12 +53,16 @@ export interface ShellProps {
    current page's offset like every tool layer. */
 function renderPenLayer(ed: EditorCtx, sh: ShellProps, curOff: number, wide?: { w: number; h: number }) {
   const { zoom } = ed;
-  const pts = ed.penMode ? sh.penPtsRef.current : null;
+  /* the same pen also runs Tuck Back's trace when the nib is armed */
+  const tuckPen = sh.tuckMode && ed.tuckTool === "pen";
+  const penning = ed.penMode || tuckPen;
+  const pts = penning ? sh.penPtsRef.current : null;
   const box = ed.shapeMode ? sh.penBoxRef.current : null;
   const sc = (v: number) => Math.round(v * zoom);
   const stop = (e: React.PointerEvent) => e.stopPropagation();
   return (
-    <div className="drawLayer penLayer" onPointerDown={ed.penMode ? sh.startPenDown : sh.startShapeDown}
+    <div className={"drawLayer penLayer" + (tuckPen ? " tuckLayer" : "")}
+      onPointerDown={penning ? sh.startPenDown : sh.startShapeDown}
       style={wide ? { left: 0, top: 0, width: wide.w * zoom, height: wide.h * zoom } : undefined}>
       {(pts?.length || box) && (
         <svg style={wide ? { width: "100%", height: "100%" } : undefined}>
@@ -91,8 +95,9 @@ function renderPenLayer(ed: EditorCtx, sh: ShellProps, curOff: number, wide?: { 
           </g>
         </svg>
       )}
-      {ed.penMode && (
+      {penning && (
         <div className="penTools" onPointerDown={stop}>
+          {tuckPen && <span className="penHint">Tuck Back pen — outline the art</span>}
           <button onClick={sh.penUndoPoint} title="Remove the last point (Ctrl+Z)">⌫ Undo point</button>
           <button onClick={sh.penClose} title="Close the shape (Enter)">✓ Close</button>
           <button onClick={sh.penCancel} title="Cancel (Esc)">✕ Cancel</button>
@@ -298,7 +303,7 @@ function renderSpreadCanvas(ed: EditorCtx, sh: ShellProps) {
       )}
       {snapRef.current.x != null && <div className="snapLineV" style={{ left: (snapRef.current.x + curOff) * zoom }} />}
       {snapRef.current.y != null && <div className="snapLineH" style={{ top: snapRef.current.y * zoom }} />}
-      {tuckMode && (
+      {tuckMode && ed.tuckTool === "lasso" && (
         /* Tuck's spread version: the lasso layer covers BOTH pages, so a
            trace can start and end anywhere on the spread. Trace points are
            kept in current-page units (like every op), so the drawn path
@@ -329,7 +334,8 @@ function renderSpreadCanvas(ed: EditorCtx, sh: ShellProps) {
           )}
         </div>
       )}
-      {(ed.penMode || ed.shapeMode) && renderPenLayer(ed, sh, curOff, { w: totalW, h: totalH })}
+      {(ed.penMode || ed.shapeMode || (tuckMode && ed.tuckTool === "pen")) &&
+        renderPenLayer(ed, sh, curOff, { w: totalW, h: totalH })}
       {dragTipRef.current && (
         <div className="dragTip" style={{
           left: (dragTipRef.current.x + dragTipRef.current.w + curOff) * zoom + 6,
@@ -441,7 +447,7 @@ export function renderCanvasArea(ed: EditorCtx, sh: ShellProps) {
           {!tuckMode && renderOverlay(ed)}
           {snapRef.current.x != null && <div className="snapLineV" style={{ left: snapRef.current.x * zoom }} />}
           {snapRef.current.y != null && <div className="snapLineH" style={{ top: snapRef.current.y * zoom }} />}
-          {tuckMode && (
+          {tuckMode && ed.tuckTool === "lasso" && (
             <div className="drawLayer tuckLayer" onPointerDown={sh.startTuckDrag}>
               {sh.tuckPtsRef.current && sh.tuckPtsRef.current.length > 1 && (
                 <svg>
@@ -460,7 +466,7 @@ export function renderCanvasArea(ed: EditorCtx, sh: ShellProps) {
               )}
             </div>
           )}
-          {(ed.penMode || ed.shapeMode) && renderPenLayer(ed, sh, 0)}
+          {(ed.penMode || ed.shapeMode || (tuckMode && ed.tuckTool === "pen")) && renderPenLayer(ed, sh, 0)}
           {dragTipRef.current && (
             <div className="dragTip" style={{
               left: (dragTipRef.current.x + dragTipRef.current.w) * zoom + 6,

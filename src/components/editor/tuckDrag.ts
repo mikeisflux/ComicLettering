@@ -220,17 +220,22 @@ export function beginTuckLasso(d: TuckDragDeps, e: React.PointerEvent) {
 
 /* Clean the raw stroke into a closed ring, find the artwork underneath, and
    build the first preview. Returns null (with a status message) when there is
-   nothing usable. */
-async function buildTuckAsk(d: TuckDragDeps, raw: number[][]): Promise<TuckAsk | null> {
-  if (raw.length < 6) {
+   nothing usable. clean=false is the PEN path: its outline is deliberate —
+   anchors and flattened curves — so the hand-shake smoothing must not touch
+   it (exported for tuckOps' finishTuckPen). */
+export async function buildTuckAsk(d: TuckDragDeps, raw: number[][], clean = true): Promise<TuckAsk | null> {
+  if (raw.length < (clean ? 6 : 3)) {
     d.setStatus("Draw a loop around the art that should sit in front of the lettering.");
     return null;
   }
   /* the stroke rarely closes exactly where it started; trim the overshoot,
      even out the spacing, then take the hand-shake out of it */
-  let ring = closeSketchLoop(raw);
-  if (ring.length < 6) ring = raw;
-  ring = smoothSketchRing(resampleRing(ring, Math.min(200, Math.max(48, ring.length))), 2);
+  let ring = raw;
+  if (clean) {
+    ring = closeSketchLoop(raw);
+    if (ring.length < 6) ring = raw;
+    ring = smoothSketchRing(resampleRing(ring, Math.min(200, Math.max(48, ring.length))), 2);
+  }
 
   const b = pathBounds(ring);
   if (b.w < 12 || b.h < 12) {

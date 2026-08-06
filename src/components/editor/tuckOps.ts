@@ -5,7 +5,7 @@ import type React from "react";
 import { Assets, Doc, makeImage } from "@/lib/model";
 import { encodeImage, samError, segmentBox } from "@/lib/sam";
 import { TuckAsk, coverRect, tuckPreview } from "./tuck";
-import { beginTuckLasso } from "./tuckDrag";
+import { beginTuckLasso, buildTuckAsk } from "./tuckDrag";
 import { facingOffset } from "./spreadOps";
 import { nextAid } from "./ops";
 import type { EditorCtx } from "./ctx";
@@ -30,6 +30,8 @@ export interface TuckDeps {
   setTuckAsk: SetTuckAsk;
   /* persist a generated cutout into the artwork store (Editor-local) */
   keepGenerated: (aid: string, dataUrl: string) => void;
+  /* which trace tool the reader picked on the toolbar (magnet or nib) */
+  getTool: () => "lasso" | "pen";
   /* for nextAid — read at call time, so the latest ctx bag is used */
   getEd: () => EditorCtx;
 }
@@ -42,20 +44,30 @@ export function makeTuckHandlers(d: TuckDeps) {
       return;
     }
     d.setTuckMode(true);
-    d.setStatus("Draw around the art the SFX should hide behind — Esc cancels.");
+    d.setStatus(d.getTool() === "pen"
+      ? "Tuck Back pen: click around the art the SFX should hide behind — click-and-drag curves a point, close on your first point (Enter closes, Ctrl+Z removes a point, Esc cancels)."
+      : "Draw around the art the SFX should hide behind — the lasso snaps to the art's edges, hold Alt for freehand. Esc cancels.");
   };
 
-  const startTuckDrag = (e: React.PointerEvent) => {
-    /* spread view: hand the lasso the facing page and where it sits on
-       screen, so the trace can sweep across the spine and cut the facing
-       page's art */
-    beginTuckLasso({
-      docRef: d.docRef, assetsRef: d.assetsRef, pageIndexRef: d.pageIndexRef,
-      ptsRef: d.tuckPtsRef,
-      pagePoint: d.pagePoint, zoom: d.zoom, force: d.force,
-      setStatus: d.setStatus, setTuckMode: d.setTuckMode, setTuckAsk: d.setTuckAsk,
-      facing: facingOffset(d.pageDivRef.current, d.zoom),
-    }, e);
+  /* spread view: hand the trace the facing page and where it sits on
+     screen, so it can sweep across the spine and cut the facing page's art */
+  const dragDeps = () => ({
+    docRef: d.docRef, assetsRef: d.assetsRef, pageIndexRef: d.pageIndexRef,
+    ptsRef: d.tuckPtsRef,
+    pagePoint: d.pagePoint, zoom: d.zoom, force: d.force,
+    setStatus: d.setStatus, setTuckMode: d.setTuckMode, setTuckAsk: d.setTuckAsk,
+    facing: facingOffset(d.pageDivRef.current, d.zoom),
+  });
+
+  const startTuckDrag = (e: React.PointerEvent) => beginTuckLasso(dragDeps(), e);
+
+  /* the PEN route: a closed anchor path (flattened, exact — no hand-shake
+     smoothing) drops into the same pipeline the lasso feeds */
+  const finishTuckPen = async (body: number[][]) => {
+    d.setTuckMode(false);
+    const ask = await buildTuckAsk(dragDeps(), body, false);
+    if (ask) d.setTuckAsk(ask);
+    d.force();
   };
 
   const retuneTuck = (patch: Partial<TuckAsk>) => {
@@ -122,5 +134,5 @@ export function makeTuckHandlers(d: TuckDeps) {
       : "Cutout placed — draw around the next letter, or press Esc when the word is done.");
   };
 
-  return { startTuck, startTuckDrag, retuneTuck, runTuckAuto, applyTuck };
+  return { startTuck, startTuckDrag, finishTuckPen, retuneTuck, runTuckAuto, applyTuck };
 }

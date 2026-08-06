@@ -32,6 +32,13 @@ export interface PenDeps {
   penPtsRef: Ref<PenPt[] | null>;
   shapeMode: ShapeKind | null;
   penBoxRef: Ref<ShapeBox | null>;
+  /* Tuck Back can run its trace with this pen instead of the magnetic
+     lasso — same anchors/curves/keys, the closed path handed to
+     completeTuck instead of becoming a panel */
+  tuckMode: boolean;
+  tuckTool: "lasso" | "pen";
+  completeTuck: (body: number[][]) => void;
+  setTuckMode: (v: boolean) => void;
   zoom: number;
   pendingLockRef: Ref<Set<string>>;
   pagePoint: (e: { clientX: number; clientY: number }) => { x: number; y: number };
@@ -119,17 +126,27 @@ export function usePenPanel(deps: PenDeps) {
     d.setStatus("Custom panel created — drop artwork into it like any panel.");
   };
 
+  /* is the pen currently working for Tuck Back rather than panels? */
+  const tuckPen = () => {
+    const d = ref.current;
+    return !d.penMode && d.tuckMode && d.tuckTool === "pen";
+  };
+
   const finish = () => {
     const d = ref.current;
+    const forTuck = tuckPen();
     const anchors = d.penPtsRef.current;
     d.penPtsRef.current = null;
-    d.setPenMode(false);
+    if (!forTuck) d.setPenMode(false);
     if (!anchors || anchors.length < 3) {
-      d.setStatus("Panel cancelled — place at least three points.");
+      if (forTuck) d.setTuckMode(false);
+      d.setStatus("Cancelled — place at least three points.");
       d.force();
       return;
     }
-    placePanel(flattenPen(anchors), "poly");
+    const body = flattenPen(anchors);
+    if (forTuck) { d.completeTuck(body); return; }
+    placePanel(body, "poly");
   };
 
   const cancel = () => {
@@ -138,7 +155,8 @@ export function usePenPanel(deps: PenDeps) {
     d.penBoxRef.current = null;
     d.setPenMode(false);
     d.setShapeMode(null);
-    d.setStatus("Panel drawing cancelled.");
+    if (d.tuckMode) d.setTuckMode(false);
+    d.setStatus("Drawing cancelled.");
     d.force();
   };
 
@@ -159,12 +177,13 @@ export function usePenPanel(deps: PenDeps) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const d = ref.current;
-      if (!d.penMode && !d.shapeMode) return;
+      const penActive = d.penMode || tuckPen();
+      if (!penActive && !d.shapeMode) return;
       const undoKey = ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") ||
         e.key === "Backspace" || e.key === "Delete";
-      if (e.key === "Enter" && d.penMode) { e.preventDefault(); e.stopPropagation(); finish(); }
+      if (e.key === "Enter" && penActive) { e.preventDefault(); e.stopPropagation(); finish(); }
       else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); cancel(); }
-      else if (undoKey && d.penMode) { e.preventDefault(); e.stopPropagation(); undoPoint(); }
+      else if (undoKey && penActive) { e.preventDefault(); e.stopPropagation(); undoPoint(); }
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);

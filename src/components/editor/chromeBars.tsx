@@ -260,10 +260,7 @@ export function renderToolbar(ed: EditorCtx) {
     <ToolBtn label="Instant Alpha" icon="🪄"
       disabled={!selEl || (selEl.type !== "image" && selEl.type !== "panel") || !selEl.img}
       onClick={() => { if (selEl && (selEl.type === "image" || selEl.type === "panel") && selEl.img) runInstantAlpha(ed, selEl.id, selEl.img); }} />
-    <ToolBtn label="Tuck Back" icon="🖼️⃰" accent
-      title="Tuck Back: select your sound-effect lettering, then draw around the part of the artwork that should come forward — it is cut out and placed in front, so the word sits behind it like hand-traced masking."
-      disabled={!selEl || selEl.type !== "text"}
-      onClick={() => ed.startTuck()} />
+    {renderTuckBtn(ed)}
     <ToolBtn label="Note" icon="📌"
       title="Pin a review note to the page — teammates on the shared book see it (File → Share & Review)"
       onClick={() => {
@@ -281,6 +278,73 @@ export function renderToolbar(ed: EditorCtx) {
     <div className="tbSpacer" />
     <div className="tbHint">Runs entirely in your browser — nothing is uploaded.</div>
   </header>
+  );
+}
+
+/* ---------------- Tuck Back button with tool flyout ---------------- */
+
+/* press-and-hold timer + "the hold opened the flyout, swallow the click"
+   flag — module level because renderToolbar is a plain function, not a
+   component (one editor per page, so this is safe) */
+let tuckHold: ReturnType<typeof setTimeout> | null = null;
+let tuckFlyJustOpened = false;
+
+const magnetSvg = (
+  <svg viewBox="0 0 24 24" aria-hidden>
+    <path d="M8 4 v7 a4 4 0 0 0 8 0 V4" fill="none" stroke="currentColor" strokeWidth={3.2} />
+    <path d="M6.2 6.8 h3.6 M14.2 6.8 h3.6" stroke="currentColor" strokeWidth={1.8} />
+  </svg>
+);
+const nibSvg = (
+  <svg viewBox="0 0 24 24" aria-hidden>
+    <path d="M12 2.5 L16 9 L13.4 18.5 L10.6 18.5 L8 9 Z" fill="none" stroke="currentColor" strokeWidth={1.8} />
+    <line x1={12} y1={9} x2={12} y2={14} stroke="currentColor" strokeWidth={1.8} />
+    <circle cx={12} cy={8.2} r={1.4} fill="currentColor" />
+  </svg>
+);
+
+/* Tuck Back with a press-and-hold tool picker: a quick press starts the
+   trace with the tool shown on the button; holding ~450ms (or right-
+   clicking) opens the magnet/nib flyout to switch. The choice sticks. */
+function renderTuckBtn(ed: EditorCtx) {
+  const { selEl, openMenu, setOpenMenu } = ed;
+  const disabled = !selEl || selEl.type !== "text";
+  const pen = ed.tuckTool === "pen";
+  const openFly = () => { tuckFlyJustOpened = true; setOpenMenu("tuckfly"); };
+  const arm = () => { if (tuckHold) clearTimeout(tuckHold); tuckHold = setTimeout(openFly, 450); };
+  const disarm = () => { if (tuckHold) { clearTimeout(tuckHold); tuckHold = null; } };
+  const pick = (t: "lasso" | "pen") => { ed.setTuckTool(t); setOpenMenu(null); ed.startTuck(); };
+  return (
+    <span className="tuckWrap">
+      <button className="toolBtn accent" disabled={disabled}
+        title={`Tuck Back — ${pen ? "pen path" : "magnetic lasso"}. Select your SFX lettering, then outline the art that should come forward; it is cut out and placed in front so the word sits behind it. PRESS AND HOLD to switch between the magnetic lasso and the pen.`}
+        onPointerDown={() => { if (!disabled) arm(); }}
+        onPointerUp={disarm} onPointerLeave={disarm}
+        onContextMenu={(e) => { e.preventDefault(); if (!disabled) openFly(); }}
+        onClick={() => {
+          disarm();
+          if (tuckFlyJustOpened) { tuckFlyJustOpened = false; return; }
+          ed.startTuck();
+        }}>
+        <span className="tIcon tuckIco">{pen ? nibSvg : magnetSvg}</span>
+        <span className="tLabel">Tuck Back ▾</span>
+      </button>
+      {openMenu === "tuckfly" && (
+        <>
+          <div className="menuBackdrop" onPointerDown={() => setOpenMenu(null)} />
+          <div className="tuckFly">
+            <button className={!pen ? "on" : ""} onClick={() => pick("lasso")}
+              title="Freehand trace that snaps to the art's edges — hold Alt while tracing for pure freehand">
+              {magnetSvg}<span>Magnetic Lasso</span>
+            </button>
+            <button className={pen ? "on" : ""} onClick={() => pick("pen")}
+              title="Click points around the art; click-and-drag curves any point; close on your first point">
+              {nibSvg}<span>Pen Path</span>
+            </button>
+          </div>
+        </>
+      )}
+    </span>
   );
 }
 
