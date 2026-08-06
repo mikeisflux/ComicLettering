@@ -599,8 +599,9 @@ export interface AdjustEl extends BaseEl {
   params: Record<string, number | string>;
 }
 export type AdjustKind =
-  | "brightness" | "exposure" | "levels" | "curves" | "hsl" | "colorbalance"
-  | "bw" | "photofilter" | "invert" | "posterize" | "threshold"
+  | "colorvib" | "brightness" | "exposure" | "levels" | "curves" | "hsl" | "colorbalance"
+  | "bw" | "photofilter" | "channelmixer" | "colorlookup" | "selectivecolor"
+  | "invert" | "posterize" | "threshold"
   | "gradientmap" | "grain" | "clarity";
 
 export type El = PanelEl | ImageEl | BalloonEl | TextEl | AdjustEl;

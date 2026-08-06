@@ -14,9 +14,39 @@ export interface AdjustParamSpec {
   min?: number; max?: number; step?: number;
   def: number | string;
   color?: boolean;
+  /* gradient painted on the slider track (Photoshop-style temp/tint ramps) */
+  track?: string;
+  /* rendered as the interactive curve graph, not a slider */
+  curve?: boolean;
 }
 
+/* Selective Color's nine families (key prefix + display name) */
+export const SEL_FAMILIES: [string, string][] = [
+  ["red", "Reds"], ["yel", "Yellows"], ["grn", "Greens"], ["cyn", "Cyans"],
+  ["blu", "Blues"], ["mag", "Magentas"], ["wht", "Whites"], ["neu", "Neutrals"], ["blk", "Blacks"],
+];
+const SELCOLOR_PARAMS: AdjustParamSpec[] = [
+  ...SEL_FAMILIES.flatMap(([f, name]) =>
+    (["c", "m", "y", "k"] as const).map((ch) => ({
+      key: `${f}_${ch}`, label: `${name} ${ch.toUpperCase()}`, min: -100, max: 100, def: 0,
+    }))),
+  { key: "method", label: "Method", min: 0, max: 1, def: 0 },
+];
+
 export const ADJUST_META: Record<AdjustKind, { label: string; params: AdjustParamSpec[] }> = {
+  colorvib: {
+    label: "Color and Vibrance",
+    params: [
+      { key: "temp", label: "Temperature", min: -100, max: 100, def: 0,
+        track: "linear-gradient(90deg,#2b6cff,#a9b2c4 50%,#ffd23f)" },
+      { key: "tint", label: "Tint", min: -100, max: 100, def: 0,
+        track: "linear-gradient(90deg,#2ecc40,#c9c2cc 50%,#ff2fd0)" },
+      { key: "vib", label: "Vibrance", min: -100, max: 100, def: 0,
+        track: "linear-gradient(90deg,#a9a9a9,#c9a08e 50%,#ff5a3c)" },
+      { key: "sat", label: "Saturation", min: -100, max: 100, def: 0,
+        track: "linear-gradient(90deg,#9c9c9c,#cf8d76 50%,#ff4d2e)" },
+    ],
+  },
   brightness: {
     label: "Brightness/Contrast",
     params: [
@@ -26,7 +56,11 @@ export const ADJUST_META: Record<AdjustKind, { label: string; params: AdjustPara
   },
   exposure: {
     label: "Exposure",
-    params: [{ key: "e", label: "Exposure", min: -100, max: 100, def: 0 }],
+    params: [
+      { key: "e", label: "Exposure", min: -100, max: 100, def: 0 },
+      { key: "offset", label: "Offset", min: -100, max: 100, def: 0 },
+      { key: "gammaC", label: "Gamma correction", min: 0.2, max: 2.4, step: 0.02, def: 1 },
+    ],
   },
   levels: {
     label: "Levels",
@@ -34,37 +68,84 @@ export const ADJUST_META: Record<AdjustKind, { label: string; params: AdjustPara
       { key: "blacks", label: "Blacks in", min: 0, max: 100, def: 0 },
       { key: "whites", label: "Whites in", min: 0, max: 100, def: 0 },
       { key: "gamma", label: "Midtones (gamma)", min: 0.2, max: 2.4, step: 0.02, def: 1 },
+      { key: "outB", label: "Output black", min: 0, max: 255, def: 0 },
+      { key: "outW", label: "Output white", min: 0, max: 255, def: 255 },
     ],
   },
   curves: {
-    label: "Curves (S)",
-    params: [{ key: "s", label: "S-curve", min: -100, max: 100, def: 0 }],
+    label: "Curves",
+    params: [{ key: "pts", label: "Curve", def: "0:0,1:1", curve: true }],
   },
   hsl: {
     label: "Hue/Saturation",
     params: [
-      { key: "hue", label: "Hue", min: -180, max: 180, def: 0 },
-      { key: "sat", label: "Saturation", min: -100, max: 100, def: 0 },
-      { key: "vib", label: "Vibrance", min: 0, max: 100, def: 0 },
+      { key: "hue", label: "Hue", min: -180, max: 180, def: 0,
+        track: "linear-gradient(90deg,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)" },
+      { key: "sat", label: "Saturation", min: -100, max: 100, def: 0,
+        track: "linear-gradient(90deg,#8a8a8a,#c96fae 50%,#ff0040)" },
+      { key: "light", label: "Lightness", min: -100, max: 100, def: 0,
+        track: "linear-gradient(90deg,#000,#8a8a8a 50%,#fff)" },
     ],
   },
   colorbalance: {
     label: "Color Balance",
     params: [
-      { key: "r", label: "Cyan ↔ Red", min: -100, max: 100, def: 0 },
-      { key: "g", label: "Magenta ↔ Green", min: -100, max: 100, def: 0 },
-      { key: "b", label: "Yellow ↔ Blue", min: -100, max: 100, def: 0 },
+      { key: "r", label: "Cyan ↔ Red", min: -100, max: 100, def: 0,
+        track: "linear-gradient(90deg,#0fd8d8,#9b9b9b 50%,#f00)" },
+      { key: "g", label: "Magenta ↔ Green", min: -100, max: 100, def: 0,
+        track: "linear-gradient(90deg,#e42ce4,#9b9b9b 50%,#0c0)" },
+      { key: "b", label: "Yellow ↔ Blue", min: -100, max: 100, def: 0,
+        track: "linear-gradient(90deg,#e0d000,#9b9b9b 50%,#00e)" },
     ],
   },
   bw: {
     label: "Black & White",
-    params: [{ key: "amt", label: "Desaturate", min: 0, max: 100, def: 100 }],
+    params: [
+      { key: "reds", label: "Reds", min: -100, max: 200, def: 40, track: "linear-gradient(90deg,#000,#f33,#ffd9d9)" },
+      { key: "yellows", label: "Yellows", min: -100, max: 200, def: 60, track: "linear-gradient(90deg,#000,#e6c800,#fff7c2)" },
+      { key: "greens", label: "Greens", min: -100, max: 200, def: 40, track: "linear-gradient(90deg,#000,#2c2,#d6f5d6)" },
+      { key: "cyans", label: "Cyans", min: -100, max: 200, def: 60, track: "linear-gradient(90deg,#000,#0cc,#d2f4f4)" },
+      { key: "blues", label: "Blues", min: -100, max: 200, def: 20, track: "linear-gradient(90deg,#000,#44f,#d9d9ff)" },
+      { key: "magentas", label: "Magentas", min: -100, max: 200, def: 80, track: "linear-gradient(90deg,#000,#e3e,#f8d6f8)" },
+    ],
   },
   photofilter: {
     label: "Photo Filter",
     params: [
       { key: "color", label: "Filter color", def: "#ec8a00", color: true },
       { key: "density", label: "Density", min: 0, max: 100, def: 25 },
+    ],
+  },
+  selectivecolor: {
+    label: "Selective Color",
+    params: SELCOLOR_PARAMS,   // custom family panel in adjustDialog
+  },
+  colorlookup: {
+    label: "Color Lookup",
+    /* the look itself is picked from LOOKUP_TABLE in the dialog */
+    params: [
+      { key: "look", label: "Look", def: "Teal & Orange" },
+      { key: "strength", label: "Strength", min: 0, max: 100, def: 100 },
+    ],
+  },
+  channelmixer: {
+    label: "Channel Mixer",
+    /* one row of source weights per output channel + constant; mono uses
+       the red row as the gray recipe (custom panel in adjustDialog) */
+    params: [
+      { key: "rr", label: "Red ← Red", min: -200, max: 200, def: 100 },
+      { key: "rg", label: "Red ← Green", min: -200, max: 200, def: 0 },
+      { key: "rb", label: "Red ← Blue", min: -200, max: 200, def: 0 },
+      { key: "rk", label: "Red constant", min: -200, max: 200, def: 0 },
+      { key: "gr", label: "Green ← Red", min: -200, max: 200, def: 0 },
+      { key: "gg", label: "Green ← Green", min: -200, max: 200, def: 100 },
+      { key: "gb", label: "Green ← Blue", min: -200, max: 200, def: 0 },
+      { key: "gk", label: "Green constant", min: -200, max: 200, def: 0 },
+      { key: "br", label: "Blue ← Red", min: -200, max: 200, def: 0 },
+      { key: "bg", label: "Blue ← Green", min: -200, max: 200, def: 0 },
+      { key: "bb", label: "Blue ← Blue", min: -200, max: 200, def: 100 },
+      { key: "bk", label: "Blue constant", min: -200, max: 200, def: 0 },
+      { key: "mono", label: "Monochrome", min: 0, max: 1, def: 0 },
     ],
   },
   invert: {
@@ -82,18 +163,28 @@ export const ADJUST_META: Record<AdjustKind, { label: string; params: AdjustPara
   gradientmap: {
     label: "Gradient Map",
     params: [
+      { key: "preset", label: "Gradient", def: "Crimson" },
       { key: "a", label: "Shadows color", def: "#1a1240", color: true },
       { key: "b", label: "Highlights color", def: "#ffcf6b", color: true },
+      { key: "rev", label: "Reverse", min: 0, max: 1, def: 0 },
+      { key: "method", label: "Method", def: "Smooth" },
       { key: "amt", label: "Blend", min: 0, max: 100, def: 100 },
     ],
   },
   grain: {
     label: "Grain",
-    params: [{ key: "amt", label: "Amount", min: 0, max: 100, def: 35 }],
+    params: [
+      { key: "amt", label: "Amount", min: 0, max: 100, def: 35 },
+      { key: "size", label: "Size", min: 1, max: 40, def: 10 },
+      { key: "rough", label: "Roughness", min: 1, max: 4, step: 1, def: 2 },
+    ],
   },
   clarity: {
-    label: "Clarity/Dehaze",
-    params: [{ key: "amt", label: "Amount", min: -100, max: 100, def: 30 }],
+    label: "Clarity and Dehaze",
+    params: [
+      { key: "clarity", label: "Clarity", min: -100, max: 100, def: 0 },
+      { key: "dehaze", label: "Dehaze", min: -100, max: 100, def: 0 },
+    ],
   },
 };
 
@@ -158,6 +249,151 @@ const hexRGB = (hex: string): [number, number, number] => {
   return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
 };
 
+/* ---------------- Gradient Map: the preset gradient library ---------------- */
+
+export const GRADIENT_MAPS: Record<string, [string, string[]][]> = {
+  Basics: [
+    ["Black → White", ["#000000", "#ffffff"]],
+    ["Sepia Tone", ["#1c120a", "#8a6a48", "#f7ecd9"]],
+    ["Crimson", ["#0a0004", "#6b0f2b", "#ffffff"]],
+  ],
+  Blues: [
+    ["Midnight", ["#000000", "#0b2a5e", "#bcd9ff"]],
+    ["Cyanotype", ["#0a1a3c", "#2a6a9e", "#d8f2fa"]],
+    ["Steel", ["#111318", "#5a7a9e", "#dfe9f2"]],
+  ],
+  Purples: [
+    ["Amethyst", ["#160a2e", "#7b3fbf", "#f0e2ff"]],
+    ["Ultraviolet", ["#20003c", "#c96bff"]],
+  ],
+  Pinks: [
+    ["Rose", ["#3c0518", "#ff5f8f", "#ffe3ec"]],
+    ["Bubblegum", ["#7a1f5c", "#ffb3d9"]],
+  ],
+  Reds: [
+    ["Blood", ["#000000", "#8a0f0f", "#ffd9c2"]],
+    ["Ember", ["#1a0000", "#ff4400", "#ffe8b0"]],
+  ],
+  Oranges: [
+    ["Sunset", ["#2b0a3c", "#ff6a00", "#ffd166"]],
+    ["Amber", ["#221100", "#ffb300"]],
+  ],
+  Greens: [
+    ["Forest", ["#03180c", "#2e8b57", "#eaf7d9"]],
+    ["Toxic", ["#031f00", "#8aff00"]],
+  ],
+  Grays: [
+    ["Silver", ["#111111", "#9aa2ad", "#f5f7fa"]],
+    ["Charcoal", ["#0a0a0a", "#666666"]],
+  ],
+  Cloud: [
+    ["Sky", ["#3a6ea5", "#dfeeff", "#ffffff"]],
+    ["Dawn Cloud", ["#5a4a7a", "#f2b5a0", "#fff3e0"]],
+  ],
+  Iridescent: [
+    ["Oil Slick", ["#1a0533", "#12b3a6", "#c96bff"]],
+    ["Chrome", ["#222222", "#cfd6de", "#5a7a9e"]],
+  ],
+  Pastels: [
+    ["Peach", ["#b86a5a", "#f7c8a8", "#fdf3ea"]],
+    ["Mint Cream", ["#5a8a7a", "#bfe8d8", "#f4fff9"]],
+  ],
+  Neutrals: [
+    ["Bronze", ["#1c120a", "#a97b50", "#f2e3d0"]],
+    ["Ivory", ["#3c3428", "#fffbe8"]],
+  ],
+};
+export const gradientStops = (name: string): string[] | null => {
+  for (const group of Object.values(GRADIENT_MAPS)) {
+    const hit = group.find(([n]) => n === name);
+    if (hit) return hit[1];
+  }
+  return null;
+};
+
+/* ---------------- Color Lookup: the built-in look library ----------------
+   Each look is a compact grade — per-channel gain and lift, a saturation
+   move and an S-contrast — compiled through the same primitives as every
+   other tool (original looks in the spirit of the classic film LUT names,
+   not copies of Adobe's tables). */
+interface Look { sat: number; con: number; gain: [number, number, number]; lift: [number, number, number] }
+export const LOOKUP_TABLE: Record<string, Look> = {
+  "2-Strip": { sat: 1.2, con: 0.2, gain: [1.08, 0.95, 0.85], lift: [0, 0.02, 0.02] },
+  "3-Strip": { sat: 1.35, con: 0.3, gain: [1.1, 1, 0.95], lift: [0, 0, 0] },
+  "Bleach Bypass": { sat: 0.45, con: 0.45, gain: [1.05, 1.05, 1.05], lift: [0, 0, 0] },
+  "Candlelight": { sat: 1.05, con: 0.1, gain: [1.18, 1, 0.75], lift: [0.02, 0, 0] },
+  "Crisp Warm": { sat: 1.1, con: 0.3, gain: [1.1, 1.02, 0.9], lift: [0, 0, 0] },
+  "Crisp Winter": { sat: 1.05, con: 0.3, gain: [0.92, 1, 1.12], lift: [0, 0, 0] },
+  "Drop Blues": { sat: 1.05, con: 0.15, gain: [1.05, 1, 0.8], lift: [0, 0, 0] },
+  "Edgy Amber": { sat: 1, con: 0.35, gain: [1.2, 1, 0.75], lift: [0, 0, 0] },
+  "Fall Colors": { sat: 1.2, con: 0.15, gain: [1.12, 1.02, 0.82], lift: [0, 0, 0] },
+  "Filmstock": { sat: 0.9, con: 0.2, gain: [1.02, 1, 0.96], lift: [0.02, 0.02, 0.02] },
+  "Foggy Night": { sat: 0.6, con: -0.1, gain: [0.85, 0.9, 1.05], lift: [0.06, 0.07, 0.1] },
+  "Futuristic Bleak": { sat: 0.7, con: 0.2, gain: [0.95, 1, 1.08], lift: [0.02, 0.02, 0.04] },
+  "Horror Blue": { sat: 0.75, con: 0.3, gain: [0.85, 0.95, 1.2], lift: [0, 0, 0.04] },
+  "Late Sunset": { sat: 1.1, con: 0.2, gain: [1.15, 0.95, 0.85], lift: [0.03, 0.01, 0.05] },
+  "Moonlight": { sat: 0.7, con: 0.2, gain: [0.85, 0.95, 1.15], lift: [0.02, 0.03, 0.08] },
+  "Night From Day": { sat: 0.6, con: 0.25, gain: [0.7, 0.8, 1], lift: [0, 0.01, 0.05] },
+  "Soft Warming": { sat: 1.05, con: 0.08, gain: [1.08, 1, 0.94], lift: [0.02, 0.01, 0] },
+  "Teal & Orange": { sat: 1.15, con: 0.25, gain: [1.1, 1, 0.9], lift: [0, 0.02, 0.05] },
+  "Tension Green": { sat: 0.9, con: 0.25, gain: [0.95, 1.1, 0.9], lift: [0.01, 0.03, 0.02] },
+};
+
+/* ---------------- curves: shared by the graph UI and the filter ----------------
+   Points serialise as "x:y,x:y" (0..1, x ascending). The curve through them
+   is a monotone cubic (Fritsch–Carlson), so it never overshoots the way a
+   naive spline does — the drawn graph and the applied table are the SAME
+   samples. */
+
+export function parseCurve(v: unknown): [number, number][] {
+  const pts: [number, number][] = [];
+  if (typeof v === "string") {
+    for (const seg of v.split(",")) {
+      const [x, y] = seg.split(":").map(Number);
+      if (Number.isFinite(x) && Number.isFinite(y)) pts.push([clamp(x, 0, 1), clamp(y, 0, 1)]);
+    }
+  }
+  if (pts.length < 2) return [[0, 0], [1, 1]];
+  pts.sort((a, b) => a[0] - b[0]);
+  return pts;
+}
+export const serializeCurve = (pts: [number, number][]): string =>
+  pts.map(([x, y]) => `${F(x)}:${F(y)}`).join(",");
+
+export function sampleCurve(pts: [number, number][], n: number): number[] {
+  const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+  const k = pts.length;
+  /* Fritsch–Carlson tangents */
+  const d: number[] = [], m: number[] = [];
+  for (let i = 0; i < k - 1; i++) d.push((ys[i + 1] - ys[i]) / Math.max(1e-6, xs[i + 1] - xs[i]));
+  for (let i = 0; i < k; i++) {
+    if (i === 0) m.push(d[0]);
+    else if (i === k - 1) m.push(d[k - 2]);
+    else m.push(d[i - 1] * d[i] <= 0 ? 0 : (d[i - 1] + d[i]) / 2);
+  }
+  for (let i = 0; i < k - 1; i++) {
+    if (d[i] === 0) { m[i] = 0; m[i + 1] = 0; continue; }
+    const a = m[i] / d[i], b = m[i + 1] / d[i];
+    const s = a * a + b * b;
+    if (s > 9) { const t = 3 / Math.sqrt(s); m[i] = t * a * d[i]; m[i + 1] = t * b * d[i]; }
+  }
+  const out: number[] = [];
+  for (let s = 0; s < n; s++) {
+    const x = s / (n - 1);
+    if (x <= xs[0]) { out.push(clamp(ys[0], 0, 1)); continue; }
+    if (x >= xs[k - 1]) { out.push(clamp(ys[k - 1], 0, 1)); continue; }
+    let i = 0;
+    while (i < k - 2 && x > xs[i + 1]) i++;
+    const h = Math.max(1e-6, xs[i + 1] - xs[i]);
+    const t = (x - xs[i]) / h;
+    const t2 = t * t, t3 = t2 * t;
+    const y = (2 * t3 - 3 * t2 + 1) * ys[i] + (t3 - 2 * t2 + t) * h * m[i]
+      + (-2 * t3 + 3 * t2) * ys[i + 1] + (t3 - t2) * h * m[i + 1];
+    out.push(clamp(y, 0, 1));
+  }
+  return out;
+}
+
 function stageMarkup(el: AdjustEl, src: string, out: string): string {
   const p = el.params || {};
   switch (el.kind) {
@@ -166,8 +402,25 @@ function stageMarkup(el: AdjustEl, src: string, out: string): string {
       const icpt = num(p.b, 0) / 200 + (1 - slope) / 2;
       return linearCT(src, out, slope, icpt);
     }
-    case "exposure":
-      return linearCT(src, out, Math.pow(2, num(p.e, 0) / 50), 0);
+    case "colorvib": {
+      /* temperature/tint as gentle channel offsets, vibrance+saturation as
+         a combined saturate — the Photoshop Color-and-Vibrance quartet */
+      const t = num(p.temp, 0) / 300, ti = num(p.tint, 0) / 300;
+      const off = linearCT(src, `${out}t`, 1, t, -ti, -t);
+      const sat = Math.max(0, (1 + num(p.sat, 0) / 100) * (1 + num(p.vib, 0) / 150));
+      return off + `<feColorMatrix in="${out}t" type="saturate" values="${F(sat)}" result="${out}"/>`;
+    }
+    case "exposure": {
+      const lin = linearCT(src, `${out}e`, Math.pow(2, num(p.e, 0) / 50), num(p.offset, 0) / 200);
+      const g = clamp(num(p.gammaC, 1), 0.2, 2.4);
+      const exp = F(1 / g);
+      return lin +
+        `<feComponentTransfer in="${out}e" result="${out}">` +
+        `<feFuncR type="gamma" amplitude="1" exponent="${exp}" offset="0"/>` +
+        `<feFuncG type="gamma" amplitude="1" exponent="${exp}" offset="0"/>` +
+        `<feFuncB type="gamma" amplitude="1" exponent="${exp}" offset="0"/>` +
+        `</feComponentTransfer>`;
+    }
     case "levels": {
       const b = clamp(num(p.blacks, 0), 0, 100) / 200;         // 0..0.5 in
       const w = 1 - clamp(num(p.whites, 0), 0, 100) / 200;
@@ -175,38 +428,132 @@ function stageMarkup(el: AdjustEl, src: string, out: string): string {
       const lin = linearCT(src, `${out}l`, slope, -b * slope);
       const g = clamp(num(p.gamma, 1), 0.2, 2.4);
       const exp = F(1 / g);
-      return lin +
-        `<feComponentTransfer in="${out}l" result="${out}">` +
+      const gam =
+        `<feComponentTransfer in="${out}l" result="${out}g">` +
         `<feFuncR type="gamma" amplitude="1" exponent="${exp}" offset="0"/>` +
         `<feFuncG type="gamma" amplitude="1" exponent="${exp}" offset="0"/>` +
         `<feFuncB type="gamma" amplitude="1" exponent="${exp}" offset="0"/>` +
         `</feComponentTransfer>`;
+      /* output levels: remap onto [outB, outW] */
+      const ob = clamp(num(p.outB, 0), 0, 255) / 255;
+      const ow = clamp(num(p.outW, 255), 0, 255) / 255;
+      return lin + gam + linearCT(`${out}g`, out, ow - ob, ob);
     }
     case "curves": {
-      const k = clamp(num(p.s, 0), -100, 100) / 100;
-      const vals: string[] = [];
-      for (let i = 0; i <= 16; i++) {
-        const t = i / 16;
-        const s = t * t * (3 - 2 * t);          // smoothstep S
-        const v = k >= 0 ? t + k * (s - t) : t - k * (t - (0.5 + (t - 0.5) * 0.6));
-        vals.push(F(clamp(v, 0, 1)));
+      /* legacy layers saved a single S strength; new ones carry points */
+      let pts = parseCurve(p.pts);
+      if (typeof p.pts !== "string" && typeof p.s === "number") {
+        const k = clamp(p.s, -100, 100) / 100;
+        pts = [[0, 0], [0.25, clamp(0.25 - k * 0.12, 0, 1)], [0.75, clamp(0.75 + k * 0.12, 0, 1)], [1, 1]];
       }
-      return tableCT(src, out, vals.join(" "));
+      return tableCT(src, out, sampleCurve(pts, 33).map(F).join(" "));
     }
     case "hsl": {
       const hue = `<feColorMatrix in="${src}" type="hueRotate" values="${F(num(p.hue, 0))}" result="${out}h"/>`;
-      const sat = (1 + num(p.sat, 0) / 100) * (1 + num(p.vib, 0) / 200);
-      return hue + `<feColorMatrix in="${out}h" type="saturate" values="${F(Math.max(0, sat))}" result="${out}"/>`;
+      const sat = Math.max(0, 1 + num(p.sat, 0) / 100);
+      return hue +
+        `<feColorMatrix in="${out}h" type="saturate" values="${F(sat)}" result="${out}s"/>` +
+        linearCT(`${out}s`, out, 1, num(p.light, 0) / 200);
     }
     case "colorbalance":
       return linearCT(src, out, 1, num(p.r, 0) / 200, num(p.g, 0) / 200, num(p.b, 0) / 200);
-    case "bw":
-      return `<feColorMatrix in="${src}" type="saturate" values="${F(1 - clamp(num(p.amt, 100), 0, 100) / 100)}" result="${out}"/>`;
+    case "bw": {
+      /* legacy layers stored a single desaturate amount */
+      if (typeof p.reds !== "number" && typeof p.amt === "number") {
+        return `<feColorMatrix in="${src}" type="saturate" values="${F(1 - clamp(p.amt, 0, 100) / 100)}" result="${out}"/>`;
+      }
+      /* six-hue mix folded to per-channel weights (secondaries split into
+         their two primaries), normalised so the mix stays exposure-neutral */
+      const wr = num(p.reds, 40), wy = num(p.yellows, 60), wg = num(p.greens, 40);
+      const wc = num(p.cyans, 60), wb = num(p.blues, 20), wm = num(p.magentas, 80);
+      let rc = wr + wy / 2 + wm / 2, gc = wg + wy / 2 + wc / 2, bc = wb + wc / 2 + wm / 2;
+      const sum = rc + gc + bc;
+      if (Math.abs(sum) < 1) { rc = gc = bc = 1 / 3; }
+      else { rc /= sum; gc /= sum; bc /= sum; }
+      const row = `${F(rc)} ${F(gc)} ${F(bc)} 0 0`;
+      return `<feColorMatrix in="${src}" type="matrix" result="${out}" values="${row} ${row} ${row} 0 0 0 1 0"/>`;
+    }
     case "photofilter": {
       const d = clamp(num(p.density, 25), 0, 100) / 100;
       return `<feFlood flood-color="${str(p.color, "#ec8a00")}" result="${out}f"/>` +
         `<feBlend in="${src}" in2="${out}f" mode="multiply" result="${out}m"/>` +
         MIX(src, `${out}m`, out, d);
+    }
+    case "selectivecolor": {
+      /* Per-family CMYK shifts. Each family gets a per-pixel membership
+         mask (linear channel math, clamped by the filter), the CMYK move
+         becomes ± channel deltas, and mask×delta is added on via
+         arithmetic composites. Families at zero cost nothing. */
+      const method = num(p.method, 0) ? 0.9 : 0.45;   // absolute vs relative
+      const MASKS: Record<string, [number, number, number, number] | "neu"> = {
+        red: [1, -0.5, -0.5, 0], yel: [0.5, 0.5, -1, 0], grn: [-0.5, 1, -0.5, 0],
+        cyn: [-1, 0.5, 0.5, 0], blu: [-0.5, -0.5, 1, 0], mag: [0.5, -1, 0.5, 0],
+        wht: [0.64, 2.15, 0.22, -2], blk: [-0.64, -2.15, -0.22, 1], neu: "neu",
+      };
+      const toHex = (r: number, g: number, b: number) => {
+        const c = (v: number) => Math.round(clamp(v, 0, 1) * 255).toString(16).padStart(2, "0");
+        return `#${c(r)}${c(g)}${c(b)}`;
+      };
+      let cur = src, body = "", fi = 0;
+      for (const fam of Object.keys(MASKS)) {
+        const c = num(p[`${fam}_c`], 0) / 100, m = num(p[`${fam}_m`], 0) / 100;
+        const y = num(p[`${fam}_y`], 0) / 100, k = num(p[`${fam}_k`], 0) / 100;
+        if (!c && !m && !y && !k) continue;
+        const dR = (-c - k) * method, dG = (-m - k) * method, dB = (-y - k) * method;
+        const mk = `${out}m${fi}`;
+        const spec = MASKS[fam];
+        if (spec === "neu") {
+          body += LUM(src, `${mk}l`) +
+            `<feComponentTransfer in="${mk}l" result="${mk}">` +
+            `<feFuncR type="table" tableValues="0 1 0"/><feFuncG type="table" tableValues="0 1 0"/><feFuncB type="table" tableValues="0 1 0"/>` +
+            `</feComponentTransfer>`;
+        } else {
+          const [mr, mg, mb, mo] = spec;
+          const rowM = `${F(mr)} ${F(mg)} ${F(mb)} 0 ${F(mo)}`;
+          body += `<feColorMatrix in="${src}" type="matrix" result="${mk}" values="${rowM} ${rowM} ${rowM} 0 0 0 1 0"/>`;
+        }
+        const pos = toHex(Math.max(0, dR), Math.max(0, dG), Math.max(0, dB));
+        const neg = toHex(Math.max(0, -dR), Math.max(0, -dG), Math.max(0, -dB));
+        body += `<feFlood flood-color="${pos}" result="${mk}fp"/>` +
+          `<feComposite in="${mk}" in2="${mk}fp" operator="arithmetic" k1="1" k2="0" k3="0" k4="0" result="${mk}p"/>` +
+          `<feFlood flood-color="${neg}" result="${mk}fn"/>` +
+          `<feComposite in="${mk}" in2="${mk}fn" operator="arithmetic" k1="1" k2="0" k3="0" k4="0" result="${mk}n"/>` +
+          `<feComposite in="${cur}" in2="${mk}p" operator="arithmetic" k1="0" k2="1" k3="1" k4="0" result="${mk}a"/>` +
+          `<feComposite in="${mk}a" in2="${mk}n" operator="arithmetic" k1="0" k2="1" k3="-1" k4="0" result="${mk}z"/>`;
+        cur = `${mk}z`;
+        fi++;
+      }
+      return body + linearCT(cur, out, 1, 0);   // identity when nothing set
+    }
+    case "colorlookup": {
+      const look = LOOKUP_TABLE[String(p.look)] ?? LOOKUP_TABLE["Teal & Orange"];
+      const gains =
+        `<feComponentTransfer in="${src}" result="${out}g">` +
+        `<feFuncR type="linear" slope="${F(look.gain[0])}" intercept="${F(look.lift[0])}"/>` +
+        `<feFuncG type="linear" slope="${F(look.gain[1])}" intercept="${F(look.lift[1])}"/>` +
+        `<feFuncB type="linear" slope="${F(look.gain[2])}" intercept="${F(look.lift[2])}"/>` +
+        `</feComponentTransfer>`;
+      const sat = `<feColorMatrix in="${out}g" type="saturate" values="${F(look.sat)}" result="${out}s"/>`;
+      const vals: string[] = [];
+      for (let i = 0; i <= 16; i++) {
+        const t = i / 16;
+        const s = t * t * (3 - 2 * t);
+        vals.push(F(clamp(t + look.con * (s - t), 0, 1)));
+      }
+      const con = tableCT(`${out}s`, `${out}c`, vals.join(" "));
+      return gains + sat + con + MIX(src, `${out}c`, out, clamp(num(p.strength, 100), 0, 100) / 100);
+    }
+    case "channelmixer": {
+      const v = (k: string, d: number) => num(p[k], d) / 100;
+      const rows: [number, number, number, number][] = num(p.mono, 0)
+        ? Array(3).fill([v("rr", 1), v("rg", 0), v("rb", 0), v("rk", 0)]) as [number, number, number, number][]
+        : [
+          [v("rr", 1), v("rg", 0), v("rb", 0), v("rk", 0)],
+          [v("gr", 0), v("gg", 1), v("gb", 0), v("gk", 0)],
+          [v("br", 0), v("bg", 0), v("bb", 1), v("bk", 0)],
+        ];
+      const vals = rows.map(([a, b, c, k]) => `${F(a)} ${F(b)} ${F(c)} 0 ${F(k)}`).join(" ");
+      return `<feColorMatrix in="${src}" type="matrix" result="${out}" values="${vals} 0 0 0 1 0"/>`;
     }
     case "invert": {
       const a = clamp(num(p.amt, 100), 0, 100) / 100;
@@ -223,26 +570,55 @@ function stageMarkup(el: AdjustEl, src: string, out: string): string {
       return LUM(src, `${out}l`) + discreteCT(`${out}l`, out, bands);
     }
     case "gradientmap": {
-      const [ar, ag, ab] = hexRGB(str(p.a, "#1a1240"));
-      const [br, bg, bb] = hexRGB(str(p.b, "#ffcf6b"));
+      /* preset stops (2-3) or the custom A→B pair; Reverse flips; the
+         Stripes method quantises the map into hard bands */
+      let stops = (typeof p.preset === "string" && p.preset !== "Custom" && gradientStops(p.preset))
+        || [str(p.a, "#1a1240"), str(p.b, "#ffcf6b")];
+      if (num(p.rev, 0)) stops = [...stops].reverse();
+      const rgb = stops.map(hexRGB);
+      const chan = (i: 0 | 1 | 2) => rgb.map((s) => F(s[i])).join(" ");
       const amt = clamp(num(p.amt, 100), 0, 100) / 100;
-      return LUM(src, `${out}l`) +
-        tableCT(`${out}l`, `${out}g`, `${F(ar)} ${F(br)}`, `${F(ag)} ${F(bg)}`, `${F(ab)} ${F(bb)}`) +
+      const lum = LUM(src, `${out}l`);
+      if (p.method === "Stripes") {
+        /* sample the gradient at 8 bands, applied as a discrete table */
+        const at = (t: number, i: 0 | 1 | 2) => {
+          const x = t * (rgb.length - 1);
+          const j = Math.min(rgb.length - 2, Math.floor(x));
+          return rgb[j][i] + (rgb[j + 1][i] - rgb[j][i]) * (x - j);
+        };
+        const band = (i: 0 | 1 | 2) => Array.from({ length: 8 }, (_, j) => F(at((j + 0.5) / 8, i))).join(" ");
+        return lum +
+          `<feComponentTransfer in="${out}l" result="${out}g">` +
+          `<feFuncR type="discrete" tableValues="${band(0)}"/>` +
+          `<feFuncG type="discrete" tableValues="${band(1)}"/>` +
+          `<feFuncB type="discrete" tableValues="${band(2)}"/>` +
+          `</feComponentTransfer>` +
+          MIX(src, `${out}g`, out, amt);
+      }
+      return lum +
+        tableCT(`${out}l`, `${out}g`, chan(0), chan(1), chan(2)) +
         MIX(src, `${out}g`, out, amt);
     }
     case "grain": {
       const k = clamp(num(p.amt, 35), 0, 100) / 100 * 0.55;
-      return `<feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="7" stitchTiles="stitch" result="${out}n"/>` +
+      const freq = 0.9 / clamp(num(p.size, 10), 1, 40) * 10;   // bigger size → coarser noise
+      const oct = Math.round(clamp(num(p.rough, 2), 1, 4));
+      return `<feTurbulence type="fractalNoise" baseFrequency="${F(freq)}" numOctaves="${oct}" seed="7" stitchTiles="stitch" result="${out}n"/>` +
         `<feColorMatrix in="${out}n" type="matrix" result="${out}g" values="` +
         `0.33 0.33 0.34 0 0 0.33 0.33 0.34 0 0 0.33 0.33 0.34 0 0 0 0 0 0 1"/>` +
         `<feComposite in="${src}" in2="${out}g" operator="arithmetic" ` +
         `k1="0" k2="1" k3="${F(k)}" k4="${F(-k / 2)}" result="${out}"/>`;
     }
     case "clarity": {
-      const k = clamp(num(p.amt, 30), -100, 100) / 100 * 1.4;
-      return `<feGaussianBlur in="${src}" stdDeviation="3" result="${out}b"/>` +
+      /* clarity: unsharp local contrast; dehaze: contrast + black depth +
+         a saturation lift (the classic haze cut), both signed */
+      const k = clamp(num(p.clarity, num(p.amt, 0)), -100, 100) / 100 * 1.4;
+      const un = `<feGaussianBlur in="${src}" stdDeviation="3" result="${out}b"/>` +
         `<feComposite in="${src}" in2="${out}b" operator="arithmetic" ` +
-        `k1="0" k2="${F(1 + k)}" k3="${F(-k)}" k4="0" result="${out}"/>`;
+        `k1="0" k2="${F(1 + k)}" k3="${F(-k)}" k4="0" result="${out}c"/>`;
+      const d = clamp(num(p.dehaze, 0), -100, 100) / 100;
+      return un + linearCT(`${out}c`, `${out}d`, 1 + d * 0.5, -d * 0.22) +
+        `<feColorMatrix in="${out}d" type="saturate" values="${F(Math.max(0, 1 + d * 0.25))}" result="${out}"/>`;
     }
   }
 }

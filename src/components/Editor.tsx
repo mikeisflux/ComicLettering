@@ -51,10 +51,11 @@ import {
 } from "./editor/tabs";
 import { renderFormatBar, renderMenuBar, renderToolbar } from "./editor/chromeBars";
 import {
-  renderAdjustDialog, renderContextMenu, renderExportDialog, renderExportProgress,
+  renderContextMenu, renderExportDialog, renderExportProgress,
   renderFindDialog, renderInstallHelp,
   renderScriptDialog, renderTailAsk, renderTray, renderTuckDialog,
 } from "./editor/dialogs";
+import { renderAdjustDialog } from "./editor/adjustDialog";
 
 const AUTOSAVE_KEY = "comiclettering.autosave.v2";
 /* gutter between facing pages on the spread canvas, in page units */
