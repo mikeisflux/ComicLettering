@@ -214,6 +214,40 @@ export interface TextRun { t: string; b?: boolean; i?: boolean; u?: boolean }
 export function runsToText(runs: TextRun[]): string {
   return runs.map((r) => r.t).join("");
 }
+/* Toggle bold/italic/underline on a character range of an element's
+   lettering, straight against the runs model — no DOM selection needed.
+   Word-processor semantics: if any covered character lacks the emphasis,
+   the whole range turns ON; otherwise it turns off. */
+export function applyRunEmphasis(
+  el: { text: string; runs?: TextRun[] },
+  start: number, end: number, kind: "bold" | "italic" | "underline",
+) {
+  const key = kind === "bold" ? "b" : kind === "italic" ? "i" : "u";
+  const base: TextRun[] = el.runs?.length ? el.runs.map((r) => ({ ...r })) : [{ t: el.text }];
+  const out: TextRun[] = [];
+  const covered: TextRun[] = [];
+  let pos = 0;
+  for (const r of base) {
+    const rs = pos, re = pos + r.t.length;
+    const cutA = Math.max(rs, Math.min(start, re));
+    const cutB = Math.max(rs, Math.min(end, re));
+    for (const [a, b, inSel] of [[rs, cutA, false], [cutA, cutB, true], [cutB, re, false]] as const) {
+      if (b <= a) continue;
+      const nr: TextRun = { ...r, t: r.t.slice(a - rs, b - rs) };
+      out.push(nr);
+      if (inSel) covered.push(nr);
+    }
+    pos = re;
+  }
+  if (!covered.length) return;
+  const turnOn = covered.some((r) => !r[key]);
+  for (const r of covered) {
+    if (turnOn) r[key] = true;
+    else delete r[key];
+  }
+  el.runs = normalizeRuns(out);
+}
+
 /* collapse runs that carry no emphasis (or a single plain run) to nothing, so
    we only persist `runs` when there is real inline formatting */
 export function normalizeRuns(runs: TextRun[]): TextRun[] | undefined {

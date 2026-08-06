@@ -5,7 +5,7 @@ import React from "react";
 import {
   BalloonEl, BalloonKind, DEFAULT_TEXT_SIZE, DPI, Doc, El, FONTS, FillStyle,
   GradStop, Page,
-  TAILLESS_KINDS, TextEl, TextStyle, applyCrossbarI, clamp, makeBalloon, makeImage, newPage,
+  TAILLESS_KINDS, TextEl, TextStyle, applyCrossbarI, applyRunEmphasis, clamp, makeBalloon, makeImage, newPage,
   pageMargins, rotVec,
   makePanel, makeText, solid, uid,
 } from "@/lib/model";
@@ -371,11 +371,28 @@ export function movePage(ed: EditorCtx, dir: -1 | 1) {
 
 /* B/I/U from ANY entry point (format bar, Format menu, Ctrl+B/I/U): while
    lettering is open they act on the HIGHLIGHTED words, like a word
-   processor; with the box merely selected they restyle the whole element. */
+   processor; with the box merely selected they restyle the whole element.
+
+   The live-DOM path only works when the text selection survived the click —
+   true for Ctrl+B and mouse clicks on the guarded format-bar buttons. A
+   tablet tap or a menu click blurs the editor first (exiting editing and
+   killing the selection), which used to fall through and bold EVERYTHING.
+   Editor.tsx records the highlighted range as character offsets on every
+   selectionchange, so that path now re-finds the words in the runs model
+   and styles just those. */
 export function toggleSelEmphasis(ed: EditorCtx, kind: "bold" | "italic" | "underline") {
   if (ed.editingId) {
     const dom = document.querySelector(`.el[data-id="${ed.editingId}"] .txt`) as HTMLElement | null;
     if (dom && toggleEmphasis(dom, kind)) { onLetteringInput(ed, ed.editingId, dom); return; }
+  }
+  const rec = ed.selRangeRef.current;
+  if (rec && rec.end > rec.start && ed.selId === rec.id) {
+    const el = ed.page?.els.find((x) => x.id === rec.id);
+    if (el && (el.type === "balloon" || el.type === "text") && !el.locked) {
+      applyRunEmphasis(el, rec.start, rec.end, kind);
+      ed.commit();
+      return;
+    }
   }
   ed.mutateSel<BalloonEl | TextEl>((x) => {
     if (!x.ts) return;

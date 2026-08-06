@@ -439,15 +439,15 @@ export function renderFormatBar(ed: EditorCtx) {
     </div>
     <button className={"fbTog" + (selTs?.bold ? " on" : "")} disabled={!selTs}
       title="Bold — highlight words while editing to bold just those (Ctrl+B)"
-      onMouseDown={(e) => e.preventDefault()}
+      onPointerDown={(e) => e.preventDefault()} onMouseDown={(e) => e.preventDefault()}
       onClick={() => emphasis("bold")}><b>B</b></button>
     <button className={"fbTog" + (selTs?.italic ? " on" : "")} disabled={!selTs}
       title="Italic — highlight words while editing to italicise just those (Ctrl+I)"
-      onMouseDown={(e) => e.preventDefault()}
+      onPointerDown={(e) => e.preventDefault()} onMouseDown={(e) => e.preventDefault()}
       onClick={() => emphasis("italic")}><i>I</i></button>
     <button className={"fbTog" + (selTs?.underline ? " on" : "")} disabled={!selTs}
       title="Underline — highlight words while editing to underline just those (Ctrl+U)"
-      onMouseDown={(e) => e.preventDefault()}
+      onPointerDown={(e) => e.preventDefault()} onMouseDown={(e) => e.preventDefault()}
       onClick={() => emphasis("underline")}><u>U</u></button>
     {(["left", "center", "right", "justify"] as const).map((a) => (
       <button key={a} className={"fbTog" + (selTs?.align === a ? " on" : "")} disabled={!selTs}

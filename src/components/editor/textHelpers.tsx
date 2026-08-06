@@ -184,6 +184,44 @@ export function domToRuns(root: HTMLElement): TextRun[] {
   walk(root, false, false, false);
   return runs;
 }
+
+/* Map the live DOM text selection inside an editing node to CHARACTER
+   offsets in the text domToRuns will capture — same walk, same ZWSP
+   stripping, same <br>/<div> newline rules — so a highlighted word can be
+   re-found in the runs model after the DOM (and its selection) is gone. */
+export function domSelectionOffsets(root: HTMLElement): { start: number; end: number } | null {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return null;
+  const range = sel.getRangeAt(0);
+  if (!root.contains(range.startContainer) || !root.contains(range.endContainer)) return null;
+  let pos = 0, last = "", start = -1, end = -1;
+  const cleanLen = (s: string) => s.replace(/\u200b/g, "").length;
+  const walk = (node: Node) => {
+    const kids = node.childNodes;
+    for (let idx = 0; idx < kids.length; idx++) {
+      if (node === range.startContainer && idx === range.startOffset) start = pos;
+      if (node === range.endContainer && idx === range.endOffset) end = pos;
+      const child = kids[idx];
+      if (child.nodeType === 3) {
+        const raw = child.textContent || "";
+        if (child === range.startContainer) start = pos + cleanLen(raw.slice(0, range.startOffset));
+        if (child === range.endContainer) end = pos + cleanLen(raw.slice(0, range.endOffset));
+        const clean = raw.replace(/\u200b/g, "");
+        if (clean) { pos += clean.length; last = clean[clean.length - 1]; }
+      } else if (child.nodeType === 1) {
+        const tag = (child as HTMLElement).tagName.toLowerCase();
+        if (tag === "br") { pos += 1; last = "\n"; continue; }
+        if ((tag === "div" || tag === "p") && pos > 0 && last !== "\n") { pos += 1; last = "\n"; }
+        walk(child);
+      }
+    }
+    if (node === range.startContainer && kids.length === range.startOffset) start = pos;
+    if (node === range.endContainer && kids.length === range.endOffset) end = pos;
+  };
+  walk(root);
+  if (start < 0 || end < 0) return null;
+  return start <= end ? { start, end } : { start: end, end: start };
+}
 export function renderRuns(runs: TextRun[], ts: TextStyle): ReactNode {
   return runs.map((r, idx) => {
     const txt = ts.crossbarI ? applyCrossbarI(ts.caps ? r.t.toUpperCase() : r.t) : r.t;

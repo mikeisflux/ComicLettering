@@ -64,6 +64,11 @@ export interface EditorCtx {
   /* balloon / caption-box colourway names for newly created shapes */
   activeShapeRef: React.RefObject<{ balloon: string; box: string }>;
   styleClipRef: React.RefObject<StyleClip | null>;
+  /* the last highlighted word-range while editing lettering, as character
+     offsets — B/I/U re-find the words in the runs model through this even
+     after the click that pressed the button blurred the editor (tablet taps
+     and menu clicks kill the DOM selection before the handler runs) */
+  selRangeRef: React.RefObject<{ id: string; start: number; end: number } | null>;
   clipboardRef: React.RefObject<El | null>;
   customFontIdsRef: React.RefObject<Record<string, string>>;
   fileImageRef: React.RefObject<HTMLInputElement | null>;

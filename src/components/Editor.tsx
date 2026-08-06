@@ -21,7 +21,7 @@ import { FLAT } from "@/lib/warp";
 import { ImageFormat, pageThumbnail, spreadNeighbor } from "@/lib/exportPng";
 import { artUrl, ensureArt, holdArt, listArtIds, primeArtIds, putArt, requestPersistence } from "@/lib/assetStore";
 import {
-  BalloonPreset, HINT, PRESET_KEY, ProjectMeta, ProofMatch, domToRuns,
+  BalloonPreset, HINT, PRESET_KEY, ProjectMeta, ProofMatch, domSelectionOffsets, domToRuns,
   letterStyleCss, runsToHtml,
 } from "./editor/textHelpers";
 import { SmartTip, pickTip } from "./editor/smartTips";
@@ -520,6 +520,26 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   useEffect(() => { editingIdRef.current = editingId; }, [editingId]);
   useEffect(() => { currentRef.current = current; }, [current]);
 
+  /* While lettering is being edited, keep a running record of the
+     highlighted word-range as character offsets. The record survives the
+     blur a toolbar tap or menu click causes, so B/I/U can still hit just
+     those words (see toggleSelEmphasis) — the DOM selection itself dies
+     with the tap on tablets. */
+  const selRangeRef = useRef<{ id: string; start: number; end: number } | null>(null);
+  useEffect(() => {
+    const onSel = () => {
+      const id = editingIdRef.current;
+      if (!id) return;
+      const root = document.querySelector(`.el[data-id="${id}"] .txt`) as HTMLElement | null;
+      if (!root) return;
+      const off = domSelectionOffsets(root);
+      if (off && off.end > off.start) selRangeRef.current = { id, ...off };
+      else if (off) selRangeRef.current = null;   // deliberately collapsed caret
+    };
+    document.addEventListener("selectionchange", onSel);
+    return () => document.removeEventListener("selectionchange", onSel);
+  }, []);
+
   const undo = useCallback(() => {
     if (hIndexRef.current <= 0) return;
     hIndexRef.current--;
@@ -720,6 +740,9 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
 
   const select = useCallback((id: string | null, additive = false) => {
     setCtxMenu(null);
+    /* a fresh canvas click is a new intent — any recorded word-range from a
+       previous edit is stale now (it must NOT survive into the next B press) */
+    if (selRangeRef.current && selRangeRef.current.id !== id) selRangeRef.current = null;
     settlePendingLock(id);
     if (editingId && editingId !== id) finishEditing();
     if (!id) { setSelIds([]); return; }
@@ -1009,7 +1032,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const ed: EditorCtx = {
     demo, doc, page, selId, selIds, selEl, selEls, editingId, zoom, status, pageIndex,
     docRef, assetsRef, histRef, hIndexRef, pageIndexRef, pendingLockRef,
-    panelImageTarget, aidRef, activeStyleRef, styleClipRef, clipboardRef,
+    panelImageTarget, aidRef, activeStyleRef, styleClipRef, selRangeRef, clipboardRef,
     customFontIdsRef, fileImageRef, filePanelImageRef, fileOpenRef,
     fileFontRef, fileStampRef,
     force, commit, autosave, undo, redo, setStatus, select, setSelId,
