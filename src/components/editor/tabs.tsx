@@ -1,13 +1,14 @@
 /* Right-panel tabs: Layouts, Layers, Proof, Photos, Library.
    Plain exported render functions taking the EditorCtx bag. */
 import {
-  LAYOUT_CATEGORIES, LayoutRect, PanelEl, SavedLayout, applyLayout, capturePageLayout, clamp, makeImage,
+  LAYOUT_CATEGORIES, LayoutRect, PanelEl, SavedLayout, applyLayout, capturePageLayout, clamp, makeImage, uid,
 } from "@/lib/model";
 import { loadImage } from "@/lib/exportPng";
 import { elLabel } from "./textHelpers";
 import { EditorCtx } from "./ctx";
 import {
-  applyProofFix, assignImageToPanel, deleteProject, exportAllPages,
+  addFromTray, applyProofFix, assignImageToPanel, deleteProject, deleteSel,
+  duplicateSel, exportAllPages,
   exportJSON, loadProject, refreshProjects, runProof, saveProject,
 } from "./ops";
 import { detectPanelsFromArt } from "./panelOps";
@@ -140,6 +141,27 @@ export function renderLayoutsTab(ed: EditorCtx) {
 
 /* ---------------- layers tab ---------------- */
 
+/* which layer groups are folded shut, and where the layer context menu
+   opened — session-local UI state (plain render functions hold no hooks) */
+const collapsedGroups = new Set<string>();
+let layerCtxPos = { x: 0, y: 0 };
+let layerCtxRange = "";
+let layerCtxAsking = false;
+
+/* "2, 4-6" → zero-based page indices, clamped to the document */
+function parsePageList(s: string, n: number): number[] {
+  const out = new Set<number>();
+  for (const part of s.split(/[,\s]+/)) {
+    const m = part.match(/^(\d+)(?:-(\d+))?$/);
+    if (!m) continue;
+    const a = +m[1], b = m[2] ? +m[2] : a;
+    for (let i = Math.min(a, b); i <= Math.max(a, b); i++) {
+      if (i >= 1 && i <= n) out.add(i - 1);
+    }
+  }
+  return [...out].sort((x, y) => x - y);
+}
+
 export function renderLayersTab(ed: EditorCtx) {
   const { page, autoLock, setAutoLock, selId, select, pendingLockRef, commit } = ed;
   if (!page) return null;
@@ -152,48 +174,281 @@ export function renderLayersTab(ed: EditorCtx) {
     p.els.splice(clamp(i + delta, 0, p.els.length), 0, el);
     commit();
   };
+  const rename = (el: (typeof els)[number]) => {
+    const n = window.prompt("Layer name:", el.name ?? elLabel(el));
+    if (n === null) return;
+    el.name = n.trim() || undefined;
+    commit();
+  };
+  /* copy a layer onto other pages (the layer context menu's big feature —
+     grade or stamp once, apply book-wide) */
+  const copyToPages = (el: (typeof els)[number], targets: number[]) => {
+    const d = ed.docRef.current!;
+    let count = 0;
+    for (const pi of targets) {
+      if (pi === ed.pageIndex) continue;
+      const copy = JSON.parse(JSON.stringify(el)) as typeof el;
+      copy.id = uid();
+      d.pages[pi].els.push(copy);
+      count++;
+    }
+    commit();
+    ed.rebuildThumbs();
+    ed.setStatus(count
+      ? `Copied “${elLabel(el)}” onto ${count} page${count === 1 ? "" : "s"}.`
+      : "No other pages in that range.");
+  };
+  const groupSelected = () => {
+    const ids = new Set(ed.selIds);
+    const members = page.els.filter((e) => ids.has(e.id));
+    if (members.length < 2) {
+      ed.setStatus("Pick at least two layers first (Ctrl+click rows adds to the selection), then group.");
+      return;
+    }
+    const gname = window.prompt("Group name:", "Group");
+    if (gname === null) return;
+    const g = gname.trim() || "Group";
+    const top = Math.max(...members.map((e) => page.els.indexOf(e)));
+    const insertAt = page.els.slice(0, top + 1).filter((e) => !ids.has(e.id)).length;
+    const rest = page.els.filter((e) => !ids.has(e.id));
+    members.forEach((m) => { m.group = g; });
+    page.els = [...rest.slice(0, insertAt), ...members, ...rest.slice(insertAt)];
+    commit();
+  };
+  const ungroup = (g: string) => {
+    for (const e of page.els) if (e.group === g) delete e.group;
+    collapsedGroups.delete(g);
+    commit();
+  };
+  /* drag the grip to reorder — the row follows the finger and drops into
+     whichever slot it's released over (the list shows FRONT first, so
+     dragging DOWN moves the element BACK in the stack) */
+  const dragRow = (e: React.PointerEvent, id: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const grip = e.currentTarget as HTMLElement;
+    const rowEl = grip.closest(".layerRow") as HTMLElement;
+    const list = rowEl.parentElement as HTMLElement;
+    const rows = [...list.querySelectorAll(".layerRow")] as HTMLElement[];
+    const pitch = rows.length > 1 ? rows[1].offsetTop - rows[0].offsetTop : rowEl.offsetHeight + 4;
+    const di = rows.indexOf(rowEl);
+    const startY = e.clientY;
+    const pid = e.pointerId;
+    let dragging = false;
+    const slotsOf = (ev: PointerEvent) =>
+      clamp(Math.round((ev.clientY - startY) / Math.max(1, pitch)), -di, rows.length - 1 - di);
+    const onMove = (ev: PointerEvent) => {
+      if (ev.pointerId !== pid) return;
+      const dy = ev.clientY - startY;
+      if (!dragging && Math.abs(dy) > 5) { dragging = true; rowEl.classList.add("dragging"); }
+      if (!dragging) return;
+      ev.preventDefault();
+      rowEl.style.transform = `translateY(${slotsOf(ev) * pitch}px)`;
+    };
+    const onUp = (ev: PointerEvent) => {
+      if (ev.pointerId !== pid) return;
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      rowEl.style.transform = "";
+      rowEl.classList.remove("dragging");
+      if (!dragging) return;
+      const slots = slotsOf(ev);
+      if (slots) move(id, -slots);   // list is reversed vs the els array
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+  };
   return (
     <div className="inspBody">
       <div className="fld">
         <label>Auto-lock new items</label>
         <input type="checkbox" checked={autoLock} onChange={(e) => setAutoLock(e.target.checked)} />
       </div>
-      <div className="tips">Every item you place is its own layer. Top of this list = front of the page. New items lock automatically when you click away — right-click any item (or use 🔒) to unlock.</div>
+      <div className="tips">Every item is its own layer; top of the list = front of the page. Drag the ⠿ grip to reorder, double-click to rename, Ctrl+click to pick several, right-click for more (copy to other pages…).</div>
       <div className="layerList">
-        {els.map((el) => (
-          <div key={el.id} className={"layerRow" + (selId === el.id ? " on" : "") + (el.hidden ? " off" : "")}
-            onClick={() => select(el.id)}
-            onDoubleClick={() => { if (el.type === "adjust") ed.setAdjustEdit(el.id); }}>
-            <button className={"layerBtn eye" + (el.hidden ? " shut" : "")}
-              title={el.hidden ? "Show this layer" : "Hide this layer (it leaves the page, thumbnails and exports until switched back on)"}
-              onClick={(e) => {
-                e.stopPropagation();
-                el.hidden = !el.hidden;
-                commit();
-              }}>
-              <svg viewBox="0 0 24 24">
-                <path d="M2.5 12 C5.5 6.8 9 5 12 5 s6.5 1.8 9.5 7 C18.5 17.2 15 19 12 19 s-6.5-1.8-9.5-7 Z" />
-                {!el.hidden && <circle cx={12} cy={12} r={3} />}
-                {el.hidden && <line x1={4} y1={20} x2={20} y2={4} />}
-              </svg>
-            </button>
-            <span className="layerName">{elLabel(el)}</span>
-            {el.type === "adjust" && (
-              <button className="layerBtn" title="Edit this adjustment's sliders (or double-click the row)"
-                onClick={(e) => { e.stopPropagation(); ed.setAdjustEdit(el.id); }}>✎</button>
-            )}
-            <button className="layerBtn" title="Forward" onClick={(e) => { e.stopPropagation(); move(el.id, 1); }}>▲</button>
-            <button className="layerBtn" title="Backward" onClick={(e) => { e.stopPropagation(); move(el.id, -1); }}>▼</button>
-            <button className={"layerBtn" + (el.locked ? " lockOn" : "")} title={el.locked ? "Unlock" : "Lock"}
-              onClick={(e) => {
-                e.stopPropagation();
-                el.locked = !el.locked;
-                pendingLockRef.current.delete(el.id);
-                commit();
-              }}>{el.locked ? "🔒" : "🔓"}</button>
-          </div>
-        ))}
+        {(() => {
+          const rows: React.ReactNode[] = [];
+          let lastGroup: string | undefined;
+          const eyeSvg = (hidden: boolean | undefined) => (
+            <svg viewBox="0 0 24 24">
+              <path d="M2.5 12 C5.5 6.8 9 5 12 5 s6.5 1.8 9.5 7 C18.5 17.2 15 19 12 19 s-6.5-1.8-9.5-7 Z" />
+              {!hidden && <circle cx={12} cy={12} r={3} />}
+              {hidden && <line x1={4} y1={20} x2={20} y2={4} />}
+            </svg>
+          );
+          for (const el of els) {
+            const g = el.group;
+            if (g && g !== lastGroup) {
+              const members = page.els.filter((e) => e.group === g);
+              const allHid = members.every((m) => m.hidden);
+              const shut = collapsedGroups.has(g);
+              rows.push(
+                <div key={`grp-${g}-${rows.length}`} className="layerGroupRow"
+                  onClick={() => { if (shut) collapsedGroups.delete(g); else collapsedGroups.add(g); ed.force(); }}
+                  onDoubleClick={() => {
+                    const n = window.prompt("Group name:", g);
+                    if (n === null) return;
+                    const name = n.trim() || g;
+                    for (const m of members) m.group = name;
+                    commit();
+                  }}>
+                  <span className="grpChev">{shut ? "▸" : "▾"}</span>
+                  <svg className="grpFolder" viewBox="0 0 24 24">
+                    <path d="M3.5 7 a1.5 1.5 0 0 1 1.5 -1.5 h4.4 l2 2.2 h7.6 a1.5 1.5 0 0 1 1.5 1.5 V17 a1.5 1.5 0 0 1 -1.5 1.5 H5 A1.5 1.5 0 0 1 3.5 17 Z" />
+                  </svg>
+                  <span className="layerName">{g}</span>
+                  <button className={"layerBtn eye" + (allHid ? " shut" : "")}
+                    title={allHid ? "Show the whole group" : "Hide the whole group"}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      for (const m of members) m.hidden = !allHid ? true : undefined;
+                      commit();
+                    }}>{eyeSvg(allHid)}</button>
+                  <button className="layerBtn" title="Ungroup"
+                    onClick={(e) => { e.stopPropagation(); ungroup(g); }}>✕</button>
+                </div>
+              );
+            }
+            lastGroup = g;
+            if (g && collapsedGroups.has(g)) continue;
+            rows.push(
+              <div key={el.id}
+                className={"layerRow" + (ed.selIds.includes(el.id) ? " on" : "") + (el.hidden ? " off" : "") + (g ? " inGroup" : "")}
+                onClick={(e) => select(el.id, e.ctrlKey || e.metaKey || e.shiftKey)}
+                onDoubleClick={() => rename(el)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  select(el.id);
+                  layerCtxPos = { x: Math.min(e.clientX, innerWidth - 230), y: Math.min(e.clientY, innerHeight - 240) };
+                  layerCtxAsking = false;
+                  layerCtxRange = "";
+                  ed.setOpenMenu(`layerCtx:${el.id}`);
+                }}>
+                <span className="layerGrip" title="Drag to reorder"
+                  onPointerDown={(e) => dragRow(e, el.id)}>
+                  <svg viewBox="0 0 8 16">{[2, 6].map((x) => [2, 8, 14].map((y) => (
+                    <circle key={`${x}${y}`} cx={x} cy={y} r={1.2} />)))}</svg>
+                </span>
+                <button className={"layerBtn eye" + (el.hidden ? " shut" : "")}
+                  title={el.hidden ? "Show this layer" : "Hide this layer (it leaves the page, thumbnails and exports until switched back on)"}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    el.hidden = !el.hidden;
+                    commit();
+                  }}>{eyeSvg(el.hidden)}</button>
+                <span className="layerName" title={elLabel(el) + " — double-click to rename"}>{elLabel(el)}</span>
+                {el.type === "adjust" && (
+                  <button className="layerBtn" title="Edit this adjustment's sliders"
+                    onClick={(e) => { e.stopPropagation(); ed.setAdjustEdit(el.id); }}>✎</button>
+                )}
+                <button className={"layerBtn" + (el.locked ? " lockOn" : "")} title={el.locked ? "Unlock" : "Lock"}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    el.locked = !el.locked;
+                    pendingLockRef.current.delete(el.id);
+                    commit();
+                  }}>{el.locked ? "🔒" : "🔓"}</button>
+              </div>
+            );
+          }
+          return rows;
+        })()}
         {els.length === 0 && <div className="tips">Nothing on this page yet.</div>}
+      </div>
+      {/* the layer context menu: rename, copy to other pages, delete */}
+      {ed.openMenu?.startsWith("layerCtx:") && (() => {
+        const el = page.els.find((x) => x.id === ed.openMenu!.slice(9));
+        if (!el) return null;
+        const close = () => ed.setOpenMenu(null);
+        return (
+          <>
+            <div className="menuBackdrop" onPointerDown={close} />
+            <div className="lfMenu layerCtxMenu" style={{ left: layerCtxPos.x, top: layerCtxPos.y }}>
+              {!layerCtxAsking ? (
+                <>
+                  <button onClick={() => { close(); rename(el); }}>Rename…</button>
+                  {el.type === "adjust" && (
+                    <button onClick={() => { close(); ed.setAdjustEdit(el.id); }}>Edit sliders…</button>
+                  )}
+                  <div className="lfSep" />
+                  <button onClick={() => {
+                    close();
+                    copyToPages(el, ed.doc!.pages.map((_, i) => i));
+                  }}>Copy to ALL pages</button>
+                  <button onClick={() => { layerCtxAsking = true; ed.force(); }}>Copy to pages…</button>
+                  <div className="lfSep" />
+                  <button className="lfDanger" onClick={() => {
+                    close();
+                    if (el.locked) { ed.setStatus("This layer is locked — unlock it first."); return; }
+                    page.els = page.els.filter((x) => x.id !== el.id);
+                    commit();
+                  }}>Delete layer</button>
+                </>
+              ) : (
+                <>
+                  <div className="lfLabel">Pages (e.g. 2, 4-6):</div>
+                  <input autoFocus defaultValue={layerCtxRange} placeholder={`1-${ed.doc!.pages.length}`}
+                    onChange={(e) => { layerCtxRange = e.target.value; }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        close();
+                        copyToPages(el, parsePageList(layerCtxRange, ed.doc!.pages.length));
+                      }
+                      e.stopPropagation();
+                    }} />
+                  <div className="lfRow">
+                    <button onClick={() => { layerCtxAsking = false; ed.force(); }}>Back</button>
+                    <button className="lfGo" onClick={() => {
+                      close();
+                      copyToPages(el, parsePageList(layerCtxRange, ed.doc!.pages.length));
+                    }}>Apply</button>
+                  </div>
+                </>
+              )}
+            </div>
+          </>
+        );
+      })()}
+      {/* the standard layers control strip: new / duplicate / delete —
+          layers shouldn't have to live forever */}
+      <div className="layerFoot">
+        <span className="lfWrap">
+          <button className="layerBtn lfBtn" title="New layer…"
+            onClick={(e) => { e.stopPropagation(); ed.setOpenMenu(ed.openMenu === "layerAdd" ? null : "layerAdd"); }}>
+            <svg viewBox="0 0 24 24"><rect x={4} y={4} width={16} height={16} rx={3} /><path d="M12 8.5 v7 M8.5 12 h7" /></svg>
+          </button>
+          {ed.openMenu === "layerAdd" && (
+            <>
+              <div className="menuBackdrop" onPointerDown={() => ed.setOpenMenu(null)} />
+              <div className="lfMenu">
+                {([["Balloon", "speech"], ["Caption box", "caption"], ["Text", "text"], ["SFX lettering", "sfx"], ["Panel", "panel"]] as const).map(([label, kind]) => (
+                  <button key={kind} onClick={() => { ed.setOpenMenu(null); addFromTray(ed, kind); }}>{label}</button>
+                ))}
+                <button onClick={() => {
+                  ed.setOpenMenu(null);
+                  ed.setTab("inspector");
+                  ed.setStatus("Adjustment layers live at the bottom of the Inspector — pick a tool there.");
+                }}>Adjustment layer…</button>
+              </div>
+            </>
+          )}
+        </span>
+        <button className="layerBtn lfBtn" disabled={!selId} title="Duplicate the selected layer (Ctrl+D)"
+          onClick={() => duplicateSel(ed)}>
+          <svg viewBox="0 0 24 24"><rect x={8} y={8} width={12} height={12} rx={2.5} /><path d="M16 4.5 H7 a2.5 2.5 0 0 0 -2.5 2.5 V16" /></svg>
+        </button>
+        <button className="layerBtn lfBtn" disabled={ed.selIds.length < 2}
+          title="Group the selected layers (Ctrl+click rows to pick several)"
+          onClick={groupSelected}>
+          <svg viewBox="0 0 24 24"><path d="M3.5 7 a1.5 1.5 0 0 1 1.5 -1.5 h4.4 l2 2.2 h7.6 a1.5 1.5 0 0 1 1.5 1.5 V17 a1.5 1.5 0 0 1 -1.5 1.5 H5 A1.5 1.5 0 0 1 3.5 17 Z" /><path d="M12 10.5 v5 M9.5 13 h5" /></svg>
+        </button>
+        <span className="lfSpacer" />
+        <button className="layerBtn lfBtn lfTrash" disabled={!selId} title="Delete the selected layer (Del)"
+          onClick={() => deleteSel(ed)}>
+          <svg viewBox="0 0 24 24"><path d="M5.5 7 h13 M10 7 V5 a1 1 0 0 1 1 -1 h2 a1 1 0 0 1 1 1 v2 M7 7 l1 12.2 a1.6 1.6 0 0 0 1.6 1.3 h4.8 a1.6 1.6 0 0 0 1.6 -1.3 L17 7 M10.2 10.5 l.4 7 M13.8 10.5 l-.4 7" /></svg>
+        </button>
       </div>
     </div>
   );

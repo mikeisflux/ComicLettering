@@ -344,7 +344,8 @@ export const WORD_STAMPS: [string, string, number][] = [
 export const LT_URL = "https://api.languagetool.org/v2/check";
 
 export const elLabel = (el: El) =>
-  el.type === "balloon" ? `Balloon: ${el.text.slice(0, 18) || "(empty)"}`
+  el.name ? el.name
+    : el.type === "balloon" ? `Balloon: ${el.text.slice(0, 18) || "(empty)"}`
     : el.type === "text" ? `Lettering: ${el.text.slice(0, 18) || "(empty)"}`
     : el.type === "panel" ? "Panel"
     : el.type === "adjust" ? `✨ ${ADJUST_META[el.kind]?.label ?? "Adjustment"}`

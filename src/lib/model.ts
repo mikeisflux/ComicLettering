@@ -291,6 +291,10 @@ export interface BaseEl {
   /* layer eyeball (Layers panel): hidden layers vanish from the canvas,
      thumbnails and every export until switched back on */
   hidden?: boolean;
+  /* custom layer name (Layers panel rename) — wins over the derived label */
+  name?: string;
+  /* layer group tag — rows sharing it fold under one header in Layers */
+  group?: string;
 }
 export interface PanelEl extends BaseEl {
   type: "panel";
