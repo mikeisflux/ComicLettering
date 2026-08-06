@@ -551,6 +551,7 @@ function drawEl(
   /* join-group box in el-local coords — joined balloons share fill geometry */
   joinRect?: { x: number; y: number; w: number; h: number } | null,
 ) {
+  if (el.hidden) return;   // layer eyeball off — out of every export & thumbnail
   ctx.save();
   ctx.globalAlpha = el.opacity ?? 1;
   ctx.translate(el.x + el.w / 2, el.y + el.h / 2);
@@ -761,6 +762,7 @@ export function elCrossesTrim(el: El, r: TrimRect): boolean {
   return false;
 }
 export function elCrossesSpine(el: El, trimX: number, side: 1 | -1): boolean {
+  if (el.hidden) return false;   // hidden layers don't carry across the spine
   if (el.type === "balloon") return balloonCrossesSpine(el, trimX, side);
   if (el.type === "text") return textCrossesSpine(el, trimX, side);
   if (el.type === "image") return stampCrossesSpine(el, trimX, side);
@@ -822,6 +824,7 @@ function drawPageEls(
        two partners (same pass structure as the editor's renderJoinBands) */
     for (const l of links) {
       if (l.afterIndex !== i) continue;
+      if (l.child.hidden || l.base.hidden) continue;   // no band to a hidden layer
       const bandClip = lc?.mode === "clip" &&
         (elCrossesTrim(l.child, lc) || elCrossesTrim(l.base, lc));
       if (bandClip) clipAtTrim();

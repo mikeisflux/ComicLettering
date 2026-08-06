@@ -976,6 +976,12 @@ input[type="range"] { width: 110px; }
 .layerName { flex: 1; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .layerBtn { background: #f4f5f7; border: 1px solid var(--edge2); border-radius: 4px; padding: 2px 6px; font-size: 11px; cursor: pointer; }
 .layerBtn.lockOn { background: #fdecd4; border-color: #e0a05c; }
+/* the layer eyeball: visibility toggle per layer */
+.layerBtn.eye { display: flex; align-items: center; justify-content: center; padding: 2px 4px; }
+.layerBtn.eye svg { width: 17px; height: 15px; fill: none; stroke: #445; stroke-width: 1.8; }
+.layerBtn.eye svg circle { fill: #445; stroke: none; }
+.layerBtn.eye.shut svg { stroke: #99a; }
+.layerRow.off .layerName { opacity: 0.45; font-style: italic; }
 
 /* proofing */
 .proofCard { background: #fff; border: 1px solid var(--edge2); border-radius: 6px; padding: 10px; margin: 8px 0; cursor: pointer; }

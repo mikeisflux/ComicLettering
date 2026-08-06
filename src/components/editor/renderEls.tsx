@@ -123,7 +123,8 @@ export function renderJoinBands(
 ) {
   const page = ed.page!;
   return joinLinks(page)
-    .filter((l) => l.afterIndex === index && (!only || only(l)))
+    .filter((l) => l.afterIndex === index && (!only || only(l)) &&
+      !l.child.hidden && !l.base.hidden)   // no band to a hidden layer
     .map((l) => {
       const { el: bEl, base } = resolveBalloon(page, l.child);
       if (!base || !bEl.band) return null;   // melted or detached — no band
@@ -177,6 +178,7 @@ export function claimPage(ed: EditorCtx): boolean {
 
 export function renderEl(ed: EditorCtx, el: El) {
   const { editingId, select, startDrag, setStatus, setEditingId, panelImageTarget, filePanelImageRef, setCtxMenu, assetsRef, page, zoom, finishEditing } = ed;
+  if (el.hidden) return null;   // layer eyeball off — gone from both canvases
   const tf = [
     el.rot ? `rotate(${el.rot}deg)` : "",
     el.flipH ? "scaleX(-1)" : "",

@@ -161,8 +161,21 @@ export function renderLayersTab(ed: EditorCtx) {
       <div className="tips">Every item you place is its own layer. Top of this list = front of the page. New items lock automatically when you click away — right-click any item (or use 🔒) to unlock.</div>
       <div className="layerList">
         {els.map((el) => (
-          <div key={el.id} className={"layerRow" + (selId === el.id ? " on" : "")}
+          <div key={el.id} className={"layerRow" + (selId === el.id ? " on" : "") + (el.hidden ? " off" : "")}
             onClick={() => select(el.id)}>
+            <button className={"layerBtn eye" + (el.hidden ? " shut" : "")}
+              title={el.hidden ? "Show this layer" : "Hide this layer (it leaves the page, thumbnails and exports until switched back on)"}
+              onClick={(e) => {
+                e.stopPropagation();
+                el.hidden = !el.hidden;
+                commit();
+              }}>
+              <svg viewBox="0 0 24 24">
+                <path d="M2.5 12 C5.5 6.8 9 5 12 5 s6.5 1.8 9.5 7 C18.5 17.2 15 19 12 19 s-6.5-1.8-9.5-7 Z" />
+                {!el.hidden && <circle cx={12} cy={12} r={3} />}
+                {el.hidden && <line x1={4} y1={20} x2={20} y2={4} />}
+              </svg>
+            </button>
             <span className="layerName">{elLabel(el)}</span>
             <button className="layerBtn" title="Forward" onClick={(e) => { e.stopPropagation(); move(el.id, 1); }}>▲</button>
             <button className="layerBtn" title="Backward" onClick={(e) => { e.stopPropagation(); move(el.id, -1); }}>▼</button>

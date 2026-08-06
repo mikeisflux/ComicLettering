@@ -288,6 +288,9 @@ export interface BaseEl {
   flipH?: boolean;
   flipV?: boolean;
   locked?: boolean;
+  /* layer eyeball (Layers panel): hidden layers vanish from the canvas,
+     thumbnails and every export until switched back on */
+  hidden?: boolean;
 }
 export interface PanelEl extends BaseEl {
   type: "panel";
