@@ -31,6 +31,7 @@ import { makeCrossPageDrop } from "./editor/spreadOps";
 import { KeyFns, useEditorKeys } from "./editor/useEditorKeys";
 import { useFontsStamps } from "./editor/useFontsStamps";
 import { useSketchDraw } from "./editor/useSketchDraw";
+import { PenPt, usePenPanel } from "./editor/usePenPanel";
 import { ShellProps, renderCanvasArea, renderHiddenInputs, renderPagesPanel } from "./editor/editorShell";
 import { PageSetupDialog } from "./editor/chrome";
 import { CollabState, EditorCtx, ExportProgress } from "./editor/ctx";
@@ -868,21 +869,34 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
 
   /* ---------------- hand-drawn balloon sketching ---------------- */
 
+  /* spread canvas: map a current-page-local x to the page it falls on
+     (shared by the balloon sketcher and the panel pen tool) */
+  const resolveSpreadTarget = (cx: number) => {
+    const d = docRef.current;
+    if (!d) return { idx: pageIndex, shift: 0 };
+    const curOff = spreadOffX(pageIndex);
+    for (const s of spreadLayout) {
+      const local = cx + curOff - s.off;
+      if (local >= 0 && local <= d.pages[s.idx].w) return { idx: s.idx, shift: curOff - s.off };
+    }
+    return { idx: pageIndex, shift: 0 };
+  };
+
   const startSketch = useSketchDraw({
     docRef, pageIndexRef, drawPtsRef, pendingLockRef,
     pagePoint, force, commit, setDrawMode, setStatus, setSelId, setTailAsk,
     setPageIndex,
-    /* spread canvas: map a current-page-local x to the page it falls on */
-    resolveTarget: (cx: number) => {
-      const d = docRef.current;
-      if (!d) return { idx: pageIndex, shift: 0 };
-      const curOff = spreadOffX(pageIndex);
-      for (const s of spreadLayout) {
-        const local = cx + curOff - s.off;
-        if (local >= 0 && local <= d.pages[s.idx].w) return { idx: s.idx, shift: curOff - s.off };
-      }
-      return { idx: pageIndex, shift: 0 };
-    },
+    resolveTarget: resolveSpreadTarget,
+  });
+
+  /* ---------------- "Draw Your Own" panel pen tool ---------------- */
+
+  const [penMode, setPenMode] = useState(false);
+  const penPtsRef = useRef<PenPt[] | null>(null);
+  const { startPenDown } = usePenPanel({
+    docRef, pageIndexRef, penMode, penPtsRef, zoom, pendingLockRef,
+    pagePoint, force, commit, setPenMode, setStatus, setSelId,
+    resolveTarget: resolveSpreadTarget, setPageIndex,
   });
 
   /* ---------------- keyboard (see useEditorKeys) ---------------- */
@@ -1005,7 +1019,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     setZoom, bumpFonts, registerRuntimeFont, savePresets,
     tab, setTab, layoutCat, setLayoutCat, myLayouts, setMyLayouts, autoLock, setAutoLock,
     projects, setProjects, current, setCurrent, dbError, setDbError,
-    presets, proof, setProof, drawMode, setDrawMode, tailAsk, setTailAsk,
+    presets, proof, setProof, drawMode, setDrawMode, penMode, setPenMode, tailAsk, setTailAsk,
     ctxMenu, setCtxMenu, setShowSetup, showExport, setShowExport,
     exportProgress, setExportProgress,
     exportFmt, setExportFmt, exportScope, setExportScope, exportDpi,
@@ -1049,6 +1063,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     areaRef, pageDivRef, dragTipRef, snapRef, thumbs, askAddPage,
     tuckMode, tuckPtsRef,
     drawPtsRef, startSketch, startTuckDrag,
+    penPtsRef, startPenDown,
   };
 
   useEffect(() => {

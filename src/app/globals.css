@@ -684,6 +684,13 @@ input[type="range"] { width: 110px; }
 .drawLayer { position: absolute; inset: 0; z-index: 55; cursor: crosshair; touch-action: none; }
 .drawLayer svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
 .drawLayer path { fill: rgba(30, 136, 229, 0.08); stroke: #1e88e5; stroke-width: 2; stroke-dasharray: 6 4; }
+/* "Draw Your Own" panel pen tool overlay */
+.penLayer { z-index: 60; }
+.penLayer path.penPath { fill: #2f7fd61a; stroke: var(--sel); stroke-width: 2; stroke-dasharray: none; }
+.penLayer .penAnchor { fill: #fff; stroke: var(--sel); stroke-width: 2; }
+.penLayer .penAnchor.first { fill: var(--accent); stroke: #fff; }
+.penLayer .penHandle { stroke: var(--accent); stroke-width: 1.5; }
+.penLayer .penHandleDot { fill: var(--accent); }
 .trayBtn.on { background: #dcebfb; box-shadow: inset 0 0 0 1.5px var(--sel); border-radius: 6px; }
 
 /* LMC families — original typefaces made for LetterMyComic (OFL 1.1),

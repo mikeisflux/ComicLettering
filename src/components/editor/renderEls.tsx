@@ -4,7 +4,7 @@
    contentEditable text keeps focus while editing). */
 import React, { CSSProperties } from "react";
 import {
-  El, FILTERS, JoinLink, TextEl, aabbOverlap, applyCrossbarI, joinGroupRect, joinLinks, resolveBalloon, rotVec,
+  El, FILTERS, JoinLink, PanelEl, TextEl, aabbOverlap, applyCrossbarI, joinGroupRect, joinLinks, panelPathD, resolveBalloon, rotVec,
 } from "@/lib/model";
 import { arcTextLayout, balloonGeom, connectorMid } from "@/lib/geometry";
 import { fillCss } from "@/lib/fills";
@@ -255,18 +255,49 @@ export function renderEl(ed: EditorCtx, el: El) {
 
   if (el.type === "panel" || el.type === "image") {
     const src = el.img ? assetsRef.current[el.img] : null;
+    /* pen-drawn ("Draw Your Own") panel: fill and artwork clip to the drawn
+       outline and the border strokes along it. The shadow filter must sit on
+       the OUTER div — clip-path would clip away its own drop-shadow. */
+    const penD = el.type === "panel" ? panelPathD(el) : null;
+    const zIndex =
+      /* Tuck cutouts are foreground ART: with a facing partner they sit
+         above the carried lettering too (zIndex 1), exactly like the
+         canvas renderer's final cutout pass — a cross-spine tuck reads as
+         the art passing in front of the double-page SFX */
+      el.type === "image" && el.cut && ed.doc && spreadNeighbor(ed.doc, ed.pageIndex)
+        ? 2 : undefined;
+    if (penD) {
+      return (
+        <div {...common} className="el panel" style={{
+          ...style, border: "none", overflow: "visible", zIndex,
+          filter: el.shadow ? "drop-shadow(8px 8px 12px #00000059)" : undefined,
+        }}>
+          <div style={{ position: "absolute", inset: 0, overflow: "hidden", clipPath: `path("${penD}")`, ...fillCss((el as PanelEl).fill) }}>
+            {src && (
+              <img src={src} className="cover" draggable={false} alt=""
+                style={{ filter: FILTERS[el.filter]?.css || undefined }} />
+            )}
+          </div>
+          {el.borderW > 0 && (
+            <svg width={el.w} height={el.h} viewBox={`0 0 ${el.w} ${el.h}`}
+              style={{ position: "absolute", left: 0, top: 0, pointerEvents: "none" }}>
+              <defs><clipPath id={`penclip-${el.id}`}><path d={penD} /></clipPath></defs>
+              {/* doubled stroke clipped to the inside = the same inner border
+                  a rect panel's CSS border gives */}
+              <path d={penD} fill="none" stroke={el.borderC} strokeWidth={el.borderW * 2}
+                clipPath={`url(#penclip-${el.id})`} />
+            </svg>
+          )}
+        </div>
+      );
+    }
     const st: CSSProperties = {
       ...style,
       ...(el.type === "panel" ? fillCss(el.fill) : {}),
       border: el.borderW > 0 ? `${el.borderW}px solid ${el.borderC}` : "none",
       overflow: "hidden",
       boxShadow: el.shadow ? "8px 8px 12px #00000059" : undefined,
-      /* Tuck cutouts are foreground ART: with a facing partner they sit
-         above the carried lettering too (zIndex 1), exactly like the
-         canvas renderer's final cutout pass — a cross-spine tuck reads as
-         the art passing in front of the double-page SFX */
-      zIndex: el.type === "image" && el.cut && ed.doc && spreadNeighbor(ed.doc, ed.pageIndex)
-        ? 2 : undefined,
+      zIndex,
     };
     return (
       <div {...common} className={"el " + el.type} style={st}>

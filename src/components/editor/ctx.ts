@@ -167,6 +167,9 @@ export interface EditorCtx {
   setProof: SetState<{ busy: boolean; error: string | null; matches: ProofMatch[] } | null>;
   drawMode: boolean;
   setDrawMode: SetState<boolean>;
+  /* "Draw Your Own" panel pen tool (Layouts tab) */
+  penMode: boolean;
+  setPenMode: SetState<boolean>;
   tailAsk: string | null;
   setTailAsk: SetState<string | null>;
   ctxMenu: { x: number; y: number; id: string } | null;

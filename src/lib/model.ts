@@ -259,6 +259,10 @@ export interface PanelEl extends BaseEl {
   type: "panel";
   fill: FillStyle; borderW: number; borderC: string;
   img: string | null; filter: FilterKey;
+  /* "Draw Your Own" pen-tool outline: closed shape as fractions of the
+     panel box (curves arrive pre-flattened to a dense polygon, so moving/
+     resizing just scales). Absent = plain rectangle. */
+  pts?: [number, number][];
 }
 export interface ImageEl extends BaseEl {
   type: "image";
@@ -1111,6 +1115,15 @@ export function makePanel(x: number, y: number, w: number, h: number): PanelEl {
   return { ...base(x, y, w, h), type: "panel", fill: solid("#ffffff"), borderW: 6, borderC: "#111111", img: null, filter: "none" };
 }
 
+/* the SVG/Path2D outline of a pen-drawn panel, in the panel's local units —
+   ONE builder shared by the DOM editor and the canvas/PDF export so the two
+   stay WYSIWYG. Null for plain rectangular panels. */
+export function panelPathD(el: PanelEl): string | null {
+  if (!el.pts || el.pts.length < 3) return null;
+  return el.pts.map(([fx, fy], i) =>
+    `${i ? "L" : "M"}${(fx * el.w).toFixed(2)} ${(fy * el.h).toFixed(2)}`).join(" ") + " Z";
+}
+
 export function makeImage(x: number, y: number, w: number, h: number, img: string): ImageEl {
   return { ...base(x, y, w, h), type: "image", img, filter: "none", borderW: 0, borderC: "#111111" };
 }
@@ -1125,14 +1138,15 @@ export function makeText(x: number, y: number, w: number, h: number, sfx: boolea
   };
 }
 
-/* a user-saved custom layout (kept in localStorage, listed as "My Layouts") */
-export interface SavedLayout { name: string; fracs: LayoutRect[] }
+/* a user-saved custom layout (kept in localStorage, listed as "My Layouts");
+   pts aligns with fracs and carries pen-drawn panel shapes (null = rect) */
+export interface SavedLayout { name: string; fracs: LayoutRect[]; pts?: ([number, number][] | null)[] }
 
 /* Inverse of applyLayout: read the page's CURRENT panel frames back into
    margin-relative fractions (undoing the interior gutter insets applyLayout
    adds), so any hand-tuned arrangement round-trips exactly when saved and
    re-applied as a custom layout. */
-export function capturePageLayout(page: Page): LayoutRect[] | null {
+export function capturePageLayout(page: Page): { fracs: LayoutRect[]; pts: ([number, number][] | null)[] } | null {
   const mg = pageMargins(page);
   const g = Math.round(page.w * 0.02);
   const cw = page.w - mg.l - mg.r, ch = page.h - mg.t - mg.b;
@@ -1140,18 +1154,24 @@ export function capturePageLayout(page: Page): LayoutRect[] | null {
   const panels = page.els.filter((e): e is PanelEl => e.type === "panel");
   if (!panels.length) return null;
   const r4 = (v: number) => Math.round(v * 1e4) / 1e4;
-  return panels.map((p) => {
+  const fracs = panels.map((p) => {
+    /* pen-drawn shapes keep their exact frame — the gutter inset baked into
+       rect layouts would warp the outline */
+    const shaped = !!p.pts;
     let x0 = p.x, x1 = p.x + p.w, y0 = p.y, y1 = p.y + p.h;
-    if (x0 > mg.l + 1) x0 -= g / 2;
-    if (x1 < mg.l + cw - 1) x1 += g / 2;
-    if (y0 > mg.t + 1) y0 -= g / 2;
-    if (y1 < mg.t + ch - 1) y1 += g / 2;
+    if (!shaped) {
+      if (x0 > mg.l + 1) x0 -= g / 2;
+      if (x1 < mg.l + cw - 1) x1 += g / 2;
+      if (y0 > mg.t + 1) y0 -= g / 2;
+      if (y1 < mg.t + ch - 1) y1 += g / 2;
+    }
     const fx = clamp(r4((x0 - mg.l) / cw), 0, 0.98);
     const fy = clamp(r4((y0 - mg.t) / ch), 0, 0.98);
     const fw = clamp(r4((x1 - x0) / cw), 0.02, 1 - fx);
     const fh = clamp(r4((y1 - y0) / ch), 0.02, 1 - fy);
     return (p.rot ? [fx, fy, fw, fh, p.rot] : [fx, fy, fw, fh]) as LayoutRect;
   });
+  return { fracs, pts: panels.map((p) => p.pts ?? null) };
 }
 
 export function applyLayout(page: Page, fracs: LayoutRect[]) {

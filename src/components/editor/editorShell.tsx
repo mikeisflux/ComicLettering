@@ -14,6 +14,7 @@ import { renderCommentCatcher, renderCommentPins } from "./collab";
 import { StylesPanel } from "./stylesPanel";
 import { addPageAt } from "./spreadOps";
 import { dragInProgress } from "./penInput";
+import { PenPt, flattenPen } from "./usePenPanel";
 import {
   ART_ACCEPT, ART_FORMATS_LABEL, assignImageToPanel, duplicatePage, importFontFiles,
   importImageFile, importJSON, importStampFiles, isSupportedArtFile, movePage,
@@ -34,6 +35,46 @@ export interface ShellProps {
   drawPtsRef: { current: number[][] | null };
   startSketch: (e: React.PointerEvent) => void;
   startTuckDrag: (e: React.PointerEvent) => void;
+  /* "Draw Your Own" panel pen tool */
+  penPtsRef: { current: PenPt[] | null };
+  startPenDown: (e: React.PointerEvent) => void;
+}
+
+/* The pen tool's live overlay: the path so far (curves included), each
+   anchor as a dot (first one highlighted — clicking it closes the shape)
+   and the curve handles of arced points. Rendered on BOTH canvases; on the
+   spread it rides at the current page's offset like every tool layer. */
+function renderPenLayer(ed: EditorCtx, sh: ShellProps, curOff: number, wide?: { w: number; h: number }) {
+  const { zoom } = ed;
+  const pts = sh.penPtsRef.current;
+  const sc = (v: number) => Math.round(v * zoom);
+  return (
+    <div className="drawLayer penLayer" onPointerDown={sh.startPenDown}
+      style={wide ? { left: 0, top: 0, width: wide.w * zoom, height: wide.h * zoom } : undefined}>
+      {pts && pts.length > 0 && (
+        <svg style={wide ? { width: "100%", height: "100%" } : undefined}>
+          <g transform={curOff ? `translate(${curOff * zoom} 0)` : undefined}>
+            {pts.length > 1 && (
+              <path className="penPath"
+                d={"M " + flattenPen(pts, true).map(([qx, qy]) => `${sc(qx)} ${sc(qy)}`).join(" L ")} />
+            )}
+            {pts.map((p, i) => (
+              <g key={i}>
+                {(p.hx !== 0 || p.hy !== 0) && (
+                  <>
+                    <line className="penHandle" x1={sc(p.x - p.hx)} y1={sc(p.y - p.hy)} x2={sc(p.x + p.hx)} y2={sc(p.y + p.hy)} />
+                    <circle className="penHandleDot" cx={sc(p.x + p.hx)} cy={sc(p.y + p.hy)} r={3} />
+                    <circle className="penHandleDot" cx={sc(p.x - p.hx)} cy={sc(p.y - p.hy)} r={3} />
+                  </>
+                )}
+                <circle className={"penAnchor" + (i === 0 ? " first" : "")} cx={sc(p.x)} cy={sc(p.y)} r={i === 0 ? 6 : 4.5} />
+              </g>
+            ))}
+          </g>
+        </svg>
+      )}
+    </div>
+  );
 }
 
 /* the add-page dialog's quantity field, read at click time (the panel is a
@@ -257,6 +298,7 @@ function renderSpreadCanvas(ed: EditorCtx, sh: ShellProps) {
           )}
         </div>
       )}
+      {ed.penMode && renderPenLayer(ed, sh, curOff, { w: totalW, h: totalH })}
       {dragTipRef.current && (
         <div className="dragTip" style={{
           left: (dragTipRef.current.x + dragTipRef.current.w + curOff) * zoom + 6,
@@ -387,6 +429,7 @@ export function renderCanvasArea(ed: EditorCtx, sh: ShellProps) {
               )}
             </div>
           )}
+          {ed.penMode && renderPenLayer(ed, sh, 0)}
           {dragTipRef.current && (
             <div className="dragTip" style={{
               left: (dragTipRef.current.x + dragTipRef.current.w) * zoom + 6,

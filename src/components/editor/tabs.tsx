@@ -1,7 +1,7 @@
 /* Right-panel tabs: Layouts, Layers, Proof, Photos, Library.
    Plain exported render functions taking the EditorCtx bag. */
 import {
-  LAYOUT_CATEGORIES, LayoutRect, applyLayout, capturePageLayout, clamp, makeImage,
+  LAYOUT_CATEGORIES, LayoutRect, PanelEl, SavedLayout, applyLayout, capturePageLayout, clamp, makeImage,
 } from "@/lib/model";
 import { loadImage } from "@/lib/exportPng";
 import { elLabel } from "./textHelpers";
@@ -13,14 +13,22 @@ import {
 import { detectPanelsFromArt } from "./panelOps";
 
 
-/* shared mini-preview of a layout's panel rects */
-function layoutThumb(fracs: LayoutRect[]) {
+/* shared mini-preview of a layout's panels — pen-drawn shapes show their
+   real outline, everything else a rect */
+function layoutThumb(fracs: LayoutRect[], pts?: ([number, number][] | null)[]) {
   return (
     <svg viewBox="0 0 60 84">
-      {fracs.map(([fx, fy, fw, fh, rot], j) => (
-        <rect key={j} x={4 + fx * 52} y={4 + fy * 76} width={Math.max(2, fw * 52 - 2)} height={Math.max(2, fh * 76 - 2)}
-          transform={rot ? `rotate(${rot} ${4 + fx * 52 + fw * 26} ${4 + fy * 76 + fh * 38})` : undefined} />
-      ))}
+      {fracs.map(([fx, fy, fw, fh, rot], j) => {
+        const pp = pts?.[j];
+        if (pp && pp.length > 2) {
+          return <polygon key={j}
+            points={pp.map(([px, py]) => `${4 + (fx + px * fw) * 52},${4 + (fy + py * fh) * 76}`).join(" ")} />;
+        }
+        return (
+          <rect key={j} x={4 + fx * 52} y={4 + fy * 76} width={Math.max(2, fw * 52 - 2)} height={Math.max(2, fh * 76 - 2)}
+            transform={rot ? `rotate(${rot} ${4 + fx * 52 + fw * 26} ${4 + fy * 76 + fh * 38})` : undefined} />
+        );
+      })}
     </svg>
   );
 }
@@ -30,16 +38,26 @@ export function renderLayoutsTab(ed: EditorCtx) {
   const MY = LAYOUT_CATEGORIES.length;   // "My Layouts" pseudo-category index
   const mine = layoutCat >= MY;
   const cat = mine ? null : LAYOUT_CATEGORIES[layoutCat];
-  const apply = (fracs: LayoutRect[]) => { if (page) { applyLayout(page, fracs); commit(); } };
+  const apply = (fracs: LayoutRect[], pts?: SavedLayout["pts"]) => {
+    if (!page) return;
+    applyLayout(page, fracs);
+    /* applyLayout puts the fresh panels at the head of els in fracs order —
+       hand pen-drawn outlines back to their panels */
+    if (pts) pts.forEach((pp, i) => {
+      const el = page.els[i];
+      if (pp && el?.type === "panel") (el as PanelEl).pts = pp;
+    });
+    commit();
+  };
   const saveCurrent = () => {
     if (!page) return;
-    const fracs = capturePageLayout(page);
-    if (!fracs) { setStatus("No panels on this page yet — apply a layout or draw panels, arrange them, then save."); return; }
+    const cap = capturePageLayout(page);
+    if (!cap) { setStatus("No panels on this page yet — apply a layout or draw panels, arrange them, then save."); return; }
     const name = window.prompt("Name this layout:", "My layout");
     if (!name) return;
-    setMyLayouts([...myLayouts.filter((l) => l.name !== name), { name, fracs }]);
+    setMyLayouts([...myLayouts.filter((l) => l.name !== name), { name, fracs: cap.fracs, pts: cap.pts }]);
     setLayoutCat(MY);
-    setStatus(`Saved “${name}” to My Layouts (${fracs.length} panel${fracs.length > 1 ? "s" : ""}).`);
+    setStatus(`Saved “${name}” to My Layouts (${cap.fracs.length} panel${cap.fracs.length > 1 ? "s" : ""}).`);
   };
   return (
     <div className="inspBody">
@@ -65,8 +83,8 @@ export function renderLayoutsTab(ed: EditorCtx) {
           {myLayouts.map((l) => (
             <span key={l.name} className="layoutWrap">
               <button className="layoutBtn" title={`${l.name} — ${l.fracs.length} panel${l.fracs.length > 1 ? "s" : ""}`}
-                onClick={() => apply(l.fracs)}>
-                {layoutThumb(l.fracs)}
+                onClick={() => apply(l.fracs, l.pts)}>
+                {layoutThumb(l.fracs, l.pts)}
               </button>
               <button className="layoutDel" title={`Delete “${l.name}”`}
                 onClick={() => { if (window.confirm(`Delete layout “${l.name}”?`)) setMyLayouts(myLayouts.filter((x) => x.name !== l.name)); }}>
@@ -79,6 +97,13 @@ export function renderLayoutsTab(ed: EditorCtx) {
         <div className="tips">Nothing saved yet. Arrange panels on a page — start from any premade layout and drag, resize or rotate the frames, or draw your own — then hit <b>Save page as layout</b> below.</div>
       ))}
       <div className="tips">Applying a layout replaces the page&apos;s panels; balloons, lettering and images are kept. Panels are normal frames — move, resize or rotate them right on the page to customise any layout.</div>
+      <div className="btnRow">
+        <button onClick={() => {
+          ed.setPenMode(true);
+          setStatus("Pen tool: click the page to place corners, click-and-DRAG to curve a point, click your first point (or press Enter) to close the panel — Esc cancels.");
+        }}>Draw Your Own</button>
+      </div>
+      <div className="tips">A pen tool for panels of any shape — corners on click, curves on click-drag (every point can arc), close on the first point. The shape fills, clips artwork and inks its border just like a normal panel.</div>
       <div className="btnRow">
         <button onClick={saveCurrent}>Save page as layout…</button>
       </div>

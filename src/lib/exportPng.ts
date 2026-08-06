@@ -1,7 +1,7 @@
 /* Full-resolution canvas renderer — used for PNG export and page thumbnails. */
 import {
   Assets, BalloonEl, Doc, El, FILTERS, FONTS, ImageEl, JoinLink, Page, TextEl, TextRun, TextStyle,
-  aabbOverlap, applyCrossbarI, deg2rad, joinGroupRect, joinLinks, lightenHex, pageBleed, resolveBalloon, rotVec,
+  aabbOverlap, applyCrossbarI, deg2rad, joinGroupRect, joinLinks, lightenHex, pageBleed, panelPathD, resolveBalloon, rotVec,
 } from "./model";
 import { balloonGeom, arcTextLayout } from "./geometry";
 import { paintFill } from "./fills";
@@ -559,8 +559,11 @@ function drawEl(
   ctx.translate(-el.w / 2, -el.h / 2);
 
   if (el.type === "panel" || el.type === "image") {
-    const rectPath = new Path2D();
-    rectPath.rect(0, 0, el.w, el.h);
+    /* pen-drawn ("Draw Your Own") panels carry their outline in pts — the
+       same panelPathD the DOM editor clips with, so export stays WYSIWYG */
+    const penD = el.type === "panel" ? panelPathD(el) : null;
+    const rectPath = penD ? new Path2D(penD) : new Path2D();
+    if (!penD) rectPath.rect(0, 0, el.w, el.h);
     if (el.shadow) {
       ctx.save();
       shapeShadow(ctx, true, 10);
@@ -579,8 +582,18 @@ function drawEl(
     }
     if (el.borderW > 0) {
       ctx.strokeStyle = el.borderC;
-      ctx.lineWidth = el.borderW;
-      ctx.strokeRect(el.borderW / 2, el.borderW / 2, el.w - el.borderW, el.h - el.borderW);
+      if (penD) {
+        /* doubled stroke clipped to the inside — the DOM's inner border */
+        ctx.save();
+        ctx.clip(rectPath);
+        ctx.lineWidth = el.borderW * 2;
+        ctx.lineJoin = "round";
+        ctx.stroke(rectPath);
+        ctx.restore();
+      } else {
+        ctx.lineWidth = el.borderW;
+        ctx.strokeRect(el.borderW / 2, el.borderW / 2, el.w - el.borderW, el.h - el.borderW);
+      }
     }
   } else if (el.type === "balloon") {
     const g = balloonGeom(el);
