@@ -261,7 +261,7 @@ export function renderLayersTab(ed: EditorCtx) {
     window.addEventListener("pointercancel", onUp);
   };
   return (
-    <div className="inspBody">
+    <div className="inspBody layersBody">
       <div className="fld">
         <label>Auto-lock new items</label>
         <input type="checkbox" checked={autoLock} onChange={(e) => setAutoLock(e.target.checked)} />
