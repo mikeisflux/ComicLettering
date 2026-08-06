@@ -22,12 +22,14 @@ function crc32(data: Uint8Array): number {
 
 export async function exportCbz(
   doc: Doc, assets: Assets, filename: string, dpi = 225,
-  pages?: number[], onProgress?: (i: number, n: number) => void
+  /* awaited between pages — a caller driving a progress bar can return a
+     promise that resolves after the browser has painted the update */
+  pages?: number[], onProgress?: (i: number, n: number) => void | Promise<void>
 ) {
   const idxs = pages ?? doc.pages.map((_, i) => i);
   const files: { name: Uint8Array; data: Uint8Array; crc: number }[] = [];
   for (let i = 0; i < idxs.length; i++) {
-    onProgress?.(i + 1, idxs.length);
+    await onProgress?.(i + 1, idxs.length);
     const data = await pageJpegBytes(doc.pages[idxs[i]], assets, dpi, spreadNeighbor(doc, idxs[i]));
     files.push({
       name: enc.encode(`page-${String(idxs[i] + 1).padStart(3, "0")}.jpg`),

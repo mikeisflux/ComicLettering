@@ -13,6 +13,16 @@ import { EditorCtx } from "./ctx";
 import { ensureAllArt, refitLegacyLettering } from "./ops";
 
 
+/* Real-time export progress: update the bar overlay, then yield two frames
+   so the browser actually PAINTS it before the next page's heavy canvas
+   work grabs the main thread. Every export path awaits this between units
+   of work — that is what makes the bar move in real time instead of
+   jumping straight to done. total 0 = indeterminate (busy sweep). */
+function showProgress(ed: EditorCtx, label: string, done: number, total: number) {
+  ed.setExportProgress({ label, done, total });
+  return new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
+}
+
 /* ---------------- project library (SQL) ---------------- */
 
 export async function refreshProjects(ed: EditorCtx) {
@@ -155,27 +165,36 @@ export async function exportJSON(ed: EditorCtx) {
   if (demo) { setStatus("Saving project files is off in the demo — subscribe to unlock."); return; }
   /* materialise every asset the document references before packing */
   setStatus("Packing artwork…");
+  await showProgress(ed, "Preparing artwork…", 0, 0);
   try { await ensureAllArt(ed); } catch { /* pack whatever is available */ }
   const parts: string[] = ['{"doc":', JSON.stringify(docRef.current), ',"assets":{'];
   let first = true;
   let inlined = 0;
   let skipped = 0;
-  for (const [id, url] of Object.entries(assetsRef.current)) {
-    if (typeof url !== "string") continue;
-    let out = url;
-    if (url.startsWith("blob:")) {
-      try {
-        const b = await fetch(url).then((r) => r.blob());
-        out = await blobToDataUrl(b);
-        inlined++;
-        setStatus(`Packing artwork… ${inlined}`);
-      } catch { skipped++; continue; }   // unreadable blob — skip, don't corrupt
+  const blobTotal = Object.values(assetsRef.current)
+    .filter((u) => typeof u === "string" && u.startsWith("blob:")).length;
+  let blob: Blob;
+  try {
+    for (const [id, url] of Object.entries(assetsRef.current)) {
+      if (typeof url !== "string") continue;
+      let out = url;
+      if (url.startsWith("blob:")) {
+        await showProgress(ed, `Packing artwork ${inlined + skipped + 1} of ${blobTotal}`, inlined + skipped, blobTotal);
+        try {
+          const b = await fetch(url).then((r) => r.blob());
+          out = await blobToDataUrl(b);
+          inlined++;
+          setStatus(`Packing artwork… ${inlined}`);
+        } catch { skipped++; continue; }   // unreadable blob — skip, don't corrupt
+      }
+      parts.push((first ? "" : ",") + JSON.stringify(id) + ":", JSON.stringify(out));
+      first = false;
     }
-    parts.push((first ? "" : ",") + JSON.stringify(id) + ":", JSON.stringify(out));
-    first = false;
+    parts.push("}}");
+    blob = new Blob(parts, { type: "application/x-lettermycomic" });
+  } finally {
+    ed.setExportProgress(null);
   }
-  parts.push("}}");
-  const blob = new Blob(parts, { type: "application/x-lettermycomic" });
   const name = (current?.name || "comic-project") + ".lmc";
   const doneMsg = (where: string) =>
     `Saved “${name}”${where} — artwork included (${fmtBytes(blob.size)}${skipped ? `, ${skipped} image${skipped > 1 ? "s" : ""} unreadable and skipped` : ""}).`;
@@ -269,12 +288,18 @@ export async function exportAllPages(ed: EditorCtx) {
   if (demo) { setStatus("Export is off in the demo — subscribe to unlock."); return; }
   const d = docRef.current!;
   setStatus("Loading artwork…");
-  await ensureAllArt(ed);
-  for (let i = 0; i < d.pages.length; i++) {
-    setStatus(`Exporting page ${i + 1}/${d.pages.length}…`);
-    await exportPagePNG(d.pages[i], assetsRef.current, `comic-page-${i + 1}.png`, spreadNeighbor(d, i));
+  try {
+    await showProgress(ed, "Loading artwork…", 0, 0);
+    await ensureAllArt(ed);
+    for (let i = 0; i < d.pages.length; i++) {
+      setStatus(`Exporting page ${i + 1}/${d.pages.length}…`);
+      await showProgress(ed, `Exporting page ${i + 1} of ${d.pages.length} (PNG)`, i, d.pages.length);
+      await exportPagePNG(d.pages[i], assetsRef.current, `comic-page-${i + 1}.png`, spreadNeighbor(d, i));
+    }
+    setStatus(`Exported ${d.pages.length} page${d.pages.length > 1 ? "s" : ""}.`);
+  } finally {
+    ed.setExportProgress(null);
   }
-  setStatus(`Exported ${d.pages.length} page${d.pages.length > 1 ? "s" : ""}.`);
 }
 
 export async function runExport(
@@ -285,39 +310,54 @@ export async function runExport(
   const { demo, setStatus, setShowExport, docRef, current, pageIndexRef,
     exportFrom, exportTo, letteringOnly, exportCropMarks, assetsRef } = ed;
   if (demo) { setStatus("Export is off in the demo — subscribe to export print-ready pages."); setShowExport(false); return; }
+  if (ed.exportProgress) return;   // an export is already running — ignore re-clicks
   setStatus("Loading artwork…");
-  await ensureAllArt(ed);
-  const d = docRef.current!;
-  const nameBase = (current?.name || "comic").replace(/[^\w\- ]+/g, "");
-  const idxs =
-    scope === "current" ? [pageIndexRef.current]
-      : scope === "all" ? d.pages.map((_, i) => i)
-      : d.pages.map((_, i) => i).filter((i) =>
-          i + 1 >= Math.min(exportFrom, exportTo) && i + 1 <= Math.max(exportFrom, exportTo));
-  if (!idxs.length) { setStatus("No pages in that range."); return; }
   try {
+    await showProgress(ed, "Loading artwork…", 0, 0);
+    await ensureAllArt(ed);
+    const d = docRef.current!;
+    const nameBase = (current?.name || "comic").replace(/[^\w\- ]+/g, "");
+    const idxs =
+      scope === "current" ? [pageIndexRef.current]
+        : scope === "all" ? d.pages.map((_, i) => i)
+        : d.pages.map((_, i) => i).filter((i) =>
+            i + 1 >= Math.min(exportFrom, exportTo) && i + 1 <= Math.max(exportFrom, exportTo));
+    if (!idxs.length) { setStatus("No pages in that range."); return; }
     if (format === "pdf") {
       const sub = { ...d, pages: idxs.map((i) => d.pages[i]) };
       const { exportPdf } = await import("@/lib/pdfExport");
       /* spread partners resolved against the FULL document, so exporting a
          page range keeps double-page lettering intact */
-      await exportPdf(sub, assetsRef.current, `${nameBase}.pdf`, (i, n) => setStatus(`Rendering PDF page ${i}/${n}…`), dpi, exportCropMarks,
+      await exportPdf(sub, assetsRef.current, `${nameBase}.pdf`, (i, n) => {
+        setStatus(`Rendering PDF page ${i}/${n}…`);
+        return showProgress(ed, `Rendering PDF page ${i} of ${n}`, i - 1, n);
+      }, dpi, exportCropMarks,
         idxs.map((i) => spreadNeighbor(d, i)));
+      await showProgress(ed, "Building PDF…", idxs.length, idxs.length);
     } else if (format === "cbz") {
       const { exportCbz } = await import("@/lib/cbz");
-      await exportCbz(d, assetsRef.current, `${nameBase}.cbz`, dpi, idxs, (i, n) => setStatus(`Packing CBZ page ${i}/${n}…`));
+      await exportCbz(d, assetsRef.current, `${nameBase}.cbz`, dpi, idxs, (i, n) => {
+        setStatus(`Packing CBZ page ${i}/${n}…`);
+        return showProgress(ed, `Packing CBZ page ${i} of ${n}`, i - 1, n);
+      });
+      await showProgress(ed, "Building CBZ…", idxs.length, idxs.length);
     } else {
       const fmt = letteringOnly ? "png" : format; // transparency needs PNG
+      let doneCnt = 0;
       for (const pi of idxs) {
         setStatus(`Exporting page ${pi + 1} (${fmt.toUpperCase()} @ ${dpi} dpi${letteringOnly ? ", lettering only" : ""})…`);
+        await showProgress(ed, `Exporting page ${pi + 1} (${fmt.toUpperCase()} @ ${dpi} dpi)`, doneCnt, idxs.length);
         const suffix = letteringOnly ? "-lettering" : "";
         await exportPageImage(d.pages[pi], assetsRef.current, `${nameBase}-page-${pi + 1}${suffix}.${fmt}`, fmt, dpi, letteringOnly, spreadNeighbor(d, pi));
+        doneCnt++;
       }
     }
     setStatus("Export complete.");
     setShowExport(false);
   } catch (err) {
     setStatus("Export failed: " + String(err).slice(0, 120));
+  } finally {
+    ed.setExportProgress(null);
   }
 }
 

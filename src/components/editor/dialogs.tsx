@@ -496,7 +496,38 @@ export function renderExportDialog(ed: EditorCtx) {
         </div>
         <div className="setupFoot">
           <button onClick={() => setShowExport(false)}>Cancel</button>
-          <button className="okBtn" onClick={() => runExport(ed, exportFmt, exportScope, exportDpi)}>Export</button>
+          <button className="okBtn" disabled={!!ed.exportProgress}
+            onClick={() => runExport(ed, exportFmt, exportScope, exportDpi)}>
+            {ed.exportProgress ? "Exporting…" : "Export"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* Real-time export progress — ONE bar for every export path: the image
+   loop (PNG/JPG/TIFF), PDF, CBZ, "Export all pages" and .lmc packing.
+   The overlay also swallows clicks, so "nothing is happening" re-clicks
+   can't stack a second export on top of the first. */
+export function renderExportProgress(ed: EditorCtx) {
+  const p = ed.exportProgress;
+  if (!p) return null;
+  const pct = p.total > 0 ? Math.round((p.done / p.total) * 100) : null;
+  return (
+    <div className="setupOverlay" style={{ zIndex: 4000 }}>
+      <div className="setupDlg" style={{ width: 380 }}>
+        <div className="setupTitle">Exporting…</div>
+        <div className="setupBody" style={{ flexDirection: "column", gap: 8 }}>
+          <div style={{ fontSize: 13 }}>{p.label}</div>
+          <div className={"progTrack" + (pct === null ? " indet" : "")}
+            role="progressbar" aria-valuemin={0} aria-valuemax={100}
+            aria-valuenow={pct ?? undefined} aria-label={p.label}>
+            <div className="progFill" style={pct === null ? undefined : { width: pct + "%" }} />
+          </div>
+          <div style={{ fontSize: 12, color: "#667", textAlign: "right" }}>
+            {pct === null ? "Preparing…" : `${p.done} of ${p.total} done — ${pct}%`}
+          </div>
         </div>
       </div>
     </div>

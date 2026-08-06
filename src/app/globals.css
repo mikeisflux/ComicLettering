@@ -982,6 +982,27 @@ input[type="range"] { width: 110px; }
 }
 .setupFoot button { min-width: 96px; padding: 7px 14px; background: #fff; border: 1px solid var(--edge2); border-radius: 6px; }
 .setupFoot .okBtn { background: var(--sel); color: #fff; border-color: #1e5fa8; font-weight: 700; }
+.setupFoot .okBtn:disabled { opacity: .55; }
+
+/* real-time export progress bar (see renderExportProgress) */
+.progTrack {
+  height: 14px; border-radius: 7px; overflow: hidden;
+  background: #d7dbe2; border: 1px solid var(--edge2); position: relative;
+}
+.progFill {
+  height: 100%; width: 0; border-radius: 7px;
+  background: linear-gradient(#4b93e0, var(--sel));
+  transition: width .25s ease;
+}
+/* size still unknown (loading artwork) — a sweeping busy stripe */
+.progTrack.indet .progFill {
+  width: 40%; position: absolute; left: -40%;
+  animation: progSweep 1.1s linear infinite;
+}
+@keyframes progSweep {
+  from { left: -40%; }
+  to { left: 100%; }
+}
 
 /* ---------------- tray ---------------- */
 .tray {

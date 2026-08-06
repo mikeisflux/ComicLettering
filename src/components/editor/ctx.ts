@@ -32,6 +32,9 @@ export interface CollabState {
 }
 export type ExportFmt = ImageFormat | "pdf" | "cbz";
 export type ExportScope = "current" | "all" | "range";
+/* live export progress — drives the progress-bar overlay. total 0 means
+   "busy but size unknown" (indeterminate sweep, e.g. while artwork loads). */
+export interface ExportProgress { label: string; done: number; total: number }
 export type StyleClip = Partial<TextStyle> & { fill?: FillStyle; stroke?: string; strokeW?: number };
 
 export interface EditorCtx {
@@ -167,6 +170,10 @@ export interface EditorCtx {
   setShowSetup: SetState<boolean>;
   showExport: boolean;
   setShowExport: SetState<boolean>;
+  /* real-time progress for EVERY export path (image loop, PDF, CBZ,
+     export-all, .lmc packing) — non-null while an export runs */
+  exportProgress: ExportProgress | null;
+  setExportProgress: SetState<ExportProgress | null>;
   exportFmt: ExportFmt;
   setExportFmt: SetState<ExportFmt>;
   exportScope: ExportScope;

@@ -33,7 +33,7 @@ import { useFontsStamps } from "./editor/useFontsStamps";
 import { useSketchDraw } from "./editor/useSketchDraw";
 import { ShellProps, renderCanvasArea, renderHiddenInputs, renderPagesPanel } from "./editor/editorShell";
 import { PageSetupDialog } from "./editor/chrome";
-import { CollabState, EditorCtx } from "./editor/ctx";
+import { CollabState, EditorCtx, ExportProgress } from "./editor/ctx";
 import { renderCommentComposer, renderTeamDialog } from "./editor/collab";
 import {
   addFromTray, alignSel, applyQuickFill, copySel, cutSel, deleteSel,
@@ -50,7 +50,8 @@ import {
 } from "./editor/tabs";
 import { renderFormatBar, renderMenuBar, renderToolbar } from "./editor/chromeBars";
 import {
-  renderContextMenu, renderExportDialog, renderFindDialog, renderInstallHelp,
+  renderContextMenu, renderExportDialog, renderExportProgress, renderFindDialog,
+  renderInstallHelp,
   renderScriptDialog, renderTailAsk, renderTray, renderTuckDialog,
 } from "./editor/dialogs";
 
@@ -204,6 +205,9 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; id: string } | null>(null);
   const [showSetup, setShowSetup] = useState(false);
   const [showExport, setShowExport] = useState(false);
+  /* real-time export progress — non-null while any export runs, drives the
+     progress-bar overlay so users see work happening instead of re-clicking */
+  const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
   const [exportFmt, setExportFmt] = useState<ImageFormat | "pdf" | "cbz">("png");
   const [exportScope, setExportScope] = useState<"current" | "all" | "range">("all");
   const [exportDpi, setExportDpi] = useState(225);
@@ -994,6 +998,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     projects, setProjects, current, setCurrent, dbError, setDbError,
     presets, proof, setProof, drawMode, setDrawMode, tailAsk, setTailAsk,
     ctxMenu, setCtxMenu, setShowSetup, showExport, setShowExport,
+    exportProgress, setExportProgress,
     exportFmt, setExportFmt, exportScope, setExportScope, exportDpi,
     styleTab, setStyleTab, activeStyle, setActiveStyle, activeShape,
     setActiveShape, activeShapeRef,
@@ -1095,6 +1100,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       {renderContextMenu(ed)}
       {renderTailAsk(ed)}
       {renderExportDialog(ed)}
+      {renderExportProgress(ed)}
       {renderFindDialog(ed)}
       {renderInstallHelp(ed)}
       {renderScriptDialog(ed)}
