@@ -570,19 +570,11 @@ function resizeAround(page: Page, el: BalloonEl, w: number, h: number) {
   el.y = Math.round(clamp(cy - h / 2, 0, Math.max(0, page.h - h)));
 }
 
-export function fitBalloonToText(ed: EditorCtx) {
-  const { page, selId, setStatus, mutateSel } = ed;
-  const el = page?.els.find((x) => x.id === selId);
-  if (!el || el.type !== "balloon") { setStatus("Select a balloon to fit."); return; }
-  if (el.locked) { setStatus("That balloon is locked — unlock it to resize."); return; }
-  if (!el.text.trim()) { setStatus("Type some text first, then fit the balloon to it."); return; }
-  const g = balloonGeom(el);
-  const [, , tw, th] = g.textRect;
-  const fracW = tw / el.w, fracH = th / el.h;
-  if (!(fracW > 0) || !(fracH > 0)) return;
-  /* measure the lettering in a hidden node that mirrors on-canvas layout */
-  const meas = document.createElement("div");
+/* measure an element's lettering in a hidden node that mirrors on-canvas
+   layout: longest line width (respecting manual breaks), then wrapped height */
+function measureLettering(el: BalloonEl | TextEl): { w: number; h: number } {
   const ts = el.ts;
+  const meas = document.createElement("div");
   Object.assign(meas.style, {
     position: "absolute", left: "-9999px", top: "0",
     visibility: "hidden", whiteSpace: "pre",
@@ -596,25 +588,61 @@ export function fitBalloonToText(ed: EditorCtx) {
   } as CSSStyleDeclaration);
   meas.textContent = el.text;
   document.body.appendChild(meas);
-  const lineW = meas.scrollWidth;          // longest line (respects manual breaks)
-  /* height at that width, allowing wrapping */
+  const w = meas.scrollWidth;
   meas.style.whiteSpace = "pre-wrap";
-  meas.style.width = `${lineW + 2}px`;
-  const lineH = meas.scrollHeight;
+  meas.style.width = `${w + 2}px`;
+  const h = meas.scrollHeight;
   document.body.removeChild(meas);
-  const maxTextW = page!.w * 0.9;
-  const targetTW = clamp(lineW + ts.size * 0.5, 24, maxTextW);
-  const targetTH = lineH + ts.size * 0.35;
-  const newW = clamp(Math.round(targetTW / fracW), 60, page!.w);
-  const newH = clamp(Math.round(targetTH / fracH), 44, page!.h);
-  /* keep the balloon centred while it resizes */
-  const cx = el.x + el.w / 2, cy = el.y + el.h / 2;
-  mutateSel<BalloonEl>((b) => {
-    b.w = newW; b.h = newH;
-    b.x = Math.round(cx - newW / 2);
-    b.y = Math.round(cy - newH / 2);
-  });
-  setStatus("Balloon fitted to its lettering.");
+  return { w, h };
+}
+
+/* Fit to text (Ctrl+\) — hugs every SELECTED balloon and text box to its own
+   lettering, each measured and sized individually, so Ctrl+A then Ctrl+\
+   fits the whole page in one stroke. Locked and empty items are skipped;
+   page art and panels are never touched. */
+export function fitBalloonToText(ed: EditorCtx) {
+  const { page, selIds, setStatus, commit } = ed;
+  if (!page) return;
+  const targets = page.els.filter((x): x is BalloonEl | TextEl =>
+    selIds.includes(x.id) && (x.type === "balloon" || x.type === "text"));
+  if (!targets.length) { setStatus("Select a balloon or text box to fit (Ctrl+A grabs the whole page)."); return; }
+  let fitted = 0, locked = 0, empty = 0;
+  for (const el of targets) {
+    if (el.locked) { locked++; continue; }
+    if (!el.text.trim()) { empty++; continue; }
+    const ts = el.ts;
+    const { w: lineW, h: lineH } = measureLettering(el);
+    let newW: number, newH: number;
+    if (el.type === "balloon") {
+      /* the lettering sits in an inner fraction of the balloon (shape-
+         dependent) — size the balloon so that inner rect hugs the text */
+      const g = balloonGeom(el);
+      const [, , tw, th] = g.textRect;
+      const fracW = tw / el.w, fracH = th / el.h;
+      if (!(fracW > 0) || !(fracH > 0)) continue;
+      const targetTW = clamp(lineW + ts.size * 0.5, 24, page.w * 0.9);
+      const targetTH = lineH + ts.size * 0.35;
+      newW = clamp(Math.round(targetTW / fracW), 60, page.w);
+      newH = clamp(Math.round(targetTH / fracH), 44, page.h);
+    } else {
+      /* text/caption boxes hold their lettering edge-to-edge — snug pad */
+      newW = clamp(Math.round(lineW + ts.size * 0.6), 40, page.w);
+      newH = clamp(Math.round(lineH + ts.size * 0.4), 24, page.h);
+    }
+    /* keep each item centred where it was while it resizes */
+    const cx = el.x + el.w / 2, cy = el.y + el.h / 2;
+    el.w = newW; el.h = newH;
+    el.x = Math.round(cx - newW / 2);
+    el.y = Math.round(cy - newH / 2);
+    fitted++;
+  }
+  if (fitted) {
+    commit();
+    setStatus(fitted === 1
+      ? "Fitted to its lettering."
+      : `Fitted ${fitted} balloons & text boxes to their lettering${locked ? ` (${locked} locked skipped)` : ""}.`);
+  } else if (locked) setStatus("Those items are locked — unlock them to resize.");
+  else if (empty) setStatus("Type some text first, then fit to it.");
 }
 
 export function balanceRag(ed: EditorCtx) {

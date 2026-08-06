@@ -137,7 +137,7 @@ export function renderInspector(ed: EditorCtx) {
           <Fld label="Shadow"><input type="checkbox" checked={el.shadow}
             onChange={(e) => mutateSel((b) => { b.shadow = e.target.checked; })} /></Fld>
           <div className="btnRow">
-            <button onClick={() => fitBalloonToText(ed)} title="Resize the balloon to hug its lettering (Ctrl+|)">Fit to text</button>
+            <button onClick={() => fitBalloonToText(ed)} title="Resize the balloon to hug its lettering (Ctrl+\)">Fit to text</button>
           </div>
           <div className="btnRow">
             <button onClick={() => { panelImageTarget.current = el.id; filePanelImageRef.current?.click(); }}>

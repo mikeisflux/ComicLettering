@@ -109,6 +109,12 @@ export function useEditorKeys(deps: EditorKeyDeps) {
       if (mod && e.key.toLowerCase() === "v") { e.preventDefault(); fns.pasteClip(); return; }
       if (mod && e.key === "[" && !e.shiftKey) { e.preventDefault(); fns.alignSel("hcenter"); return; }
       if (mod && e.key === "]" && !e.shiftKey) { e.preventDefault(); fns.alignSel("vcenter"); return; }
+      /* fit balloons & text boxes to their lettering — | shares the \ key,
+         so Ctrl+\ and Ctrl+Shift+| both count (e.code catches layouts whose
+         key value is neither character) */
+      if (mod && (e.key === "\\" || e.key === "|" || e.code === "Backslash")) {
+        e.preventDefault(); fns.fitBalloonToText(); return;
+      }
       /* selection */
       if (mod && e.key.toLowerCase() === "a") {
         e.preventDefault();
@@ -125,13 +131,6 @@ export function useEditorKeys(deps: EditorKeyDeps) {
       if (mod && e.shiftKey && e.key.toLowerCase() === "l") {
         e.preventDefault(); fns.setLocked(false);
         setStatus("Unlocked."); return;
-      }
-      /* balloon fit: Ctrl+| hugs the balloon to its lettering — same op as
-         Arrange → Fit Balloon to Text. The | lives on the backslash key, so
-         accept the shifted and unshifted press alike (e.code covers layouts
-         where Ctrl+Shift+\ never produces a "|" key value). */
-      if (mod && (e.key === "|" || e.key === "\\" || e.code === "Backslash")) {
-        e.preventDefault(); fns.fitBalloonToText(); return;
       }
       /* view */
       if (mod && (e.key === "=" || e.key === "+")) { e.preventDefault(); setUserZoomed(true); setZoom((z) => clamp(z * 1.2, 0.05, 4)); return; }
