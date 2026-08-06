@@ -9,7 +9,7 @@ import React, {
   useCallback, useEffect, useReducer, useRef, useState,
 } from "react";
 import {
-  Assets, BalloonEl, Doc, El, FillStyle, GradStop, Page, TextEl,
+  Assets, BalloonEl, Doc, El, FillStyle, GradStop, Page, SavedLayout, TextEl,
   TextStyle, aabbOverlap, clamp, newPage, normalizeDoc, normalizeRuns,
   pageBleed, pageMargins, reseedIds, rotVec, runsToText, starterDoc,
 } from "@/lib/model";
@@ -139,6 +139,15 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const [userZoomed, setUserZoomed] = useState(false);
   const [tab, setTab] = useState<"layouts" | "inspector" | "layers" | "photos" | "library" | "proof">("layouts");
   const [layoutCat, setLayoutCat] = useState(0);
+  /* user-saved custom page layouts ("My Layouts") — persisted per browser */
+  const [myLayouts, setMyLayoutsState] = useState<SavedLayout[]>([]);
+  useEffect(() => {
+    try { setMyLayoutsState(JSON.parse(localStorage.getItem("lmc.mylayouts") || "[]")); } catch { /* ignore */ }
+  }, []);
+  const setMyLayouts = useCallback((next: SavedLayout[]) => {
+    setMyLayoutsState(next);
+    try { localStorage.setItem("lmc.mylayouts", JSON.stringify(next)); } catch { /* private mode */ }
+  }, []);
   const [status, setStatusRaw] = useState(HINT);
   const [thumbs, setThumbs] = useState<Record<number, string>>({});
   const [projects, setProjects] = useState<ProjectMeta[] | null>(null);
@@ -994,7 +1003,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     autosaveSoon,
     rebuildThumbs, reseedAids, setThumbs, setPageIndex, setUserZoomed,
     setZoom, bumpFonts, registerRuntimeFont, savePresets,
-    tab, setTab, layoutCat, setLayoutCat, autoLock, setAutoLock,
+    tab, setTab, layoutCat, setLayoutCat, myLayouts, setMyLayouts, autoLock, setAutoLock,
     projects, setProjects, current, setCurrent, dbError, setDbError,
     presets, proof, setProof, drawMode, setDrawMode, tailAsk, setTailAsk,
     ctxMenu, setCtxMenu, setShowSetup, showExport, setShowExport,

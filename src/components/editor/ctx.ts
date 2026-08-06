@@ -3,7 +3,7 @@
    functions (NOT components — reconciliation output is identical) receive
    it as their first argument. */
 import type React from "react";
-import type { Assets, Doc, El, FillStyle, GradStop, Page, TextStyle } from "@/lib/model";
+import type { Assets, Doc, El, FillStyle, GradStop, Page, SavedLayout, TextStyle } from "@/lib/model";
 import type { ImageFormat } from "@/lib/exportPng";
 import type { BalloonPreset, ProjectMeta, ProofMatch } from "./textHelpers";
 import type { TuckAsk } from "./tuck";
@@ -150,6 +150,10 @@ export interface EditorCtx {
   setTab: SetState<TabKey>;
   layoutCat: number;
   setLayoutCat: SetState<number>;
+  /* user-saved custom page layouts — the "My Layouts" category (persisted
+     per browser; the setter writes through to localStorage) */
+  myLayouts: SavedLayout[];
+  setMyLayouts: (next: SavedLayout[]) => void;
   autoLock: boolean;
   setAutoLock: (v: boolean) => void;
   projects: ProjectMeta[] | null;

@@ -1125,6 +1125,35 @@ export function makeText(x: number, y: number, w: number, h: number, sfx: boolea
   };
 }
 
+/* a user-saved custom layout (kept in localStorage, listed as "My Layouts") */
+export interface SavedLayout { name: string; fracs: LayoutRect[] }
+
+/* Inverse of applyLayout: read the page's CURRENT panel frames back into
+   margin-relative fractions (undoing the interior gutter insets applyLayout
+   adds), so any hand-tuned arrangement round-trips exactly when saved and
+   re-applied as a custom layout. */
+export function capturePageLayout(page: Page): LayoutRect[] | null {
+  const mg = pageMargins(page);
+  const g = Math.round(page.w * 0.02);
+  const cw = page.w - mg.l - mg.r, ch = page.h - mg.t - mg.b;
+  if (cw <= 0 || ch <= 0) return null;
+  const panels = page.els.filter((e): e is PanelEl => e.type === "panel");
+  if (!panels.length) return null;
+  const r4 = (v: number) => Math.round(v * 1e4) / 1e4;
+  return panels.map((p) => {
+    let x0 = p.x, x1 = p.x + p.w, y0 = p.y, y1 = p.y + p.h;
+    if (x0 > mg.l + 1) x0 -= g / 2;
+    if (x1 < mg.l + cw - 1) x1 += g / 2;
+    if (y0 > mg.t + 1) y0 -= g / 2;
+    if (y1 < mg.t + ch - 1) y1 += g / 2;
+    const fx = clamp(r4((x0 - mg.l) / cw), 0, 0.98);
+    const fy = clamp(r4((y0 - mg.t) / ch), 0, 0.98);
+    const fw = clamp(r4((x1 - x0) / cw), 0.02, 1 - fx);
+    const fh = clamp(r4((y1 - y0) / ch), 0.02, 1 - fy);
+    return (p.rot ? [fx, fy, fw, fh, p.rot] : [fx, fy, fw, fh]) as LayoutRect;
+  });
+}
+
 export function applyLayout(page: Page, fracs: LayoutRect[]) {
   const mg = pageMargins(page);
   const g = Math.round(page.w * 0.02);

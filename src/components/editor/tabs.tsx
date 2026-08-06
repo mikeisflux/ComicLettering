@@ -1,7 +1,7 @@
 /* Right-panel tabs: Layouts, Layers, Proof, Photos, Library.
    Plain exported render functions taking the EditorCtx bag. */
 import {
-  LAYOUT_CATEGORIES, LayoutRect, applyLayout, clamp, makeImage,
+  LAYOUT_CATEGORIES, LayoutRect, applyLayout, capturePageLayout, clamp, makeImage,
 } from "@/lib/model";
 import { loadImage } from "@/lib/exportPng";
 import { elLabel } from "./textHelpers";
@@ -13,31 +13,76 @@ import {
 import { detectPanelsFromArt } from "./panelOps";
 
 
+/* shared mini-preview of a layout's panel rects */
+function layoutThumb(fracs: LayoutRect[]) {
+  return (
+    <svg viewBox="0 0 60 84">
+      {fracs.map(([fx, fy, fw, fh, rot], j) => (
+        <rect key={j} x={4 + fx * 52} y={4 + fy * 76} width={Math.max(2, fw * 52 - 2)} height={Math.max(2, fh * 76 - 2)}
+          transform={rot ? `rotate(${rot} ${4 + fx * 52 + fw * 26} ${4 + fy * 76 + fh * 38})` : undefined} />
+      ))}
+    </svg>
+  );
+}
+
 export function renderLayoutsTab(ed: EditorCtx) {
-  const { layoutCat, setLayoutCat, page, commit } = ed;
-  const cat = LAYOUT_CATEGORIES[layoutCat];
+  const { layoutCat, setLayoutCat, page, commit, myLayouts, setMyLayouts, setStatus } = ed;
+  const MY = LAYOUT_CATEGORIES.length;   // "My Layouts" pseudo-category index
+  const mine = layoutCat >= MY;
+  const cat = mine ? null : LAYOUT_CATEGORIES[layoutCat];
+  const apply = (fracs: LayoutRect[]) => { if (page) { applyLayout(page, fracs); commit(); } };
+  const saveCurrent = () => {
+    if (!page) return;
+    const fracs = capturePageLayout(page);
+    if (!fracs) { setStatus("No panels on this page yet — apply a layout or draw panels, arrange them, then save."); return; }
+    const name = window.prompt("Name this layout:", "My layout");
+    if (!name) return;
+    setMyLayouts([...myLayouts.filter((l) => l.name !== name), { name, fracs }]);
+    setLayoutCat(MY);
+    setStatus(`Saved “${name}” to My Layouts (${fracs.length} panel${fracs.length > 1 ? "s" : ""}).`);
+  };
   return (
     <div className="inspBody">
       <div className="fld">
         <label>Layout</label>
         <select value={layoutCat} onChange={(e) => setLayoutCat(+e.target.value)}>
           {LAYOUT_CATEGORIES.map((c, i) => <option key={c.name} value={i}>{c.name}</option>)}
+          <option value={MY}>My Layouts ({myLayouts.length})</option>
         </select>
       </div>
-      <div className="layoutGrid">
-        {cat.layouts.map((fracs, i) => (
-          <button key={i} className="layoutBtn" title={`${fracs.length} panel${fracs.length > 1 ? "s" : ""}`}
-            onClick={() => { if (page) { applyLayout(page, fracs as LayoutRect[]); commit(); } }}>
-            <svg viewBox="0 0 60 84">
-              {fracs.map(([fx, fy, fw, fh, rot], j) => (
-                <rect key={j} x={4 + fx * 52} y={4 + fy * 76} width={Math.max(2, fw * 52 - 2)} height={Math.max(2, fh * 76 - 2)}
-                  transform={rot ? `rotate(${rot} ${4 + fx * 52 + fw * 26} ${4 + fy * 76 + fh * 38})` : undefined} />
-              ))}
-            </svg>
-          </button>
-        ))}
+      {!mine && (
+        <div className="layoutGrid">
+          {cat!.layouts.map((fracs, i) => (
+            <button key={i} className="layoutBtn" title={`${fracs.length} panel${fracs.length > 1 ? "s" : ""}`}
+              onClick={() => apply(fracs as LayoutRect[])}>
+              {layoutThumb(fracs as LayoutRect[])}
+            </button>
+          ))}
+        </div>
+      )}
+      {mine && (myLayouts.length ? (
+        <div className="layoutGrid">
+          {myLayouts.map((l) => (
+            <span key={l.name} className="layoutWrap">
+              <button className="layoutBtn" title={`${l.name} — ${l.fracs.length} panel${l.fracs.length > 1 ? "s" : ""}`}
+                onClick={() => apply(l.fracs)}>
+                {layoutThumb(l.fracs)}
+              </button>
+              <button className="layoutDel" title={`Delete “${l.name}”`}
+                onClick={() => { if (window.confirm(`Delete layout “${l.name}”?`)) setMyLayouts(myLayouts.filter((x) => x.name !== l.name)); }}>
+                ✕
+              </button>
+            </span>
+          ))}
+        </div>
+      ) : (
+        <div className="tips">Nothing saved yet. Arrange panels on a page — start from any premade layout and drag, resize or rotate the frames, or draw your own — then hit <b>Save page as layout</b> below.</div>
+      ))}
+      <div className="tips">Applying a layout replaces the page&apos;s panels; balloons, lettering and images are kept. Panels are normal frames — move, resize or rotate them right on the page to customise any layout.</div>
+      <div className="btnRow">
+        <button onClick={saveCurrent}>Save page as layout…</button>
       </div>
-      <div className="tips">Applying a layout replaces the page&apos;s panels; balloons, lettering and images are kept.</div>
+      <div className="tips">Keeps this page&apos;s panel arrangement under My Layouts — saving with the same name replaces it.</div>
       <div className="btnRow">
         <button onClick={() => detectPanelsFromArt(ed)}>Detect panels from page art</button>
       </div>
