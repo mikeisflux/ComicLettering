@@ -126,6 +126,13 @@ export function useEditorKeys(deps: EditorKeyDeps) {
         e.preventDefault(); fns.setLocked(false);
         setStatus("Unlocked."); return;
       }
+      /* balloon fit: Ctrl+| hugs the balloon to its lettering — same op as
+         Arrange → Fit Balloon to Text. The | lives on the backslash key, so
+         accept the shifted and unshifted press alike (e.code covers layouts
+         where Ctrl+Shift+\ never produces a "|" key value). */
+      if (mod && (e.key === "|" || e.key === "\\" || e.code === "Backslash")) {
+        e.preventDefault(); fns.fitBalloonToText(); return;
+      }
       /* view */
       if (mod && (e.key === "=" || e.key === "+")) { e.preventDefault(); setUserZoomed(true); setZoom((z) => clamp(z * 1.2, 0.05, 4)); return; }
       if (mod && e.key === "-") { e.preventDefault(); setUserZoomed(true); setZoom((z) => clamp(z / 1.2, 0.05, 4)); return; }
