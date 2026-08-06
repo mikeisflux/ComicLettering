@@ -285,9 +285,13 @@ export function renderToolbar(ed: EditorCtx) {
 
 /* press-and-hold timer + "the hold opened the flyout, swallow the click"
    flag — module level because renderToolbar is a plain function, not a
-   component (one editor per page, so this is safe) */
+   component (one editor per page, so this is safe). The flyout renders
+   position:FIXED at the button's screen spot: the toolbar scrolls
+   (overflow-x auto), and an absolute flyout inside it was clipped
+   invisible — the reported "picker never shows up". */
 let tuckHold: ReturnType<typeof setTimeout> | null = null;
 let tuckFlyJustOpened = false;
+let tuckFlyPos = { left: 0, top: 0 };
 
 const magnetSvg = (
   <svg viewBox="0 0 24 24" aria-hidden>
@@ -307,20 +311,32 @@ const nibSvg = (
    trace with the tool shown on the button; holding ~450ms (or right-
    clicking) opens the magnet/nib flyout to switch. The choice sticks. */
 function renderTuckBtn(ed: EditorCtx) {
-  const { selEl, openMenu, setOpenMenu } = ed;
-  const disabled = !selEl || selEl.type !== "text";
+  const { openMenu, setOpenMenu } = ed;
   const pen = ed.tuckTool === "pen";
+  /* NOT disabled without an SFX: the picker must open regardless, and a
+     bare click gets the "select your SFX lettering first" status hint */
+  const anchor = (el: HTMLElement) => {
+    const r = el.getBoundingClientRect();
+    tuckFlyPos = {
+      left: Math.max(4, Math.min(r.left, window.innerWidth - 190)),
+      top: r.bottom + 4,
+    };
+  };
   const openFly = () => { tuckFlyJustOpened = true; setOpenMenu("tuckfly"); };
-  const arm = () => { if (tuckHold) clearTimeout(tuckHold); tuckHold = setTimeout(openFly, 450); };
+  const arm = (el: HTMLElement) => {
+    anchor(el);
+    if (tuckHold) clearTimeout(tuckHold);
+    tuckHold = setTimeout(openFly, 450);
+  };
   const disarm = () => { if (tuckHold) { clearTimeout(tuckHold); tuckHold = null; } };
   const pick = (t: "lasso" | "pen") => { ed.setTuckTool(t); setOpenMenu(null); ed.startTuck(); };
   return (
     <span className="tuckWrap">
-      <button className="toolBtn accent" disabled={disabled}
+      <button className="toolBtn accent"
         title={`Tuck Back — ${pen ? "pen path" : "magnetic lasso"}. Select your SFX lettering, then outline the art that should come forward; it is cut out and placed in front so the word sits behind it. PRESS AND HOLD to switch between the magnetic lasso and the pen.`}
-        onPointerDown={() => { if (!disabled) arm(); }}
+        onPointerDown={(e) => arm(e.currentTarget)}
         onPointerUp={disarm} onPointerLeave={disarm}
-        onContextMenu={(e) => { e.preventDefault(); if (!disabled) openFly(); }}
+        onContextMenu={(e) => { e.preventDefault(); anchor(e.currentTarget); openFly(); }}
         onClick={() => {
           disarm();
           if (tuckFlyJustOpened) { tuckFlyJustOpened = false; return; }
@@ -332,7 +348,7 @@ function renderTuckBtn(ed: EditorCtx) {
       {openMenu === "tuckfly" && (
         <>
           <div className="menuBackdrop" onPointerDown={() => setOpenMenu(null)} />
-          <div className="tuckFly">
+          <div className="tuckFly" style={{ left: tuckFlyPos.left, top: tuckFlyPos.top }}>
             <button className={!pen ? "on" : ""} onClick={() => pick("lasso")}
               title="Freehand trace that snaps to the art's edges — hold Alt while tracing for pure freehand">
               {magnetSvg}<span>Magnetic Lasso</span>
