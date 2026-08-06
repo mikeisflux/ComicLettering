@@ -167,9 +167,12 @@ export interface EditorCtx {
   setProof: SetState<{ busy: boolean; error: string | null; matches: ProofMatch[] } | null>;
   drawMode: boolean;
   setDrawMode: SetState<boolean>;
-  /* "Draw Your Own" panel pen tool (Layouts tab) */
+  /* "Draw Your Own Panel" tools (Layouts tab): the pen, and the one-drag
+     rectangle/oval/circle marquees */
   penMode: boolean;
   setPenMode: SetState<boolean>;
+  shapeMode: "rect" | "oval" | "circle" | null;
+  setShapeMode: SetState<"rect" | "oval" | "circle" | null>;
   tailAsk: string | null;
   setTailAsk: SetState<string | null>;
   ctxMenu: { x: number; y: number; id: string } | null;

@@ -1120,8 +1120,17 @@ export function makePanel(x: number, y: number, w: number, h: number): PanelEl {
    stay WYSIWYG. Null for plain rectangular panels. */
 export function panelPathD(el: PanelEl): string | null {
   if (!el.pts || el.pts.length < 3) return null;
+  /* renormalise defensively: the outline must exactly fill the panel's box
+     no matter what the stored fractions look like, so the drawn shape can
+     never come apart from the frame the handles show */
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const [fx, fy] of el.pts) {
+    if (fx < x0) x0 = fx; if (fx > x1) x1 = fx;
+    if (fy < y0) y0 = fy; if (fy > y1) y1 = fy;
+  }
+  const sw = x1 - x0 || 1, sh = y1 - y0 || 1;
   return el.pts.map(([fx, fy], i) =>
-    `${i ? "L" : "M"}${(fx * el.w).toFixed(2)} ${(fy * el.h).toFixed(2)}`).join(" ") + " Z";
+    `${i ? "L" : "M"}${(((fx - x0) / sw) * el.w).toFixed(2)} ${(((fy - y0) / sh) * el.h).toFixed(2)}`).join(" ") + " Z";
 }
 
 export function makeImage(x: number, y: number, w: number, h: number, img: string): ImageEl {

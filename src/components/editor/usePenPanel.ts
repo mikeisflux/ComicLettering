@@ -1,10 +1,17 @@
 "use client";
-/* "Draw Your Own" panel pen tool — Photoshop-style path drawing:
-   click places a corner anchor, click-and-DRAG pulls symmetric curve
+/* "Draw Your Own Panel" tools — a Photoshop-style pen plus one-drag shape
+   marquees (rectangle, oval, circle).
+
+   Pen: click places a corner anchor, click-and-DRAG pulls symmetric curve
    handles out of the anchor (so any point can arc), clicking the first
-   anchor again (or Enter) closes the shape, Esc cancels. The closed
-   outline becomes a custom-shaped panel (PanelEl.pts) that fills, clips
-   artwork and strokes its border along the drawn path.
+   anchor again (or Enter) closes the shape, Ctrl+Z / Backspace removes the
+   last point, Esc cancels — all mirrored by the floating Undo/Close/Cancel
+   buttons on the canvas so tablets get them too. The closed outline becomes
+   a custom-shaped panel (PanelEl.pts).
+
+   Marquees: one drag sweeps out the shape — rectangle panels stay plain
+   rects; ovals/circles get a dense ellipse outline in pts (circle locks the
+   drag square).
 
    Deps are re-supplied every render into a ref (same pattern as
    useSketchDraw) so handlers never run stale closures. */
@@ -13,6 +20,8 @@ import { Doc, makePanel } from "@/lib/model";
 import { claimDrag, rejectPalm, releaseDrag } from "./penInput";
 
 export interface PenPt { x: number; y: number; hx: number; hy: number }
+export type ShapeKind = "rect" | "oval" | "circle";
+export interface ShapeBox { x0: number; y0: number; x1: number; y1: number }
 
 interface Ref<T> { current: T }
 
@@ -21,12 +30,15 @@ export interface PenDeps {
   pageIndexRef: Ref<number>;
   penMode: boolean;
   penPtsRef: Ref<PenPt[] | null>;
+  shapeMode: ShapeKind | null;
+  penBoxRef: Ref<ShapeBox | null>;
   zoom: number;
   pendingLockRef: Ref<Set<string>>;
   pagePoint: (e: { clientX: number; clientY: number }) => { x: number; y: number };
   force: () => void;
   commit: () => void;
   setPenMode: (v: boolean) => void;
+  setShapeMode: (v: ShapeKind | null) => void;
   setStatus: (s: string) => void;
   setSelId: (id: string | null) => void;
   /* spread canvas: which page a current-page-local x really falls on (see
@@ -65,21 +77,20 @@ export function flattenPen(pts: PenPt[], open = false): number[][] {
   return out;
 }
 
+/* a full ellipse inscribed in the unit box, dense enough to print smooth */
+const ellipseFracs = (n = 96): [number, number][] =>
+  Array.from({ length: n }, (_, i) => {
+    const a = (i / n) * Math.PI * 2;
+    return [(1 + Math.cos(a)) / 2, (1 + Math.sin(a)) / 2] as [number, number];
+  });
+
 export function usePenPanel(deps: PenDeps) {
   const ref = useRef(deps);
   ref.current = deps;
 
-  const finish = () => {
+  /* drop a finished outline onto the page as a panel */
+  const placePanel = (body: number[][], shape: "poly" | "ellipse" | "rect") => {
     const d = ref.current;
-    const anchors = d.penPtsRef.current;
-    d.penPtsRef.current = null;
-    d.setPenMode(false);
-    if (!anchors || anchors.length < 3) {
-      d.setStatus("Panel cancelled — place at least three points.");
-      d.force();
-      return;
-    }
-    const body = flattenPen(anchors);
     const xs = body.map((q) => q[0]), ys = body.map((q) => q[1]);
     const x0 = Math.min(...xs), x1 = Math.max(...xs);
     const y0 = Math.min(...ys), y1 = Math.max(...ys);
@@ -98,7 +109,9 @@ export function usePenPanel(deps: PenDeps) {
       d.setPageIndex(t.idx);
     }
     const p = makePanel(Math.round(x0 + t.shift), Math.round(y0), Math.round(bw), Math.round(bh));
-    p.pts = body.map(([qx, qy]) => [(qx - x0) / bw, (qy - y0) / bh] as [number, number]);
+    if (shape === "ellipse") p.pts = ellipseFracs();
+    else if (shape === "poly") p.pts = body.map(([qx, qy]) => [(qx - x0) / bw, (qy - y0) / bh] as [number, number]);
+    /* shape === "rect": a plain rectangular panel, no outline needed */
     pg.els.unshift(p);   // panels sit behind everything, same as applyLayout
     d.pendingLockRef.current.add(p.id);
     d.commit();
@@ -106,21 +119,52 @@ export function usePenPanel(deps: PenDeps) {
     d.setStatus("Custom panel created — drop artwork into it like any panel.");
   };
 
+  const finish = () => {
+    const d = ref.current;
+    const anchors = d.penPtsRef.current;
+    d.penPtsRef.current = null;
+    d.setPenMode(false);
+    if (!anchors || anchors.length < 3) {
+      d.setStatus("Panel cancelled — place at least three points.");
+      d.force();
+      return;
+    }
+    placePanel(flattenPen(anchors), "poly");
+  };
+
   const cancel = () => {
     const d = ref.current;
     d.penPtsRef.current = null;
+    d.penBoxRef.current = null;
     d.setPenMode(false);
-    d.setStatus("Pen cancelled.");
+    d.setShapeMode(null);
+    d.setStatus("Panel drawing cancelled.");
     d.force();
   };
 
-  /* Enter closes, Esc cancels — capture phase so the pen wins over the
-     editor's global keymap while it is armed */
+  /* Ctrl+Z / Backspace while the pen is armed: take back the last point */
+  const undoPoint = () => {
+    const d = ref.current;
+    const pts = d.penPtsRef.current;
+    if (!pts || !pts.length) { cancel(); return; }
+    pts.pop();
+    d.setStatus(pts.length
+      ? `Point removed — ${pts.length} left. Keep clicking, or Esc to cancel.`
+      : "All points removed — click to start again, or Esc to leave the pen.");
+    d.force();
+  };
+
+  /* Enter closes, Ctrl+Z/Backspace undo a point, Esc cancels — capture
+     phase so the pen wins over the editor's global keymap while armed */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!ref.current.penMode) return;
-      if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); finish(); }
+      const d = ref.current;
+      if (!d.penMode && !d.shapeMode) return;
+      const undoKey = ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") ||
+        e.key === "Backspace" || e.key === "Delete";
+      if (e.key === "Enter" && d.penMode) { e.preventDefault(); e.stopPropagation(); finish(); }
       else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); cancel(); }
+      else if (undoKey && d.penMode) { e.preventDefault(); e.stopPropagation(); undoPoint(); }
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
@@ -169,5 +213,53 @@ export function usePenPanel(deps: PenDeps) {
     window.addEventListener("pointercancel", onUp);
   };
 
-  return { startPenDown };
+  /* rectangle/oval/circle marquee: one drag sweeps out the panel */
+  const startShapeDown = (e: React.PointerEvent) => {
+    if (rejectPalm(e)) return;
+    const pid = e.pointerId;
+    if (!claimDrag(pid)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const d0 = ref.current;
+    const pt = d0.pagePoint(e);
+    const box: ShapeBox = { x0: pt.x, y0: pt.y, x1: pt.x, y1: pt.y };
+    d0.penBoxRef.current = box;
+    d0.force();
+    const onMove = (ev: PointerEvent) => {
+      if (ev.pointerId !== pid) return;
+      const d = ref.current;
+      const p = d.pagePoint(ev);
+      if (d.shapeMode === "circle") {
+        /* a circle stays a circle: lock the sweep square */
+        const s = Math.max(Math.abs(p.x - box.x0), Math.abs(p.y - box.y0));
+        box.x1 = box.x0 + Math.sign(p.x - box.x0 || 1) * s;
+        box.y1 = box.y0 + Math.sign(p.y - box.y0 || 1) * s;
+      } else {
+        box.x1 = p.x;
+        box.y1 = p.y;
+      }
+      d.force();
+    };
+    const onUp = (ev: PointerEvent) => {
+      if (ev.pointerId !== pid) return;
+      releaseDrag(pid);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      const d = ref.current;
+      const kind = d.shapeMode;
+      d.penBoxRef.current = null;
+      d.setShapeMode(null);
+      if (!kind) { d.force(); return; }
+      const x = Math.min(box.x0, box.x1), y = Math.min(box.y0, box.y1);
+      const w = Math.abs(box.x1 - box.x0), h = Math.abs(box.y1 - box.y0);
+      placePanel([[x, y], [x + w, y], [x + w, y + h], [x, y + h]],
+        kind === "rect" ? "rect" : "ellipse");
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+  };
+
+  return { startPenDown, startShapeDown, penUndoPoint: undoPoint, penClose: finish, penCancel: cancel };
 }

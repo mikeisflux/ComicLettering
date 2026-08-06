@@ -684,13 +684,35 @@ input[type="range"] { width: 110px; }
 .drawLayer { position: absolute; inset: 0; z-index: 55; cursor: crosshair; touch-action: none; }
 .drawLayer svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
 .drawLayer path { fill: rgba(30, 136, 229, 0.08); stroke: #1e88e5; stroke-width: 2; stroke-dasharray: 6 4; }
-/* "Draw Your Own" panel pen tool overlay */
+/* "Draw Your Own Panel" tools overlay (pen + shape marquees) */
 .penLayer { z-index: 60; }
-.penLayer path.penPath { fill: #2f7fd61a; stroke: var(--sel); stroke-width: 2; stroke-dasharray: none; }
+.penLayer .penPath { fill: #2f7fd61a; stroke: var(--sel); stroke-width: 2; stroke-dasharray: none; }
 .penLayer .penAnchor { fill: #fff; stroke: var(--sel); stroke-width: 2; }
 .penLayer .penAnchor.first { fill: var(--accent); stroke: #fff; }
 .penLayer .penHandle { stroke: var(--accent); stroke-width: 1.5; }
 .penLayer .penHandleDot { fill: var(--accent); }
+/* floating controls while drawing — tablets have no Enter/Esc/Ctrl+Z */
+.penTools {
+  position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 6px; align-items: center; z-index: 70; white-space: nowrap;
+}
+.penTools button {
+  padding: 7px 13px; border-radius: 8px; border: 1px solid #33465c;
+  background: #141a22ee; color: #fff; font-size: 13px;
+}
+.penTools button:hover { background: #24304a; }
+.penTools .penHint {
+  padding: 7px 11px; border-radius: 8px; background: #141a22cc; color: #cdd6e2; font-size: 12.5px;
+}
+/* the Layouts tab's shape-tool row */
+.shapeRow { display: flex; gap: 8px; margin: 2px 0 10px; }
+.shapeBtn {
+  width: 46px; height: 40px; display: flex; align-items: center; justify-content: center;
+  background: #fff; border: 1px solid var(--edge2); border-radius: 8px;
+}
+.shapeBtn.on { box-shadow: inset 0 0 0 2px var(--sel); background: #eaf3fd; }
+.shapeBtn svg { width: 24px; height: 24px; fill: none; stroke: #333c48; stroke-width: 1.8; }
+.shapeBtn svg circle[r="1.4"] { fill: #333c48; stroke: none; }
 .trayBtn.on { background: #dcebfb; box-shadow: inset 0 0 0 1.5px var(--sel); border-radius: 6px; }
 
 /* LMC families — original typefaces made for LetterMyComic (OFL 1.1),

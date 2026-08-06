@@ -97,13 +97,35 @@ export function renderLayoutsTab(ed: EditorCtx) {
         <div className="tips">Nothing saved yet. Arrange panels on a page — start from any premade layout and drag, resize or rotate the frames, or draw your own — then hit <b>Save page as layout</b> below.</div>
       ))}
       <div className="tips">Applying a layout replaces the page&apos;s panels; balloons, lettering and images are kept. Panels are normal frames — move, resize or rotate them right on the page to customise any layout.</div>
-      <div className="btnRow">
-        <button onClick={() => {
-          ed.setPenMode(true);
-          setStatus("Pen tool: click the page to place corners, click-and-DRAG to curve a point, click your first point (or press Enter) to close the panel — Esc cancels.");
-        }}>Draw Your Own</button>
+      <div className="fld" style={{ marginBottom: 2 }}><label>Draw Your Own Panel</label></div>
+      <div className="shapeRow">
+        <button className={"shapeBtn" + (ed.penMode ? " on" : "")}
+          title="Pen — click corners, click-and-drag to curve, close on your first point (Enter closes, Ctrl+Z removes a point, Esc cancels)"
+          onClick={() => {
+            ed.setShapeMode(null);
+            ed.setPenMode(true);
+            setStatus("Pen tool: click the page to place corners, click-and-DRAG to curve a point, click your first point (or press Enter) to close — Ctrl+Z removes the last point, Esc cancels.");
+          }}>
+          <svg viewBox="0 0 24 24">
+            <path d="M12 2.5 L16 9 L13.4 18.5 L10.6 18.5 L8 9 Z" />
+            <line x1={12} y1={9} x2={12} y2={14} />
+            <circle cx={12} cy={8.2} r={1.4} />
+          </svg>
+        </button>
+        <button className={"shapeBtn" + (ed.shapeMode === "rect" ? " on" : "")} title="Rectangle — drag a box on the page"
+          onClick={() => { ed.setPenMode(false); ed.setShapeMode("rect"); setStatus("Drag on the page to sweep out a rectangle panel — Esc cancels."); }}>
+          <svg viewBox="0 0 24 24"><rect x={4} y={6} width={16} height={12} strokeDasharray="3 2" /></svg>
+        </button>
+        <button className={"shapeBtn" + (ed.shapeMode === "oval" ? " on" : "")} title="Oval — drag on the page"
+          onClick={() => { ed.setPenMode(false); ed.setShapeMode("oval"); setStatus("Drag on the page to sweep out an oval panel — Esc cancels."); }}>
+          <svg viewBox="0 0 24 24"><ellipse cx={12} cy={12} rx={9} ry={6} /></svg>
+        </button>
+        <button className={"shapeBtn" + (ed.shapeMode === "circle" ? " on" : "")} title="Circle — drag on the page (stays perfectly round)"
+          onClick={() => { ed.setPenMode(false); ed.setShapeMode("circle"); setStatus("Drag on the page to sweep out a circle panel — it stays perfectly round. Esc cancels."); }}>
+          <svg viewBox="0 0 24 24"><circle cx={12} cy={12} r={8} /></svg>
+        </button>
       </div>
-      <div className="tips">A pen tool for panels of any shape — corners on click, curves on click-drag (every point can arc), close on the first point. The shape fills, clips artwork and inks its border just like a normal panel.</div>
+      <div className="tips">Panels of any shape: the pen builds polygons and curved shapes point by point (every point can arc), the marquees drag out rectangles, ovals and perfect circles. Each one fills, clips artwork and inks its border just like a normal panel.</div>
       <div className="btnRow">
         <button onClick={saveCurrent}>Save page as layout…</button>
       </div>

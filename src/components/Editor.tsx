@@ -31,7 +31,7 @@ import { makeCrossPageDrop } from "./editor/spreadOps";
 import { KeyFns, useEditorKeys } from "./editor/useEditorKeys";
 import { useFontsStamps } from "./editor/useFontsStamps";
 import { useSketchDraw } from "./editor/useSketchDraw";
-import { PenPt, usePenPanel } from "./editor/usePenPanel";
+import { PenPt, ShapeBox, ShapeKind, usePenPanel } from "./editor/usePenPanel";
 import { ShellProps, renderCanvasArea, renderHiddenInputs, renderPagesPanel } from "./editor/editorShell";
 import { PageSetupDialog } from "./editor/chrome";
 import { CollabState, EditorCtx, ExportProgress } from "./editor/ctx";
@@ -892,10 +892,12 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   /* ---------------- "Draw Your Own" panel pen tool ---------------- */
 
   const [penMode, setPenMode] = useState(false);
+  const [shapeMode, setShapeMode] = useState<ShapeKind | null>(null);
   const penPtsRef = useRef<PenPt[] | null>(null);
-  const { startPenDown } = usePenPanel({
-    docRef, pageIndexRef, penMode, penPtsRef, zoom, pendingLockRef,
-    pagePoint, force, commit, setPenMode, setStatus, setSelId,
+  const penBoxRef = useRef<ShapeBox | null>(null);
+  const { startPenDown, startShapeDown, penUndoPoint, penClose, penCancel } = usePenPanel({
+    docRef, pageIndexRef, penMode, penPtsRef, shapeMode, penBoxRef, zoom, pendingLockRef,
+    pagePoint, force, commit, setPenMode, setShapeMode, setStatus, setSelId,
     resolveTarget: resolveSpreadTarget, setPageIndex,
   });
 
@@ -1019,7 +1021,8 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     setZoom, bumpFonts, registerRuntimeFont, savePresets,
     tab, setTab, layoutCat, setLayoutCat, myLayouts, setMyLayouts, autoLock, setAutoLock,
     projects, setProjects, current, setCurrent, dbError, setDbError,
-    presets, proof, setProof, drawMode, setDrawMode, penMode, setPenMode, tailAsk, setTailAsk,
+    presets, proof, setProof, drawMode, setDrawMode, penMode, setPenMode,
+    shapeMode, setShapeMode, tailAsk, setTailAsk,
     ctxMenu, setCtxMenu, setShowSetup, showExport, setShowExport,
     exportProgress, setExportProgress,
     exportFmt, setExportFmt, exportScope, setExportScope, exportDpi,
@@ -1063,7 +1066,8 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     areaRef, pageDivRef, dragTipRef, snapRef, thumbs, askAddPage,
     tuckMode, tuckPtsRef,
     drawPtsRef, startSketch, startTuckDrag,
-    penPtsRef, startPenDown,
+    penPtsRef, startPenDown, penBoxRef, startShapeDown,
+    penUndoPoint, penClose, penCancel,
   };
 
   useEffect(() => {

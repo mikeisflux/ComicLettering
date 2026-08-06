@@ -14,7 +14,7 @@ import { renderCommentCatcher, renderCommentPins } from "./collab";
 import { StylesPanel } from "./stylesPanel";
 import { addPageAt } from "./spreadOps";
 import { dragInProgress } from "./penInput";
-import { PenPt, flattenPen } from "./usePenPanel";
+import { PenPt, ShapeBox, flattenPen } from "./usePenPanel";
 import {
   ART_ACCEPT, ART_FORMATS_LABEL, assignImageToPanel, duplicatePage, importFontFiles,
   importImageFile, importJSON, importStampFiles, isSupportedArtFile, movePage,
@@ -35,30 +35,39 @@ export interface ShellProps {
   drawPtsRef: { current: number[][] | null };
   startSketch: (e: React.PointerEvent) => void;
   startTuckDrag: (e: React.PointerEvent) => void;
-  /* "Draw Your Own" panel pen tool */
+  /* "Draw Your Own Panel" tools: pen + shape marquees */
   penPtsRef: { current: PenPt[] | null };
   startPenDown: (e: React.PointerEvent) => void;
+  penBoxRef: { current: ShapeBox | null };
+  startShapeDown: (e: React.PointerEvent) => void;
+  penUndoPoint: () => void;
+  penClose: () => void;
+  penCancel: () => void;
 }
 
-/* The pen tool's live overlay: the path so far (curves included), each
-   anchor as a dot (first one highlighted — clicking it closes the shape)
-   and the curve handles of arced points. Rendered on BOTH canvases; on the
-   spread it rides at the current page's offset like every tool layer. */
+/* The panel-drawing overlay: the pen path so far (curves included), each
+   anchor as a dot (first one highlighted — clicking it closes the shape),
+   the curve handles of arced points, the live rectangle/oval/circle
+   marquee, and a floating Undo/Close/Cancel toolbar (so tablets get the
+   controls too). Rendered on BOTH canvases; on the spread it rides at the
+   current page's offset like every tool layer. */
 function renderPenLayer(ed: EditorCtx, sh: ShellProps, curOff: number, wide?: { w: number; h: number }) {
   const { zoom } = ed;
-  const pts = sh.penPtsRef.current;
+  const pts = ed.penMode ? sh.penPtsRef.current : null;
+  const box = ed.shapeMode ? sh.penBoxRef.current : null;
   const sc = (v: number) => Math.round(v * zoom);
+  const stop = (e: React.PointerEvent) => e.stopPropagation();
   return (
-    <div className="drawLayer penLayer" onPointerDown={sh.startPenDown}
+    <div className="drawLayer penLayer" onPointerDown={ed.penMode ? sh.startPenDown : sh.startShapeDown}
       style={wide ? { left: 0, top: 0, width: wide.w * zoom, height: wide.h * zoom } : undefined}>
-      {pts && pts.length > 0 && (
+      {(pts?.length || box) && (
         <svg style={wide ? { width: "100%", height: "100%" } : undefined}>
           <g transform={curOff ? `translate(${curOff * zoom} 0)` : undefined}>
-            {pts.length > 1 && (
+            {pts && pts.length > 1 && (
               <path className="penPath"
                 d={"M " + flattenPen(pts, true).map(([qx, qy]) => `${sc(qx)} ${sc(qy)}`).join(" L ")} />
             )}
-            {pts.map((p, i) => (
+            {pts?.map((p, i) => (
               <g key={i}>
                 {(p.hx !== 0 || p.hy !== 0) && (
                   <>
@@ -70,8 +79,30 @@ function renderPenLayer(ed: EditorCtx, sh: ShellProps, curOff: number, wide?: { 
                 <circle className={"penAnchor" + (i === 0 ? " first" : "")} cx={sc(p.x)} cy={sc(p.y)} r={i === 0 ? 6 : 4.5} />
               </g>
             ))}
+            {box && (ed.shapeMode === "rect" ? (
+              <rect className="penPath"
+                x={sc(Math.min(box.x0, box.x1))} y={sc(Math.min(box.y0, box.y1))}
+                width={sc(Math.abs(box.x1 - box.x0))} height={sc(Math.abs(box.y1 - box.y0))} />
+            ) : (
+              <ellipse className="penPath"
+                cx={sc((box.x0 + box.x1) / 2)} cy={sc((box.y0 + box.y1) / 2)}
+                rx={sc(Math.abs(box.x1 - box.x0) / 2)} ry={sc(Math.abs(box.y1 - box.y0) / 2)} />
+            ))}
           </g>
         </svg>
+      )}
+      {ed.penMode && (
+        <div className="penTools" onPointerDown={stop}>
+          <button onClick={sh.penUndoPoint} title="Remove the last point (Ctrl+Z)">⌫ Undo point</button>
+          <button onClick={sh.penClose} title="Close the shape (Enter)">✓ Close</button>
+          <button onClick={sh.penCancel} title="Cancel (Esc)">✕ Cancel</button>
+        </div>
+      )}
+      {ed.shapeMode && (
+        <div className="penTools" onPointerDown={stop}>
+          <span className="penHint">Drag to sweep out the {ed.shapeMode === "rect" ? "rectangle" : ed.shapeMode}</span>
+          <button onClick={sh.penCancel} title="Cancel (Esc)">✕ Cancel</button>
+        </div>
       )}
     </div>
   );
@@ -298,7 +329,7 @@ function renderSpreadCanvas(ed: EditorCtx, sh: ShellProps) {
           )}
         </div>
       )}
-      {ed.penMode && renderPenLayer(ed, sh, curOff, { w: totalW, h: totalH })}
+      {(ed.penMode || ed.shapeMode) && renderPenLayer(ed, sh, curOff, { w: totalW, h: totalH })}
       {dragTipRef.current && (
         <div className="dragTip" style={{
           left: (dragTipRef.current.x + dragTipRef.current.w + curOff) * zoom + 6,
@@ -429,7 +460,7 @@ export function renderCanvasArea(ed: EditorCtx, sh: ShellProps) {
               )}
             </div>
           )}
-          {ed.penMode && renderPenLayer(ed, sh, 0)}
+          {(ed.penMode || ed.shapeMode) && renderPenLayer(ed, sh, 0)}
           {dragTipRef.current && (
             <div className="dragTip" style={{
               left: (dragTipRef.current.x + dragTipRef.current.w) * zoom + 6,
