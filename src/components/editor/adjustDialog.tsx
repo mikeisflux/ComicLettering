@@ -9,7 +9,7 @@
    All widgets read/write the SAME params the shared filter engine
    (lib/pageAdjust) compiles, so the preview, the canvas and the exports
    can never disagree. */
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { AdjustEl, clamp } from "@/lib/model";
 import {
   ADJUST_META, AdjustParamSpec, GRADIENT_MAPS, LOOKUP_TABLE, SEL_FAMILIES,
@@ -21,10 +21,17 @@ import { EditorCtx } from "./ctx";
 const numOf = (v: number | string | undefined, def: number) =>
   typeof v === "number" && Number.isFinite(v) ? v : def;
 
+/* where the floating panel was last dragged (kept for the session so it
+   reopens where the letterer parked it) */
+let adjPos = { x: 0, y: 0 };
+
 /* ---------------- Curves: the point-drag graph ---------------- */
 
 function CurveGraph({ ed, el }: { ed: EditorCtx; el: AdjustEl }) {
   const W = 256, H = 200, P = 10;
+  /* the page's own luminance histogram sits behind the curve, so the
+     graph reads against the actual image data (like the PS panel) */
+  const hist = usePageHistogram(ed);
   const pts = parseCurve(el.params.pts);
   const samples = sampleCurve(pts, 65);
   const path = samples.map((y, i) => `${i ? "L" : "M"}${(P + (i / 64) * W).toFixed(1)} ${(P + (1 - y) * H).toFixed(1)}`).join(" ");
@@ -79,6 +86,10 @@ function CurveGraph({ ed, el }: { ed: EditorCtx; el: AdjustEl }) {
     <div className="curveWrap">
       <svg viewBox={`0 0 ${W + 2 * P} ${H + 2 * P}`} className="curveSvg" onPointerDown={down}>
         <rect x={P} y={P} width={W} height={H} className="cvBg" />
+        {hist?.map((v, i) => (
+          <rect key={`h${i}`} x={P + (i / 64) * W} y={P + H - v * (H - 4)}
+            width={W / 64 + 0.4} height={v * (H - 4)} className="cvHist" />
+        ))}
         {[1, 2, 3].map((i) => (
           <React.Fragment key={i}>
             <line x1={P + (W * i) / 4} y1={P} x2={P + (W * i) / 4} y2={P + H} className="cvGrid" />
@@ -135,6 +146,61 @@ function LevelsPanel({ ed, el }: { ed: EditorCtx; el: AdjustEl }) {
     el.params = { ...el.params, ...patch };
     if (final) ed.commit(); else ed.force();
   };
+  /* the sample eyedroppers: arm one, click a spot on the PAGE, and that
+     pixel becomes the black / gray (midtone) / white point */
+  const [sampling, setSampling] = useState<null | "b" | "g" | "w">(null);
+  const sampleCvRef = useRef<HTMLCanvasElement | null>(null);
+  useEffect(() => {
+    if (!sampling) return;
+    (async () => {
+      const pg = ed.page;
+      if (!pg) return;
+      try {
+        sampleCvRef.current = await renderPageToCanvas(
+          { ...pg, els: pg.els.filter((e) => e.type !== "adjust") },
+          ed.assetsRef.current, 360 / pg.w);
+      } catch { sampleCvRef.current = null; }
+    })();
+    const onDown = (e: PointerEvent) => {
+      /* the floating panel stays usable while armed */
+      if ((e.target as HTMLElement | null)?.closest?.(".adjFloat")) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setSampling(null);
+      const pg = ed.page;
+      const cv = sampleCvRef.current;
+      if (!pg || !cv) return;
+      const pt = ed.pagePoint(e);
+      if (pt.x < 0 || pt.y < 0 || pt.x > pg.w || pt.y > pg.h) return;
+      const cx = cv.getContext("2d", { willReadFrequently: true });
+      if (!cx) return;
+      const px = cx.getImageData(
+        clamp(Math.round((pt.x / pg.w) * cv.width), 0, cv.width - 1),
+        clamp(Math.round((pt.y / pg.h) * cv.height), 0, cv.height - 1), 1, 1).data;
+      const lum = (0.2126 * px[0] + 0.7152 * px[1] + 0.0722 * px[2]) / 255;
+      if (sampling === "b") set({ blacks: clamp(lum, 0, 0.49) * 200 }, true);
+      else if (sampling === "w") set({ whites: clamp(1 - lum, 0, 0.49) * 200 }, true);
+      else {
+        /* gamma that lands the sampled tone on middle gray */
+        const b = clamp(numOf(el.params.blacks, 0), 0, 100) / 200;
+        const w = 1 - clamp(numOf(el.params.whites, 0), 0, 100) / 200;
+        const ln = clamp((lum - b) / Math.max(0.02, w - b), 0.02, 0.98);
+        set({ gamma: clamp(Math.log(ln) / Math.log(0.5), 0.2, 2.4) }, true);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { e.stopPropagation(); setSampling(null); }
+    };
+    window.addEventListener("pointerdown", onDown, true);
+    window.addEventListener("keydown", onKey, true);
+    document.body.style.cursor = "crosshair";
+    return () => {
+      window.removeEventListener("pointerdown", onDown, true);
+      window.removeEventListener("keydown", onKey, true);
+      document.body.style.cursor = "";
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sampling]);
   /* caret positions on the 0..1 input axis */
   const bx = clamp(numOf(p.blacks, 0), 0, 100) / 200;
   const wx = 1 - clamp(numOf(p.whites, 0), 0, 100) / 200;
@@ -176,8 +242,28 @@ function LevelsPanel({ ed, el }: { ed: EditorCtx; el: AdjustEl }) {
   const caret = (x: number, cls: string) => (
     <path d={`M${(x * W).toFixed(1)} 2 l6 10 h-12 Z`} className={cls} />
   );
+  const dropIcon = (
+    <svg viewBox="0 0 24 24">
+      <path d="M17.3 2.7 a2.4 2.4 0 0 1 3.4 3.4 l-2.3 2.3 -3.4 -3.4 Z" fill="currentColor" />
+      <path d="M13.9 6.1 L4.5 15.5 c-.5 .5 -.8 1.1 -.9 1.8 l-.3 2.4 a.8 .8 0 0 0 .9 .9 l2.4 -.3 c.7 -.1 1.3 -.4 1.8 -.9 L17.9 10.1 Z"
+        fill="none" stroke="currentColor" strokeWidth={1.6} />
+    </svg>
+  );
   return (
     <div className="levelsWrap">
+      <div className="lvDrops">
+        {(["b", "g", "w"] as const).map((k) => (
+          <button key={k} className={"lvDrop" + (sampling === k ? " on" : "")}
+            title={k === "b" ? "Set black point — click the darkest spot on the page"
+              : k === "g" ? "Set gray point — click something that should be middle gray"
+              : "Set white point — click the brightest spot on the page"}
+            onClick={() => setSampling(sampling === k ? null : k)}>
+            {dropIcon}
+            <span className="lvDropDot" style={{ background: k === "b" ? "#000" : k === "g" ? "#8a8a8a" : "#fff" }} />
+          </button>
+        ))}
+        {sampling && <span className="lvDropHint">Click the page… (Esc cancels)</span>}
+      </div>
       <svg viewBox={`0 0 ${W} ${H}`} className="levelsHist">
         <rect x={0} y={0} width={W} height={H} className="cvBg" />
         {hist === null && <text x={W / 2} y={H / 2} className="lvBusy">reading the page…</text>}
@@ -556,6 +642,23 @@ export function renderAdjustDialog(ed: EditorCtx) {
     if (final) ed.commit(); else ed.force();
   };
   const done = () => { ed.setAdjustEdit(null); ed.commit(); };
+  /* the panel floats and drags by its title bar — the page must stay in
+     clear view while sliders move (the grade previews live on canvas) */
+  const dragDlg = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const dlg = e.currentTarget.parentElement as HTMLElement;
+    const sx = e.clientX - adjPos.x, sy = e.clientY - adjPos.y;
+    const move = (ev: PointerEvent) => {
+      adjPos = { x: ev.clientX - sx, y: ev.clientY - sy };
+      dlg.style.transform = `translate(${adjPos.x}px, ${adjPos.y}px)`;
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
   const sliderRow = (spec: AdjustParamSpec) => (
     <div key={spec.key} className="adjRow">
       <label>{spec.label}</label>
@@ -578,9 +681,10 @@ export function renderAdjustDialog(ed: EditorCtx) {
     </div>
   );
   return (
-    <div className="setupOverlay" onPointerDown={(e) => { if (e.target === e.currentTarget) done(); }}>
-      <div className="setupDlg" style={{ width: 400 }}>
-        <div className="setupTitle">✨ {meta.label}</div>
+    <div className="setupOverlay adjFloat">
+      <div className="setupDlg" style={{ width: 400, transform: `translate(${adjPos.x}px, ${adjPos.y}px)` }}>
+        <div className="setupTitle adjGrab" onPointerDown={dragDlg}
+          title="Drag to move this panel out of the way — the page previews the grade live behind it">✨ {meta.label}</div>
         <div className="setupBody" style={{ flexDirection: "column", gap: 10 }}>
           {el.kind === "curves" ? (
             <CurveGraph ed={ed} el={el} />
