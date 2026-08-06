@@ -3,7 +3,7 @@
    text boxes get sentence-aware lines (a sentence of ≤7 words on its own
    line, longer ones balanced at ~5-7 words). ops.ts re-exports these, so
    call sites are unchanged. */
-import { BalloonEl, FONTS, TextEl, TextStyle, clamp } from "@/lib/model";
+import { BalloonEl, FONTS, TAILLESS_KINDS, TextEl, TextStyle, clamp } from "@/lib/model";
 import { balloonGeom } from "@/lib/geometry";
 import { EditorCtx } from "./ctx";
 
@@ -30,10 +30,12 @@ function makeMeasurer(ts: TextStyle): HTMLDivElement {
 function measureLettering(el: BalloonEl | TextEl, wrapW?: number): { w: number; h: number } {
   const meas = makeMeasurer(el.ts);
   meas.textContent = el.text;
-  const w = wrapW ?? meas.scrollWidth;
+  /* fractional width, rounded UP — scrollWidth truncates to whole pixels,
+     and a box 1px short of its longest word re-breaks it mid-word */
+  const w = wrapW ?? Math.ceil(meas.getBoundingClientRect().width) + 1;
   meas.style.whiteSpace = "pre-wrap";
   meas.style.width = `${w + 2}px`;
-  const h = meas.scrollHeight;
+  const h = Math.ceil(meas.getBoundingClientRect().height);
   document.body.removeChild(meas);
   return { w, h };
 }
@@ -41,7 +43,7 @@ function measureLettering(el: BalloonEl | TextEl, wrapW?: number): { w: number; 
 /* per-word pixel widths + the width of one space, for wrap planning */
 function wordWidths(words: string[], ts: TextStyle): { wW: number[]; spaceW: number } {
   const meas = makeMeasurer(ts);
-  const measure = (s: string) => { meas.textContent = s; return meas.scrollWidth; };
+  const measure = (s: string) => { meas.textContent = s; return meas.getBoundingClientRect().width; };
   const wW = words.map(measure);
   const spaceW = measure("x x") - measure("xx");
   document.body.removeChild(meas);
@@ -78,7 +80,10 @@ function planOvalWrap(el: BalloonEl): number | null {
   const { wW, spaceW } = wordWidths(words, el.ts);
   const oneLineW = wW.reduce((a, b) => a + b, 0) + spaceW * (wW.length - 1);
   const lineHpx = el.ts.size * (el.ts.lineHeight ?? 1.05);
-  const TARGET = 1.4;    // text-block w:h that reads as a clean oval
+  /* letters are short and wide, so the PIXEL block of a pleasing oval is
+     much wider than tall — ~2.6:1 lands the drawn balloon near 1.5-1.8:1.
+     (1.4 here read as "square-ish" and produced 1-2 word columns.) */
+  const TARGET = 2.6;
   let bestW: number | null = null, bestScore = Infinity, lastRows = 0;
   for (let L = 1; L <= words.length; L++) {
     const W = widthForLines(wW, spaceW, L, oneLineW);
@@ -106,7 +111,7 @@ function splitSentences(words: string[]): string[][] {
 /* TEXT BOXES: sentence-aware lines — a sentence of ≤7 words gets its OWN
    line; longer ones break into balanced lines of at most ~6 words. Returns
    the planned lines as word arrays. */
-function planCaptionLines(el: TextEl, maxW: number): string[][] {
+function planCaptionLines(el: BalloonEl | TextEl, maxW: number): string[][] {
   const words = el.text.replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
   const lines: string[][] = [];
   for (const s of splitSentences(words)) {
@@ -131,7 +136,7 @@ function planCaptionLines(el: TextEl, maxW: number): string[][] {
    whitespace is already single spaces the newlines land 1:1 on them, so any
    bold/italic runs survive untouched; otherwise the runs are dropped (same
    trade balanceRag makes — the reflow changes the text). */
-function applyLineBreaks(el: TextEl, lines: string[][]) {
+function applyLineBreaks(el: BalloonEl | TextEl, lines: string[][]) {
   const newText = lines.map((l) => l.join(" ")).join("\n");
   if (newText === el.text) return;
   if (el.runs && newText.length === el.text.length) {
@@ -167,8 +172,13 @@ export function fitBalloonToText(ed: EditorCtx) {
     if (el.locked) { locked++; continue; }
     if (!el.text.trim()) { empty++; continue; }
     const ts = el.ts;
+    /* a "text box" is a TextEl OR a tailless box balloon (caption, rounded,
+       cosmic, emitter) — those read as prose, so they take the sentence
+       rules. Only tailed SPEECH balloons get the oval shape logic. */
+    const isBox = el.type === "text" ||
+      (el.type === "balloon" && TAILLESS_KINDS.includes(el.kind));
     let newW: number, newH: number;
-    if (el.type === "balloon") {
+    if (el.type === "balloon" && !isBox) {
       /* the lettering sits in an inner fraction of the balloon (shape-
          dependent) — size the balloon so that inner rect hugs the text */
       const g = balloonGeom(el);
@@ -184,13 +194,23 @@ export function fitBalloonToText(ed: EditorCtx) {
       newW = clamp(Math.round(targetTW / fracW), 60, page.w);
       newH = clamp(Math.round(targetTH / fracH), 44, page.h);
     } else {
-      /* captions/text boxes: sentence-aware line breaks written into the
-         text itself, then a snug box around the longest line. Warped SFX
-         keeps its lines — an arc reflows badly. */
-      if (!el.warp) applyLineBreaks(el, planCaptionLines(el, page.w * 0.8));
+      /* text boxes: sentence-aware line breaks written into the text
+         itself, then a snug box around the longest line. Warped SFX keeps
+         its lines — an arc reflows badly. */
+      if (!(el.type === "text" && el.warp)) applyLineBreaks(el, planCaptionLines(el, page.w * 0.8));
       const { w: lineW, h: lineH } = measureLettering(el);
-      newW = clamp(Math.round(lineW + ts.size * 0.6), 40, page.w);
-      newH = clamp(Math.round(lineH + ts.size * 0.4), 24, page.h);
+      if (el.type === "balloon") {
+        /* a box balloon still pads its lettering by its own geometry */
+        const g = balloonGeom(el);
+        const [, , tw, th] = g.textRect;
+        const fracW = tw / el.w, fracH = th / el.h;
+        if (!(fracW > 0) || !(fracH > 0)) continue;
+        newW = clamp(Math.round((lineW + ts.size * 0.5) / fracW), 60, page.w);
+        newH = clamp(Math.round((lineH + ts.size * 0.35) / fracH), 44, page.h);
+      } else {
+        newW = clamp(Math.round(lineW + ts.size * 0.6), 40, page.w);
+        newH = clamp(Math.round(lineH + ts.size * 0.4), 24, page.h);
+      }
     }
     /* keep each item centred where it was while it resizes */
     const cx = el.x + el.w / 2, cy = el.y + el.h / 2;
