@@ -15,7 +15,7 @@ const APK_URL = "https://github.com/mikeisflux/ComicLettering/releases/download/
    approves the listing (null renders an "In review — link coming soon"
    badge, so the card ships before the store does). */
 const STORE_URLS: Record<string, string | null> = {
-  windows: null,   // Microsoft Store (submitted)
+  windows: "https://apps.microsoft.com/detail/9N61LFGVKNDM",   // Microsoft Store — LIVE
   chrome: null,    // Chrome Web Store (submitted)
   edge: null,      // Microsoft Edge Add-ons (submitted)
   firefox: null,   // addons.mozilla.org (submitted)
@@ -29,7 +29,7 @@ const PLATFORMS: {
   {
     key: "windows", name: "Windows", store: "Microsoft Store",
     blurb: "The studio as a real Windows app — Start-menu icon, its own window, .lmc files open straight into it.",
-    now: <>Available right now without the store: open the <Link href="/app">Studio</Link> in
+    now: <>Prefer to skip the store? Open the <Link href="/app">Studio</Link> in
       Chrome or Edge and click the red <b>Install as App</b> button — same app, one click.</>,
   },
   {
@@ -103,8 +103,9 @@ export default function GetTheAppPage() {
       {/* ---- every platform: the store path + what works today ---- */}
       <h2 style={{ textAlign: "center", marginTop: 56 }}>On every desktop &amp; browser</h2>
       <p className="sub" style={{ textAlign: "center", margin: "0 auto 26px", maxWidth: 640 }}>
-        LetterMyComic is coming to every major store — and you never have to wait
-        for one: every platform has a way to install or run the studio today.
+        LetterMyComic is now on the Microsoft Store, with the browser stores in
+        review — and you never have to wait for one: every platform has a way to
+        install or run the studio today.
       </p>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 18 }}>
         {PLATFORMS.map((p) => {

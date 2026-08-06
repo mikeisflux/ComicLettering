@@ -416,8 +416,21 @@ export function renderInstallHelp(ed: EditorCtx) {
             Installed, the studio runs in its own window with its own icon, works like a desktop
             app, and gives your .lmc project files the LetterMyComic icon.
           </div>
+          {/Windows/.test(ua) && (
+            <div style={{ fontSize: 12, color: "#667" }}>
+              On Windows you can also grab it straight from the Microsoft Store —
+              the Store app registers .lmc files automatically.
+            </div>
+          )}
         </div>
         <div className="setupFoot">
+          {/Windows/.test(ua) && (
+            <a className="okBtn" style={{ textDecoration: "none" }}
+              href="https://apps.microsoft.com/detail/9N61LFGVKNDM"
+              target="_blank" rel="noreferrer">
+              Microsoft Store
+            </a>
+          )}
           {isFirefox && (
             <a className="okBtn" style={{ textDecoration: "none" }}
               href="https://addons.mozilla.org/en-US/firefox/addon/lettermycomic-comic-lettering-studio/"
