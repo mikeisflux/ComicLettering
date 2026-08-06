@@ -1004,12 +1004,17 @@ input[type="range"] { width: 110px; }
 .layerRow.off .layerName { opacity: 0.45; font-style: italic; }
 
 /* page adjustment layers: the inspector tool grid + slider dialog rows */
-.adjGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.adjGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
 .adjBtn {
-  padding: 8px 6px; font-size: 12px; line-height: 1.2;
-  background: #fff; border: 1px solid var(--edge2); border-radius: 7px; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 8px 3px 6px; font-size: 10px; line-height: 1.15; text-align: center;
+  color: #3c4654;
+  background: #fff; border: 1px solid var(--edge2); border-radius: 8px; cursor: pointer;
 }
+.adjBtn svg { width: 23px; height: 23px; color: #4a5568; }
+.adjBtn span { word-break: break-word; }
 .adjBtn:hover { border-color: var(--sel); background: #f2f7fd; }
+.adjBtn:hover svg { color: var(--sel); }
 .adjRow { display: flex; align-items: center; gap: 10px; }
 .adjRow label { flex: 0 0 118px; font-size: 13px; }
 .adjRow input[type="range"] { flex: 1; }
@@ -1270,3 +1275,117 @@ input[type="range"].adjTrack::-moz-range-thumb {
   font-size: 13px; font-weight: 600;
 }
 @media (max-width: 700px) { .railClose { display: block; } }
+
+/* ================= polish pass: depth, glow & motion =================
+   One layer of finish over the whole chrome: soft lifts and glows on
+   every control, glassy floating bars, animated dialog and menu
+   entrances, and a breathing glow on the install CTA. Scoped to visual
+   properties only — no layout changes — and switched off wholesale for
+   prefers-reduced-motion. */
+
+.toolBtn, .fbTog, .trayBtn, .layerBtn, .adjBtn, .shapeBtn, .layoutBtn,
+.setupFoot button, .btnRow button, .menuTop, .tuckFly button,
+.penTools button, .tabs button, .layerRow, .proofCard, .layoutDel {
+  transition: background-color .16s ease, border-color .16s ease,
+    box-shadow .18s ease, color .16s ease, transform .12s ease, filter .18s ease;
+}
+
+/* toolbar: lift + inner sheen; accent tools glow their ember */
+.toolBtn:not(:disabled):hover {
+  background: #ffffff14; border-color: #ffffff2e;
+  box-shadow: 0 2px 10px #0006, inset 0 1px 0 #ffffff1c;
+  transform: translateY(-1px);
+}
+.toolBtn:not(:disabled):active { transform: translateY(0) scale(.97); }
+.toolBtn.accent:not(:disabled):hover { box-shadow: 0 0 14px #f0812c55, 0 2px 10px #0006; }
+.toolBtn.accent .tIcon { filter: drop-shadow(0 0 6px #f0812c59); }
+
+/* menu bar: accent underline sweep */
+.menuTop:hover { background: #ffffff12; box-shadow: inset 0 -2px 0 var(--accent); }
+.menuTop.on { box-shadow: inset 0 -2px 0 var(--sel); }
+
+/* dropdowns & flyouts descend in */
+@keyframes lmcMenuIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+.menuDrop, .tuckFly { animation: lmcMenuIn .15s ease; box-shadow: 0 16px 44px #00000073; }
+.tuckFly { backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.tuckFly button:hover { box-shadow: 0 0 12px #2f7fd655; transform: translateX(2px); }
+
+/* dialogs: frosted veil, springy entrance, luminous OK */
+@keyframes lmcVeilIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes lmcDlgIn { from { opacity: 0; transform: translateY(12px) scale(.965); } to { opacity: 1; transform: none; } }
+.setupOverlay {
+  background: #0d131c8f;
+  backdrop-filter: blur(5px) saturate(1.15); -webkit-backdrop-filter: blur(5px) saturate(1.15);
+  animation: lmcVeilIn .16s ease;
+}
+.setupDlg {
+  box-shadow: 0 28px 90px #000000b3, inset 0 1px 0 #ffffffcc;
+  animation: lmcDlgIn .22s cubic-bezier(.18, .9, .32, 1.18);
+}
+.setupFoot .okBtn {
+  background: linear-gradient(180deg, #4b93e0, #2f7fd6);
+  box-shadow: 0 4px 14px #2f7fd64d, inset 0 1px 0 #ffffff45;
+}
+.setupFoot .okBtn:not(:disabled):hover {
+  filter: brightness(1.07);
+  box-shadow: 0 6px 22px #2f7fd678, inset 0 1px 0 #ffffff45;
+  transform: translateY(-1px);
+}
+.setupFoot button:not(.okBtn):hover { border-color: var(--sel); box-shadow: 0 2px 10px #00000021; }
+
+/* floating pen controls go glassy */
+.penTools button, .penTools .penHint {
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 4px 16px #00000059;
+}
+.penTools button:hover { border-color: var(--sel); box-shadow: 0 0 14px #2f7fd666, 0 4px 16px #00000059; transform: translateY(-1px); }
+
+/* panel tiles: hover lift, icon glow */
+.layoutBtn:hover, .adjBtn:hover, .shapeBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px #00000021;
+}
+.adjBtn:hover svg { filter: drop-shadow(0 0 6px #2f7fd64d); }
+.shapeBtn.on { box-shadow: inset 0 0 0 2px var(--sel), 0 0 12px #2f7fd63d; }
+.layoutBtn:active, .adjBtn:active, .shapeBtn:active { transform: translateY(0) scale(.97); }
+
+/* layers list: quiet hover, selected row haloed */
+.layerRow:hover { border-color: #b9c6d6; box-shadow: 0 2px 8px #0000000f; }
+.layerRow.on { box-shadow: 0 0 0 1px var(--sel), 0 0 12px #2f7fd63b; }
+.layerBtn:hover { border-color: var(--sel); color: #1e5fa8; }
+.layerBtn.eye:hover svg { filter: drop-shadow(0 0 4px #2f7fd680); }
+
+/* right-panel tabs: sliding accent underline feel */
+.tabs button:hover { box-shadow: inset 0 -2px 0 #2f7fd66b; }
+
+/* selection furniture: crisp with a whisper of glow */
+.handle { box-shadow: 0 1px 4px #00000059, 0 0 6px #2f7fd63d; }
+.handle.tail { box-shadow: 0 0 12px #f0812c8c, 0 1px 4px #00000059; }
+.handle.tailBow { box-shadow: 0 0 10px #e3333380, 0 1px 4px #00000059; }
+
+/* the red install CTA breathes */
+@keyframes lmcInstPulse {
+  0%, 100% { box-shadow: 0 2px 8px #00000059; }
+  50% { box-shadow: 0 0 18px 3px #e3313159, 0 2px 8px #00000059; }
+}
+.installBtn { animation: lmcInstPulse 2.8s ease-in-out infinite; }
+.installBtn:hover { animation-play-state: paused; box-shadow: 0 0 22px 4px #e3313180, 0 2px 8px #00000059; transform: translateY(-1px); }
+
+/* export progress bar: sheen sweeping the fill */
+.progFill {
+  background: linear-gradient(#4b93e0, var(--sel));
+  box-shadow: 0 0 10px #2f7fd680;
+}
+
+/* keyboard focus gets a proper halo (mouse clicks stay clean) */
+button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible {
+  outline: 2px solid #2f7fd6b3; outline-offset: 1px;
+}
+
+/* motion off for readers who ask for it */
+@media (prefers-reduced-motion: reduce) {
+  .setupOverlay, .setupDlg, .menuDrop, .tuckFly, .installBtn { animation: none !important; }
+  .toolBtn, .fbTog, .trayBtn, .layerBtn, .adjBtn, .shapeBtn, .layoutBtn,
+  .setupFoot button, .btnRow button, .menuTop, .tuckFly button,
+  .penTools button, .tabs button, .layerRow, .proofCard, .layoutDel { transition: none !important; }
+}

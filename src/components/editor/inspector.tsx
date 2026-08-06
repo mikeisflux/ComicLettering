@@ -67,6 +67,101 @@ export function tsControls(ed: EditorCtx, el: BalloonEl | TextEl) {
   );
 }
 
+/* each adjustment tool's tile icon — small 24×24 glyphs in the spirit of
+   the Photoshop adjustments panel, with a touch of colour where the tool
+   is about colour */
+const ADJ_ICONS: Record<AdjustKind, React.ReactNode> = {
+  colorvib: (
+    <svg viewBox="0 0 24 24"><path d="M12 4 L20 19 H4 Z" fill="none" stroke="currentColor" strokeWidth={1.8} />
+      <path d="M12 9 L16.4 17.5 H7.6 Z" fill="#f0812c" stroke="none" /></svg>
+  ),
+  brightness: (
+    <svg viewBox="0 0 24 24"><circle cx={12} cy={12} r={4} fill="#f5c518" stroke="currentColor" strokeWidth={1.2} />
+      {Array.from({ length: 8 }, (_, i) => {
+        const a = (i * Math.PI) / 4;
+        return <line key={i} x1={12 + Math.cos(a) * 6.5} y1={12 + Math.sin(a) * 6.5}
+          x2={12 + Math.cos(a) * 9.5} y2={12 + Math.sin(a) * 9.5} stroke="currentColor" strokeWidth={1.6} />;
+      })}</svg>
+  ),
+  exposure: (
+    <svg viewBox="0 0 24 24"><rect x={3.5} y={3.5} width={17} height={17} rx={2} fill="none" stroke="currentColor" strokeWidth={1.6} />
+      <path d="M20 4 L4 20" stroke="currentColor" strokeWidth={1.2} />
+      <path d="M7 8 h4 M9 6 v4 M13.5 16.5 h4" stroke="currentColor" strokeWidth={1.6} /></svg>
+  ),
+  levels: (
+    <svg viewBox="0 0 24 24">{[[4, 12], [8, 7], [12, 15], [16, 9]].map(([x, h], i) => (
+      <rect key={i} x={x} y={20 - h} width={3.2} height={h} fill="currentColor" />))}
+      <path d="M3 21 h18" stroke="currentColor" strokeWidth={1.4} /></svg>
+  ),
+  curves: (
+    <svg viewBox="0 0 24 24"><rect x={3.5} y={3.5} width={17} height={17} fill="none" stroke="currentColor" strokeWidth={1.4} />
+      <path d="M5 19 C 10 18 14 6 19 5" fill="none" stroke="#2f7fd6" strokeWidth={2} />
+      <circle cx={12} cy={12} r={1.8} fill="#2f7fd6" /></svg>
+  ),
+  hsl: (
+    <svg viewBox="0 0 24 24"><rect x={4} y={5} width={16} height={3.6} rx={1.4} fill="#e33" />
+      <rect x={4} y={10.2} width={16} height={3.6} rx={1.4} fill="#3b3" />
+      <rect x={4} y={15.4} width={16} height={3.6} rx={1.4} fill="#36e" /></svg>
+  ),
+  colorbalance: (
+    <svg viewBox="0 0 24 24"><path d="M12 4 v16 M5 7 h14" stroke="currentColor" strokeWidth={1.6} fill="none" />
+      <path d="M5 7 l-2.6 6 a3 3 0 0 0 5.2 0 Z" fill="#0cc" stroke="none" />
+      <path d="M19 7 l-2.6 6 a3 3 0 0 0 5.2 0 Z" fill="#e33" stroke="none" />
+      <path d="M9 20 h6" stroke="currentColor" strokeWidth={1.6} /></svg>
+  ),
+  bw: (
+    <svg viewBox="0 0 24 24"><rect x={4} y={4} width={16} height={16} rx={2} fill="none" stroke="currentColor" strokeWidth={1.6} />
+      <path d="M12 4 v16 H6 a2 2 0 0 1 -2 -2 V6 a2 2 0 0 1 2 -2 Z" fill="currentColor" /></svg>
+  ),
+  photofilter: (
+    <svg viewBox="0 0 24 24"><rect x={3} y={7} width={18} height={12} rx={2} fill="none" stroke="currentColor" strokeWidth={1.6} />
+      <path d="M8 7 l1.5 -2.5 h5 L16 7" fill="none" stroke="currentColor" strokeWidth={1.6} />
+      <circle cx={12} cy={13} r={3.6} fill="none" stroke="currentColor" strokeWidth={1.6} />
+      <circle cx={12} cy={13} r={2} fill="#f0812c" /></svg>
+  ),
+  channelmixer: (
+    <svg viewBox="0 0 24 24"><circle cx={9.4} cy={9.5} r={4.6} fill="#e33" opacity={0.85} />
+      <circle cx={14.6} cy={9.5} r={4.6} fill="#3b3" opacity={0.7} />
+      <circle cx={12} cy={14.2} r={4.6} fill="#36e" opacity={0.6} /></svg>
+  ),
+  colorlookup: (
+    <svg viewBox="0 0 24 24">{["#e33", "#f5c518", "#3b3", "#0cc", "#36e", "#c3c", "#888", "#432", "#111"].map((c, i) => (
+      <rect key={i} x={4.5 + (i % 3) * 5.2} y={4.5 + Math.floor(i / 3) * 5.2} width={4.4} height={4.4} rx={0.8} fill={c} />))}</svg>
+  ),
+  selectivecolor: (
+    <svg viewBox="0 0 24 24"><rect x={4} y={4} width={16} height={16} rx={2} fill="none" stroke="currentColor" strokeWidth={1.6} />
+      <path d="M4.8 4.8 L19.2 19.2 M19.2 4.8 L4.8 19.2" stroke="currentColor" strokeWidth={1.4} />
+      <path d="M6 5 h12 l-6 6.4 Z" fill="#e33" opacity={0.8} /></svg>
+  ),
+  invert: (
+    <svg viewBox="0 0 24 24"><rect x={4} y={4} width={16} height={16} rx={2} fill="none" stroke="currentColor" strokeWidth={1.6} />
+      <path d="M19 5 L5 19 V7 a2 2 0 0 1 2 -2 Z" fill="currentColor" />
+      <circle cx={15} cy={15} r={2.6} fill="currentColor" />
+      <circle cx={9} cy={9} r={2.6} fill="#fff" /></svg>
+  ),
+  posterize: (
+    <svg viewBox="0 0 24 24"><path d="M4 20 V16 h4 V12 h4 V8 h4 V4 h4 V20 Z" fill="currentColor" /></svg>
+  ),
+  threshold: (
+    <svg viewBox="0 0 24 24"><rect x={4} y={4} width={16} height={16} rx={2} fill="none" stroke="currentColor" strokeWidth={1.6} />
+      <path d="M12 4 h6 a2 2 0 0 1 2 2 v12 a2 2 0 0 1 -2 2 h-6 Z" fill="currentColor" />
+      <path d="M8 8 v8 M12 8 v8" stroke="currentColor" strokeWidth={1.4} /></svg>
+  ),
+  gradientmap: (
+    <svg viewBox="0 0 24 24">{[0, 1, 2, 3, 4].map((i) => (
+      <rect key={i} x={4 + i * 3.2} y={7} width={3.2} height={10} fill="currentColor" opacity={1 - i * 0.21} />))}
+      <rect x={3.6} y={6.6} width={16.6} height={10.8} rx={1.5} fill="none" stroke="currentColor" strokeWidth={1.4} /></svg>
+  ),
+  grain: (
+    <svg viewBox="0 0 24 24">{[[6, 7, 1.3], [11, 5, 1], [16, 8, 1.5], [8, 12, 1], [13, 11, 1.3], [18, 13, 1], [5, 16, 1.4], [10, 17, 1.1], [15, 16, 1.4], [19, 18, 1]].map(([x, y, r], i) => (
+      <circle key={i} cx={x} cy={y} r={r} fill="currentColor" />))}</svg>
+  ),
+  clarity: (
+    <svg viewBox="0 0 24 24"><circle cx={12} cy={12} r={7.5} fill="none" stroke="currentColor" strokeWidth={1.8} strokeDasharray="3 2.6" />
+      <circle cx={12} cy={12} r={3} fill="currentColor" /></svg>
+  ),
+};
+
 /* PAGE ADJUSTMENTS — a Photoshop-style tool grid. Every click adds an
    ADJUSTMENT LAYER to the current page (it appears in the Layers panel
    with its own eyeball) and opens that layer's slider dialog. Double-click
@@ -88,7 +183,8 @@ export function renderPageAdjustSection(ed: EditorCtx) {
               ed.setAdjustEdit(layer.id);
               ed.setStatus(`${ADJUST_META[k].label} layer added to this page — find it in Layers, eyeball it off, or double-click it to re-tune.`);
             }}>
-            {ADJUST_META[k].label}
+            {ADJ_ICONS[k]}
+            <span>{ADJUST_META[k].label}</span>
           </button>
         ))}
       </div>

@@ -11,6 +11,7 @@ import {
 import { LT_URL, ProofMatch } from "./textHelpers";
 import { EditorCtx } from "./ctx";
 import { ensureAllArt, refitLegacyLettering } from "./ops";
+import { launchFireworks } from "./fireworks";
 
 
 /* Real-time export progress: update the bar overlay, then yield two frames
@@ -297,6 +298,7 @@ export async function exportAllPages(ed: EditorCtx) {
       await exportPagePNG(d.pages[i], assetsRef.current, `comic-page-${i + 1}.png`, spreadNeighbor(d, i));
     }
     setStatus(`Exported ${d.pages.length} page${d.pages.length > 1 ? "s" : ""}.`);
+    launchFireworks();
   } finally {
     ed.setExportProgress(null);
   }
@@ -354,6 +356,7 @@ export async function runExport(
     }
     setStatus("Export complete.");
     setShowExport(false);
+    launchFireworks();   // the book is out — sparks earned
   } catch (err) {
     setStatus("Export failed: " + String(err).slice(0, 120));
   } finally {
