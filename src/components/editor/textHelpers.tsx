@@ -6,6 +6,7 @@ import {
   BalloonKind, El, FONTS, FillStyle, TextRun, TextStyle, applyCrossbarI, lightenHex,
 } from "@/lib/model";
 import { LetterStyle } from "@/lib/presets";
+import { ADJUST_META } from "@/lib/pageAdjust";
 import { fontString } from "@/lib/exportPng";
 import { BrushKey, brushScale, brushURL } from "@/lib/brushes";
 import { glowFilter } from "@/lib/glows";
@@ -346,6 +347,7 @@ export const elLabel = (el: El) =>
   el.type === "balloon" ? `Balloon: ${el.text.slice(0, 18) || "(empty)"}`
     : el.type === "text" ? `Lettering: ${el.text.slice(0, 18) || "(empty)"}`
     : el.type === "panel" ? "Panel"
+    : el.type === "adjust" ? `✨ ${ADJUST_META[el.kind]?.label ?? "Adjustment"}`
     : "Image";
 
 export interface ScriptItem {

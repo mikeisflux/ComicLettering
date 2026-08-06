@@ -138,6 +138,13 @@ export interface EditorCtx {
      (picked by press-and-holding the toolbar's Tuck Back button) */
   tuckTool: "lasso" | "pen";
   setTuckTool: (t: "lasso" | "pen") => void;
+  /* the adjustment layer whose slider dialog is open (double-click it in
+     Layers, or it opens as soon as a tool adds one) */
+  adjustEdit: string | null;
+  setAdjustEdit: SetState<string | null>;
+  /* the toolbar's white selection arrow: drop every modal tool (pen,
+     shapes, Tuck Back, sketch, note pinning) back to the normal mouse */
+  resetTools: () => void;
   /* the traced cutout awaiting confirmation, and its controls */
   tuckAsk: TuckAsk | null;
   setTuckAsk: SetState<TuckAsk | null>;

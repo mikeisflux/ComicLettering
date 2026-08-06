@@ -1,9 +1,10 @@
 /* Right-panel Inspector — page / element property editors.
    Plain exported render functions taking the EditorCtx bag. */
 import {
-  BALLOON_KINDS, BLEED, BalloonEl, BalloonKind, FILTERS, FONTS, PAGE_SIZES,
+  AdjustKind, BALLOON_KINDS, BLEED, BalloonEl, BalloonKind, FILTERS, FONTS, PAGE_SIZES,
   PanelEl, TAILLESS_KINDS, TextEl, TextStyle, clamp,
 } from "@/lib/model";
+import { ADJUST_META, makeAdjust } from "@/lib/pageAdjust";
 import { Fld } from "./textHelpers";
 import { FontMenu, SubtypeSelect, tsVariant } from "./FontMenu";
 import { FillPicker } from "./FillPicker";
@@ -66,6 +67,41 @@ export function tsControls(ed: EditorCtx, el: BalloonEl | TextEl) {
   );
 }
 
+/* PAGE ADJUSTMENTS — a Photoshop-style tool grid. Every click adds an
+   ADJUSTMENT LAYER to the current page (it appears in the Layers panel
+   with its own eyeball) and opens that layer's slider dialog. Double-click
+   the layer any time to re-tune it; delete the layer to drop the grade. */
+export function renderPageAdjustSection(ed: EditorCtx) {
+  const { page } = ed;
+  if (!page) return null;
+  return (
+    <div className="inspSection">
+      <div className="inspHead">Page adjustments</div>
+      <div className="adjGrid">
+        {(Object.keys(ADJUST_META) as AdjustKind[]).map((k) => (
+          <button key={k} className="adjBtn" title={`Add a ${ADJUST_META[k].label} adjustment layer to this page`}
+            onClick={() => {
+              const layer = makeAdjust(k, page.w, page.h);
+              page.els.push(layer);           // top of the stack
+              ed.commit();
+              ed.setSelId(layer.id);
+              ed.setAdjustEdit(layer.id);
+              ed.setStatus(`${ADJUST_META[k].label} layer added to this page — find it in Layers, eyeball it off, or double-click it to re-tune.`);
+            }}>
+            {ADJUST_META[k].label}
+          </button>
+        ))}
+      </div>
+      <div className="tips">
+        Each tool adds an adjustment LAYER grading this whole page — switch it
+        off with the layer&apos;s eyeball in Layers, double-click the layer to
+        reopen its sliders, delete the layer to remove the grade. Grades print
+        exactly as previewed.
+      </div>
+    </div>
+  );
+}
+
 export function renderInspector(ed: EditorCtx) {
   const { page, selEl, commit, fitZoom, setShowSetup, force, mutateSel, presets, panelImageTarget, filePanelImageRef } = ed;
   if (!page) return null;
@@ -99,6 +135,7 @@ export function renderInspector(ed: EditorCtx) {
           <div className="inspHead">Page background</div>
           <FillPicker value={p.bg} onChange={(f, final) => { p.bg = f; if (final) commit(); else force(); }} />
         </div>
+        {renderPageAdjustSection(ed)}
         <div className="inspSection">
           <div className="inspHead">Tips</div>
           <div className="tips">
@@ -264,6 +301,7 @@ export function renderInspector(ed: EditorCtx) {
             onChange={(e) => mutateSel((b) => { b.locked = e.target.checked; })} />
         </Fld>
       </div>
+      {renderPageAdjustSection(ed)}
     </div>
   );
 }

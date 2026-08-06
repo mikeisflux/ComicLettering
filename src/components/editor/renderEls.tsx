@@ -179,6 +179,7 @@ export function claimPage(ed: EditorCtx): boolean {
 export function renderEl(ed: EditorCtx, el: El) {
   const { editingId, select, startDrag, setStatus, setEditingId, panelImageTarget, filePanelImageRef, setCtxMenu, assetsRef, page, zoom, finishEditing } = ed;
   if (el.hidden) return null;   // layer eyeball off — gone from both canvases
+  if (el.type === "adjust") return null;   // grades the page via its filter, not a drawable
   const tf = [
     el.rot ? `rotate(${el.rot}deg)` : "",
     el.flipH ? "scaleX(-1)" : "",

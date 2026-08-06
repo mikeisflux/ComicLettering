@@ -589,7 +589,21 @@ export interface TextEl extends BaseEl {
   /* SFX arc warp: -100..100 (0/undefined = straight). +bulges up, −bulges down */
   warp?: number;
 }
-export type El = PanelEl | ImageEl | BalloonEl | TextEl;
+/* A page ADJUSTMENT LAYER (Photoshop-style): lives in the Layers panel,
+   grades the WHOLE page through the shared SVG-filter engine
+   (lib/pageAdjust.ts) in both the editor and every export. hidden (the
+   layer eyeball) switches the grade off; params drive its dialog. */
+export interface AdjustEl extends BaseEl {
+  type: "adjust";
+  kind: AdjustKind;
+  params: Record<string, number | string>;
+}
+export type AdjustKind =
+  | "brightness" | "exposure" | "levels" | "curves" | "hsl" | "colorbalance"
+  | "bw" | "photofilter" | "invert" | "posterize" | "threshold"
+  | "gradientmap" | "grain" | "clarity";
+
+export type El = PanelEl | ImageEl | BalloonEl | TextEl | AdjustEl;
 
 export interface PageMargin { t: number; r: number; b: number; l: number }
 export interface Page {

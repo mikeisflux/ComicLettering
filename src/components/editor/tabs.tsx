@@ -162,7 +162,8 @@ export function renderLayersTab(ed: EditorCtx) {
       <div className="layerList">
         {els.map((el) => (
           <div key={el.id} className={"layerRow" + (selId === el.id ? " on" : "") + (el.hidden ? " off" : "")}
-            onClick={() => select(el.id)}>
+            onClick={() => select(el.id)}
+            onDoubleClick={() => { if (el.type === "adjust") ed.setAdjustEdit(el.id); }}>
             <button className={"layerBtn eye" + (el.hidden ? " shut" : "")}
               title={el.hidden ? "Show this layer" : "Hide this layer (it leaves the page, thumbnails and exports until switched back on)"}
               onClick={(e) => {
@@ -177,6 +178,10 @@ export function renderLayersTab(ed: EditorCtx) {
               </svg>
             </button>
             <span className="layerName">{elLabel(el)}</span>
+            {el.type === "adjust" && (
+              <button className="layerBtn" title="Edit this adjustment's sliders (or double-click the row)"
+                onClick={(e) => { e.stopPropagation(); ed.setAdjustEdit(el.id); }}>✎</button>
+            )}
             <button className="layerBtn" title="Forward" onClick={(e) => { e.stopPropagation(); move(el.id, 1); }}>▲</button>
             <button className="layerBtn" title="Backward" onClick={(e) => { e.stopPropagation(); move(el.id, -1); }}>▼</button>
             <button className={"layerBtn" + (el.locked ? " lockOn" : "")} title={el.locked ? "Unlock" : "Lock"}

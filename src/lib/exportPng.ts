@@ -9,6 +9,7 @@ import { BrushKey, brushScale, brushTile } from "./brushes";
 import { glowPasses } from "./glows";
 import { Warp, drawWarped, isWarped, warpBounds } from "./warp";
 import { canvasFilterSupported, pixelFilter } from "./canvasCompat";
+import { pageAdjustCanvas, pageAdjustLayers } from "./pageAdjust";
 
 interface MergeInfo { d: string; bodyD?: string; color: string; cx: number; cy: number; rot: number; bw: number; bh: number; stroke?: string; strokeW?: number }
 
@@ -552,6 +553,7 @@ function drawEl(
   joinRect?: { x: number; y: number; w: number; h: number } | null,
 ) {
   if (el.hidden) return;   // layer eyeball off — out of every export & thumbnail
+  if (el.type === "adjust") return;   // grades apply as a whole-page pass, not a drawable
   ctx.save();
   ctx.globalAlpha = el.opacity ?? 1;
   ctx.translate(el.x + el.w / 2, el.y + el.h / 2);
@@ -907,6 +909,13 @@ export async function renderPageToCanvas(
     }
   }
   clearShadow(ctx);
+  /* page ADJUSTMENT LAYERS: the finished page runs through the same SVG
+     filter chain the editor shows live — lettering-only exports skip the
+     grade (they hand clean lettering back to production) */
+  if (!letteringOnly) {
+    const grade = pageAdjustLayers(page);
+    if (grade.length) return pageAdjustCanvas(canvas, grade);
+  }
   return canvas;
 }
 

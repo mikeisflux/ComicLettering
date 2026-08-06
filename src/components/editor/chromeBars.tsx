@@ -257,6 +257,9 @@ export function renderToolbar(ed: EditorCtx) {
     <ToolBtn label="Smaller" icon="A−" disabled={!selTs} onClick={() =>
       mutateSel<BalloonEl | TextEl>((x) => { x.ts.size = clamp(Math.round(x.ts.size / 1.12), 8, 800); })} />
     <span className="tbSep" />
+    <ToolBtn label="Select" icon="↖"
+      title="Selection tool — the normal mouse. Drops the pen, shape marquees, Tuck Back, balloon sketch and note tools."
+      onClick={() => ed.resetTools()} />
     <ToolBtn label="Instant Alpha" icon="🪄"
       disabled={!selEl || (selEl.type !== "image" && selEl.type !== "panel") || !selEl.img}
       onClick={() => { if (selEl && (selEl.type === "image" || selEl.type === "panel") && selEl.img) runInstantAlpha(ed, selEl.id, selEl.img); }} />

@@ -1,6 +1,7 @@
 /* Balloon tray (bottom bar), context menu and modal dialogs.
    Plain exported render functions taking the EditorCtx bag. */
 import { clamp, makeText } from "@/lib/model";
+import { ADJUST_META } from "@/lib/pageAdjust";
 import { LETTER_STYLES, applyLetterStyle } from "@/lib/presets";
 import { STAMPS, WORD_STAMPS, letterStyleCss } from "./textHelpers";
 import { TrayBtn } from "./chrome";
@@ -439,6 +440,61 @@ export function renderInstallHelp(ed: EditorCtx) {
             </a>
           )}
           <button className="okBtn" onClick={close}>Got it</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* Adjustment-layer editor — opened when a tool adds a layer, and by
+   double-clicking (or ✎) the layer in the Layers panel. Sliders preview
+   live; Done commits, Delete removes the layer and its grade. */
+export function renderAdjustDialog(ed: EditorCtx) {
+  const id = ed.adjustEdit;
+  const page = ed.page;
+  if (!id || !page) return null;
+  const el = page.els.find((x) => x.id === id);
+  if (!el || el.type !== "adjust") return null;
+  const meta = ADJUST_META[el.kind];
+  const set = (k: string, v: number | string, final: boolean) => {
+    el.params = { ...el.params, [k]: v };
+    if (final) ed.commit(); else ed.force();
+  };
+  const done = () => { ed.setAdjustEdit(null); ed.commit(); };
+  return (
+    <div className="setupOverlay" onPointerDown={(e) => { if (e.target === e.currentTarget) done(); }}>
+      <div className="setupDlg" style={{ width: 380 }}>
+        <div className="setupTitle">✨ {meta.label}</div>
+        <div className="setupBody" style={{ flexDirection: "column", gap: 10 }}>
+          {meta.params.map((spec) => (
+            <div key={spec.key} className="adjRow">
+              <label>{spec.label}</label>
+              {spec.color ? (
+                <input type="color" value={String(el.params[spec.key] ?? spec.def)}
+                  onChange={(e) => set(spec.key, e.target.value, true)} />
+              ) : (
+                <>
+                  <input type="range" min={spec.min} max={spec.max} step={spec.step ?? 1}
+                    value={Number(el.params[spec.key] ?? spec.def)}
+                    onChange={(e) => set(spec.key, +e.target.value, false)}
+                    onPointerUp={() => ed.commit()} />
+                  <span className="adjVal">{Number(el.params[spec.key] ?? spec.def)}</span>
+                </>
+              )}
+            </div>
+          ))}
+          <div style={{ fontSize: 12, color: "#667" }}>
+            This layer grades the whole page. Its eyeball in the Layers panel
+            switches the grade off; double-click the layer to reopen this.
+          </div>
+        </div>
+        <div className="setupFoot">
+          <button onClick={() => {
+            page.els = page.els.filter((x) => x.id !== id);
+            ed.setAdjustEdit(null);
+            ed.commit();
+          }}>Delete Layer</button>
+          <button className="okBtn" onClick={done}>Done</button>
         </div>
       </div>
     </div>

@@ -15,6 +15,21 @@ import { StylesPanel } from "./stylesPanel";
 import { addPageAt } from "./spreadOps";
 import { dragInProgress } from "./penInput";
 import { PenPt, ShapeBox, flattenPen } from "./usePenPanel";
+import { adjustFilterMarkup, pageAdjustLayers } from "@/lib/pageAdjust";
+
+/* the page's live grade (adjustment layers) as a CSS filter reference —
+   the SVG defs are mounted once per canvas area (renderAdjustDefs) */
+const pageAdjUrl = (ed: EditorCtx, idx: number) => {
+  const pg = ed.doc?.pages[idx];
+  return pg && pageAdjustLayers(pg).length ? `url(#pgadj-${idx})` : undefined;
+};
+const renderAdjustDefs = (ed: EditorCtx) => (
+  <svg width={0} height={0} style={{ position: "absolute" }} aria-hidden>
+    <defs dangerouslySetInnerHTML={{
+      __html: ed.doc!.pages.map((p, i) => adjustFilterMarkup(`pgadj-${i}`, pageAdjustLayers(p))).join(""),
+    }} />
+  </svg>
+);
 import {
   ART_ACCEPT, ART_FORMATS_LABEL, assignImageToPanel, duplicatePage, importFontFiles,
   importImageFile, importJSON, importStampFiles, isSupportedArtFile, movePage,
@@ -219,6 +234,7 @@ function spreadHalf(ed: EditorCtx, sh: ShellProps, idx: number, off: number) {
         position: "absolute", left: off, top: 0, width: pg.w, height: pg.h,
         overflow: isCur && sh.tuckMode ? "visible" : "hidden",
         clipPath: spineCrop,
+        filter: pageAdjUrl(ed, idx),
         boxShadow: "0 4px 26px #00000066",
         /* own stacking context: a half's z-indexed children (tuck cutouts,
            carried lettering) must never paint over the OTHER half — print
@@ -372,6 +388,7 @@ export function renderCanvasArea(ed: EditorCtx, sh: ShellProps) {
   return (
     <div className="canvasArea" ref={sh.areaRef}
       onDragOver={(e) => e.preventDefault()} onDrop={(e) => onDrop(ed, e)}>
+      {renderAdjustDefs(ed)}
       <div className="rulerRow">
         <div className="rulerCorner" />
         <Ruler length={rulerW} zoom={zoom} vertical={false} offset={STAGE_MX}
@@ -394,6 +411,7 @@ export function renderCanvasArea(ed: EditorCtx, sh: ShellProps) {
               /* while the tuck lasso is armed the page unclips, so a trace
                  sweeping across the spine stays visible */
               overflow: tuckMode ? "visible" : undefined,
+              filter: pageAdjUrl(ed, ed.pageIndex),
               ...fillCss(page.bg),
             }}
             onPointerDown={(e) => { if (e.target === e.currentTarget && !dragInProgress()) select(null); }}

@@ -1003,6 +1003,18 @@ input[type="range"] { width: 110px; }
 .layerBtn.eye.shut svg { stroke: #99a; }
 .layerRow.off .layerName { opacity: 0.45; font-style: italic; }
 
+/* page adjustment layers: the inspector tool grid + slider dialog rows */
+.adjGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.adjBtn {
+  padding: 8px 6px; font-size: 12px; line-height: 1.2;
+  background: #fff; border: 1px solid var(--edge2); border-radius: 7px; cursor: pointer;
+}
+.adjBtn:hover { border-color: var(--sel); background: #f2f7fd; }
+.adjRow { display: flex; align-items: center; gap: 10px; }
+.adjRow label { flex: 0 0 130px; font-size: 13px; }
+.adjRow input[type="range"] { flex: 1; }
+.adjRow .adjVal { min-width: 34px; text-align: right; font-size: 12.5px; color: #556; }
+
 /* proofing */
 .proofCard { background: #fff; border: 1px solid var(--edge2); border-radius: 6px; padding: 10px; margin: 8px 0; cursor: pointer; }
 .proofCard:hover { border-color: var(--sel); }

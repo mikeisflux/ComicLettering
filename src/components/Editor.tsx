@@ -51,8 +51,8 @@ import {
 } from "./editor/tabs";
 import { renderFormatBar, renderMenuBar, renderToolbar } from "./editor/chromeBars";
 import {
-  renderContextMenu, renderExportDialog, renderExportProgress, renderFindDialog,
-  renderInstallHelp,
+  renderAdjustDialog, renderContextMenu, renderExportDialog, renderExportProgress,
+  renderFindDialog, renderInstallHelp,
   renderScriptDialog, renderTailAsk, renderTray, renderTuckDialog,
 } from "./editor/dialogs";
 
@@ -215,6 +215,8 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; id: string } | null>(null);
   const [showSetup, setShowSetup] = useState(false);
   const [showExport, setShowExport] = useState(false);
+  /* the adjustment layer whose slider dialog is open */
+  const [adjustEdit, setAdjustEdit] = useState<string | null>(null);
   /* real-time export progress — non-null while any export runs, drives the
      progress-bar overlay so users see work happening instead of re-clicking */
   const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
@@ -515,8 +517,8 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const modalOpenRef = useRef(false);
   useEffect(() => {
     modalOpenRef.current =
-      showSetup || showExport || showFind || showScript || showGradMaker || !!tuckAsk || !!tailAsk;
-  }, [showSetup, showExport, showFind, showScript, showGradMaker, tuckAsk, tailAsk]);
+      showSetup || showExport || showFind || showScript || showGradMaker || !!tuckAsk || !!tailAsk || !!adjustEdit;
+  }, [showSetup, showExport, showFind, showScript, showGradMaker, tuckAsk, tailAsk, adjustEdit]);
   useEffect(() => { editingIdRef.current = editingId; }, [editingId]);
   useEffect(() => { currentRef.current = current; }, [current]);
 
@@ -963,6 +965,17 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   });
   finishTuckPenRef.current = finishTuckPen;
 
+  /* the toolbar's white selection arrow: back to the plain mouse from any
+     modal tool (pen, shape marquees, Tuck Back, balloon sketch, notes) */
+  const resetTools = () => {
+    penCancel();                    // pen/shape/tuck modes + their refs
+    setDrawMode(false);
+    drawPtsRef.current = null;
+    setTuckAsk(null);
+    setCommentMode(false);
+    setStatus("Selection tool — the normal mouse.");
+  };
+
   /* ---------------- element ops ---------------- */
 
   /* Applies to every selected element, so one edit reaches the whole set.
@@ -1057,6 +1070,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     setEditingId, finishEditing, mutateSel, startDrag, pagePoint, fitZoom, startTuck,
     selectAllOnPage, installApp, appInstalled, showInstallHelp, setShowInstallHelp, winHide, toggleWindow, setAskAddPage,
     tuckAsk, setTuckAsk, retuneTuck, runTuckAuto, applyTuck, tuckTool, setTuckTool,
+    adjustEdit, setAdjustEdit, resetTools,
     autosaveSoon,
     rebuildThumbs, reseedAids, setThumbs, setPageIndex, setUserZoomed,
     setZoom, bumpFonts, registerRuntimeFont, savePresets,
@@ -1173,6 +1187,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       {renderFindDialog(ed)}
       {renderInstallHelp(ed)}
       {renderScriptDialog(ed)}
+      {renderAdjustDialog(ed)}
 
       {showGradMaker && (
         <GradientMaker
