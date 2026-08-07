@@ -1,6 +1,7 @@
 /* Full-resolution canvas renderer — used for PNG export and page thumbnails. */
 import {
   Assets, BalloonEl, Doc, El, FILTERS, FONTS, ImageEl, JoinLink, Page, TextEl, TextRun, TextStyle,
+  Fade,
   aabbOverlap, applyCrossbarI, deg2rad, joinGroupRect, joinLinks, lightenHex, pageBleed, panelPathD, resolveBalloon, rotVec,
 } from "./model";
 import { balloonGeom, arcTextLayout } from "./geometry";
@@ -547,6 +548,38 @@ function clearShadow(ctx: CanvasRenderingContext2D) {
   ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0; ctx.shadowBlur = 0;
 }
 
+/* the canvas twin of model.ts' fadeMaskCss: erase toward transparency from
+   a corner, an edge, or all around (vignette) */
+function fadeErase(c: CanvasRenderingContext2D, fade: Fade, w: number, h: number) {
+  const s = Math.min(1, Math.max(0.02, fade.size / 100));
+  c.save();
+  c.globalCompositeOperation = "destination-out";
+  let g: CanvasGradient;
+  if (fade.dir === "vignette") {
+    const r = Math.hypot(w, h) / 2;
+    g = c.createRadialGradient(w / 2, h / 2, Math.max(0, r * (1 - s)), w / 2, h / 2, r);
+    g.addColorStop(0, "rgba(0,0,0,0)");
+    g.addColorStop(1, "rgba(0,0,0,1)");
+  } else {
+    /* diagonal reach matches the CSS gradient-line length closely enough
+       for a soft feather */
+    const d = 0.85;
+    const ends: Record<string, [number, number, number, number]> = {
+      left: [0, 0, w * s, 0], right: [w, 0, w - w * s, 0],
+      top: [0, 0, 0, h * s], bottom: [0, h, 0, h - h * s],
+      tl: [0, 0, w * s * d, h * s * d], tr: [w, 0, w - w * s * d, h * s * d],
+      bl: [0, h, w * s * d, h - h * s * d], br: [w, h, w - w * s * d, h - h * s * d],
+    };
+    const [x0, y0, x1, y1] = ends[fade.dir] ?? ends.left;
+    g = c.createLinearGradient(x0, y0, x1, y1);
+    g.addColorStop(0, "rgba(0,0,0,1)");
+    g.addColorStop(1, "rgba(0,0,0,0)");
+  }
+  c.fillStyle = g;
+  c.fillRect(0, 0, w, h);
+  c.restore();
+}
+
 function drawEl(
   ctx: CanvasRenderingContext2D, el: El, assets: Assets, merge?: MergeInfo | null,
   /* join-group box in el-local coords — joined balloons share fill geometry */
@@ -562,41 +595,63 @@ function drawEl(
   ctx.translate(-el.w / 2, -el.h / 2);
 
   if (el.type === "panel" || el.type === "image") {
-    /* pen-drawn ("Draw Your Own") panels carry their outline in pts — the
-       same panelPathD the DOM editor clips with, so export stays WYSIWYG */
-    const penD = el.type === "panel" ? panelPathD(el) : null;
-    const rectPath = penD ? new Path2D(penD) : new Path2D();
-    if (!penD) rectPath.rect(0, 0, el.w, el.h);
-    if (el.shadow) {
-      ctx.save();
-      shapeShadow(ctx, true, 10);
-      ctx.fillStyle = el.type === "panel" ? "#ffffff" : "#00000001";
-      ctx.fill(rectPath);
-      ctx.restore();
-    }
-    if (el.type === "panel") paintFill(ctx, el.fill, el.w, el.h, rectPath);
-    const src = el.img ? assets[el.img] : null;
-    const img = src ? imgCache.get(src) : null;
-    if (img) {
-      ctx.save();
-      ctx.clip(rectPath);
-      drawCoverWithFilter(ctx, img, el.w, el.h, el.filter);
-      ctx.restore();
-    }
-    if (el.borderW > 0) {
-      ctx.strokeStyle = el.borderC;
-      if (penD) {
-        /* doubled stroke clipped to the inside — the DOM's inner border */
-        ctx.save();
-        ctx.clip(rectPath);
-        ctx.lineWidth = el.borderW * 2;
-        ctx.lineJoin = "round";
-        ctx.stroke(rectPath);
-        ctx.restore();
-      } else {
-        ctx.lineWidth = el.borderW;
-        ctx.strokeRect(el.borderW / 2, el.borderW / 2, el.w - el.borderW, el.h - el.borderW);
+    const paintBody = (c: CanvasRenderingContext2D) => {
+      /* pen-drawn ("Draw Your Own") panels carry their outline in pts — the
+         same panelPathD the DOM editor clips with, so export stays WYSIWYG */
+      const penD = el.type === "panel" ? panelPathD(el) : null;
+      const rectPath = penD ? new Path2D(penD) : new Path2D();
+      if (!penD) rectPath.rect(0, 0, el.w, el.h);
+      if (el.shadow) {
+        c.save();
+        shapeShadow(c, true, 10);
+        c.fillStyle = el.type === "panel" ? "#ffffff" : "#00000001";
+        c.fill(rectPath);
+        c.restore();
       }
+      if (el.type === "panel") paintFill(c, el.fill, el.w, el.h, rectPath);
+      const src = el.img ? assets[el.img] : null;
+      const img = src ? imgCache.get(src) : null;
+      if (img) {
+        c.save();
+        c.clip(rectPath);
+        drawCoverWithFilter(c, img, el.w, el.h, el.filter);
+        c.restore();
+      }
+      if (el.borderW > 0) {
+        c.strokeStyle = el.borderC;
+        if (penD) {
+          /* doubled stroke clipped to the inside — the DOM's inner border */
+          c.save();
+          c.clip(rectPath);
+          c.lineWidth = el.borderW * 2;
+          c.lineJoin = "round";
+          c.stroke(rectPath);
+          c.restore();
+        } else {
+          c.lineWidth = el.borderW;
+          c.strokeRect(el.borderW / 2, el.borderW / 2, el.w - el.borderW, el.h - el.borderW);
+        }
+      }
+    };
+    const fade = el.fade;
+    if (fade && fade.size > 0 && typeof document !== "undefined") {
+      /* fade tool: paint the element offscreen (2× so high-dpi exports stay
+         sharp), erase with the fade gradient, then blit — the same mask the
+         DOM applies via fadeMaskCss */
+      const off = document.createElement("canvas");
+      off.width = Math.max(2, Math.ceil(el.w * 2));
+      off.height = Math.max(2, Math.ceil(el.h * 2));
+      const oc = off.getContext("2d");
+      if (oc) {
+        oc.scale(2, 2);
+        paintBody(oc);
+        fadeErase(oc, fade, el.w, el.h);
+        ctx.drawImage(off, 0, 0, el.w, el.h);
+      } else {
+        paintBody(ctx);
+      }
+    } else {
+      paintBody(ctx);
     }
   } else if (el.type === "balloon") {
     const g = balloonGeom(el);

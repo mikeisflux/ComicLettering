@@ -1,7 +1,7 @@
 /* Right-panel Inspector — page / element property editors.
    Plain exported render functions taking the EditorCtx bag. */
 import {
-  AdjustKind, BALLOON_KINDS, BLEED, BalloonEl, BalloonKind, FILTERS, FONTS, PAGE_SIZES,
+  AdjustKind, BALLOON_KINDS, BLEED, BalloonEl, BalloonKind, FILTERS, FONTS, FadeDir, PAGE_SIZES,
   PanelEl, TAILLESS_KINDS, TextEl, TextStyle, clamp,
 } from "@/lib/model";
 import { ADJUST_META, makeAdjust } from "@/lib/pageAdjust";
@@ -344,6 +344,33 @@ export function renderInspector(ed: EditorCtx) {
             </Fld>
             <Fld label="Shadow"><input type="checkbox" checked={el.shadow}
               onChange={(e) => mutateSel((b) => { b.shadow = e.target.checked; })} /></Fld>
+            {/* fade tool: feather the art to transparent from a corner,
+                an edge, or all around — prints exactly as previewed */}
+            <Fld label="Fade">
+              <select value={el.fade?.dir ?? "none"}
+                onChange={(e) => mutateSel<PanelEl>((b) => {
+                  const dir = e.target.value;
+                  b.fade = dir === "none" ? undefined : { dir: dir as FadeDir, size: b.fade?.size ?? 35 };
+                })}>
+                <option value="none">None</option>
+                <option value="tl">Top-left corner</option>
+                <option value="tr">Top-right corner</option>
+                <option value="bl">Bottom-left corner</option>
+                <option value="br">Bottom-right corner</option>
+                <option value="left">Left edge</option>
+                <option value="right">Right edge</option>
+                <option value="top">Top edge</option>
+                <option value="bottom">Bottom edge</option>
+                <option value="vignette">All around (vignette)</option>
+              </select>
+            </Fld>
+            {el.fade && (
+              <Fld label="Fade reach">
+                <input type="range" min={5} max={100} value={el.fade.size}
+                  onChange={(e) => mutateSel<PanelEl>((b) => { if (b.fade) b.fade = { ...b.fade, size: +e.target.value }; }, false)}
+                  onPointerUp={() => ed.commit()} />
+              </Fld>
+            )}
             <div className="btnRow">
               <button onClick={() => { panelImageTarget.current = el.id; filePanelImageRef.current?.click(); }}>
                 {el.img ? "Replace image…" : "Set image…"}

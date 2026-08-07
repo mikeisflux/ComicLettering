@@ -296,10 +296,35 @@ export interface BaseEl {
   /* layer group tag — rows sharing it fold under one header in Layers */
   group?: string;
 }
+/* Fade tool: feather a panel/image to transparent from a corner, an edge,
+   or all around (vignette). size = how far the fade reaches, in % */
+export type FadeDir = "tl" | "tr" | "bl" | "br" | "left" | "right" | "top" | "bottom" | "vignette";
+export interface Fade { dir: FadeDir; size: number }
+
+/* the DOM mask for a fade — the canvas renderer mirrors these gradients
+   (fadeErase in exportPng) so editor and export stay WYSIWYG */
+export function fadeMaskCss(fade?: Fade): string | undefined {
+  if (!fade || !fade.size) return undefined;
+  const s = clamp(fade.size, 2, 100);
+  const lin = (ang: string) => `linear-gradient(${ang}, transparent 0%, #000 ${s}%)`;
+  switch (fade.dir) {
+    case "left": return lin("to right");
+    case "right": return lin("to left");
+    case "top": return lin("to bottom");
+    case "bottom": return lin("to top");
+    case "tl": return lin("135deg");
+    case "tr": return lin("225deg");
+    case "bl": return lin("45deg");
+    case "br": return lin("315deg");
+    case "vignette": return `radial-gradient(ellipse at center, #000 ${Math.max(0, 100 - s)}%, transparent 100%)`;
+  }
+}
+
 export interface PanelEl extends BaseEl {
   type: "panel";
   fill: FillStyle; borderW: number; borderC: string;
   img: string | null; filter: FilterKey;
+  fade?: Fade;
   /* "Draw Your Own" pen-tool outline: closed shape as fractions of the
      panel box (curves arrive pre-flattened to a dense polygon, so moving/
      resizing just scales). Absent = plain rectangle. */
@@ -309,6 +334,7 @@ export interface ImageEl extends BaseEl {
   type: "image";
   img: string; filter: FilterKey;
   borderW: number; borderC: string;
+  fade?: Fade;
   /* a Tuck Back cutout rather than artwork in its own right. It sits
      above the lettering, so it would otherwise be the first thing the next
      trace lands on — and tracing a cutout of a cutout gets you nowhere. */

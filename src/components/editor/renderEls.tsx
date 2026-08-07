@@ -4,7 +4,7 @@
    contentEditable text keeps focus while editing). */
 import React, { CSSProperties } from "react";
 import {
-  El, FILTERS, JoinLink, PanelEl, TextEl, aabbOverlap, applyCrossbarI, joinGroupRect, joinLinks, panelPathD, resolveBalloon, rotVec,
+  El, FILTERS, JoinLink, PanelEl, TextEl, aabbOverlap, applyCrossbarI, fadeMaskCss, joinGroupRect, joinLinks, panelPathD, resolveBalloon, rotVec,
 } from "@/lib/model";
 import { arcTextLayout, balloonGeom, connectorMid } from "@/lib/geometry";
 import { fillCss } from "@/lib/fills";
@@ -258,6 +258,8 @@ export function renderEl(ed: EditorCtx, el: El) {
 
   if (el.type === "panel" || el.type === "image") {
     const src = el.img ? assetsRef.current[el.img] : null;
+    /* fade tool: mask mirrors the export's fadeErase gradients */
+    const fadeCss = fadeMaskCss(el.fade);
     /* pen-drawn ("Draw Your Own") panel: fill and artwork clip to the drawn
        outline and the border strokes along it. The shadow filter must sit on
        the OUTER div — clip-path would clip away its own drop-shadow. */
@@ -274,6 +276,7 @@ export function renderEl(ed: EditorCtx, el: El) {
         <div {...common} className="el panel" style={{
           ...style, border: "none", overflow: "visible", zIndex,
           filter: el.shadow ? "drop-shadow(8px 8px 12px #00000059)" : undefined,
+          WebkitMaskImage: fadeCss, maskImage: fadeCss,
         }}>
           <div style={{ position: "absolute", inset: 0, overflow: "hidden", clipPath: `path("${penD}")`, ...fillCss((el as PanelEl).fill) }}>
             {src && (
@@ -299,7 +302,8 @@ export function renderEl(ed: EditorCtx, el: El) {
       ...(el.type === "panel" ? fillCss(el.fill) : {}),
       border: el.borderW > 0 ? `${el.borderW}px solid ${el.borderC}` : "none",
       overflow: "hidden",
-      boxShadow: el.shadow ? "8px 8px 12px #00000059" : undefined,
+      boxShadow: el.shadow && !fadeCss ? "8px 8px 12px #00000059" : undefined,
+      WebkitMaskImage: fadeCss, maskImage: fadeCss,
       zIndex,
     };
     return (

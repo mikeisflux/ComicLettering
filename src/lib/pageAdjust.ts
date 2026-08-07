@@ -480,50 +480,94 @@ function stageMarkup(el: AdjustEl, src: string, out: string): string {
         MIX(src, `${out}m`, out, d);
     }
     case "selectivecolor": {
-      /* Per-family CMYK shifts. Each family gets a per-pixel membership
-         mask (linear channel math, clamped by the filter), the CMYK move
-         becomes ± channel deltas, and mask×delta is added on via
-         arithmetic composites. Families at zero cost nothing. */
-      const method = num(p.method, 0) ? 0.9 : 0.45;   // absolute vs relative
-      const MASKS: Record<string, [number, number, number, number] | "neu"> = {
-        red: [1, -0.5, -0.5, 0], yel: [0.5, 0.5, -1, 0], grn: [-0.5, 1, -0.5, 0],
-        cyn: [-1, 0.5, 0.5, 0], blu: [-0.5, -0.5, 1, 0], mag: [0.5, -1, 0.5, 0],
-        wht: [0.64, 2.15, 0.22, -2], blk: [-0.64, -2.15, -0.22, 1], neu: "neu",
-      };
+      /* Photoshop-compatible Selective Color (masks per pkh.me's reverse
+         engineering / FFmpeg's selectivecolor): a pixel's membership in
+         each family comes from channel min/max comparisons —
+           reds R−max(G,B) · yellows min(R,G)−B · greens G−max(R,B)
+           cyans min(G,B)−R · blues B−max(R,G) · magentas min(R,B)−G
+           whites 2·min−1 · blacks 1−2·max · neutrals broad mid-tent —
+         and the C/M/Y/K sliders push ink into R/G/B (K into all three).
+         RELATIVE additionally scales by the pixel's existing ink (1−C).
+
+         Filter mechanics: min/max via feBlend darken/lighten; the hue
+         subtraction A−B is realised as the alpha-safe product A·(1−B)
+         (a plain arithmetic subtract zeroes the ALPHA channel and premul
+         storage then destroys the mask — the bug that made v1 a no-op);
+         negative deltas apply through complement→add→complement for the
+         same reason. */
+      const active = SEL_FAMILIES.map(([f]) => f).filter((f) =>
+        num(p[`${f}_c`], 0) || num(p[`${f}_m`], 0) || num(p[`${f}_y`], 0) || num(p[`${f}_k`], 0));
+      if (!active.length) return linearCT(src, out, 1, 0);
+      const relative = !num(p.method, 0);
       const toHex = (r: number, g: number, b: number) => {
         const c = (v: number) => Math.round(clamp(v, 0, 1) * 255).toString(16).padStart(2, "0");
         return `#${c(r)}${c(g)}${c(b)}`;
       };
-      let cur = src, body = "", fi = 0;
-      for (const fam of Object.keys(MASKS)) {
+      /* shared per-stage images: isolated channels + their inverses */
+      const CR = `${out}cr`, CG = `${out}cg`, CB = `${out}cb`, INV = `${out}inv`;
+      const iso = (r: number, g: number, b: number, res: string) => {
+        const row = `${r} ${g} ${b} 0 0`;
+        return `<feColorMatrix in="${src}" type="matrix" result="${res}" values="${row} ${row} ${row} 0 0 0 0 1"/>`;
+      };
+      let body = iso(1, 0, 0, CR) + iso(0, 1, 0, CG) + iso(0, 0, 1, CB);
+      if (relative) {
+        /* 1−R / 1−G / 1−B per channel — the pixel's ink room */
+        body += `<feColorMatrix in="${src}" type="matrix" result="${INV}" values="` +
+          `-1 0 0 0 1 0 -1 0 0 1 0 0 -1 0 1 0 0 0 0 1"/>`;
+      }
+      const blend = (mode: string, a: string, b: string, res: string) =>
+        `<feBlend mode="${mode}" in="${a}" in2="${b}" result="${res}"/>`;
+      const mul = (a: string, b: string, res: string) =>
+        `<feComposite in="${a}" in2="${b}" operator="arithmetic" k1="1" k2="0" k3="0" k4="0" result="${res}"/>`;
+      const invCT = (a: string, res: string) => linearCT(a, res, -1, 1);
+      let cur = src, fi = 0;
+      for (const fam of active) {
+        const mk = `${out}m${fi}`;
+        /* membership mask, alpha kept at 1 throughout */
+        switch (fam) {
+          case "red": body += blend("lighten", CG, CB, `${mk}t`) + invCT(`${mk}t`, `${mk}i`) + mul(CR, `${mk}i`, mk); break;
+          case "yel": body += blend("darken", CR, CG, `${mk}t`) + invCT(CB, `${mk}i`) + mul(`${mk}t`, `${mk}i`, mk); break;
+          case "grn": body += blend("lighten", CR, CB, `${mk}t`) + invCT(`${mk}t`, `${mk}i`) + mul(CG, `${mk}i`, mk); break;
+          case "cyn": body += blend("darken", CG, CB, `${mk}t`) + invCT(CR, `${mk}i`) + mul(`${mk}t`, `${mk}i`, mk); break;
+          case "blu": body += blend("lighten", CR, CG, `${mk}t`) + invCT(`${mk}t`, `${mk}i`) + mul(CB, `${mk}i`, mk); break;
+          case "mag": body += blend("darken", CR, CB, `${mk}t`) + invCT(CG, `${mk}i`) + mul(`${mk}t`, `${mk}i`, mk); break;
+          case "wht": body += blend("darken", CR, CG, `${mk}t`) + blend("darken", `${mk}t`, CB, `${mk}u`) +
+            linearCT(`${mk}u`, mk, 2, -1); break;
+          case "blk": body += blend("lighten", CR, CG, `${mk}t`) + blend("lighten", `${mk}t`, CB, `${mk}u`) +
+            linearCT(`${mk}u`, mk, -2, 1); break;
+          default: body += LUM(src, `${mk}l`) +
+            `<feComponentTransfer in="${mk}l" result="${mk}">` +
+            `<feFuncR type="table" tableValues="0 1 1 1 1 1 0"/>` +
+            `<feFuncG type="table" tableValues="0 1 1 1 1 1 0"/>` +
+            `<feFuncB type="table" tableValues="0 1 1 1 1 1 0"/>` +
+            `</feComponentTransfer>`;
+        }
+        /* relative scales the mask by the ink room per channel */
+        const maskUse = relative ? `${mk}rel` : mk;
+        if (relative) body += mul(mk, INV, `${mk}rel`);
         const c = num(p[`${fam}_c`], 0) / 100, m = num(p[`${fam}_m`], 0) / 100;
         const y = num(p[`${fam}_y`], 0) / 100, k = num(p[`${fam}_k`], 0) / 100;
-        if (!c && !m && !y && !k) continue;
-        const dR = (-c - k) * method, dG = (-m - k) * method, dB = (-y - k) * method;
-        const mk = `${out}m${fi}`;
-        const spec = MASKS[fam];
-        if (spec === "neu") {
-          body += LUM(src, `${mk}l`) +
-            `<feComponentTransfer in="${mk}l" result="${mk}">` +
-            `<feFuncR type="table" tableValues="0 1 0"/><feFuncG type="table" tableValues="0 1 0"/><feFuncB type="table" tableValues="0 1 0"/>` +
-            `</feComponentTransfer>`;
-        } else {
-          const [mr, mg, mb, mo] = spec;
-          const rowM = `${F(mr)} ${F(mg)} ${F(mb)} 0 ${F(mo)}`;
-          body += `<feColorMatrix in="${src}" type="matrix" result="${mk}" values="${rowM} ${rowM} ${rowM} 0 0 0 1 0"/>`;
+        const dR = -(c + k), dG = -(m + k), dB = -(y + k);
+        const hasPos = dR > 0 || dG > 0 || dB > 0;
+        const hasNeg = dR < 0 || dG < 0 || dB < 0;
+        if (hasPos) {
+          body += `<feFlood flood-color="${toHex(Math.max(0, dR), Math.max(0, dG), Math.max(0, dB))}" result="${mk}fp"/>` +
+            mul(maskUse, `${mk}fp`, `${mk}p`) +
+            `<feComposite in="${cur}" in2="${mk}p" operator="arithmetic" k1="0" k2="1" k3="1" k4="0" result="${mk}a"/>`;
+          cur = `${mk}a`;
         }
-        const pos = toHex(Math.max(0, dR), Math.max(0, dG), Math.max(0, dB));
-        const neg = toHex(Math.max(0, -dR), Math.max(0, -dG), Math.max(0, -dB));
-        body += `<feFlood flood-color="${pos}" result="${mk}fp"/>` +
-          `<feComposite in="${mk}" in2="${mk}fp" operator="arithmetic" k1="1" k2="0" k3="0" k4="0" result="${mk}p"/>` +
-          `<feFlood flood-color="${neg}" result="${mk}fn"/>` +
-          `<feComposite in="${mk}" in2="${mk}fn" operator="arithmetic" k1="1" k2="0" k3="0" k4="0" result="${mk}n"/>` +
-          `<feComposite in="${cur}" in2="${mk}p" operator="arithmetic" k1="0" k2="1" k3="1" k4="0" result="${mk}a"/>` +
-          `<feComposite in="${mk}a" in2="${mk}n" operator="arithmetic" k1="0" k2="1" k3="-1" k4="0" result="${mk}z"/>`;
-        cur = `${mk}z`;
+        if (hasNeg) {
+          /* cur − d as 1 − ((1 − cur) + d): every step keeps alpha at 1 */
+          body += `<feFlood flood-color="${toHex(Math.max(0, -dR), Math.max(0, -dG), Math.max(0, -dB))}" result="${mk}fn"/>` +
+            mul(maskUse, `${mk}fn`, `${mk}n`) +
+            invCT(cur, `${mk}v`) +
+            `<feComposite in="${mk}v" in2="${mk}n" operator="arithmetic" k1="0" k2="1" k3="1" k4="0" result="${mk}w"/>` +
+            invCT(`${mk}w`, `${mk}z`);
+          cur = `${mk}z`;
+        }
         fi++;
       }
-      return body + linearCT(cur, out, 1, 0);   // identity when nothing set
+      return body + linearCT(cur, out, 1, 0);
     }
     case "colorlookup": {
       const look = LOOKUP_TABLE[String(p.look)] ?? LOOKUP_TABLE["Teal & Orange"];
