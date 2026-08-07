@@ -548,18 +548,25 @@ function clearShadow(ctx: CanvasRenderingContext2D) {
   ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0; ctx.shadowBlur = 0;
 }
 
-/* the canvas twin of model.ts' fadeMaskCss: erase toward transparency from
-   a corner, an edge, or all around (vignette) */
+/* the canvas twin of model.ts' fadeMaskCss/fadeOverlayCss: fade the drawn
+   element toward transparency (legacy) or INTO white/black, from a corner,
+   an edge, or all around (vignette). source-atop keeps the white/black
+   overlay inside the element's own pixels — pen shapes included. */
 function fadeErase(c: CanvasRenderingContext2D, fade: Fade, w: number, h: number) {
   const s = Math.min(1, Math.max(0.02, fade.size / 100));
+  const [solid, clear] = fade.to === "black"
+    ? ["rgba(0,0,0,1)", "rgba(0,0,0,0)"]
+    : fade.to === "white"
+      ? ["rgba(255,255,255,1)", "rgba(255,255,255,0)"]
+      : ["rgba(0,0,0,1)", "rgba(0,0,0,0)"];
   c.save();
-  c.globalCompositeOperation = "destination-out";
+  c.globalCompositeOperation = fade.to ? "source-atop" : "destination-out";
   let g: CanvasGradient;
   if (fade.dir === "vignette") {
     const r = Math.hypot(w, h) / 2;
     g = c.createRadialGradient(w / 2, h / 2, Math.max(0, r * (1 - s)), w / 2, h / 2, r);
-    g.addColorStop(0, "rgba(0,0,0,0)");
-    g.addColorStop(1, "rgba(0,0,0,1)");
+    g.addColorStop(0, clear);
+    g.addColorStop(1, solid);
   } else {
     /* diagonal reach matches the CSS gradient-line length closely enough
        for a soft feather */
@@ -572,8 +579,8 @@ function fadeErase(c: CanvasRenderingContext2D, fade: Fade, w: number, h: number
     };
     const [x0, y0, x1, y1] = ends[fade.dir] ?? ends.left;
     g = c.createLinearGradient(x0, y0, x1, y1);
-    g.addColorStop(0, "rgba(0,0,0,1)");
-    g.addColorStop(1, "rgba(0,0,0,0)");
+    g.addColorStop(0, solid);
+    g.addColorStop(1, clear);
   }
   c.fillStyle = g;
   c.fillRect(0, 0, w, h);

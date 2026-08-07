@@ -299,12 +299,33 @@ export interface BaseEl {
 /* Fade tool: feather a panel/image to transparent from a corner, an edge,
    or all around (vignette). size = how far the fade reaches, in % */
 export type FadeDir = "tl" | "tr" | "bl" | "br" | "left" | "right" | "top" | "bottom" | "vignette";
-export interface Fade { dir: FadeDir; size: number }
+/* to: fade the art INTO white or black; absent = legacy fade-to-transparent */
+export interface Fade { dir: FadeDir; size: number; to?: "white" | "black" }
 
 /* the DOM mask for a fade — the canvas renderer mirrors these gradients
    (fadeErase in exportPng) so editor and export stay WYSIWYG */
+/* the white/black fade as a CSS overlay gradient (solid at the chosen
+   corner/edge, gone by `size`%) — canvas twin lives in exportPng */
+export function fadeOverlayCss(fade?: Fade): string | undefined {
+  if (!fade || !fade.size || !fade.to) return undefined;
+  const s = clamp(fade.size, 2, 100);
+  const col = fade.to === "black" ? "#000" : "#fff";
+  const lin = (ang: string) => `linear-gradient(${ang}, ${col} 0%, transparent ${s}%)`;
+  switch (fade.dir) {
+    case "left": return lin("to right");
+    case "right": return lin("to left");
+    case "top": return lin("to bottom");
+    case "bottom": return lin("to top");
+    case "tl": return lin("135deg");
+    case "tr": return lin("225deg");
+    case "bl": return lin("45deg");
+    case "br": return lin("315deg");
+    case "vignette": return `radial-gradient(ellipse at center, transparent ${Math.max(0, 100 - s)}%, ${col} 100%)`;
+  }
+}
+
 export function fadeMaskCss(fade?: Fade): string | undefined {
-  if (!fade || !fade.size) return undefined;
+  if (!fade || !fade.size || fade.to) return undefined;
   const s = clamp(fade.size, 2, 100);
   const lin = (ang: string) => `linear-gradient(${ang}, transparent 0%, #000 ${s}%)`;
   switch (fade.dir) {

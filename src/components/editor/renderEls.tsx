@@ -4,7 +4,7 @@
    contentEditable text keeps focus while editing). */
 import React, { CSSProperties } from "react";
 import {
-  El, FILTERS, JoinLink, PanelEl, TextEl, aabbOverlap, applyCrossbarI, fadeMaskCss, joinGroupRect, joinLinks, panelPathD, resolveBalloon, rotVec,
+  El, FILTERS, JoinLink, PanelEl, TextEl, aabbOverlap, applyCrossbarI, fadeMaskCss, fadeOverlayCss, joinGroupRect, joinLinks, panelPathD, resolveBalloon, rotVec,
 } from "@/lib/model";
 import { arcTextLayout, balloonGeom, connectorMid } from "@/lib/geometry";
 import { fillCss } from "@/lib/fills";
@@ -258,8 +258,13 @@ export function renderEl(ed: EditorCtx, el: El) {
 
   if (el.type === "panel" || el.type === "image") {
     const src = el.img ? assetsRef.current[el.img] : null;
-    /* fade tool: mask mirrors the export's fadeErase gradients */
+    /* fade tool: legacy transparent fades mask the element; white/black
+       fades overlay a gradient — both mirror the export's fadeErase */
     const fadeCss = fadeMaskCss(el.fade);
+    const fadeOv = fadeOverlayCss(el.fade);
+    const fadeOvNode = fadeOv ? (
+      <div style={{ position: "absolute", inset: 0, background: fadeOv, pointerEvents: "none" }} aria-hidden />
+    ) : null;
     /* pen-drawn ("Draw Your Own") panel: fill and artwork clip to the drawn
        outline and the border strokes along it. The shadow filter must sit on
        the OUTER div — clip-path would clip away its own drop-shadow. */
@@ -283,6 +288,7 @@ export function renderEl(ed: EditorCtx, el: El) {
               <img src={src} className="cover" draggable={false} alt=""
                 style={{ filter: FILTERS[el.filter]?.css || undefined }} />
             )}
+            {fadeOvNode}
           </div>
           {el.borderW > 0 && (
             <svg width={el.w} height={el.h} viewBox={`0 0 ${el.w} ${el.h}`}
@@ -312,6 +318,7 @@ export function renderEl(ed: EditorCtx, el: El) {
           <img src={src} className="cover" draggable={false} alt=""
             style={{ filter: FILTERS[el.filter]?.css || undefined }} />
         )}
+        {fadeOvNode}
       </div>
     );
   }

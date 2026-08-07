@@ -1111,6 +1111,17 @@ input[type="range"].adjTrack::-moz-range-thumb {
   border-radius: 5px; font-size: 12.5px; cursor: pointer;
 }
 .lfMenu button:hover { background: #eaf3fd; }
+/* the fade tool popup (floats — no veil, live canvas preview behind it) */
+.fadePick { width: 100%; text-align: left; padding: 6px 9px; background: #fff; border: 1px solid var(--edge2); border-radius: 6px; }
+.fadePick:hover { border-color: var(--sel); }
+.lfMenu.fadeMenu { position: fixed; bottom: auto; z-index: 450; min-width: 210px; }
+.fadeKinds { display: flex; gap: 6px; padding: 0 6px 4px; }
+.fadeKinds button { flex: 1; border: 1px solid var(--edge2); border-radius: 6px; padding: 7px 6px; background: #fff; }
+.fadeKinds button.on { box-shadow: inset 0 0 0 2px var(--sel); background: #eaf3fd; }
+.fadeDirs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 0 6px 4px; }
+.fadeDirs button { border: 1px solid var(--edge2); border-radius: 6px; padding: 6px 0; background: #fff; font-size: 13px; }
+.fadeDirs button.on { box-shadow: inset 0 0 0 2px var(--sel); background: #eaf3fd; }
+.fadeMenu input[type="range"] { width: calc(100% - 16px); margin: 2px 8px 8px; }
 /* drag-to-reorder grip on each layer row */
 .layerGrip {
   display: flex; align-items: center; padding: 2px 1px;

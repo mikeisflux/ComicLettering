@@ -67,6 +67,17 @@ export function tsControls(ed: EditorCtx, el: BalloonEl | TextEl) {
   );
 }
 
+/* the fade tool's popup anchor + labels */
+let fadePos = { x: 0, y: 0 };
+const FADE_DIR_LABEL: Record<FadeDir, string> = {
+  tl: "Top-left corner", tr: "Top-right corner", bl: "Bottom-left corner", br: "Bottom-right corner",
+  left: "Left edge", right: "Right edge", top: "Top edge", bottom: "Bottom edge",
+  vignette: "All around (vignette)",
+};
+const FADE_DIR_GLYPH: Record<FadeDir, string> = {
+  tl: "◤", top: "▲", tr: "◥", left: "◀", vignette: "◎", right: "▶", bl: "◣", bottom: "▼", br: "◢",
+};
+
 /* each adjustment tool's tile icon — small 24×24 glyphs in the spirit of
    the Photoshop adjustments panel, with a touch of colour where the tool
    is about colour */
@@ -344,32 +355,55 @@ export function renderInspector(ed: EditorCtx) {
             </Fld>
             <Fld label="Shadow"><input type="checkbox" checked={el.shadow}
               onChange={(e) => mutateSel((b) => { b.shadow = e.target.checked; })} /></Fld>
-            {/* fade tool: feather the art to transparent from a corner,
-                an edge, or all around — prints exactly as previewed */}
+            {/* fade tool: one button, both kinds in the popup — the popup
+                floats with NO veil so the fade previews live on the page */}
             <Fld label="Fade">
-              <select value={el.fade?.dir ?? "none"}
-                onChange={(e) => mutateSel<PanelEl>((b) => {
-                  const dir = e.target.value;
-                  b.fade = dir === "none" ? undefined : { dir: dir as FadeDir, size: b.fade?.size ?? 35 };
-                })}>
-                <option value="none">None</option>
-                <option value="tl">Top-left corner</option>
-                <option value="tr">Top-right corner</option>
-                <option value="bl">Bottom-left corner</option>
-                <option value="br">Bottom-right corner</option>
-                <option value="left">Left edge</option>
-                <option value="right">Right edge</option>
-                <option value="top">Top edge</option>
-                <option value="bottom">Bottom edge</option>
-                <option value="vignette">All around (vignette)</option>
-              </select>
+              <button className="fadePick" onClick={(e) => {
+                const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                fadePos = { x: Math.min(r.left - 120, innerWidth - 240), y: Math.min(r.bottom + 6, innerHeight - 330) };
+                ed.setOpenMenu(ed.openMenu === "fadeMenu" ? null : "fadeMenu");
+              }}>
+                {el.fade ? `${el.fade.to === "black" ? "⬛ Black" : "⬜ White"} · ${FADE_DIR_LABEL[el.fade.dir]}` : "Fade tool…"}
+              </button>
             </Fld>
-            {el.fade && (
-              <Fld label="Fade reach">
-                <input type="range" min={5} max={100} value={el.fade.size}
-                  onChange={(e) => mutateSel<PanelEl>((b) => { if (b.fade) b.fade = { ...b.fade, size: +e.target.value }; }, false)}
-                  onPointerUp={() => ed.commit()} />
-              </Fld>
+            {ed.openMenu === "fadeMenu" && (
+              <>
+                <div className="menuBackdrop" onPointerDown={() => ed.setOpenMenu(null)} />
+                <div className="lfMenu fadeMenu" style={{ left: fadePos.x, top: fadePos.y }}>
+                  <div className="lfLabel">Fade the art into…</div>
+                  <div className="fadeKinds">
+                    <button className={el.fade && el.fade.to !== "black" ? "on" : ""}
+                      onClick={() => mutateSel<PanelEl>((b) => {
+                        b.fade = { to: "white", dir: b.fade?.dir ?? "br", size: b.fade?.size ?? 35 };
+                      })}>⬜ White</button>
+                    <button className={el.fade?.to === "black" ? "on" : ""}
+                      onClick={() => mutateSel<PanelEl>((b) => {
+                        b.fade = { to: "black", dir: b.fade?.dir ?? "br", size: b.fade?.size ?? 35 };
+                      })}>⬛ Black</button>
+                  </div>
+                  {el.fade && (
+                    <>
+                      <div className="lfLabel">From</div>
+                      <div className="fadeDirs">
+                        {(["tl", "top", "tr", "left", "vignette", "right", "bl", "bottom", "br"] as FadeDir[]).map((d) => (
+                          <button key={d} className={el.fade?.dir === d ? "on" : ""} title={FADE_DIR_LABEL[d]}
+                            onClick={() => mutateSel<PanelEl>((b) => { if (b.fade) b.fade = { ...b.fade, dir: d }; })}>
+                            {FADE_DIR_GLYPH[d]}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="lfLabel">Reach</div>
+                      <input type="range" min={5} max={100} value={el.fade.size}
+                        onChange={(e) => mutateSel<PanelEl>((b) => { if (b.fade) b.fade = { ...b.fade, size: +e.target.value }; }, false)}
+                        onPointerUp={() => ed.commit()} />
+                      <div className="lfRow">
+                        <button onClick={() => { mutateSel<PanelEl>((b) => { b.fade = undefined; }); ed.setOpenMenu(null); }}>Remove</button>
+                        <button className="lfGo" onClick={() => ed.setOpenMenu(null)}>Done</button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </>
             )}
             <div className="btnRow">
               <button onClick={() => { panelImageTarget.current = el.id; filePanelImageRef.current?.click(); }}>
