@@ -51,7 +51,7 @@ import {
 } from "./editor/tabs";
 import { renderFormatBar, renderMenuBar, renderToolbar } from "./editor/chromeBars";
 import {
-  renderContextMenu, renderExportDialog, renderExportProgress,
+  renderAssocHelp, renderContextMenu, renderExportDialog, renderExportProgress,
   renderFindDialog, renderInstallHelp,
   renderScriptDialog, renderTailAsk, renderTray, renderTuckDialog,
 } from "./editor/dialogs";
@@ -1020,6 +1020,20 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   usePinchZoom(areaRef, zoom, setZoom, setUserZoomed, mounted && !!doc && !!page);
   /* no native prompt available → a visible how-to-install dialog opens */
   const [showInstallHelp, setShowInstallHelp] = useState(false);
+  /* Running as the INSTALLED app for the first time: offer the one-time
+     .lmc "Open with" walkthrough — Windows only registers the file icon
+     once an association exists, and nothing tells the user that. */
+  const [showAssocHelp, setShowAssocHelp] = useState(false);
+  useEffect(() => {
+    try {
+      const installed = window.matchMedia?.("(display-mode: standalone)").matches
+        || window.matchMedia?.("(display-mode: window-controls-overlay)").matches;
+      if (installed && !localStorage.getItem("lmc.assoc.seen")) {
+        const t = setTimeout(() => setShowAssocHelp(true), 1200);
+        return () => clearTimeout(t);
+      }
+    } catch { /* private mode */ }
+  }, []);
   /* Window menu: per-panel visibility, remembered on this browser.
      PHONES start with the format bar and both side rails hidden — the
      canvas gets the screen; saved choices still win. */
@@ -1069,7 +1083,8 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     fileFontRef, fileStampRef,
     force, commit, autosave, undo, redo, setStatus, select, setSelId,
     setEditingId, finishEditing, mutateSel, startDrag, pagePoint, fitZoom, startTuck,
-    selectAllOnPage, installApp, appInstalled, showInstallHelp, setShowInstallHelp, winHide, toggleWindow, setAskAddPage,
+    selectAllOnPage, installApp, appInstalled, showInstallHelp, setShowInstallHelp,
+    showAssocHelp, setShowAssocHelp, winHide, toggleWindow, setAskAddPage,
     tuckAsk, setTuckAsk, retuneTuck, runTuckAuto, applyTuck, tuckTool, setTuckTool,
     adjustEdit, setAdjustEdit, resetTools,
     autosaveSoon,
@@ -1187,6 +1202,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       {renderExportProgress(ed)}
       {renderFindDialog(ed)}
       {renderInstallHelp(ed)}
+      {renderAssocHelp(ed)}
       {renderScriptDialog(ed)}
       {renderAdjustDialog(ed)}
 

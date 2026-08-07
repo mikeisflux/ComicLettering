@@ -445,6 +445,45 @@ export function renderInstallHelp(ed: EditorCtx) {
   );
 }
 
+/* First run as the INSTALLED app: the one-time ".lmc files open here"
+   walkthrough. Windows only paints the LetterMyComic icon on .lmc files
+   once an association exists, and nothing in the OS says so — this does. */
+export function renderAssocHelp(ed: EditorCtx) {
+  if (!ed.showAssocHelp) return null;
+  const close = () => {
+    ed.setShowAssocHelp(false);
+    try { localStorage.setItem("lmc.assoc.seen", "1"); } catch { /* private mode */ }
+  };
+  return (
+    <div className="setupOverlay" onPointerDown={(e) => { if (e.target === e.currentTarget) close(); }}>
+      <div className="setupDlg" style={{ width: 470 }}>
+        <div className="setupTitle">Give your .lmc files the LetterMyComic icon</div>
+        <div className="setupBody" style={{ flexDirection: "column", gap: 10 }}>
+          <div style={{ fontSize: 13.5, lineHeight: 1.45 }}>
+            One quick step makes every <b>.lmc</b> project file show this app&apos;s
+            icon and open here with a double-click:
+          </div>
+          <ol style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 8, fontSize: 13.5, lineHeight: 1.45 }}>
+            <li><b>Right-click</b> any .lmc file (your Save As… files).</li>
+            <li>Choose <b>Open with</b> → <b>Choose another app</b>.</li>
+            <li>Pick <b>LetterMyComic</b> in the list and tick <b>“Always”</b>
+              (Windows 11: the <i>Always</i> button at the bottom).</li>
+          </ol>
+          <div style={{ fontSize: 12, color: "#667" }}>
+            Windows remembers it from then on — icons on every .lmc file, and
+            double-clicking one opens it straight into the studio. You can
+            reopen these steps any time from Help → “Open .lmc files with this
+            app…”.
+          </div>
+        </div>
+        <div className="setupFoot">
+          <button className="okBtn" onClick={close}>Got it</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* export dialog */
 export function renderExportDialog(ed: EditorCtx) {
   const { showExport, setShowExport, exportFmt, setExportFmt, exportDpi, setExportDpi, exportScope, setExportScope, exportFrom, setExportFrom, exportTo, setExportTo, letteringOnly, setLetteringOnly, exportCropMarks, setExportCropMarks } = ed;

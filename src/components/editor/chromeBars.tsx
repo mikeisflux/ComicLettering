@@ -149,6 +149,7 @@ export function renderMenuBar(ed: EditorCtx) {
       ]],
       ["Help", [
         ["User Guide", () => window.open("/guide", "_blank")],
+        ["Open .lmc files with this app…", () => ed.setShowAssocHelp(true)],
         ["Keyboard Shortcuts", () => window.alert([
           "SELECTING",
           "  Ctrl+A  select everything on the page      Ctrl+Shift+A  deselect",
