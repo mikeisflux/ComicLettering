@@ -20,6 +20,38 @@ import {
 } from "./ops";
 import { detectPanelsFromArt } from "./panelOps";
 
+/* Help → Check for Updates. The service worker only caches immutable
+   hashed assets, so a plain reload always lands on the latest deploy —
+   but an installed app window (Store/PWA) can sit open for days and never
+   reload. This compares the window's baked build stamp against the one
+   the server is currently serving and offers that reload. */
+async function checkForUpdates(ed: EditorCtx) {
+  ed.setStatus("Checking for updates…");
+  let server: string | undefined;
+  try {
+    const res = await fetch("/api/version", { cache: "no-store" });
+    server = (await res.json())?.build;
+  } catch { /* offline / server unreachable */ }
+  if (!server) {
+    ed.setStatus("Couldn't reach the update server — check your connection and try again.");
+    return;
+  }
+  const mine = process.env.NEXT_PUBLIC_LMC_BUILD;
+  if (server === mine || server === "dev") {
+    ed.setStatus(`You're up to date (build ${mine}).`);
+    return;
+  }
+  if (!window.confirm(
+    `A new version of LetterMyComic is available.\n\nYou're on build ${mine}; the latest is ${server}. ` +
+    "Restart the studio now to update?" +
+    (ed.current && !ed.demo ? "\n\nYour project will be saved first." : ""))) return;
+  if (ed.current && !ed.demo) { try { await saveProject(ed, false); } catch { /* save reports its own errors */ } }
+  try {
+    if ("caches" in window) for (const k of await window.caches.keys()) await window.caches.delete(k);
+    await (await navigator.serviceWorker?.getRegistration())?.update();
+  } catch { /* cache cleanup is best-effort — the reload alone gets the new build */ }
+  window.location.reload();
+}
 
 export function renderMenuBar(ed: EditorCtx) {
   const {
@@ -182,6 +214,8 @@ export function renderMenuBar(ed: EditorCtx) {
           "  Ctrl+S  save    Ctrl+Shift+S  save as    Ctrl+E  export    Ctrl+P  print",
         ].join("\n"))],
         ["FAQ & Support", () => window.open("/faq", "_blank")],
+        ["—", null],
+        ["Check for Updates…", () => { void checkForUpdates(ed); }],
       ]],
     ] as [string, ([string, (() => void) | null])[]][]).map(([name, items]) => (
       <div key={name} className="menuWrap">
