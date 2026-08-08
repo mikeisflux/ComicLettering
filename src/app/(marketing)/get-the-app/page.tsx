@@ -18,7 +18,7 @@ const STORE_URLS: Record<string, string | null> = {
   windows: "https://apps.microsoft.com/detail/9N61LFGVKNDM",   // Microsoft Store — LIVE
   chrome: null,    // Chrome Web Store (submitted)
   edge: null,      // Microsoft Edge Add-ons (submitted)
-  firefox: null,   // addons.mozilla.org (submitted)
+  firefox: "https://addons.mozilla.org/addon/lettermycomic-lettering-studio/",   // Firefox Add-ons — LIVE
 };
 
 /* one card per platform: the store path plus whatever works TODAY */
@@ -47,8 +47,8 @@ const PLATFORMS: {
   {
     key: "firefox", name: "Firefox", store: "Firefox Add-ons",
     blurb: "Firefox can't install web apps, so our add-on fills the gap: a toolbar button that opens the studio in its own app window.",
-    now: <>Meanwhile the studio runs perfectly in a Firefox tab — just open the{" "}
-      <Link href="/app">Studio</Link>. The add-on adds the one-click app window.</>,
+    now: <>Grab the add-on for the one-click app window — or just open the{" "}
+      <Link href="/app">Studio</Link> in a Firefox tab; it runs perfectly either way.</>,
   },
 ];
 
