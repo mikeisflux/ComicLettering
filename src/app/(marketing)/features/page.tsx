@@ -92,7 +92,7 @@ export default function Features() {
         </section>
       ))}
       <div className="heroBtns" style={{ marginTop: 22 }}>
-        <Link className="btnBig primary" href="/pricing">Start Lettering — $20/mo</Link>
+        <Link className="btnBig primary" href="/pricing">Start Lettering — from $40</Link>
       </div>
     </main>
   );

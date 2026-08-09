@@ -7,9 +7,9 @@ import { LIFETIME_CAP } from "@/lib/paypal";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Pricing — $20/month, $160/year, passes & lifetime",
+  title: "Pricing — $160/year, passes & lifetime",
   description:
-    "LetterMyComic pricing: full access to the browser comic lettering studio for $20/month or $160/year, one-time 3-month ($40) and 6-month ($80) passes, or lifetime access ($500). Pay securely with PayPal.",
+    "LetterMyComic pricing: full access to the browser comic lettering studio for $160/year, one-time 3-month ($40) and 6-month ($80) passes, or lifetime access ($500). Pay securely with PayPal.",
   alternates: { canonical: "/pricing" },
 };
 
@@ -34,18 +34,11 @@ export default async function Pricing() {
         anytime, or pay once for a pass with no auto-renew.
       </p>
       <div className="priceGrid wide">
-        <div className="priceCard">
-          <div className="plan">Monthly</div>
-          <div className="amount">$20</div>
-          <div className="per">per month</div>
-          <ul>{FEATURES.map((f) => <li key={f}>{f}</li>)}</ul>
-          <PayPalButtons plan="monthly" />
-        </div>
         <div className="priceCard best">
           <div className="plan">Yearly</div>
           <div className="amount">$160</div>
           <div className="per">per year</div>
-          <div className="save">Save $80 — 4 months free vs monthly</div>
+          <div className="save">Everything included — works out to about $13/month</div>
           <ul>{FEATURES.map((f) => <li key={f}>{f}</li>)}</ul>
           <PayPalButtons plan="yearly" />
         </div>
@@ -53,7 +46,7 @@ export default async function Pricing() {
           <div className="plan">3-Month Pass</div>
           <div className="amount">$40</div>
           <div className="per">one payment — no auto-renew</div>
-          <div className="save">3 months for the price of 2 — save $20</div>
+          <div className="save">One flat payment — perfect for lettering a single book</div>
           <ul>{FEATURES.map((f) => <li key={f}>{f}</li>)}</ul>
           <PayPalOrderButton tier="pass3" />
         </div>
@@ -61,7 +54,7 @@ export default async function Pricing() {
           <div className="plan">6-Month Pass</div>
           <div className="amount">$80</div>
           <div className="per">one payment — no auto-renew</div>
-          <div className="save">6 months for the price of 4 — save $40</div>
+          <div className="save">Half a year of lettering, one payment</div>
           <ul>{FEATURES.map((f) => <li key={f}>{f}</li>)}</ul>
           <PayPalOrderButton tier="pass6" />
         </div>

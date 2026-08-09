@@ -86,7 +86,7 @@ export default function Page() {
       ]}
       faqs={[
         { q: "What is comic lettering software?", a: "Comic lettering software is a program for adding word balloons, captions, sound effects and titles to comic art. LetterMyComic does all of this online, so you can letter a comic without installing desktop software." },
-        { q: "Is LetterMyComic free?", a: "You can create an account and try the full studio free in demo mode. Saving, export and printing unlock with a subscription of $20/month or $160/year." },
+        { q: "Is LetterMyComic free?", a: "You can create an account and try the full studio free in demo mode. Saving, export and printing unlock with a $160/year subscription, a one-time 3-month ($40) or 6-month ($80) pass, or lifetime access." },
         { q: "Do I need to install anything?", a: "No. LetterMyComic runs entirely in your browser on Windows, macOS, Linux and Chromebooks. There is nothing to download or update." },
         { q: "Can I use my own comic fonts?", a: "Yes. Along with 150+ bundled comic fonts, you can upload your own font files to your account and use them across your projects." },
         { q: "Can I export print-ready pages?", a: "Yes. Export to PNG, JPG, TIFF, PDF or CBZ at 150, 225, 300 or 450 DPI for print or digital publishing." },

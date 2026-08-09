@@ -44,7 +44,7 @@ export default function AccountPanel() {
     setBusy("");
   }
 
-  async function change(plan: "monthly" | "yearly") {
+  async function change(plan: "yearly") {
     setBusy("change"); setNote("");
     const res = await fetch("/api/account/change", {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ plan }),
@@ -111,13 +111,11 @@ export default function AccountPanel() {
             <div className="acctRow"><span>Next billing</span><b>{new Date(sub.nextBilling).toLocaleDateString()}</b></div>
           )}
           <div className="acctActions">
-            {sub.plan === "monthly" ? (
+            {/* the monthly plan is retired: existing monthly subscribers keep
+                it (and may still move up to yearly) but nobody can switch TO it */}
+            {sub.plan === "monthly" && (
               <button className="acctBtn" disabled={!!busy} onClick={() => change("yearly")}>
                 {busy === "change" ? "One moment…" : "Switch to Yearly ($160/yr — save $80)"}
-              </button>
-            ) : (
-              <button className="acctBtn" disabled={!!busy} onClick={() => change("monthly")}>
-                {busy === "change" ? "One moment…" : "Switch to Monthly ($20/mo)"}
               </button>
             )}
             <button className="acctBtn danger" disabled={!!busy} onClick={cancel}>

@@ -9,7 +9,7 @@ export const SETTING_KEYS = [
   { key: "PAYPAL_MODE", label: "PayPal mode", hint: "sandbox or live" },
   { key: "PAYPAL_CLIENT_ID", label: "PayPal client ID" },
   { key: "PAYPAL_CLIENT_SECRET", label: "PayPal client secret", secret: true },
-  { key: "PAYPAL_PLAN_MONTHLY", label: "PayPal plan ID — $20/month", hint: "P-…" },
+  { key: "PAYPAL_PLAN_MONTHLY", label: "PayPal plan ID — $20/month (retired — kept for existing subscribers)", hint: "P-…" },
   { key: "PAYPAL_PLAN_YEARLY", label: "PayPal plan ID — $160/year", hint: "P-…" },
   { key: "PAYPAL_WEBHOOK_ID", label: "PayPal webhook ID", hint: "for signature verification" },
   { key: "RECAPTCHA_SITE_KEY", label: "reCAPTCHA v3 site key", hint: "from google.com/recaptcha" },

@@ -38,8 +38,8 @@ export default function Landing({
       url,
       description: typeof lead === "string" ? lead : h1,
       offers: [
-        { "@type": "Offer", price: "20.00", priceCurrency: "USD", description: "Monthly subscription" },
         { "@type": "Offer", price: "160.00", priceCurrency: "USD", description: "Yearly subscription" },
+        { "@type": "Offer", price: "40.00", priceCurrency: "USD", description: "3-month pass (one-time)" },
       ],
     },
   ];
@@ -64,7 +64,7 @@ export default function Landing({
         <p className="lead">{lead}</p>
         <div className="heroBtns">
           <Link className="btnBig primary" href="/signup?next=/app&demo=1">{ctaLabel}</Link>
-          <Link className="btnBig secondary" href="/pricing">Pricing — $20/mo</Link>
+          <Link className="btnBig secondary" href="/pricing">Pricing — from $40</Link>
         </div>
         <p className="heroNote">Runs in your browser · no downloads · free demo, no credit card</p>
       </section>
@@ -110,7 +110,7 @@ export default function Landing({
 
       <section className="mktSection ctaSection">
         <h2>Start lettering your comic today</h2>
-        <p className="sub">Open the studio in your browser and try every tool free. Subscribe for $20/month or $160/year to save, export and print — no contracts, cancel anytime.</p>
+        <p className="sub">Open the studio in your browser and try every tool free. Unlock saving, export and printing for $160/year — or pay once for a pass, no auto-renew.</p>
         <div className="heroBtns">
           <Link className="btnBig primary" href="/signup?next=/app&demo=1">{ctaLabel}</Link>
         </div>

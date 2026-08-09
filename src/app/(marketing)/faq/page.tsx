@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 const FAQS: [string, string][] = [
   ["What is LetterMyComic?", "LetterMyComic is professional comic lettering software that runs entirely in your web browser. You get word balloons with draggable tails, SFX lettering styles, comic fonts, panel layouts, halftone and speedline fills, and print-ready PNG export — with no downloads or installs."],
-  ["How much does it cost?", "Full access is $20 per month or $160 per year (four months free compared to monthly). There is one plan and everything is included. Payments are processed securely by PayPal."],
+  ["How much does it cost?", "Full access is $160 per year, or pay once with no auto-renew: a 3-month pass for $40, a 6-month pass for $80, or lifetime access for $500. Everything is included on every plan. Payments are processed securely by PayPal."],
   ["Can I cancel anytime?", "Yes. Subscriptions renew automatically, but you can cancel from your PayPal account at any time and keep access until the end of the paid period."],
   ["Is there a free trial?", "No. To keep pricing simple and honest there is one paid plan. You can review every feature in detail on the features page before subscribing."],
   ["Does it work on my computer?", "Yes — LetterMyComic runs in any modern browser (Chrome, Edge, Firefox, Safari) on Windows, macOS, Linux and Chromebooks. There is nothing to install and updates are automatic."],

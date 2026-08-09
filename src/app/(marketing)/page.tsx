@@ -34,8 +34,8 @@ const jsonLd = {
       description:
         "Browser-based comic lettering studio: word balloons, lettering styles, panel layouts, halftone and speedline fills, PNG export.",
       offers: [
-        { "@type": "Offer", price: "20.00", priceCurrency: "USD", description: "Monthly subscription" },
         { "@type": "Offer", price: "160.00", priceCurrency: "USD", description: "Yearly subscription" },
+        { "@type": "Offer", price: "40.00", priceCurrency: "USD", description: "3-month pass (one-time)" },
       ],
     },
   ],
@@ -69,9 +69,9 @@ export default function Home() {
         <HeroSlider />
         <div className="heroBtns">
           <Link className="btnBig primary" href="/signup?next=/app&demo=1">Try the Free Demo</Link>
-          <Link className="btnBig secondary" href="/pricing">Pricing — $20/mo</Link>
+          <Link className="btnBig secondary" href="/pricing">Pricing — from $40</Link>
         </div>
-        <p className="heroNote">$20/month or $160/year · cancel anytime · works on any computer</p>
+        <p className="heroNote">$160/year or a one-time pass from $40 · cancel anytime · works on any computer</p>
       </section>
 
       <section className="mktSection showcase" id="see-it">
@@ -133,7 +133,7 @@ export default function Home() {
             workflow in five steps — no plugins, no font installs, no lost work.
           </p>
           <div className="heroBtns">
-            <Link className="btnBig primary" href="/pricing">Get Access — $20/mo</Link>
+            <Link className="btnBig primary" href="/pricing">Get Access — from $40</Link>
           </div>
         </div>
       </section>
