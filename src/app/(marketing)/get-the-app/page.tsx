@@ -17,7 +17,7 @@ const APK_URL = "https://github.com/mikeisflux/ComicLettering/releases/download/
 const STORE_URLS: Record<string, string | null> = {
   windows: "https://apps.microsoft.com/detail/9N61LFGVKNDM",   // Microsoft Store — LIVE
   chrome: null,    // Chrome Web Store (submitted)
-  edge: null,      // Microsoft Edge Add-ons (submitted)
+  edge: "https://microsoftedge.microsoft.com/addons/detail/lettermycomic-%E2%80%94-comic-let/mddigefnnjoickpabmiikhakjoeonafb",   // Edge Add-ons — LIVE
   firefox: "https://addons.mozilla.org/addon/lettermycomic-lettering-studio/",   // Firefox Add-ons — LIVE
 };
 
