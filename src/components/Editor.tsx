@@ -879,6 +879,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const startDrag = useStartDrag({
     pagePoint, commit, force, zoom,
     docRef, pageIndexRef, selIdsRef, snapRef, dragTipRef, setSelIds, crossPageDropRef, spineWarnRef,
+    assetsRef,
   });
   spineWarnRef.current = (() => {
     const d = docRef.current;

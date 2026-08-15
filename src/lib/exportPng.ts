@@ -1,6 +1,6 @@
 /* Full-resolution canvas renderer — used for PNG export and page thumbnails. */
 import {
-  Assets, BalloonEl, Doc, El, FILTERS, FONTS, ImageEl, JoinLink, Page, TextEl, TextRun, TextStyle,
+  ArtPan, Assets, BalloonEl, Doc, El, FILTERS, FONTS, ImageEl, JoinLink, Page, TextEl, TextRun, TextStyle,
   Fade,
   aabbOverlap, applyCrossbarI, deg2rad, joinGroupRect, joinLinks, lightenHex, pageBleed, panelPathD, resolveBalloon, rotVec,
 } from "./model";
@@ -492,11 +492,19 @@ function cssBaselineShift(fontCss: string, lineHPx: number): number | null {
   return shift;
 }
 
-function drawCover(ctx: CanvasRenderingContext2D, img: HTMLImageElement, w: number, h: number) {
-  const s = Math.max(w / img.naturalWidth, h / img.naturalHeight);
-  const sw = w / s, sh = h / s;
-  const sx = (img.naturalWidth - sw) / 2, sy = (img.naturalHeight - sh) / 2;
-  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
+function drawCover(
+  ctx: CanvasRenderingContext2D, img: HTMLImageElement, w: number, h: number, pan?: ArtPan,
+) {
+  /* cover fit, optionally zoomed in (pan.z ≥ 1) and panned: pan.x/y pick
+     which slice of the overflow shows (0 edge → 0.5 centre → 1 far edge).
+     No pan = the original centred crop, bit for bit. Mirrors the DOM's
+     object-position/oversize-box rendering in renderEls. */
+  const z = Math.max(1, pan?.z ?? 1);
+  const s = Math.max(w / img.naturalWidth, h / img.naturalHeight) * z;
+  const dw = img.naturalWidth * s, dh = img.naturalHeight * s;
+  const px = Math.min(1, Math.max(0, pan?.x ?? 0.5));
+  const py = Math.min(1, Math.max(0, pan?.y ?? 0.5));
+  ctx.drawImage(img, (w - dw) * px, (h - dh) * py, dw, dh);
 }
 
 function withFilter(ctx: CanvasRenderingContext2D, filterKey: string, fn: () => void) {
@@ -511,14 +519,14 @@ function withFilter(ctx: CanvasRenderingContext2D, filterKey: string, fn: () => 
 /* cover-draw with a filter on engines that have no ctx.filter (Safari):
    render to a scratch canvas, run the per-pixel filter, composite once */
 function drawCoverFiltered(
-  ctx: CanvasRenderingContext2D, img: HTMLImageElement, w: number, h: number, filterKey: string,
+  ctx: CanvasRenderingContext2D, img: HTMLImageElement, w: number, h: number, filterKey: string, pan?: ArtPan,
 ) {
   const pw = Math.max(1, Math.round(w)), ph = Math.max(1, Math.round(h));
   const t = document.createElement("canvas");
   t.width = pw; t.height = ph;
   const tc = t.getContext("2d");
-  if (!tc) { drawCover(ctx, img, w, h); return; }
-  drawCover(tc, img, pw, ph);
+  if (!tc) { drawCover(ctx, img, w, h, pan); return; }
+  drawCover(tc, img, pw, ph, pan);
   try {
     const id = tc.getImageData(0, 0, pw, ph);
     pixelFilter(id.data, filterKey);
@@ -529,11 +537,11 @@ function drawCoverFiltered(
 
 /* one entry point for filtered artwork: native filter, or pixel fallback */
 function drawCoverWithFilter(
-  ctx: CanvasRenderingContext2D, img: HTMLImageElement, w: number, h: number, filterKey: string,
+  ctx: CanvasRenderingContext2D, img: HTMLImageElement, w: number, h: number, filterKey: string, pan?: ArtPan,
 ) {
   const css = FILTERS[filterKey as keyof typeof FILTERS]?.css;
-  if (css && !canvasFilterSupported()) drawCoverFiltered(ctx, img, w, h, filterKey);
-  else withFilter(ctx, filterKey, () => drawCover(ctx, img, w, h));
+  if (css && !canvasFilterSupported()) drawCoverFiltered(ctx, img, w, h, filterKey, pan);
+  else withFilter(ctx, filterKey, () => drawCover(ctx, img, w, h, pan));
 }
 
 function shapeShadow(ctx: CanvasRenderingContext2D, on: boolean, size: number) {
@@ -621,7 +629,7 @@ function drawEl(
       if (img) {
         c.save();
         c.clip(rectPath);
-        drawCoverWithFilter(c, img, el.w, el.h, el.filter);
+        drawCoverWithFilter(c, img, el.w, el.h, el.filter, el.pan);
         c.restore();
       }
       if (el.borderW > 0) {

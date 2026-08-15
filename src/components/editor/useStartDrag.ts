@@ -6,7 +6,8 @@
    behaviour is unchanged. */
 import React, { useCallback } from "react";
 import {
-  BalloonEl, Doc, El, GRAB_MARGIN, TextEl, aabbOverlap, clamp, pageMargins, rotVec,
+  Assets, BalloonEl, Doc, El, GRAB_MARGIN, ImageEl, PanelEl, TextEl, aabbOverlap, clamp,
+  pageMargins, rotVec,
 } from "@/lib/model";
 import { FLAT } from "@/lib/warp";
 import { elCrossesSpine } from "@/lib/exportPng";
@@ -63,7 +64,10 @@ function joinTo(p: PageLike, cur: BalloonEl, hit: BalloonEl) {
 }
 
 export type DragMode =
-  | "move" | "resize" | "rotate" | "tail" | "bow" | "tilt" | "envelope";
+  | "move" | "resize" | "rotate" | "tail" | "bow" | "tilt" | "envelope"
+  /* slide the ARTWORK inside a panel/image frame (Alt-drag) — the frame
+     itself never moves */
+  | "panArt";
 
 /* plain structural ref shape — the hook only needs `.current` */
 interface Ref<T> { current: T }
@@ -87,10 +91,13 @@ export interface DragDeps {
      bleed line, so dragging lettering across it can warn that the piece
      will continue on the facing page (null = no warning needed) */
   spineWarnRef: Ref<{ side: 1 | -1; trimX: number; facing: number } | null>;
+  /* asset id → object/data URL — the panArt mode needs the artwork's
+     natural size to convert pointer pixels into pan fractions */
+  assetsRef: Ref<Assets>;
 }
 
 export function useStartDrag(deps: DragDeps) {
-  const { pagePoint, commit, force, zoom, docRef, pageIndexRef, selIdsRef, snapRef, dragTipRef, setSelIds, crossPageDropRef, spineWarnRef } = deps;
+  const { pagePoint, commit, force, zoom, docRef, pageIndexRef, selIdsRef, snapRef, dragTipRef, setSelIds, crossPageDropRef, spineWarnRef, assetsRef } = deps;
   return useCallback((
     e: React.PointerEvent, el: El, mode: DragMode, handle = ""
   ) => {
@@ -101,6 +108,13 @@ export function useStartDrag(deps: DragDeps) {
     e.stopPropagation();
     const start = pagePoint(e);
     const orig = JSON.parse(JSON.stringify(el)) as El;
+    /* panArt: the artwork's natural size (already decoded — it's on the
+       page) turns pointer movement into pan fractions of the crop slack */
+    let panImg: HTMLImageElement | null = null;
+    if (mode === "panArt" && (el.type === "panel" || el.type === "image") && el.img) {
+      const src = assetsRef.current[el.img];
+      if (src) { panImg = new Image(); panImg.src = src; }
+    }
     /* Everything else in the selection travels with the one being dragged.
        Their starting corners are captured up front so the delta is always
        measured from where the drag began, not from the last frame. */
@@ -145,6 +159,28 @@ export function useStartDrag(deps: DragDeps) {
           t.ts = { ...t.ts, env: pts };
           force();
         }
+        return;
+      }
+      if (mode === "panArt" && (cur.type === "panel" || cur.type === "image")) {
+        /* slide the picture inside its frame: pointer movement maps onto
+           the crop slack (how much of the picture overflows the frame) so
+           the art tracks the finger 1:1. The frame never moves. */
+        if (!panImg?.complete || !panImg.naturalWidth) return;
+        const o = orig as PanelEl | ImageEl;
+        const z = Math.max(1, o.pan?.z ?? 1);
+        const s = Math.max(cur.w / panImg.naturalWidth, cur.h / panImg.naturalHeight) * z;
+        const slackX = panImg.naturalWidth * s - cur.w;
+        const slackY = panImg.naturalHeight * s - cur.h;
+        const [ldx0, ldy0] = rotVec(dx, dy, -orig.rot);
+        const ldx = orig.flipH ? -ldx0 : ldx0;
+        const ldy = orig.flipV ? -ldy0 : ldy0;
+        const p0x = o.pan?.x ?? 0.5, p0y = o.pan?.y ?? 0.5;
+        (cur as PanelEl | ImageEl).pan = {
+          x: slackX > 1 ? clamp(p0x - ldx / slackX, 0, 1) : p0x,
+          y: slackY > 1 ? clamp(p0y - ldy / slackY, 0, 1) : p0y,
+          ...(z !== 1 ? { z } : {}),
+        };
+        force();
         return;
       }
       if (mode === "move") {

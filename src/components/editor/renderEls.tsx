@@ -237,7 +237,13 @@ export function renderEl(ed: EditorCtx, el: El) {
       }
       /* an additive click is picking, not dragging — starting a drag here
          would nudge the set every time you add one more to it */
-      if (!el.locked && !add) startDrag(e, el, "move");
+      if (!el.locked && !add) {
+        /* Alt-drag on a frame with artwork slides the PICTURE inside the
+           frame instead of moving the frame (also on the Position sliders
+           in the inspector — this is the pointer shortcut) */
+        const hasArt = (el.type === "panel" || el.type === "image") && !!el.img;
+        startDrag(e, el, hasArt && e.altKey ? "panArt" : "move");
+      }
       else e.preventDefault();
     },
     onDoubleClick: () => {
@@ -258,6 +264,24 @@ export function renderEl(ed: EditorCtx, el: El) {
 
   if (el.type === "panel" || el.type === "image") {
     const src = el.img ? assetsRef.current[el.img] : null;
+    /* artwork pan/zoom inside the frame. The oversized box (z×) with a
+       matching object-position reproduces the canvas renderer's math
+       exactly without needing the picture's natural size; absent pan keeps
+       the untouched `.cover` class — the original centred crop. */
+    const pan = el.pan;
+    const panSt: CSSProperties | undefined = pan ? (() => {
+      const z = Math.max(1, pan.z ?? 1);
+      const px = Math.min(1, Math.max(0, pan.x ?? 0.5));
+      const py = Math.min(1, Math.max(0, pan.y ?? 0.5));
+      return {
+        position: "absolute", display: "block", pointerEvents: "none",
+        width: `${z * 100}%`, height: `${z * 100}%`,
+        left: `calc((100% - ${z * 100}%) * ${px})`,
+        top: `calc((100% - ${z * 100}%) * ${py})`,
+        objectFit: "cover",
+        objectPosition: `${px * 100}% ${py * 100}%`,
+      };
+    })() : undefined;
     /* fade tool: legacy transparent fades mask the element; white/black
        fades overlay a gradient — both mirror the export's fadeErase */
     const fadeCss = fadeMaskCss(el.fade);
@@ -285,8 +309,8 @@ export function renderEl(ed: EditorCtx, el: El) {
         }}>
           <div style={{ position: "absolute", inset: 0, overflow: "hidden", clipPath: `path("${penD}")`, ...fillCss((el as PanelEl).fill) }}>
             {src && (
-              <img src={src} className="cover" draggable={false} alt=""
-                style={{ filter: FILTERS[el.filter]?.css || undefined }} />
+              <img src={src} className={panSt ? undefined : "cover"} draggable={false} alt=""
+                style={{ filter: FILTERS[el.filter]?.css || undefined, ...panSt }} />
             )}
             {fadeOvNode}
           </div>
@@ -315,8 +339,8 @@ export function renderEl(ed: EditorCtx, el: El) {
     return (
       <div {...common} className={"el " + el.type} style={st}>
         {src && (
-          <img src={src} className="cover" draggable={false} alt=""
-            style={{ filter: FILTERS[el.filter]?.css || undefined }} />
+          <img src={src} className={panSt ? undefined : "cover"} draggable={false} alt=""
+            style={{ filter: FILTERS[el.filter]?.css || undefined, ...panSt }} />
         )}
         {fadeOvNode}
       </div>

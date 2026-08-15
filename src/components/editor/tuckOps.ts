@@ -39,14 +39,18 @@ export interface TuckDeps {
 export function makeTuckHandlers(d: TuckDeps) {
   const startTuck = () => {
     const s = d.docRef.current?.pages[d.pageIndexRef.current].els.find((x) => x.id === d.selId);
-    if (!s || s.type !== "text") {
-      d.setStatus("Select your SFX lettering first, then Tuck Back.");
+    /* anything made of lettering can be tucked behind the art: SFX
+       lettering, word balloons AND caption/text boxes (a user request —
+       this was text-only). The cutout goes on top of the page, so the
+       pipeline downstream is the same for all of them. */
+    if (!s || (s.type !== "text" && s.type !== "balloon")) {
+      d.setStatus("Select the lettering, balloon or text box to tuck first, then Tuck Back.");
       return;
     }
     d.setTuckMode(true);
     d.setStatus(d.getTool() === "pen"
-      ? "Tuck Back pen: click around the art the SFX should hide behind — click-and-drag curves a point, close on your first point (Enter closes, Ctrl+Z removes a point, Esc cancels)."
-      : "Draw around the art the SFX should hide behind — the lasso snaps to the art's edges, hold Alt for freehand. Esc cancels.");
+      ? "Tuck Back pen: click around the art this should hide behind — click-and-drag curves a point, close on your first point (Enter closes, Ctrl+Z removes a point, Esc cancels)."
+      : "Draw around the art this should hide behind — the lasso snaps to the art's edges, hold Alt for freehand. Esc cancels.");
   };
 
   /* spread view: hand the trace the facing page and where it sits on

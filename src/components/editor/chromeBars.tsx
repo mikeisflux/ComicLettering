@@ -351,8 +351,8 @@ const nibSvg = (
 function renderTuckBtn(ed: EditorCtx) {
   const { openMenu, setOpenMenu } = ed;
   const pen = ed.tuckTool === "pen";
-  /* NOT disabled without an SFX: the picker must open regardless, and a
-     bare click gets the "select your SFX lettering first" status hint */
+  /* NOT disabled without a selection: the picker must open regardless, and
+     a bare click gets the "select the lettering to tuck first" status hint */
   const anchor = (el: HTMLElement) => {
     const r = el.getBoundingClientRect();
     tuckFlyPos = {
@@ -371,7 +371,7 @@ function renderTuckBtn(ed: EditorCtx) {
   return (
     <span className="tuckWrap">
       <button className="toolBtn accent"
-        title={`Tuck Back — ${pen ? "pen path" : "magnetic lasso"}. Select your SFX lettering, then outline the art that should come forward; it is cut out and placed in front so the word sits behind it. PRESS AND HOLD to switch between the magnetic lasso and the pen.`}
+        title={`Tuck Back — ${pen ? "pen path" : "magnetic lasso"}. Select your SFX lettering, balloon or text box, then outline the art that should come forward; it is cut out and placed in front so the lettering sits behind it. PRESS AND HOLD to switch between the magnetic lasso and the pen.`}
         onPointerDown={(e) => arm(e.currentTarget)}
         onPointerUp={disarm} onPointerLeave={disarm}
         onContextMenu={(e) => { e.preventDefault(); anchor(e.currentTarget); openFly(); }}

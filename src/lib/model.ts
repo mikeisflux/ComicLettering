@@ -341,11 +341,21 @@ export function fadeMaskCss(fade?: Fade): string | undefined {
   }
 }
 
+/* How artwork sits inside its frame's cover-crop. x/y pick WHICH part of
+   the picture shows when it overflows the frame: 0 = left/top edge flush,
+   0.5 = centred (the default — identical to the pre-pan rendering), 1 =
+   right/bottom edge flush. z zooms IN past the cover fit (≥1); the pan
+   then chooses the visible window of the enlarged picture. Absent = the
+   original centred cover-crop, untouched. */
+export interface ArtPan { x: number; y: number; z?: number }
+
 export interface PanelEl extends BaseEl {
   type: "panel";
   fill: FillStyle; borderW: number; borderC: string;
   img: string | null; filter: FilterKey;
   fade?: Fade;
+  /* reposition/zoom of the artwork inside the panel's frame */
+  pan?: ArtPan;
   /* "Draw Your Own" pen-tool outline: closed shape as fractions of the
      panel box (curves arrive pre-flattened to a dense polygon, so moving/
      resizing just scales). Absent = plain rectangle. */
@@ -356,6 +366,8 @@ export interface ImageEl extends BaseEl {
   img: string; filter: FilterKey;
   borderW: number; borderC: string;
   fade?: Fade;
+  /* reposition/zoom of the picture inside its own cover-cropped box */
+  pan?: ArtPan;
   /* a Tuck Back cutout rather than artwork in its own right. It sits
      above the lettering, so it would otherwise be the first thing the next
      trace lands on — and tracing a cutout of a cutout gets you nowhere. */

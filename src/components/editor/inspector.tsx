@@ -420,6 +420,54 @@ export function renderInspector(ed: EditorCtx) {
               </div>
             )}
           </div>
+          {/* reposition the artwork inside its frame — the cover-crop centres
+              by default and can cut off the top/bottom of tall art (a user
+              request). Sliders here; Alt-drag on the panel does the same. */}
+          {el.img && (
+            <div className="inspSection">
+              <div className="inspHead">Picture in frame</div>
+              <Fld label="Across">
+                <span className="pair">
+                  <input type="range" min={0} max={100} step={1}
+                    value={Math.round((el.pan?.x ?? 0.5) * 100)}
+                    onChange={(e) => mutateSel<PanelEl>((b) => {
+                      b.pan = { x: +e.target.value / 100, y: b.pan?.y ?? 0.5, ...(b.pan?.z && b.pan.z !== 1 ? { z: b.pan.z } : {}) };
+                    }, false)}
+                    onPointerUp={() => commit()} style={{ width: 120 }} />
+                </span>
+              </Fld>
+              <Fld label="Down">
+                <span className="pair">
+                  <input type="range" min={0} max={100} step={1}
+                    value={Math.round((el.pan?.y ?? 0.5) * 100)}
+                    onChange={(e) => mutateSel<PanelEl>((b) => {
+                      b.pan = { x: b.pan?.x ?? 0.5, y: +e.target.value / 100, ...(b.pan?.z && b.pan.z !== 1 ? { z: b.pan.z } : {}) };
+                    }, false)}
+                    onPointerUp={() => commit()} style={{ width: 120 }} />
+                </span>
+              </Fld>
+              <Fld label="Zoom">
+                <span className="pair">
+                  <input type="range" min={100} max={300} step={5}
+                    value={Math.round(Math.max(1, el.pan?.z ?? 1) * 100)}
+                    onChange={(e) => mutateSel<PanelEl>((b) => {
+                      const z = +e.target.value / 100;
+                      b.pan = { x: b.pan?.x ?? 0.5, y: b.pan?.y ?? 0.5, ...(z !== 1 ? { z } : {}) };
+                    }, false)}
+                    onPointerUp={() => commit()} style={{ width: 120 }} />
+                  <span style={{ fontSize: 11, opacity: 0.75, width: 38 }}>{Math.round(Math.max(1, el.pan?.z ?? 1) * 100)}%</span>
+                </span>
+              </Fld>
+              {el.pan && (
+                <div className="btnRow">
+                  <button onClick={() => mutateSel<PanelEl>((b) => { b.pan = undefined; })}>Reset position</button>
+                </div>
+              )}
+              <div className="tips" style={{ fontSize: 11 }}>
+                Slide which part of the picture shows when it overflows the frame — or hold <b>Alt</b> and drag the panel to move the picture by hand.
+              </div>
+            </div>
+          )}
           {el.type === "panel" && (
             <div className="inspSection">
               <div className="inspHead">Panel fill</div>

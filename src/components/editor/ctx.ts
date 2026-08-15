@@ -131,11 +131,11 @@ export interface EditorCtx {
   mutateSel: <T extends El>(mut: (el: T) => void, final?: boolean) => void;
   startDrag: (
     e: React.PointerEvent, el: El,
-    mode: "move" | "resize" | "rotate" | "tail" | "bow" | "tilt" | "envelope", handle?: string,
+    mode: "move" | "resize" | "rotate" | "tail" | "bow" | "tilt" | "envelope" | "panArt", handle?: string,
   ) => void;
   pagePoint: (e: { clientX: number; clientY: number }) => { x: number; y: number };
   fitZoom: (forceFit: boolean) => void;
-  /* enter Tuck Back trace mode (requires SFX selected) */
+  /* enter Tuck Back trace mode (requires lettering, balloon or text box selected) */
   startTuck: () => void;
   /* which Tuck Back trace tool is armed: magnetic lasso or pen path
      (picked by press-and-holding the toolbar's Tuck Back button) */
