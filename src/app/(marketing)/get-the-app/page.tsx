@@ -87,8 +87,8 @@ export default function GetTheAppPage() {
             </span>
           </div>
           <p style={{ fontSize: 14, color: "#5a6472", marginTop: 14 }}>
-            Can&apos;t wait for the store? <a href={APK_URL}>Download the Android
-            app directly (.apk)</a> — open the file on your device and allow
+            Prefer a direct download? <a href={APK_URL}>Get the Android
+            app as an .apk</a> — open the file on your device and allow
             the install when Android asks.
           </p>
           <p style={{ fontSize: 14, color: "#5a6472", marginTop: 10 }}>
@@ -103,9 +103,9 @@ export default function GetTheAppPage() {
       {/* ---- every platform: the store path + what works today ---- */}
       <h2 style={{ textAlign: "center", marginTop: 56 }}>On every desktop &amp; browser</h2>
       <p className="sub" style={{ textAlign: "center", margin: "0 auto 26px", maxWidth: 640 }}>
-        LetterMyComic is now on the Microsoft Store, with the browser stores in
-        review — and you never have to wait for one: every platform has a way to
-        install or run the studio today.
+        LetterMyComic is live on the Microsoft Store, Google Play, Firefox
+        Add-ons and Edge Add-ons, with the Chrome Web Store finishing review —
+        and every platform has a way to install or run the studio today.
       </p>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 18 }}>
         {PLATFORMS.map((p) => {
