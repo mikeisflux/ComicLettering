@@ -17,3 +17,9 @@ prisma/dev.db.migrated
 # MobileSAM weights and ONNX runtime — fetched by scripts/fetch-sam.sh
 /public/models/
 /public/ort/
+
+# iOS wrapper build artifacts (ios/ project itself IS tracked)
+ios/Pods/
+ios/build/
+ios/fastlane/report.xml
+ios/fastlane/README.md

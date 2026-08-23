@@ -1,102 +1,45 @@
-name: ios-testflight
+name: iOS — Build & Upload to App Store Connect
 
-# Builds the iPad app on GitHub's cloud Macs and uploads it to TestFlight —
-# no Mac of your own anywhere in the loop. Costs pennies per run (macOS
-# runner minutes) and only runs when the Apple app changes or on demand.
-#
-# Required repository secrets (all from App Store Connect, after the $99/yr
-# Apple Developer enrollment):
-#   APPLE_TEAM_ID          — Membership page → Team ID
-#   APPSTORE_API_KEY_ID    — Users and Access → Integrations → key ID
-#   APPSTORE_API_ISSUER_ID — same page → Issuer ID
-#   APPSTORE_API_KEY_P8    — the downloaded .p8 file's full contents
-#
-# Without the secrets the workflow still runs an unsigned build, so it
-# proves the app compiles before you enroll.
-
+# Manual trigger: Actions tab → this workflow → Run workflow.
+# Builds the ios/ wrapper on a macOS runner, signs it with certificates
+# managed by fastlane match (stored encrypted on the ios-certs branch),
+# and uploads the build to App Store Connect (TestFlight → submit from
+# appstoreconnect.apple.com).
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - "tablet/apple/**"
-      - ".github/workflows/ios.yml"
+
+permissions:
+  contents: write   # match pushes the encrypted certs to the ios-certs branch
+
+concurrency:
+  group: ios-release
+  cancel-in-progress: false
 
 jobs:
-  build:
-    runs-on: macos-14
+  release:
+    runs-on: macos-15
     defaults:
       run:
-        working-directory: tablet/apple/LetterMyComic.swiftpm
+        working-directory: ios
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check for App Store Connect credentials
-        id: creds
-        working-directory: .
+      - name: Install pods
+        run: pod install
+
+      - name: Build, sign & upload
         env:
-          P8: ${{ secrets.APPSTORE_API_KEY_P8 }}
-          KID: ${{ secrets.APPSTORE_API_KEY_ID }}
-          ISS: ${{ secrets.APPSTORE_API_ISSUER_ID }}
-          TEAM: ${{ secrets.APPLE_TEAM_ID }}
-        run: |
-          if [ -n "$P8" ] && [ -n "$KID" ] && [ -n "$ISS" ] && [ -n "$TEAM" ]; then
-            echo "ok=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "ok=false" >> "$GITHUB_OUTPUT"
-            echo "App Store Connect secrets not set — doing an unsigned compile check only."
-          fi
+          KEY_ID: ${{ secrets.KEY_ID }}
+          ISSUER_ID: ${{ secrets.ISSUER_ID }}
+          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: fastlane release
 
-      - name: Inject Team ID
-        if: steps.creds.outputs.ok == 'true'
-        run: |
-          sed -i '' "s/teamIdentifier: \"\"/teamIdentifier: \"${{ secrets.APPLE_TEAM_ID }}\"/" Package.swift
-
-      - name: Install App Store Connect API key
-        if: steps.creds.outputs.ok == 'true'
-        env:
-          P8: ${{ secrets.APPSTORE_API_KEY_P8 }}
-        run: |
-          mkdir -p ~/private_keys
-          printf '%s' "$P8" > ~/private_keys/AuthKey_${{ secrets.APPSTORE_API_KEY_ID }}.p8
-
-      - name: Archive (signed)
-        if: steps.creds.outputs.ok == 'true'
-        run: |
-          xcodebuild -scheme LetterMyComic \
-            -destination 'generic/platform=iOS' \
-            -archivePath "$RUNNER_TEMP/LetterMyComic.xcarchive" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath ~/private_keys/AuthKey_${{ secrets.APPSTORE_API_KEY_ID }}.p8 \
-            -authenticationKeyID "${{ secrets.APPSTORE_API_KEY_ID }}" \
-            -authenticationKeyIssuerID "${{ secrets.APPSTORE_API_ISSUER_ID }}" \
-            archive
-
-      - name: Upload to TestFlight
-        if: steps.creds.outputs.ok == 'true'
-        run: |
-          cat > "$RUNNER_TEMP/export.plist" <<'PLIST'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key><string>app-store-connect</string>
-            <key>destination</key><string>upload</string>
-          </dict>
-          </plist>
-          PLIST
-          xcodebuild -exportArchive \
-            -archivePath "$RUNNER_TEMP/LetterMyComic.xcarchive" \
-            -exportOptionsPlist "$RUNNER_TEMP/export.plist" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath ~/private_keys/AuthKey_${{ secrets.APPSTORE_API_KEY_ID }}.p8 \
-            -authenticationKeyID "${{ secrets.APPSTORE_API_KEY_ID }}" \
-            -authenticationKeyIssuerID "${{ secrets.APPSTORE_API_ISSUER_ID }}"
-
-      - name: Compile check (unsigned)
-        if: steps.creds.outputs.ok != 'true'
-        run: |
-          xcodebuild -scheme LetterMyComic \
-            -destination 'generic/platform=iOS' \
-            CODE_SIGNING_ALLOWED=NO \
-            build
+      - name: Keep the signed build as a run artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: LetterMyComic-ipa
+          path: ios/build/*.ipa
+          if-no-files-found: ignore

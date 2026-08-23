@@ -1,0 +1,58 @@
+# LetterMyComic iOS — built and uploaded entirely on GitHub Actions.
+#
+# Signing: `match` keeps the distribution certificate + provisioning
+# profile ENCRYPTED on the `ios-certs` branch of this same repository
+# (passphrase = MATCH_PASSWORD secret). First run creates everything via
+# the App Store Connect API key — no Mac, no Keychain Access, ever.
+#
+# Secrets expected in the environment (GitHub Actions secrets):
+#   KEY_ID / ISSUER_ID / PRIVATE_KEY  — App Store Connect API key
+#   MATCH_PASSWORD                    — passphrase for the cert storage
+#   GITHUB_TOKEN                      — pushes the ios-certs branch
+
+default_platform(:ios)
+
+platform :ios do
+  desc "Build the App Store package and upload it to App Store Connect"
+  lane :release do
+    setup_ci   # temporary CI keychain
+
+    api_key = app_store_connect_api_key(
+      key_id: ENV["KEY_ID"],
+      issuer_id: ENV["ISSUER_ID"],
+      key_content: ENV["PRIVATE_KEY"],
+    )
+
+    match(
+      type: "appstore",
+      app_identifier: "com.lettermycomic.app",
+      git_url: "https://x-access-token:#{ENV['GITHUB_TOKEN']}@github.com/mikeisflux/ComicLettering.git",
+      git_branch: "ios-certs",
+      api_key: api_key,
+      readonly: false,
+    )
+
+    update_code_signing_settings(
+      path: "pwa-shell.xcodeproj",
+      use_automatic_signing: false,
+      team_id: "9J83P53KKJ",
+      bundle_identifier: "com.lettermycomic.app",
+      code_sign_identity: "Apple Distribution",
+      profile_name: ENV["sigh_com.lettermycomic.app_appstore_profile-name"],
+    )
+
+    build_app(
+      workspace: "pwa-shell.xcworkspace",
+      scheme: "pwa-shell",
+      export_method: "app-store",
+      output_directory: "build",
+      # unique, monotonically-increasing build number per workflow run
+      xcargs: "CURRENT_PROJECT_VERSION=#{ENV['GITHUB_RUN_NUMBER'] || 1}",
+    )
+
+    upload_to_testflight(
+      api_key: api_key,
+      skip_waiting_for_build_processing: true,
+    )
+  end
+end
