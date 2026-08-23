@@ -1,111 +1,149 @@
-# LetterMyComic — lettermycomic.com
+# LetterMyComic — [lettermycomic.com](https://lettermycomic.com)
 
-A complete commercial platform for **lettermycomic.com**: an SEO-ready marketing
-site, PayPal subscriptions ($20/mo · $160/yr, no trials), an admin console with
-an internal inbox, and a professional **web-based comic lettering studio** at
-`/app` — built on the latest stack:
+**Professional comic lettering in the browser.** Word balloons that behave like
+hand-inked lettering, 600+ comic fonts, SFX warps, Tuck Back clipping masks,
+panel layouts, page grading and print-ready export — one web codebase that
+ships as the website, the installed desktop app, the Windows Store app, the
+Android app and (in progress) the iOS app.
 
-- **Next.js 15** (App Router) + **React 19** + TypeScript
-- **SQL project library** via **Prisma ORM** — SQLite by default (zero config),
-  switchable to PostgreSQL with one connection string
-- All page editing, image handling and PNG rendering run **in the browser on
-  the user's own computer** — artwork is never uploaded anywhere; the SQL
-  database only stores projects you explicitly save to the Library.
+Built and operated by **Divinity Comics Inc**.
 
-## Running it
+## Where it ships
+
+| Form | Status | Where |
+|---|---|---|
+| Web studio | Live | [lettermycomic.com/app](https://lettermycomic.com/app) |
+| Installed PWA (Chrome/Edge desktop) | Live | "Install as App" in the studio |
+| Microsoft Store (Windows MSIX) | Live | [apps.microsoft.com/detail/9N61LFGVKNDM](https://apps.microsoft.com/detail/9N61LFGVKNDM) |
+| Google Play (Android TWA) | Live | [play.google.com/store/apps/details?id=com.lettermycomic.app](https://play.google.com/store/apps/details?id=com.lettermycomic.app) |
+| Firefox add-on (app-window launcher) | Live | [addons.mozilla.org/addon/lettermycomic-lettering-studio](https://addons.mozilla.org/addon/lettermycomic-lettering-studio/) |
+| Edge add-on | Live | [Edge Add-ons listing](https://microsoftedge.microsoft.com/addons/detail/lettermycomic-%E2%80%94-comic-let/mddigefnnjoickpabmiikhakjoeonafb) |
+| Chrome Web Store | In review | — |
+| iOS / iPadOS (App Store) | Pipeline ready | built from `ios/` by GitHub Actions |
+
+Every form is the SAME code — there are no separate app codebases. A deploy to
+the website updates them all (store packages are thin wrappers; they only need
+regenerating when the manifest changes).
+
+## The studio
+
+- **Balloons** — every classic type as crisp vector shapes with draggable,
+  bendable tails. Balloons dragged together **join** with an open connector
+  band (no stroke across the junction, like hand-inked lettering); overlapping
+  joined balloons melt into one shape. Fit-to-text (Ctrl+\\), saved presets,
+  custom hand-drawn balloons.
+- **Lettering** — 600+ comic fonts across genre groups plus custom font
+  import, 90+ SFX style presets, per-word bold/italic/underline, smart
+  crossbar-I, arc/bend warping with a full envelope warp tool, tracking, rag
+  balancing, find & replace, spell/grammar proofing.
+- **Tuck Back** — trace with a magnetic lasso or pen path (or on-demand
+  auto-detect) and the traced art is cut out and placed in front of the
+  lettering, balloon or text box: clipping masks with zero Photoshop. Works
+  across the spread spine.
+- **Pages** — panel-layout library by era/style plus **custom saved layouts**
+  and **Draw Your Own Panel** (pen tool with curved anchors, rect/oval/circle
+  marquees), auto panel detection from page art, two-page spread view and
+  trim-joined print view, cross-page drags.
+- **Art** — drop images/PDFs onto panels, pan/zoom the picture inside its
+  frame (Alt-drag or inspector sliders), Instant Alpha background removal,
+  photo filters, fade-to-white/black corner fades, procedural fills
+  (gradients, halftones, tile screens, speedlines, textures).
+- **Page grading** — 17 adjustment-layer tools (curves, levels with
+  eyedroppers, HSL, selective color, channel mixer, color lookup, gradient
+  map, black & white, photo filter, exposure, grain, clarity …) with
+  Photoshop-style floating panels, live histograms and identical results in
+  the editor and every export.
+- **Layers** — eyeballs, drag-to-reorder, rename, groups, copy-to-pages,
+  right-click menu, pinned control strip.
+- **Collaboration** — shared books, pinned comments and review passes
+  (editors mark up read-only; the letterer saves).
+- **Import/export** — comic-script import that auto-builds balloons; export
+  to PNG/JPG/TIFF/PDF/CBZ up to 450 dpi with bleed/crop marks, page ranges,
+  transparent lettering-only overlays; `.lmc` project files that open with
+  the installed apps by double-click.
+- **Bleed discipline** — balloons, text and stamps hard-clip at the trim and
+  continue across the spine on the facing page; only page art may live in the
+  bleed. The DOM editor and the canvas/PDF exporter share geometry, so what
+  you see is exactly what prints.
+
+**Privacy stance:** full-resolution artwork is processed locally in the
+browser and never uploaded; only projects explicitly saved to the Library
+touch the server. No generative AI in the product.
+
+## Platform
+
+- **Marketing site** at `/` — SEO landing pages, features, pricing, FAQ, blog
+  with original lettering tutorials, user guide, JSON-LD, sitemap.
+- **Pricing** — $160/year subscription, one-time 3-month ($40) and 6-month
+  ($80) passes, limited $500 lifetime tier. (A legacy $20/month plan is
+  retired; existing monthly subscribers are grandfathered.) PayPal billing
+  with webhook status sync.
+- **/app** — the studio, demo mode for everyone, full access for subscribers.
+- **/admin** — inbox (contact + SendGrid inbound email with in-place reply),
+  users, payments setup, settings (all API keys stored in SQL).
+- **Auth** — email/password (scrypt + HMAC session cookie), reCAPTCHA v3,
+  account deletion page (store-compliance requirement).
+
+## Stack
+
+Next.js 15 (App Router) · React 19 · TypeScript · Prisma (PostgreSQL; SQLite
+for zero-config dev) · PayPal REST · SendGrid · PM2 cluster behind Caddy.
+
+## Development
 
 ```bash
-npm install        # installs deps + generates the Prisma client
-npm run db:push    # creates the SQLite database (prisma/dev.db)
+npm install        # deps + Prisma client
+npm run db:push    # create the dev database
 npm run dev        # http://localhost:3000
 ```
 
-Production: `npm run build && npm start`.
+Before pushing: `npx tsc --noEmit && npx next build` must pass. Read
+**CLAUDE.md** first — it carries the non-negotiable invariants (joined-balloon
+connector behavior, the bleed line, editor/export parity, the 1500-line file
+cap, fix-on-both-canvases and fix-every-entry-point rules).
 
-To use PostgreSQL instead of SQLite: set `DATABASE_URL` in `.env` and change
-`provider = "postgresql"` in `prisma/schema.prisma`, then `npm run db:push`.
+## Deploying
 
-## Features
+`scripts/deploy.sh` builds, health-checks and zero-downtime-reloads the PM2
+cluster (`ecosystem.config.js`, 2 instances), rolling back on a failed health
+check. The Help → **Check for Updates** menu item in the studio compares an
+open window's build stamp against `/api/version` so long-lived installed-app
+windows can pull a fresh deploy.
 
-**Pages & layouts**
-- Multi-page documents, live page thumbnails, size presets (US comic, manga B5,
-  A4, square, web strip) or custom sizes, rulers, zoom control.
-- A full panel-layout library organized by style — Basic, Strips, 40's / 60's /
-  80's Comic, Modern, Euro Comic, Manga, Graphic Novel, Picture-in-Picture and
-  Conceptual (including tilted-panel layouts).
+## Repository layout
 
-**Balloons** — every classic type, as crisp vector shapes with draggable tails:
-speech, rough (hand-drawn), buzz, radio (double outline), thought, exclaim,
-dense exclaim, whisper (dashed), square, TV (zigzag tail), pill, rounded box
-and caption.
+| Path | What |
+|---|---|
+| `src/` | The entire web app — marketing site, studio, API routes |
+| `src/lib/` | Engines: balloon geometry, fills, export/PDF, page grading, model |
+| `src/components/editor/` | Studio UI split into focused modules |
+| `prisma/` | Schema + seeds |
+| `ios/` | iOS wrapper app (WKWebView shell) + fastlane release lane |
+| `tablet/` | Android TWA (Play) and related tablet packaging |
+| `desktop/` | Electron wrapper (`.lmc` file association for non-store installs) |
+| `firefox-addon/` | Firefox/Chromium extension: app-window launcher |
+| `scripts/` | Deploy + operations |
+| `docs/` | Internal docs (lettering knowledgebase, campaign copy) |
 
-**Lettering**
-- A STYLES panel of one-click "ABC" lettering presets — gradient fills, heavy
-  outlines and drop shadows (Sunburst, Chrome, Gold, Toxic, Blood, Ice, …).
-- 19 fonts: 15 bundled open-licensed (OFL) comic/display faces — Comic Neue,
-  Patrick Hand, Kalam, Bangers, Luckiest Guy, Boogaloo, Chewy, Alfa Slab One,
-  Bungee, Creepster, Nosifer, Audiowide, Permanent Marker, Courier Prime,
-  League Gothic — plus system stacks. Self-hosted; nothing loads from CDNs.
-- Full text control: size, bold/italic/ALL CAPS, alignment, solid or gradient
-  fill, outline color/width, shadow. SFX display lettering included.
+## Store release notes
 
-**Fills** — for page backgrounds, panels and balloons; all generated
-procedurally so they stay sharp at any size:
-- Solid colors and **gradients** (with a preset swatch library)
-- **Halftone** dot fades (fine/medium/coarse; fade up/down/left/right, uniform, centered)
-- **Tile patterns**: checks, dots, inverted dots, hex dots, hollow dots, small
-  dots, diagonal/horizontal/vertical line screens, crosshatch, zigzag, noise screen
-- **Speedlines**: radial burst (2 densities), ring, corner, motion lines, faded motion
-- **Textures**: speckle, grit, static, murk, daubs, stone
+- **Windows (MSIX)** — regenerate on [PWABuilder](https://pwabuilder.com) only
+  when the manifest changes; bump both package versions past the live ones and
+  submit as an update in Partner Center. File-type association gives `.lmc`
+  files the app icon on install.
+- **Android** — Play listing id `com.lettermycomic.app`; TWA rebuilt from the
+  live manifest.
+- **iOS** — no Mac required: GitHub Actions (**iOS — Build & Upload to App
+  Store Connect**, manual trigger) builds `ios/`, manages signing via fastlane
+  match (encrypted on the `ios-certs` branch) and uploads to App Store
+  Connect. Needs the `KEY_ID` / `ISSUER_ID` / `PRIVATE_KEY` /
+  `MATCH_PASSWORD` repository secrets. The wrapper launches
+  `/app?store=ios`, which activates a store-compliance mode that hides all
+  external-purchase surfaces (Apple guideline 3.1.1) — subscribers sign in
+  with their web account (3.1.3 multiplatform services).
 
-**Artwork** — drag photos onto the page or double-click a panel to fill it;
-imported photos live in the Photos tab for reuse; photo filters (B&W, sepia,
-vivid, faded, noir); move/resize/rotate handles, z-order, duplicate, shadows.
+## License
 
-**Saving & export**
-- **Library (SQL)**: save/load/delete named projects with thumbnails.
-- Autosave to the browser between visits; JSON file export/import.
-- One-click full-resolution **PNG export** per page.
-- Undo/redo (Ctrl+Z / Ctrl+Y), Ctrl+D duplicate, Ctrl+S save, arrow-key nudge.
-
-## About the other files in this repository
-
-`Comic Life 3.zip` / `.z01`–`.z03` contain a copy of plasq's **Comic Life 3**,
-a commercial desktop application. It is closed-source and cannot be "converted"
-to the web; its code, fonts, artwork and resources are plasq's licensed
-property and **none of them are used here**. ComicLettering Studio is an
-original, independent implementation of a comparable comic-lettering workflow;
-its bundled fonts are OFL-licensed (see `public/fonts/LICENSE.txt`) and all
-fills/patterns are generated procedurally.
-
-> ⚠️ Because Comic Life 3 is commercial software, consider removing those zip
-> archives from this public repository.
-
-## Platform (lettermycomic.com)
-
-- **Marketing site** at `/` — landing, features, pricing, FAQ (with FAQ/SoftwareApplication
-  JSON-LD), contact, terms, privacy, sitemap.xml, robots.txt, OpenGraph image.
-- **Subscriptions**: PayPal ($20/month, $160/year, no trials). Admin → Payments creates
-  the PayPal plans automatically; webhook keeps statuses in sync.
-- **/app** — the studio, gated to active subscribers (admins bypass).
-- **/admin** — Inbox (contact form + SendGrid Inbound Parse email, reply via SendGrid),
-  Settings (all API keys stored in SQL: SendGrid, PayPal, reCAPTCHA v3, custom keys),
-  Users (activate/suspend, comp access, admin roles), Payments setup.
-- **Auth**: plain email/password (scrypt + HMAC session cookie), reCAPTCHA v3 on
-  signup/login/contact when keys are set. First registered account becomes admin;
-  `npm run db:seed` seeds divinitycomicsinc@gmail.com as admin with lifetime access
-  (password from SEED_ADMIN_PASSWORD, printed once if unset).
-
-## Studio highlights
-
-Comic Life-style UI with pages/styles sidebars, rulers, tabbed right panel
-(Layouts · Inspector · Layers · Photos · Library · Proof) and the balloon tray.
-Balloons auto-join when dragged near each other (bendable connector lever, drag
-tip to detach), images/PDFs drop straight into balloons and panels, Instant
-Alpha background removal, procedural fills (gradients/halftones/tiles/speedlines/
-textures), 28 lettering style presets + SFX word stamps, snapping with bleed/
-margin/center/mirror/equal-spacing guides, Ctrl+[ / Ctrl+] centering, Shift for
-proportional resize, auto-locking layers with a full right-click menu,
-LanguageTool proofing + native spellcheck, Page Setup (paper sizes in inches,
-orientation, document margins), print, and export to PNG/JPG/TIFF/PDF/CBZ with
-a DPI selector and page ranges.
+Proprietary — © Divinity Comics Inc. All rights reserved. Bundled fonts are
+OFL-licensed (see `public/fonts/LICENSE.txt`); all fills and patterns are
+generated procedurally.
