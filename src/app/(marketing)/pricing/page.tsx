@@ -28,6 +28,11 @@ export default async function Pricing() {
   const lifetimeLeft = Math.max(0, LIFETIME_CAP - lifetimeSold);
   return (
     <main className="mktSection">
+      {/* iOS App Store build: purchasing lives outside the app (guideline
+          3.1.1) — never show this page there, bounce to the studio */}
+      <script dangerouslySetInnerHTML={{ __html:
+        "if(document.documentElement.classList.contains('iosStore'))location.replace('/app')",
+      }} />
       <h2 style={{ textAlign: "center" }}>Simple, Honest Pricing</h2>
       <p className="sub" style={{ textAlign: "center", margin: "0 auto 36px" }}>
         Everything included on every plan. Pay securely with PayPal — subscribe and cancel

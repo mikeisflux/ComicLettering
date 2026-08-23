@@ -1,6 +1,7 @@
 /* Project persistence + page export + proofing ops — split from ops.ts
    (which had grown past the 1500-line cap). Same EditorCtx-bag calling
    convention; ops.ts re-exports everything here, so call sites are unchanged. */
+import { demoLock } from "@/lib/storeMode";
 import {
   Assets, BalloonEl, Doc, TextEl, normalizeDoc, reseedIds,
 } from "@/lib/model";
@@ -59,7 +60,7 @@ let saveInFlight = false;
 
 export async function saveProject(ed: EditorCtx, saveAs: boolean) {
   const { demo, setStatus, current, setCurrent, docRef, assetsRef } = ed;
-  if (demo) { setStatus("Saving is off in the demo — subscribe to save your comics to your library."); return; }
+  if (demo) { setStatus(demoLock("Saving is off in the demo — subscribe to save your comics to your library.", "Saving")); return; }
   /* review access is read-only: editors comment and close review passes,
      the letterer saves (Save a Copy still works — it makes a NEW book) */
   if (!saveAs && current && ed.collab?.role === "editor") {
@@ -163,7 +164,7 @@ async function blobToDataUrl(blob: Blob): Promise<string> {
 
 export async function exportJSON(ed: EditorCtx) {
   const { demo, setStatus, docRef, assetsRef, current } = ed;
-  if (demo) { setStatus("Saving project files is off in the demo — subscribe to unlock."); return; }
+  if (demo) { setStatus(demoLock("Saving project files is off in the demo — subscribe to unlock.", "Saving project files")); return; }
   /* materialise every asset the document references before packing */
   setStatus("Packing artwork…");
   await showProgress(ed, "Preparing artwork…", 0, 0);
@@ -271,7 +272,7 @@ export async function importJSON(ed: EditorCtx, f: File) {
 
 export async function printPage(ed: EditorCtx) {
   const { demo, setStatus, page, assetsRef } = ed;
-  if (demo) { setStatus("Printing is off in the demo — subscribe to print your pages."); return; }
+  if (demo) { setStatus(demoLock("Printing is off in the demo — subscribe to print your pages.", "Printing")); return; }
   if (!page) return;
   setStatus("Preparing print…");
   const { renderPageToCanvas } = await import("@/lib/exportPng");
@@ -286,7 +287,7 @@ export async function printPage(ed: EditorCtx) {
 
 export async function exportAllPages(ed: EditorCtx) {
   const { demo, setStatus, docRef, assetsRef } = ed;
-  if (demo) { setStatus("Export is off in the demo — subscribe to unlock."); return; }
+  if (demo) { setStatus(demoLock("Export is off in the demo — subscribe to unlock.", "Export")); return; }
   const d = docRef.current!;
   setStatus("Loading artwork…");
   try {
@@ -311,7 +312,7 @@ export async function runExport(
 ) {
   const { demo, setStatus, setShowExport, docRef, current, pageIndexRef,
     exportFrom, exportTo, letteringOnly, exportCropMarks, assetsRef } = ed;
-  if (demo) { setStatus("Export is off in the demo — subscribe to export print-ready pages."); setShowExport(false); return; }
+  if (demo) { setStatus(demoLock("Export is off in the demo — subscribe to export print-ready pages.", "Export")); setShowExport(false); return; }
   if (ed.exportProgress) return;   // an export is already running — ignore re-clicks
   setStatus("Loading artwork…");
   try {

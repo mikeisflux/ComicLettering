@@ -50,6 +50,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html:
           "if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(function(){})}",
         }} />
+        {/* iOS App Store build (guideline 3.1.1): the wrapper launches with
+            ?store=ios — persist the flag and stamp <html class="iosStore">
+            BEFORE first paint so pricing/purchase surfaces never flash.
+            See src/lib/storeMode.ts for what the class hides. */}
+        <script dangerouslySetInnerHTML={{ __html:
+          "try{if(new URLSearchParams(location.search).get('store')==='ios')localStorage.setItem('lmc.store','ios');if(localStorage.getItem('lmc.store')==='ios'||/LmcIOS/.test(navigator.userAgent))document.documentElement.classList.add('iosStore')}catch(e){}",
+        }} />
         {children}
       </body>
     </html>

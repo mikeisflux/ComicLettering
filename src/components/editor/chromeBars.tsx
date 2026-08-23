@@ -1,5 +1,6 @@
 /* Top chrome: menu bar, toolbar and format bar.
    Plain exported render functions taking the EditorCtx bag. */
+import { demoLock } from "@/lib/storeMode";
 import {
   BalloonEl, COLOR_PALETTE, DEFAULT_TEXT_SIZE, FONTS, GRADIENT_PRESETS,
   MULTI_GRADIENTS, TextEl, clamp, reseedIds, starterDoc,
@@ -75,7 +76,7 @@ export function renderMenuBar(ed: EditorCtx) {
         ["Install as App…", () => ed.installApp()],
         ["—", null],
         ["Page Setup…", () => setShowSetup(true)],
-        ["Export…", () => demo ? setStatus("Export is off in the demo — subscribe to unlock.") : setShowExport(true)],
+        ["Export…", () => demo ? setStatus(demoLock("Export is off in the demo — subscribe to unlock.", "Export")) : setShowExport(true)],
         ["Print…", () => printPage(ed)],
       ]],
       ["Edit", [
@@ -308,7 +309,7 @@ export function renderToolbar(ed: EditorCtx) {
       }} />
     <ToolBtn label="Page Setup" icon="📐" onClick={() => setShowSetup(true)} />
     <ToolBtn label="Print" icon="🖨" onClick={() => printPage(ed)} />
-    <ToolBtn label="Export" icon="🖼⇩" accent onClick={() => demo ? setStatus("Export is off in the demo — subscribe to unlock.") : setShowExport(true)} />
+    <ToolBtn label="Export" icon="🖼⇩" accent onClick={() => demo ? setStatus(demoLock("Export is off in the demo — subscribe to unlock.", "Export")) : setShowExport(true)} />
     <ToolBtn label="Inspector" icon="ⓘ" onClick={() => {
       setTab("inspector");
       if (ed.winHide.right) ed.toggleWindow("right");   // panel hidden = show it

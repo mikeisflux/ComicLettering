@@ -1488,3 +1488,12 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
   .setupFoot button, .btnRow button, .menuTop, .tuckFly button,
   .penTools button, .tabs button, .layerRow, .proofCard, .layoutDel { transition: none !important; }
 }
+
+/* ---- iOS App Store build (guideline 3.1.1 — see src/lib/storeMode.ts) ----
+   The wrapper stamps <html class="iosStore"> before paint. Hide every
+   external-purchase surface: all pricing links site-wide, priced CTAs
+   tagged data-extpay, and the install-as-app button (wrong inside a
+   native wrapper). Everything else renders exactly as on the web. */
+.iosStore a[href^="/pricing"],
+.iosStore [data-extpay],
+.iosStore .installBtn { display: none !important; }

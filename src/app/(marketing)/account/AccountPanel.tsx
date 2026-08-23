@@ -96,9 +96,11 @@ export default function AccountPanel() {
           {sub.plan?.startsWith("pass") ? (
             <p className="acctHint">
               One-time pass — nothing renews automatically.{" "}
-              {sub.status === "cancelled"
+              {/* the renewal pitch is an external-purchase direction —
+                  hidden in the iOS App Store build (guideline 3.1.1) */}
+              <span data-extpay>{sub.status === "cancelled"
                 ? <>It has ended — grab a new pass or subscription on the <a href="/pricing">pricing page</a>.</>
-                : <>Buying another pass from the <a href="/pricing">pricing page</a> stacks onto your remaining time.</>}
+                : <>Buying another pass from the <a href="/pricing">pricing page</a> stacks onto your remaining time.</>}</span>
             </p>
           ) : (
             <p className="acctHint">Your access is granted manually and isn’t billed through PayPal.</p>
@@ -126,7 +128,7 @@ export default function AccountPanel() {
       ) : (
         <>
           <div className="acctRow"><span>Plan</span><b>No active subscription</b></div>
-          <p className="acctHint">Subscribe to unlock saving, export and printing in the Studio.</p>
+          <p className="acctHint" data-extpay>Subscribe to unlock saving, export and printing in the Studio.</p>
           <div className="acctActions">
             <a className="acctBtn primary" href="/pricing">Choose a plan</a>
           </div>

@@ -1,5 +1,6 @@
 /* Right-panel tabs: Layouts, Layers, Proof, Photos, Library.
    Plain exported render functions taking the EditorCtx bag. */
+import { demoLock } from "@/lib/storeMode";
 import {
   LAYOUT_CATEGORIES, LayoutRect, PanelEl, SavedLayout, applyLayout, capturePageLayout, clamp, makeImage, uid,
 } from "@/lib/model";
@@ -536,7 +537,7 @@ export function renderLibraryTab(ed: EditorCtx) {
       <div className="btnRow">
         <button onClick={() => exportAllPages(ed)}>Export all pages (PNG)</button>
         <button onClick={async () => {
-          if (demo) { setStatus("Export is off in the demo — subscribe to export print-ready pages."); return; }
+          if (demo) { setStatus(demoLock("Export is off in the demo — subscribe to export print-ready pages.", "Export")); return; }
           try {
             const { exportPdf } = await import("@/lib/pdfExport");
             await exportPdf(docRef.current!, assetsRef.current, (current?.name || "comic") + ".pdf",

@@ -71,7 +71,7 @@ export default function Home() {
           <Link className="btnBig primary" href="/signup?next=/app&demo=1">Try the Free Demo</Link>
           <Link className="btnBig secondary" href="/pricing">Pricing — from $40</Link>
         </div>
-        <p className="heroNote">$160/year or a one-time pass from $40 · cancel anytime · works on any computer</p>
+        <p className="heroNote" data-extpay>$160/year or a one-time pass from $40 · cancel anytime · works on any computer</p>
       </section>
 
       <section className="mktSection showcase" id="see-it">

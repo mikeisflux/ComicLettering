@@ -110,7 +110,7 @@ export default function Landing({
 
       <section className="mktSection ctaSection">
         <h2>Start lettering your comic today</h2>
-        <p className="sub">Open the studio in your browser and try every tool free. Unlock saving, export and printing for $160/year — or pay once for a pass, no auto-renew.</p>
+        <p className="sub" data-extpay>Open the studio in your browser and try every tool free. Unlock saving, export and printing for $160/year — or pay once for a pass, no auto-renew.</p>
         <div className="heroBtns">
           <Link className="btnBig primary" href="/signup?next=/app&demo=1">{ctaLabel}</Link>
         </div>
