@@ -24,6 +24,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Apple rejects uploads built with anything older than the iOS 26 SDK;
+      # the runner's default Xcode lags behind, but newer ones are installed.
+      - name: Select the newest Xcode on the runner
+        run: |
+          XC=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          echo "Selecting $XC"
+          sudo xcode-select -s "$XC"
+          xcodebuild -version
+
       - name: Install pods
         run: pod install
 
