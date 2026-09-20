@@ -63,6 +63,8 @@ export const GUIDE_SECTIONS: GuideSection[] = [
       { p: "Already have the page drawn? Right-click the artwork → Detect Panels From Art (also in the Layouts tab and Insert menu). The studio reads the art's gutters and lays transparent panel frames over the panels it finds — restyle or delete any of them. It works best with clear gutters between panels." },
       { h: "Importing art" },
       { p: "Import photos and artwork in PNG, JPG, WebP, GIF, AVIF, BMP, SVG, TIFF or PDF — from the Photos tab, Insert → Image…, or by dropping files straight onto the page. Select a panel first and a clicked photo fills it (cover-cropped); filters (B&W, sepia, vivid, faded, noir) apply per image. Instant Alpha removes flat backgrounds from a stamp or logo." },
+      { h: "Position the picture in its frame" },
+      { p: "A filled panel crops the art to fit automatically, centred. To choose which part shows: select the panel and open Inspector → Picture in frame — the Across and Down sliders pan the crop, Zoom punches in tighter (up to 3×), and Reset position returns to the automatic centre. Faster by hand: hold Alt and drag the panel and the PICTURE slides inside the frame instead of the frame moving. Both are also one right-click away: Position Picture In Frame… in the context menu. The same controls appear on plain image elements, and everything pans identically in exports and print." },
       { p: "Page art is the ONLY thing allowed past the bleed line — balloons, text and stamps clip hard at the trim (see The bleed line below)." },
     ],
   },

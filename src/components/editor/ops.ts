@@ -1213,7 +1213,9 @@ export async function onDrop(ed: EditorCtx, e: React.DragEvent) {
       if (target.type === "image") fitBoxToArt(target, img);
       commit();
       setSelId(target.id);
-      setStatus(target.type === "balloon" ? "Image placed inside the balloon." : "Image placed in the panel.");
+      setStatus(target.type === "balloon"
+        ? "Image placed inside the balloon."
+        : "Image placed in the panel — choose which part shows with Inspector → Picture in frame, or Alt-drag the panel.");
     } else {
       await importImageFile(ed, f, pt.x + off, pt.y + off);
     }
@@ -1241,7 +1243,7 @@ export function fitBoxToArt(el: { x: number; y: number; w: number; h: number }, 
 }
 
 export async function assignImageToPanel(ed: EditorCtx, elId: string, aid: string) {
-  const { docRef, pageIndexRef, assetsRef, commit } = ed;
+  const { docRef, pageIndexRef, assetsRef, commit, setStatus } = ed;
   const d = docRef.current!;
   const p = d.pages[pageIndexRef.current];
   const el = p.els.find((x) => x.id === elId);
@@ -1250,6 +1252,12 @@ export async function assignImageToPanel(ed: EditorCtx, elId: string, aid: strin
   const img = await loadImage(assetsRef.current[aid]);
   if (el.type === "image") fitBoxToArt(el, img);
   commit();
+  /* the cover-crop centres automatically — say HOW to re-aim it right at
+     the moment of filling (users searched the menus for this, a reported
+     discoverability gap) */
+  if (el.type === "panel") {
+    setStatus("Image fills the panel — choose which part shows with Inspector → Picture in frame, or Alt-drag the panel.");
+  }
 }
 
 /* Un-crop: give a panel the artwork's shape without changing how much room it

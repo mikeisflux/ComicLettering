@@ -242,6 +242,19 @@ export function renderContextMenu(ed: EditorCtx) {
               <div className="ctxSep" />
             </>
           )}
+          {/* the pan/zoom crop control lives in the Inspector — surface it
+              here too: users hunting "how do I move the picture inside the
+              panel" look in the right-click menu first (a reported gap) */}
+          {(el.type === "panel" || el.type === "image") && el.img && (
+            <>
+              <button onClick={() => {
+                ed.setTab("inspector");
+                setStatus("Picture in frame: slide Across / Down / Zoom in the Inspector — or hold Alt and drag the frame to move the picture by hand.");
+                close();
+              }}>Position Picture In Frame…</button>
+              <div className="ctxSep" />
+            </>
+          )}
           <button disabled={el.locked} onClick={() => { reorder(ed, 1); close(); }}>Bring Forward</button>
           <button disabled={el.locked} onClick={() => { reorder(ed, 1e9); close(); }}>Bring To Front</button>
           <button disabled={el.locked} onClick={() => { reorder(ed, -1); close(); }}>Send Backward</button>
