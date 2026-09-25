@@ -3,6 +3,7 @@
 import { clamp, makeText } from "@/lib/model";
 import { LETTER_STYLES, applyLetterStyle } from "@/lib/presets";
 import { STAMPS, WORD_STAMPS, letterStyleCss } from "./textHelpers";
+import { describeScript, parseScript } from "@/lib/scriptParse";
 import { TrayBtn } from "./chrome";
 import { EditorCtx } from "./ctx";
 import {
@@ -727,25 +728,120 @@ export function renderTuckDialog(ed: EditorCtx) {
 export function renderScriptDialog(ed: EditorCtx) {
   const { showScript, setShowScript, scriptText, setScriptText } = ed;
   if (!showScript) return null;
+  /* live recognition readout — the writer sees what the parser understood
+     BEFORE anything lands on the page */
+  const recap = scriptText.trim() ? describeScript(parseScript(scriptText)) : "";
   return (
     <div className="setupOverlay" onPointerDown={(e) => { if (e.target === e.currentTarget) setShowScript(false); }}>
-      <div className="setupDlg" style={{ width: 560 }}>
+      <div className="setupDlg" style={{ width: 600 }}>
         <div className="setupTitle">Import Script → Balloons</div>
         <div className="setupBody" style={{ flexDirection: "column" }}>
-          <div className="mutedNote" style={{ fontSize: 12, opacity: .75, marginBottom: 6 }}>
-            Paste your script. One line each: <code>CHARACTER: dialogue</code>.
-            Use <code>CAPTION:</code>, <code>SFX:</code>, and parentheticals like
-            <code> JANE (thought):</code> or <code>(whisper)</code>. PAGE / PANEL headers are ignored.
-            Balloons are laid out on the current page for you to arrange.
+          <div className="mutedNote" style={{ fontSize: 12.5, opacity: .8, marginBottom: 6 }}>
+            Paste a script in any common format — <code>CHARACTER: dialogue</code>, or the
+            screenplay style with the name on its own line. PAGE and PANEL headers place
+            each balloon on the right page, near its panel.
           </div>
           <textarea value={scriptText} autoFocus
             onChange={(e) => setScriptText(e.target.value)}
-            placeholder={"PAGE 1\nPANEL 1\nJANE: We shouldn't be here.\nMARK (whisper): Too late now.\nCAPTION: Later that night…\nSFX: KRAKKA-THOOM"}
-            style={{ width: "100%", height: 220, fontFamily: "ui-monospace, Menlo, monospace", fontSize: 13, resize: "vertical" }} />
+            placeholder={"PAGE ONE\nPANEL 1\nJANE: We shouldn't be here.\nMARK (whisper): Too late now.\nJANE (thought): He's lying.\nCAPTION: Later that night…\nSFX: KRAKKA-THOOM\n\nPANEL 2\nMARK\n(shouting)\nRUN!!"}
+            style={{ width: "100%", height: 210, fontFamily: "ui-monospace, Menlo, monospace", fontSize: 13, resize: "vertical" }} />
+          <div className={"scriptRecap" + (recap ? "" : " empty")}>
+            {recap ? `Recognized: ${recap}` : "Nothing recognized yet — dialogue lines need a speaker."}
+          </div>
+          <div className="scriptCheat">
+            Cues in parentheses pick the balloon: <code>(thought)</code> <code>(whisper)</code>{" "}
+            <code>(shout)</code> <code>(radio)</code> / <code>(phone)</code> <code>(weak)</code>{" "}
+            <code>(buzz)</code> · <code>CAPTION:</code> <code>NARRATION:</code> <code>TITLE:</code> make boxes ·{" "}
+            <code>SFX:</code> or a bare <code>KRAKOOM!</code> line makes lettering ·{" "}
+            <code>(CONT&apos;D)</code> / <code>(LINK)</code> joins to the previous balloon ·{" "}
+            <code>!!</code> in the text reads as a shout.
+          </div>
         </div>
         <div className="setupFoot">
           <button onClick={() => setShowScript(false)}>Cancel</button>
-          <button className="okBtn" disabled={!scriptText.trim()} onClick={() => importScript(ed)}>Add to page</button>
+          <button className="okBtn" disabled={!recap} onClick={() => importScript(ed)}>Build balloons</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* Help → Keyboard Shortcuts: a real dialog with key caps, replacing the
+   browser alert() text dump. Data-driven so the list stays easy to extend. */
+const SHORTCUTS: { group: string; rows: [string[], string][] }[] = [
+  { group: "Selecting", rows: [
+    [["Ctrl", "A"], "Select everything on the page"],
+    [["Ctrl", "Shift", "A"], "Deselect"],
+    [["Ctrl", "click"], "Add or remove one item"],
+    [["Tab", "/", "Shift", "Tab"], "Step through items"],
+    [["Esc"], "Deselect, or finish editing text"],
+  ]},
+  { group: "Adding", rows: [
+    [["B"], "Balloon"], [["T"], "Text"], [["L"], "Lettering"], [["P"], "Panel"],
+  ]},
+  { group: "Editing", rows: [
+    [["Ctrl", "Z"], "Undo"], [["Ctrl", "Y"], "Redo"],
+    [["Ctrl", "D"], "Duplicate"],
+    [["Ctrl", "C"], "Copy"], [["Ctrl", "X"], "Cut"], [["Ctrl", "V"], "Paste"],
+    [["Del"], "Delete"],
+    [["←", "↑", "→", "↓"], "Nudge 1px (Shift = 10px)"],
+    [["Ctrl", "F"], "Find & replace"],
+    [["Ctrl", "L"], "Lock"], [["Ctrl", "Shift", "L"], "Unlock"],
+    [["Ctrl", "["], "Centre across"], [["Ctrl", "]"], "Centre down"],
+    [["Ctrl", "\\"], "Fit balloons & text to their text"],
+    [["Ctrl", "Shift", "["], "Send to back"], [["Ctrl", "Shift", "]"], "Bring to front"],
+  ]},
+  { group: "While dragging", rows: [
+    [["Shift"], "Keep proportions · snap 15° rotating"],
+    [["Alt"], "Ignore snapping"],
+    [["Alt", "drag"], "Slide a picture inside its panel"],
+  ]},
+  { group: "Text", rows: [
+    [["Double-click"], "Edit the words"],
+    [["Ctrl", "B"], "Bold the selected words"],
+    [["Ctrl", "I"], "Italic the selected words"],
+  ]},
+  { group: "Pages & view", rows: [
+    [["PgUp"], "Previous page"], [["PgDn"], "Next page"],
+    [["Ctrl", "Shift", "N"], "Duplicate page"],
+    [["Ctrl", "="], "Zoom in"], [["Ctrl", "−"], "Zoom out"], [["Ctrl", "0"], "Fit page"],
+  ]},
+  { group: "File", rows: [
+    [["Ctrl", "S"], "Save"], [["Ctrl", "Shift", "S"], "Save as"],
+    [["Ctrl", "E"], "Export"], [["Ctrl", "P"], "Print"],
+  ]},
+];
+
+export function renderShortcutsDialog(ed: EditorCtx) {
+  if (!ed.showShortcuts) return null;
+  const close = () => ed.setShowShortcuts(false);
+  const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
+  const cap = (k: string) => (isMac && k === "Ctrl" ? "⌘" : isMac && k === "Alt" ? "⌥" : k);
+  return (
+    <div className="setupOverlay" onPointerDown={(e) => { if (e.target === e.currentTarget) close(); }}>
+      <div className="setupDlg" style={{ width: 720 }}>
+        <div className="setupTitle">Keyboard Shortcuts</div>
+        <div className="setupBody" style={{ flexDirection: "column", maxHeight: "72vh", overflowY: "auto" }}>
+          <div className="scGrid">
+            {SHORTCUTS.map((g) => (
+              <div className="scGroup" key={g.group}>
+                <h4>{g.group}</h4>
+                {g.rows.map(([keys, what], i) => (
+                  <div className="scRow" key={i}>
+                    <span className="keys">
+                      {keys.map((k, j) => k === "/"
+                        ? <span className="sep" key={j}>or</span>
+                        : <kbd className="k" key={j}>{cap(k)}</kbd>)}
+                    </span>
+                    <span className="what">{what}</span>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="setupFoot">
+          <button className="okBtn" onClick={close}>Done</button>
         </div>
       </div>
     </div>

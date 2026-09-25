@@ -51,7 +51,7 @@ import {
 } from "./editor/tabs";
 import { renderFormatBar, renderMenuBar, renderToolbar } from "./editor/chromeBars";
 import {
-  renderAssocHelp, renderContextMenu, renderExportDialog, renderExportProgress,
+  renderAssocHelp, renderContextMenu, renderExportDialog, renderExportProgress, renderShortcutsDialog,
   renderFindDialog, renderInstallHelp,
   renderScriptDialog, renderTailAsk, renderTray, renderTuckDialog,
 } from "./editor/dialogs";
@@ -1025,6 +1025,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
      .lmc "Open with" walkthrough — Windows only registers the file icon
      once an association exists, and nothing tells the user that. */
   const [showAssocHelp, setShowAssocHelp] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
   useEffect(() => {
     try {
       const installed = window.matchMedia?.("(display-mode: standalone)").matches
@@ -1085,7 +1086,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     force, commit, autosave, undo, redo, setStatus, select, setSelId,
     setEditingId, finishEditing, mutateSel, startDrag, pagePoint, fitZoom, startTuck,
     selectAllOnPage, installApp, appInstalled, showInstallHelp, setShowInstallHelp,
-    showAssocHelp, setShowAssocHelp, winHide, toggleWindow, setAskAddPage,
+    showAssocHelp, setShowAssocHelp, showShortcuts, setShowShortcuts, winHide, toggleWindow, setAskAddPage,
     tuckAsk, setTuckAsk, retuneTuck, runTuckAuto, applyTuck, tuckTool, setTuckTool,
     adjustEdit, setAdjustEdit, resetTools,
     autosaveSoon,
@@ -1204,6 +1205,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       {renderFindDialog(ed)}
       {renderInstallHelp(ed)}
       {renderAssocHelp(ed)}
+      {renderShortcutsDialog(ed)}
       {renderScriptDialog(ed)}
       {renderAdjustDialog(ed)}
 

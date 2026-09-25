@@ -119,6 +119,9 @@ export interface EditorCtx {
   /* first run installed: "make .lmc files open here" walkthrough */
   showAssocHelp: boolean;
   setShowAssocHelp: SetState<boolean>;
+  /* Help → Keyboard Shortcuts (a styled dialog, not a browser alert) */
+  showShortcuts: boolean;
+  setShowShortcuts: SetState<boolean>;
   /* Window menu: per-panel visibility (persisted per browser) */
   winHide: { left: boolean; right: boolean; tray: boolean; format: boolean };
   toggleWindow: (k: "left" | "right" | "tray" | "format" | "all") => void;

@@ -645,13 +645,17 @@ export function importScript(ed: EditorCtx) {
           el.text = it.text;
           prev = null; // an effect breaks a run of dialogue
         } else {
-          const kind = (["caption", "thought", "whisper", "exclaim"].includes(it.kind) ? it.kind : "speech") as BalloonKind;
+          /* every balloon kind the parser can name maps straight through;
+             anything unexpected stays a speech balloon */
+          const KINDS: BalloonKind[] = ["caption", "thought", "whisper", "shout", "double", "rough", "buzz", "burst2"];
+          const kind = (KINDS.includes(it.kind as BalloonKind) ? it.kind : "speech") as BalloonKind;
           const h = clamp(Math.round(lineCt * p.w * 0.05 + p.w * 0.06), Math.round(p.w * 0.12), Math.round(p.h * 0.3));
           /* join to the previous bubble when the same NAMED character speaks
-             again — never captions (not a character) and never a bare/■ SFX */
+             again, or the script says so outright — (CONT'D) / (LINK) —
+             never captions (not a character) and never a bare/■ SFX */
           const named = kind !== "caption" && !!it.speaker
             && !/^(SFX|SOUND|FX|CAPTION|CAP|NARRATION|NARR|BOX|TITLE)$/.test(it.speaker);
-          const joinToPrev = named && prev && prev.speaker === it.speaker;
+          const joinToPrev = named && prev && (prev.speaker === it.speaker || it.link);
           const bel = makeBalloon(kind, x, y, joinToPrev ? Math.round(colW * 0.9) : colW, h);
           bel.text = it.text;
           if (joinToPrev && prev) {
@@ -683,7 +687,11 @@ export function importScript(ed: EditorCtx) {
   setScriptText("");
   setSelId(null);
   const spread = byPage.size;
-  setStatus(`Added ${count} item${count > 1 ? "s" : ""} across ${spread} page${spread > 1 ? "s" : ""}`
+  const kinds = new Map<string, number>();
+  for (const it of items) kinds.set(it.kind, (kinds.get(it.kind) || 0) + 1);
+  const recap = [...kinds.entries()].sort((a, bb) => bb[1] - a[1])
+    .map(([k, n]) => `${n} ${k === "double" ? "radio" : k === "sfx" ? "SFX" : k}`).join(", ");
+  setStatus(`Added ${count} item${count > 1 ? "s" : ""} (${recap}) across ${spread} page${spread > 1 ? "s" : ""}`
     + (madePages ? ` — ${madePages} new page${madePages > 1 ? "s" : ""} added.` : "."));
 }
 
