@@ -1161,6 +1161,26 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     fitBalloonToText: () => fitBalloonToText(ed),
     printPage: () => printPage(ed),
     duplicatePage: () => duplicatePage(ed),
+    /* Escape closes whatever is on top — one popup per press, menus and
+       context menu first, then dialogs. Returns false when nothing was open
+       so the key falls through to its canvas meaning (finish edit/deselect). */
+    closeTopDialog: () => {
+      if (ctxMenu) { setCtxMenu(null); return true; }
+      if (openMenu) { setOpenMenu(null); return true; }
+      if (showShortcuts) { setShowShortcuts(false); return true; }
+      if (showAssocHelp) { setShowAssocHelp(false); return true; }
+      if (showInstallHelp) { setShowInstallHelp(false); return true; }
+      if (composer) { setComposer(null); return true; }
+      if (showTeam) { setShowTeam(false); return true; }
+      if (askAddPage) { setAskAddPage(false); return true; }
+      if (tailAsk) { setTailAsk(null); return true; }
+      if (showGradMaker) { setShowGradMaker(false); return true; }
+      if (showFind) { setShowFind(false); return true; }
+      if (showScript) { setShowScript(false); return true; }
+      if (showExport) { setShowExport(false); return true; }
+      if (showSetup) { setShowSetup(false); return true; }
+      return false;
+    },
   };
 
   /* Editor-local render plumbing handed to the shell (see editorShell) */

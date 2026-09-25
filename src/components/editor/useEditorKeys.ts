@@ -21,6 +21,7 @@ export interface KeyFns {
   finishEditing: () => void; reorder: (d: number) => void;
   fitBalloonToText: () => void; printPage: () => void;
   duplicatePage: () => void;
+  closeTopDialog: () => boolean;
 }
 
 interface Ref<T> { current: T }
@@ -73,6 +74,9 @@ export function useEditorKeys(deps: EditorKeyDeps) {
       const t = e.target as HTMLElement;
       const inField = t.closest?.("input, select, textarea") || t.isContentEditable;
       if (e.key === "Escape") {
+        /* an open popup/dialog owns Escape — it used to deselect the element
+           BEHIND the dialog and leave the dialog up */
+        if (keyFnsRef.current.closeTopDialog()) { e.preventDefault(); return; }
         setDrawMode(false);
         drawPtsRef.current = null;
         setTuckMode(false);
