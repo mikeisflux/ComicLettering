@@ -16,6 +16,10 @@ interface MergeInfo { d: string; bodyD?: string; color: string; cx: number; cy: 
 
 const imgCache = new Map<string, HTMLImageElement>();
 
+/* drop a cached decode — for one-off object URLs (thumbnail renders) that
+   would otherwise pin a full-size page scan in memory for the whole session */
+export function forgetImage(src: string) { imgCache.delete(src); }
+
 export function loadImage(src: string): Promise<HTMLImageElement> {
   const hit = imgCache.get(src);
   if (hit) return Promise.resolve(hit);

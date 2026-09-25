@@ -18,8 +18,8 @@ import { BALLOON_STYLES, BOX_STYLES } from "@/lib/balloonStyles";
 import { StyleTab, tabForSelection } from "./editor/stylesPanel";
 import { GradientMaker, loadCustomGrads } from "./editor/GradientMaker";
 import { FLAT } from "@/lib/warp";
-import { ImageFormat, pageThumbnail, spreadNeighbor } from "@/lib/exportPng";
-import { artUrl, ensureArt, holdArt, listArtIds, primeArtIds, putArt, requestPersistence } from "@/lib/assetStore";
+import { ImageFormat, forgetImage, pageThumbnail, spreadNeighbor } from "@/lib/exportPng";
+import { artUrl, ensureArt, getArt, holdArt, listArtIds, primeArtIds, putArt, requestPersistence } from "@/lib/assetStore";
 import {
   BalloonPreset, HINT, PRESET_KEY, ProjectMeta, ProofMatch, domSelectionOffsets, domToRuns,
   letterStyleCss, runsToHtml,
@@ -449,6 +449,34 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
      never stamp the wrong page's image onto the rail. */
   const thumbGenRef = useRef(0);
 
+  /* Render one page's rail thumbnail WITH the artwork it needs, wherever
+     that artwork currently is. Only the page on screen has its blobs
+     materialised (memory tracks what is being looked at, not the whole
+     book), so the rail used to draw every OTHER page's preview from an
+     asset map that had no entry for its art: lettering over blank panels
+     after every refresh until that page was visited. Ids the live map
+     lacks are pulled from the store for this render only and released
+     again, so the memory rule still holds. */
+  const thumbOf = useCallback(async (pi: number): Promise<string> => {
+    const d = docRef.current!;
+    const nb = spreadNeighbor(d, pi);
+    const assets: Assets = { ...assetsRef.current };
+    const temp: string[] = [];
+    const need = new Set<string>();
+    for (const pg of [d.pages[pi], nb?.page]) {
+      if (!pg) continue;
+      for (const e of pg.els) if ("img" in e && e.img && !assets[e.img]) need.add(e.img as string);
+    }
+    for (const id of need) {
+      const live = artUrl(id);
+      if (live) { assets[id] = live; continue; }
+      const blob = await getArt(id);
+      if (blob) { const u = URL.createObjectURL(blob); assets[id] = u; temp.push(u); }
+    }
+    try { return await pageThumbnail(d.pages[pi], assets, 220, nb); }
+    finally { for (const u of temp) { forgetImage(u); URL.revokeObjectURL(u); } }
+  }, []);
+
   const scheduleThumb = useCallback((pi: number) => {
     if (thumbTimer.current) clearTimeout(thumbTimer.current);
     thumbTimer.current = setTimeout(async () => {
@@ -456,12 +484,12 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       if (!d || !d.pages[pi]) return;
       const gen = thumbGenRef.current;
       try {
-        const url = await pageThumbnail(d.pages[pi], assetsRef.current, 220, spreadNeighbor(d, pi));
+        const url = await thumbOf(pi);
         if (thumbGenRef.current !== gen) return; // pages changed mid-render
         setThumbs((t) => ({ ...t, [pi]: url }));
       } catch { /* ignore */ }
     }, 700);
-  }, []);
+  }, [thumbOf]);
 
   /* refresh every page thumbnail (after multi-page edits: find/replace,
      duplicate, reorder) */
@@ -473,12 +501,12 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       const next: Record<number, string> = {};
       for (let i = 0; i < d.pages.length; i++) {
         if (thumbGenRef.current !== gen) return; // superseded by a newer rebuild
-        try { next[i] = await pageThumbnail(d.pages[i], assetsRef.current, 220, spreadNeighbor(d, i)); } catch { /* ignore */ }
+        try { next[i] = await thumbOf(i); } catch { /* ignore */ }
       }
       if (thumbGenRef.current !== gen) return;
       setThumbs(next);
     })();
-  }, []);
+  }, [thumbOf]);
 
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -668,7 +696,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       for (let i = 0; i < d.pages.length; i++) {
         if (thumbGenRef.current !== gen) return; // doc replaced during boot render
         try {
-          const url = await pageThumbnail(d.pages[i], assetsRef.current, 220, spreadNeighbor(d, i));
+          const url = await thumbOf(i);
           if (thumbGenRef.current !== gen) return;
           setThumbs((t) => ({ ...t, [i]: url }));
         } catch { /* ignore */ }
@@ -1284,9 +1312,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
             setShowSetup(false);
             commit();
             fitZoom(true);
-            setThumbs({});
-            d.pages.forEach((pg, i) =>
-              pageThumbnail(pg, assetsRef.current, 220).then((u) => setThumbs((t) => ({ ...t, [i]: u }))).catch(() => { }));
+            rebuildThumbs();
           }}
         />
       )}

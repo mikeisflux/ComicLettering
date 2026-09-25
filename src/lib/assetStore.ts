@@ -32,11 +32,21 @@ function openDb(): Promise<IDBDatabase | null> {
       if (db.objectStoreNames.contains("assets")) db.deleteObjectStore("assets");
       if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
     };
-    req.onsuccess = () => resolve(req.result);
+    req.onsuccess = () => {
+      const db = req.result;
+      /* another tab upgrading the schema asks us to let go — drop the
+         handle so the next call reopens instead of erroring forever */
+      db.onversionchange = () => { db.close(); dbPromise = null; };
+      resolve(db);
+    };
     /* private browsing and locked-down profiles can refuse outright */
     req.onerror = () => resolve(null);
     req.onblocked = () => resolve(null);
   });
+  /* a failed open is NOT remembered: a transient block at boot (a second
+     tab mid-upgrade, the browser still starting) used to leave every page
+     of the book without artwork for the rest of the session */
+  dbPromise.then((db) => { if (!db) dbPromise = null; });
   return dbPromise;
 }
 
