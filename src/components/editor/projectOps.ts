@@ -3,9 +3,8 @@
    convention; ops.ts re-exports everything here, so call sites are unchanged. */
 import { demoLock } from "@/lib/storeMode";
 import {
-  Assets, BalloonEl, Doc, TextEl, normalizeDoc, reseedIds,
-} from "@/lib/model";
-import { clearArt, fmtBytes, holdArt, noteArtId, putArt, releaseAllArt } from "@/lib/assetStore";
+  Assets, BalloonEl, Doc, TextEl, normalizeDoc, reseedIds, starterDoc } from "@/lib/model";
+import { fmtBytes, holdArt, noteArtId, putArt, releaseAllArt } from "@/lib/assetStore";
 import {
   ImageFormat, docThumbnail, exportPageImage, exportPagePNG, spreadNeighbor,
 } from "@/lib/exportPng";
@@ -44,19 +43,32 @@ export async function refreshProjects(ed: EditorCtx) {
    and a 140-page book of them is gigabytes — not something to push through a
    project save. Small generated artwork (tuck cutouts, stamps) is still a data
    URL and travels with the document as before. */
-export function portableAssets(assets: Assets): { assets: Assets; local: number } {
+export async function portableAssets(assets: Assets, inlineUnder = 600_000): Promise<{ assets: Assets; local: number }> {
   const out: Assets = {};
   let local = 0;
   for (const [id, url] of Object.entries(assets)) {
-    if (typeof url === "string" && url.startsWith("blob:")) local++;
-    else out[id] = url;
+    if (typeof url !== "string" || !url.startsWith("blob:")) { out[id] = url; continue; }
+    /* every stored image is a blob: URL once it reaches the art store —
+       stamps and tuck cutouts included. Small ones are inlined so they
+       travel with the book (they used to be dropped with the page scans,
+       and came back blank on another machine); big scans stay local. */
+    try {
+      const b = await fetch(url).then((r) => r.blob());
+      if (b.size <= inlineUnder) { out[id] = await blobToDataUrl(b); continue; }
+    } catch { /* unreadable — treat as local */ }
+    local++;
   }
   return { assets: out, local };
 }
 
+
 /* Guards against a second save starting before the first returns — Ctrl+S
    held or double-clicked would otherwise POST twice and create two projects. */
 let saveInFlight = false;
+
+/* the server's updatedAt for the book that is open — sent back with each
+   save so the server can refuse to overwrite a teammate's newer save */
+let openedAt: { id: string; at: string } | null = null;
 
 export async function saveProject(ed: EditorCtx, saveAs: boolean) {
   const { demo, setStatus, current, setCurrent, docRef, assetsRef } = ed;
@@ -82,13 +94,15 @@ export async function saveProject(ed: EditorCtx, saveAs: boolean) {
   try {
     let thumbnail = "";
     try { thumbnail = await docThumbnail(d, assetsRef.current); } catch { /* optional */ }
-    const { assets: portable, local } = portableAssets(assetsRef.current);
-    const payload = { name, data: { doc: d, assets: portable }, thumbnail };
+    const { assets: portable, local } = await portableAssets(assetsRef.current);
+    const baseUpdatedAt = target && openedAt?.id === target.id ? openedAt.at : undefined;
+    const payload = { name, data: { doc: d, assets: portable }, thumbnail, baseUpdatedAt };
     const res = target
       ? await fetch(`/api/projects/${target.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) })
       : await fetch("/api/projects", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     if (!res.ok) throw new Error((await res.json())?.error || res.statusText);
     const meta = await res.json();
+    if (typeof meta.updatedAt === "string") openedAt = { id: meta.id, at: meta.updatedAt };
     setCurrent({ id: meta.id, name: meta.name });
     setStatus(local
       ? `Saved “${meta.name}” to the library. ${local} page image${local > 1 ? "s stay" : " stays"} on this computer — they are too large to upload.`
@@ -101,6 +115,28 @@ export async function saveProject(ed: EditorCtx, saveAs: boolean) {
   }
 }
 
+/* File → New / toolbar New — one path. The two copies drifted: neither
+   cleared an edit in progress (editingId pointed at an element that no
+   longer existed), the context menu, the adjustment dialog or a pending
+   tuck. The local art store is NOT cleared: other books' page art lives
+   there too (see loadProject). */
+export function newDocument(ed: EditorCtx) {
+  const { docRef, assetsRef, histRef, hIndexRef, setCurrent, setSelId, setEditingId, setPageIndex, setThumbs, autosave, force, fitZoom } = ed;
+  if (!window.confirm("Start a new document?")) return;
+  if (ed.editingIdRef.current) ed.finishEditing();
+  docRef.current = starterDoc();
+  assetsRef.current = {};
+  releaseAllArt();
+  reseedIds(docRef.current);
+  ed.reseedAids();
+  histRef.current = [JSON.stringify(docRef.current)];
+  hIndexRef.current = 0;
+  setCurrent(null); setSelId(null); setEditingId(null); setPageIndex(0); setThumbs({});
+  ed.setCtxMenu(null); ed.setAdjustEdit(null); ed.setTuckAsk(null);
+  autosave(); force(); fitZoom(true);
+  ed.rebuildThumbs();
+}
+
 export async function loadProject(ed: EditorCtx, id: string) {
   const { setStatus, docRef, assetsRef, reseedAids, histRef, hIndexRef, setCurrent, setSelId, setEditingId, setPageIndex, setThumbs, autosave, force, fitZoom } = ed;
   setStatus("Loading project…");
@@ -111,15 +147,18 @@ export async function loadProject(ed: EditorCtx, id: string) {
     const payload = p.data;
     if (!payload?.doc?.pages) throw new Error("bad project data");
     docRef.current = normalizeDoc(payload.doc);
-    /* a loaded document owns the artwork slate — drop the previous book's
-       local blobs so the store does not accumulate orphans */
-    releaseAllArt(); await clearArt();
+    /* release this tab's object URLs only. The local art store is shared
+       by EVERY book on this computer — page scans never leave it (they are
+       too big to upload), so clearing it here deleted the other books'
+       artwork the moment you opened a second one. */
+    releaseAllArt();
     assetsRef.current = payload.assets || {};
     reseedIds(docRef.current!);
     reseedAids();
     try { await refitLegacyLettering(docRef.current!); } catch { /* best-effort */ }
     histRef.current = [JSON.stringify(docRef.current)];
     hIndexRef.current = 0;
+    openedAt = typeof p.updatedAt === "string" ? { id: p.id, at: p.updatedAt } : null;
     setCurrent({ id: p.id, name: p.name });
     setSelId(null); setEditingId(null); setPageIndex(0);
     setThumbs({});
@@ -235,9 +274,7 @@ export async function importJSON(ed: EditorCtx, f: File) {
     if (d?.app !== "comiclettering" || !Array.isArray(d.pages) || d.pages.length === 0) throw new Error("not a ComicLettering project");
     if ((d as { version?: number }).version !== 2) throw new Error("this file is from an old version");
     docRef.current = normalizeDoc(d);
-    /* a loaded document owns the artwork slate — drop the previous book's
-       local blobs so the store does not accumulate orphans */
-    releaseAllArt(); await clearArt();
+    releaseAllArt();   // see loadProject — the store is shared, never cleared here
     assetsRef.current = payload.assets || {};
     reseedIds(d);
     reseedAids();

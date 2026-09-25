@@ -585,6 +585,13 @@ export function joinLinks(page: Page): JoinLink[] {
 export function normalizeDoc(doc: Doc): Doc {
   for (const p of doc.pages ?? []) {
     for (const el of p.els ?? []) {
+      /* numeric defaults: a pre-outline document (or a hand-edited one)
+         put NaN into layout math and a NaN-sized scratch canvas threw */
+      if (typeof el.rot !== "number" || !Number.isFinite(el.rot)) el.rot = 0;
+      if ((el.type === "balloon" || el.type === "text") && el.ts) {
+        if (typeof el.ts.outlineW !== "number" || !Number.isFinite(el.ts.outlineW)) el.ts.outlineW = 0;
+        if (typeof el.ts.size !== "number" || !(el.ts.size > 0)) el.ts.size = DEFAULT_TEXT_SIZE;
+      }
       if (el.type !== "balloon") continue;
       delete el.band;                       // transient — must never persist
       if (el.tail) {

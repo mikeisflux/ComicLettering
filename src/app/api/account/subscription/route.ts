@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSessionUser } from "@/lib/auth";
+import { getSessionUser, hasAccess } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getSubscription, paypalConfigured } from "@/lib/paypal";
 import { getSetting } from "@/lib/settings";
@@ -33,10 +33,25 @@ export async function GET() {
            webhook may have just written) — trust our own record. */
         status = user.subStatus;
       } else if (plan !== user.subPlan || status !== user.subStatus) {
+        /* self-heal from PayPal's record. Stamp subUpdatedAt with PayPal's
+           own status time (not "now"), or the webhook's ordering guard
+           discarded legitimate events created before this read. A
+           cancellation keeps the paid period; an activation clears a
+           stale pass date. */
+        const su = Date.parse(sub.status_update_time || "");
+        const nb = Date.parse(sub.billing_info?.next_billing_time || "");
         await prisma.user.update({
           where: { id: user.id },
-          data: { subPlan: plan, subStatus: status, subUpdatedAt: new Date() },
+          data: {
+            subPlan: plan, subStatus: status,
+            ...(Number.isFinite(su) ? { subUpdatedAt: new Date(su) } : {}),
+            ...(status === "cancelled" && Number.isFinite(nb) && nb > Date.now() ? { subUntil: new Date(nb) }
+              : status === "active" ? { subUntil: null } : {}),
+          },
         });
+        user.subStatus = status;
+        if (status === "active") user.subUntil = null;
+        else if (status === "cancelled" && Number.isFinite(nb) && nb > Date.now()) user.subUntil = new Date(nb);
       }
     }
   }
@@ -58,6 +73,6 @@ export async function GET() {
     accessUntil: user.subUntil ? user.subUntil.toISOString() : null,
     hasSubscription: !!user.subId,
     managed: plan === "comp" || plan === "lifetime" || plan?.startsWith("pass") ? "manual" : "paypal",
-    active: user.isAdmin || (status === "active" && !passExpired),
+    active: hasAccess({ isAdmin: user.isAdmin, subStatus: status, subUntil: user.subUntil }),
   });
 }

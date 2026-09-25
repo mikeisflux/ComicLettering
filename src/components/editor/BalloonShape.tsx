@@ -58,8 +58,16 @@ export function BalloonShape({ el, mergeBase, imgSrc, joinRect }: {
               </linearGradient>
             );
           }
+          /* user space over the ELEMENT box — the bounding-box default spanned
+             the body PLUS the tail, so the ramp ran to the tail tip and the
+             export (which spans the box) showed a different gradient */
+          const rad = ((f.angle - 90) * Math.PI) / 180;
+          const cx = el.w / 2, cy = el.h / 2;
+          const len = (Math.abs(Math.cos(rad)) * el.w + Math.abs(Math.sin(rad)) * el.h) / 2;
           return (
-            <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1" gradientTransform={`rotate(${f.angle - 180}, 0.5, 0.5)`}>
+            <linearGradient id={gid} gradientUnits="userSpaceOnUse"
+              x1={cx - Math.cos(rad) * len} y1={cy - Math.sin(rad) * len}
+              x2={cx + Math.cos(rad) * len} y2={cy + Math.sin(rad) * len}>
               {stops}
             </linearGradient>
           );

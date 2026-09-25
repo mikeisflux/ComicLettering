@@ -57,6 +57,9 @@ export function useSketchDraw(deps: SketchDeps) {
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
       const d = ref.current;
+      /* a cancelled gesture (second finger → pinch, browser takeover) is
+         not a finished outline — drop the points, stay in draw mode */
+      if (ev.type === "pointercancel") { d.drawPtsRef.current = null; d.force(); return; }
       const arr = d.drawPtsRef.current;
       d.drawPtsRef.current = null;
       d.setDrawMode(false);

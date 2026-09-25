@@ -10,8 +10,7 @@ import {
   addAttachedBubble, addFromTray, alignSel, copySel, cutSel, deleteSel,
   doFindReplace, duplicateSel, importScript, insertCustomStamp, insertSfxStamp,
   fitToArtwork, fitToPage, pasteClip, removeCustomStamp, reorder, resizeToActual,
-  clipboardText, resolveTailAsk, runExport, saveStyleFromSelection,
-} from "./ops";
+  clipboardText, resolveTailAsk, runExport, saveStyleFromSelection, setLocked } from "./ops";
 import { detectPanelsFromArt } from "./panelOps";
 import { SFX_STAMPS } from "@/lib/sfxStamps";
 import type { TuckMode } from "./tuck";
@@ -112,7 +111,8 @@ export function renderTray(ed: EditorCtx) {
       <TrayBtn onClick={() => setStampOpen((s) => !s)} label="Stamps">
         <svg viewBox="0 0 40 30"><text x="20" y="23" textAnchor="middle" fontSize="20">💥</text></svg>
       </TrayBtn>
-      {stampOpen && (
+      {stampOpen && (<>
+        <div className="ctxBackdrop" style={{ zIndex: 119 }} onClick={() => setStampOpen(false)} />
         <div className="stampPop">
           <div className="stampWords">
             {WORD_STAMPS.map(([word, styleName, tilt]) => {
@@ -178,7 +178,7 @@ export function renderTray(ed: EditorCtx) {
             ))}
           </div>
         </div>
-      )}
+      </>)}
     </div>
     <TrayBtn onClick={() => addFromTray(ed, "panel")} label="Panel">
       <svg viewBox="0 0 40 30"><rect x="3" y="3" width="34" height="24" fill="#fff" stroke="#222" strokeWidth="3" /></svg>
@@ -249,7 +249,7 @@ export function renderContextMenu(ed: EditorCtx) {
           {(el.type === "panel" || el.type === "image") && el.img && (
             <>
               <button onClick={() => {
-                ed.setTab("inspector");
+                ed.showTab("inspector");
                 setStatus("Picture in frame: slide Across / Down / Zoom in the Inspector — or hold Alt and drag the frame to move the picture by hand.");
                 close();
               }}>Position Picture In Frame…</button>
@@ -277,14 +277,14 @@ export function renderContextMenu(ed: EditorCtx) {
               <>
                 {!allLocked && (
                   <button onClick={() => {
-                    ed.mutateSel((x) => { x.locked = true; pendingLockRef.current.delete(x.id); });
+                    setLocked(ed, true);
                     setStatus(many ? `Locked ${ed.selIds.length} items.` : "Locked.");
                     close();
                   }}>{many ? `Lock ${ed.selIds.length} Items` : "Lock"}</button>
                 )}
                 {anyLocked && (
                   <button onClick={() => {
-                    ed.mutateSel((x) => { x.locked = false; pendingLockRef.current.delete(x.id); });
+                    setLocked(ed, false);
                     setStatus(many ? `Unlocked ${ed.selIds.length} items.` : "Unlocked.");
                     close();
                   }}>{many ? `Unlock ${ed.selIds.length} Items` : "Unlock"}</button>
@@ -340,7 +340,9 @@ export function renderContextMenu(ed: EditorCtx) {
               whatever you were actually reaching for. */}
           <div className="ctxSep" />
           <div className="ctxSub">
-            <button disabled={el.locked} className="ctxSubHead">Align Object ▸</button>
+            {/* hover opens it with a mouse; a tap toggles it (touch has no hover) */}
+            <button disabled={el.locked} className="ctxSubHead"
+              onClick={(e) => e.currentTarget.parentElement?.classList.toggle("open")}>Align Object ▸</button>
             <div className="ctxSubMenu">
               <button disabled={el.locked} onClick={() => { alignSel(ed, "left"); close(); }}>Left</button>
               <button disabled={el.locked} onClick={() => { alignSel(ed, "hcenter"); close(); }}>Center</button>
@@ -550,8 +552,10 @@ export function renderExportDialog(ed: EditorCtx) {
           <fieldset className="setupGroup">
             <legend>Options</legend>
             <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <input type="checkbox" checked={letteringOnly} onChange={(e) => setLetteringOnly(e.target.checked)} />
-              Lettering only — transparent PNG (balloons &amp; text, no artwork)
+              <input type="checkbox" checked={letteringOnly && exportFmt !== "pdf" && exportFmt !== "cbz"}
+                disabled={exportFmt === "pdf" || exportFmt === "cbz"}
+                onChange={(e) => setLetteringOnly(e.target.checked)} />
+              Lettering only — transparent PNG (balloons &amp; text, no artwork; image formats only)
             </label>
             <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6, opacity: exportFmt === "pdf" ? 1 : 0.5 }}>
               <input type="checkbox" checked={exportCropMarks} disabled={exportFmt !== "pdf"}
@@ -650,7 +654,9 @@ export function renderTuckDialog(ed: EditorCtx) {
     { k: "level", label: "Brightness" },
   ];
   return (
-    <div className="setupOverlay" onPointerDown={(e) => { if (e.target === e.currentTarget) setTuckAsk(null); }}>
+    /* no click-away close: the outline took time to trace, and a stray
+       click outside the dialog threw it away — Cancel and Esc still work */
+    <div className="setupOverlay">
       <div className="setupDlg" style={{ width: 460 }}>
         <div className="setupTitle">Tuck Back</div>
         <div className="setupBody" style={{ flexDirection: "column" }}>

@@ -100,8 +100,11 @@ export function GradientMaker({ initial, onApply, onClose, onSaved }: {
   };
 
   return (
-    <div className="modalBack" onClick={onClose}>
-      <div className="modal gradMaker" onClick={(e) => e.stopPropagation()}>
+    /* pointerdown on the veil ITSELF — with onClick, a stop drag that ended
+       over the veil produced a click on the common ancestor and closed the
+       dialog mid-drag, throwing the gradient away */
+    <div className="modalBack" onPointerDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal gradMaker">
         <h3>Gradient Maker</h3>
 
         <div className="gmPreview" style={{ background: gradCss(sortedStops) }} />

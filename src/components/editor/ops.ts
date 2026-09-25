@@ -15,7 +15,7 @@ import {
   artIdTaken, artUrl, ensureArt, fmtBytes, holdArt, noteArtId, putArt,
   requestPersistence, storageEstimate,
 } from "@/lib/assetStore";
-import { LETTER_STYLES, applyLetterStyle, captureLetterStyle } from "@/lib/presets";
+import { LETTER_STYLES, LetterStyle, applyLetterStyle, captureLetterStyle } from "@/lib/presets";
 import {
   BALLOON_STYLES, BOX_STYLES, ShapeStyle, applyShapeStyle, captureShapeStyle,
 } from "@/lib/balloonStyles";
@@ -128,20 +128,36 @@ export function deleteSel(ed: EditorCtx) {
   }
 }
 
+/* Lock / unlock the selection — the ONE path for the Inspector checkbox,
+   Arrange menu, context menu, Layers button and Ctrl+L. It also clears the
+   auto-lock "pending" flag: three of the five entry points forgot, so Lock
+   → Unlock → click the page re-locked the element (read as "unlock didn't
+   work"). */
+export function setLocked(ed: EditorCtx, v: boolean) {
+  ed.mutateSel((x) => { x.locked = v; ed.pendingLockRef.current.delete(x.id); });
+}
+
+/* Duplicate the WHOLE selection (it used to copy only the primary while
+   Copy/Cut/Delete acted on the set). Joins between duplicated balloons are
+   kept between the copies. */
 export function duplicateSel(ed: EditorCtx) {
-  const { docRef, pageIndexRef, selId, pendingLockRef, commit, setSelId } = ed;
+  const { docRef, pageIndexRef, selIds, pendingLockRef, commit, setSelIds } = ed;
   const d = docRef.current!;
   const p = d.pages[pageIndexRef.current];
-  const el = p.els.find((x) => x.id === selId);
-  if (!el) return;
-  const copy = JSON.parse(JSON.stringify(el)) as El;
-  copy.id = uid();
-  copy.x += 40; copy.y += 40;
-  copy.locked = false;
-  p.els.push(copy);
-  pendingLockRef.current.add(copy.id);
+  const src = p.els.filter((x) => selIds.includes(x.id));
+  if (!src.length) return;
+  const copies = JSON.parse(JSON.stringify(src)) as El[];
+  const idMap = new Map<string, string>();
+  for (const c of copies) { const nid = uid(); idMap.set(c.id, nid); c.id = nid; }
+  for (const c of copies) {
+    c.x += 40; c.y += 40;
+    c.locked = false;
+    if (c.type === "balloon" && c.attachTo) c.attachTo = idMap.get(c.attachTo) ?? null;
+    p.els.push(c);
+    pendingLockRef.current.add(c.id);
+  }
   commit();
-  setSelId(copy.id);
+  setSelIds(copies.map((c) => c.id));
 }
 
 /* quick fill/stroke from the format-bar pickers — applies to the selected
@@ -406,7 +422,9 @@ export function movePage(ed: EditorCtx, dir: -1 | 1) {
    and styles just those. */
 export function toggleSelEmphasis(ed: EditorCtx, kind: "bold" | "italic" | "underline") {
   if (ed.editingId) {
-    const dom = document.querySelector(`.el[data-id="${ed.editingId}"] .txt`) as HTMLElement | null;
+    /* the EDITABLE node — the spread canvas also renders a read-only carried
+       copy with the same data-id earlier in the DOM */
+    const dom = document.querySelector(`.el[data-id="${ed.editingId}"] .txt[contenteditable="true"]`) as HTMLElement | null;
     if (dom && toggleEmphasis(dom, kind)) { onLetteringInput(ed, ed.editingId, dom); return; }
   }
   const rec = ed.selRangeRef.current;
@@ -723,17 +741,21 @@ export function importScript(ed: EditorCtx) {
 }
 
 export function alignSel(ed: EditorCtx, mode: "left" | "hcenter" | "right" | "top" | "vcenter" | "bottom") {
-  const { page, selId, setStatus, commit } = ed;
-  const el = page?.els.find((x) => x.id === selId);
-  if (!el || !page) return;
-  if (el.locked) { setStatus("This item is locked."); return; }
+  const { page, selIds, setStatus, commit } = ed;
+  if (!page) return;
+  const sel = page.els.filter((x) => selIds.includes(x.id));
+  if (!sel.length) return;
+  const free = sel.filter((x) => !x.locked);
+  if (!free.length) { setStatus(sel.length > 1 ? "Everything selected is locked." : "This item is locked."); return; }
   const m = pageMargins(page);
-  if (mode === "left") el.x = m.l;
-  if (mode === "hcenter") el.x = Math.round((page.w - el.w) / 2);
-  if (mode === "right") el.x = page.w - m.r - el.w;
-  if (mode === "top") el.y = m.t;
-  if (mode === "vcenter") el.y = Math.round((page.h - el.h) / 2);
-  if (mode === "bottom") el.y = page.h - m.b - el.h;
+  for (const el of free) {
+    if (mode === "left") el.x = m.l;
+    if (mode === "hcenter") el.x = Math.round((page.w - el.w) / 2);
+    if (mode === "right") el.x = page.w - m.r - el.w;
+    if (mode === "top") el.y = m.t;
+    if (mode === "vcenter") el.y = Math.round((page.h - el.h) / 2);
+    if (mode === "bottom") el.y = page.h - m.b - el.h;
+  }
   commit();
 }
 
@@ -749,14 +771,24 @@ export async function resizeToActual(ed: EditorCtx) {
   commit();
 }
 
+/* Move the selection through the stack as one block (relative order kept):
+   a step moves it past the next unselected neighbour, front/back sends the
+   whole block. Acting on the primary alone left the rest of a Ctrl+A group
+   where it was. */
 export function reorder(ed: EditorCtx, delta: number) {
-  const { docRef, pageIndexRef, selId, commit } = ed;
+  const { docRef, pageIndexRef, selIds, commit } = ed;
   const d = docRef.current!;
   const p = d.pages[pageIndexRef.current];
-  const i = p.els.findIndex((x) => x.id === selId);
-  if (i < 0) return;
-  const [el] = p.els.splice(i, 1);
-  p.els.splice(clamp(i + delta, 0, p.els.length), 0, el);
+  const sel = new Set(selIds);
+  const block = p.els.filter((x) => sel.has(x.id));
+  if (!block.length) return;
+  const rest = p.els.filter((x) => !sel.has(x.id));
+  const first = p.els.findIndex((x) => sel.has(x.id));
+  const before = p.els.slice(0, first).filter((x) => !sel.has(x.id)).length;   // unselected items under the block
+  let at = before + (delta > 0 ? 1 : -1) * Math.min(Math.abs(delta), rest.length);
+  at = clamp(at, 0, rest.length);
+  if (at === before) return;
+  p.els = [...rest.slice(0, at), ...block, ...rest.slice(at)];
   commit();
 }
 
@@ -802,7 +834,10 @@ export function addFromTray(ed: EditorCtx, kind: string) {
     const t = makeText(s.x, s.y, w, h, kind === "sfx");
     if (kind === "sfx") {
       /* new lettering uses the active style from the STYLES panel */
-      const st = LETTER_STYLES.find((x) => x.name === activeStyleRef.current) || LETTER_STYLES[0];
+      /* styles saved in THIS book count too — the panel let you pick one
+         and promised new lettering would use it, then fell back to Sunburst */
+      const mine = (d.styles?.letters ?? []) as LetterStyle[];
+      const st = [...mine, ...LETTER_STYLES].find((x) => x.name === activeStyleRef.current) || LETTER_STYLES[0];
       t.ts = applyLetterStyle(t.ts, st);
       t.ts.outlineW = Math.round(t.ts.size * st.outlineF);
     }
@@ -822,8 +857,9 @@ export function addFromTray(ed: EditorCtx, kind: string) {
     b.y = Math.round(s.y + (h - b.h) / 2);
     /* new balloons use the colourway picked in the STYLES panel */
     const list = caption ? BOX_STYLES : BALLOON_STYLES;
+    const mine = ((d.styles?.shapes ?? []) as (ShapeStyle & { forBox?: boolean })[]).filter((x) => !!x.forBox === caption);
     const want = caption ? activeShapeRef.current.box : activeShapeRef.current.balloon;
-    const st = list.find((x) => x.name === want);
+    const st = [...mine, ...list].find((x) => x.name === want);
     if (st) applyShapeStyle(b, st);
     el = b;
   }

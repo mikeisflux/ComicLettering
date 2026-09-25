@@ -57,13 +57,20 @@ async function authSecret(): Promise<string> {
 
 const b64u = (s: string) => Buffer.from(s).toString("base64url");
 
-export async function signToken(uid: string): Promise<string> {
-  const payload = b64u(JSON.stringify({ uid, exp: Math.floor(Date.now() / 1000) + WEEK }));
+/* the session is bound to the CURRENT password: `pv` is the hash's salt,
+   so a reset or admin password change logs every other session out */
+const pwVersion = (passwordHash: string) => passwordHash.slice(0, 16);
+
+export async function signToken(uid: string, passwordHash?: string): Promise<string> {
+  const payload = b64u(JSON.stringify({
+    uid, exp: Math.floor(Date.now() / 1000) + WEEK,
+    ...(passwordHash ? { pv: pwVersion(passwordHash) } : {}),
+  }));
   const sig = createHmac("sha256", await authSecret()).update(payload).digest("base64url");
   return `${payload}.${sig}`;
 }
 
-export async function verifyToken(token: string): Promise<string | null> {
+export async function verifyToken(token: string): Promise<{ uid: string; pv?: string } | null> {
   const [payload, sig] = token.split(".");
   if (!payload || !sig) return null;
   const expect = createHmac("sha256", await authSecret()).update(payload).digest("base64url");
@@ -72,12 +79,16 @@ export async function verifyToken(token: string): Promise<string | null> {
   try {
     const data = JSON.parse(Buffer.from(payload, "base64url").toString());
     if (typeof data.uid !== "string" || data.exp < Date.now() / 1000) return null;
-    return data.uid;
+    return { uid: data.uid, pv: typeof data.pv === "string" ? data.pv : undefined };
   } catch { return null; }
 }
 
-export async function createSession(uid: string) {
-  const token = await signToken(uid);
+export async function createSession(uid: string, passwordHash?: string) {
+  if (!passwordHash) {
+    const u = await prisma.user.findUnique({ where: { id: uid }, select: { passwordHash: true } });
+    passwordHash = u?.passwordHash;
+  }
+  const token = await signToken(uid, passwordHash);
   const jar = await cookies();
   jar.set(COOKIE, token, {
     httpOnly: true, sameSite: "lax", path: "/",
@@ -88,7 +99,10 @@ export async function createSession(uid: string) {
 
 export async function destroySession() {
   const jar = await cookies();
-  jar.set(COOKIE, "", { httpOnly: true, path: "/", maxAge: 0 });
+  jar.set(COOKIE, "", {
+    httpOnly: true, sameSite: "lax", path: "/",
+    secure: process.env.NODE_ENV === "production", maxAge: 0,
+  });
 }
 
 export async function getSessionUser(): Promise<User | null> {
@@ -96,12 +110,28 @@ export async function getSessionUser(): Promise<User | null> {
     const jar = await cookies();
     const token = jar.get(COOKIE)?.value;
     if (!token) return null;
-    const uid = await verifyToken(token);
-    if (!uid) return null;
-    return await prisma.user.findUnique({ where: { id: uid } });
+    const t = await verifyToken(token);
+    if (!t) return null;
+    const user = await prisma.user.findUnique({ where: { id: t.uid } });
+    /* a token minted for an older password is dead (sessions without a
+       version — issued before this check — ride out their week) */
+    if (user && t.pv && t.pv !== pwVersion(user.passwordHash)) return null;
+    return user;
   } catch { return null; }
 }
 
-export const hasAccess = (u: User | null) =>
-  !!u && (u.isAdmin ||
-    (u.subStatus === "active" && (!u.subUntil || u.subUntil.getTime() > Date.now())));
+/* Who may use the studio:
+   - admins;
+   - an active subscription or pass (subUntil, when set, is the pass expiry);
+   - a CANCELLED subscription until the paid period ends — subUntil holds
+     the next-billing date captured when it was cancelled. The Terms, FAQ
+     and account page all promise this; access used to stop the moment the
+     cancel button was pressed. */
+export const hasAccess = (u: Pick<User, "isAdmin" | "subStatus" | "subUntil"> | null) => {
+  if (!u) return false;
+  if (u.isAdmin) return true;
+  const paidThrough = !!u.subUntil && u.subUntil.getTime() > Date.now();
+  if (u.subStatus === "active") return !u.subUntil || paidThrough;
+  if (u.subStatus === "cancelled") return paidThrough;
+  return false;
+};

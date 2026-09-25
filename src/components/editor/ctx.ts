@@ -183,6 +183,10 @@ export interface EditorCtx {
   /* UI state + setters */
   tab: TabKey;
   setTab: SetState<TabKey>;
+  /* switch to a right-panel tab AND make sure the panel is showing — every
+     "go to X" entry point uses this, so none of them can no-op on a phone
+     or after Window → Hide Inspector Panel */
+  showTab: (k: TabKey) => void;
   layoutCat: number;
   setLayoutCat: SetState<number>;
   /* user-saved custom page layouts — the "My Layouts" category (persisted

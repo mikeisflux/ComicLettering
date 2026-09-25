@@ -15,6 +15,9 @@ export async function POST(req: Request) {
 
   const cap = await capturePassOrder(String(orderId));
   if (!cap.ok) return NextResponse.json({ error: cap.error }, { status: 402 });
+  if (cap.userId && cap.userId !== user.id) {
+    return NextResponse.json({ error: "That order belongs to a different account." }, { status: 403 });
+  }
   const pass = PASSES[cap.tier];
   if (!pass || cap.amount !== pass.price) {
     return NextResponse.json({ error: "Captured order does not match a known pass." }, { status: 400 });

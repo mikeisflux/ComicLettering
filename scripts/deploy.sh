@@ -142,6 +142,9 @@ build_app() {
   log "Syncing database schema (prisma db push)…"
   npx prisma db push
   log "Building (next build)…"
+  # one build stamp for every bundle — see next.config.ts
+  NEXT_PUBLIC_LMC_BUILD="$(date -u +%Y-%m-%d).$(git rev-parse --short=10 HEAD 2>/dev/null || date +%s)"
+  export NEXT_PUBLIC_LMC_BUILD
   npm run build
 }
 

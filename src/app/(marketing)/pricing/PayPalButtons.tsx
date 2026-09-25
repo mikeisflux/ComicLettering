@@ -1,4 +1,25 @@
 "use client";
+
+const PENDING_KEY = "lmc.pendingSubscription";
+/* link an approved subscription to the signed-in account; clears the
+   pending marker on success */
+async function activate(subscriptionId: string | undefined): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!subscriptionId) return { ok: false, error: "PayPal did not return a subscription id" };
+  try {
+    const res = await fetch("/api/paypal/activate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subscriptionId }),
+    });
+    if (res.ok) { try { localStorage.removeItem(PENDING_KEY); } catch { /* ignore */ } return { ok: true }; }
+    const err = (await res.json().catch(() => ({}))).error || "Activation failed";
+    /* a subscription linked to ANOTHER account will never link here */
+    if (res.status === 409) { try { localStorage.removeItem(PENDING_KEY); } catch { /* ignore */ } }
+    return { ok: false, error: err };
+  } catch {
+    return { ok: false, error: "Network problem while activating" };
+  }
+}
 import { useEffect, useRef, useState } from "react";
 
 declare global {
@@ -61,6 +82,14 @@ export default function PayPalButtons({ plan }: { plan: "monthly" | "yearly" }) 
       const me = await fetch("/api/auth/me").then((r) => r.json()).catch(() => ({ user: null }));
       if (cancelled) return;
       if (!me.user) { setState("loggedout"); return; }
+      /* an approved-but-unlinked subscription from a previous visit */
+      let pending: string | null = null;
+      try { pending = localStorage.getItem(PENDING_KEY); } catch { /* ignore */ }
+      if (pending) {
+        const r = await activate(pending);
+        if (cancelled) return;
+        if (r.ok) { setState("done"); window.location.href = "/app"; return; }
+      }
       const cfg: Config = await fetch("/api/paypal/config").then((r) => r.json()).catch(() => ({ configured: false, clientId: null, plans: { monthly: null, yearly: null } }));
       if (cancelled) return;
       if (!cfg.configured || !cfg.plans[plan] || !cfg.clientId) { setState("unconfigured"); return; }
@@ -74,16 +103,17 @@ export default function PayPalButtons({ plan }: { plan: "monthly" | "yearly" }) 
       holder.current.innerHTML = "";
       window.paypal.Buttons({
         style: { shape: "rect", label: "subscribe", color: plan === "yearly" ? "gold" : "blue" },
-        createSubscription: (_d: unknown, actions: { subscription: { create: (o: { plan_id: string }) => Promise<string> } }) =>
-          actions.subscription.create({ plan_id: cfg.plans[plan] as string }),
+        /* custom_id = the account: if the activate call below is lost, the
+           ACTIVATED webhook still links the subscription to this user */
+        createSubscription: (_d: unknown, actions: { subscription: { create: (o: { plan_id: string; custom_id?: string }) => Promise<string> } }) =>
+          actions.subscription.create({ plan_id: cfg.plans[plan] as string, custom_id: me.user.id }),
         onApprove: async (data: { subscriptionID?: string }) => {
-          const res = await fetch("/api/paypal/activate", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ subscriptionId: data.subscriptionID }),
-          });
-          if (res.ok) { setState("done"); window.location.href = "/app"; }
-          else { setError((await res.json()).error || "Activation failed"); setState("error"); }
+          /* remember the approved subscription until it is linked — a second
+             click on fresh buttons would create (and bill) a second one */
+          try { if (data.subscriptionID) localStorage.setItem(PENDING_KEY, data.subscriptionID); } catch { /* private mode */ }
+          const r = await activate(data.subscriptionID);
+          if (r.ok) { setState("done"); window.location.href = "/app"; }
+          else { setError(r.error + " — your payment went through; reload this page to finish linking it, or contact us."); setState("error"); }
         },
         onError: (err: unknown) => { setError(String(err).slice(0, 200)); setState("error"); },
       }).render(holder.current);
@@ -131,6 +161,14 @@ export function PayPalOrderButton({ tier }: { tier: "pass3" | "pass6" | "lifetim
       const me = await fetch("/api/auth/me").then((r) => r.json()).catch(() => ({ user: null }));
       if (cancelled) return;
       if (!me.user) { setState("loggedout"); return; }
+      /* an approved-but-unlinked subscription from a previous visit */
+      let pending: string | null = null;
+      try { pending = localStorage.getItem(PENDING_KEY); } catch { /* ignore */ }
+      if (pending) {
+        const r = await activate(pending);
+        if (cancelled) return;
+        if (r.ok) { setState("done"); window.location.href = "/app"; return; }
+      }
       const cfg: Config = await fetch("/api/paypal/config").then((r) => r.json()).catch(() => ({ configured: false, clientId: null, plans: { monthly: null, yearly: null } }));
       if (cancelled) return;
       if (!cfg.clientId) { setState("unconfigured"); return; }

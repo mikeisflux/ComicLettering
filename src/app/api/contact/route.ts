@@ -23,6 +23,9 @@ export async function POST(req: Request) {
     if (!email || !message) {
       return NextResponse.json({ error: "Email and message are required." }, { status: 400 });
     }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim())) {
+      return NextResponse.json({ error: "Enter a valid email address so we can reply." }, { status: 400 });
+    }
     await prisma.message.create({
       data: {
         direction: "in",
@@ -35,6 +38,7 @@ export async function POST(req: Request) {
     });
     return NextResponse.json({ ok: true });
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    console.error(err);
+    return NextResponse.json({ error: "Something went wrong — please try again." }, { status: 500 });
   }
 }

@@ -64,7 +64,9 @@ export async function POST(req: Request, { params }: Params) {
       const shareRole = body.role === "editor" ? "editor" : "letterer";
       if (!email) return NextResponse.json({ error: "An email is required." }, { status: 400 });
       const invitee = await prisma.user.findUnique({ where: { email } });
-      if (!invitee) return NextResponse.json({ error: "No LetterMyComic account uses that email — they need to sign up first." }, { status: 404 });
+      /* the same answer whether or not the address has an account — this
+         endpoint must not double as an email lookup */
+      if (!invitee) return NextResponse.json({ error: "Could not share with that address. Ask them to sign up with it first, then try again." }, { status: 404 });
       if (invitee.id === user.id) return NextResponse.json({ error: "That is your own account." }, { status: 400 });
       await prisma.projectShare.upsert({
         where: { projectId_userId: { projectId: id, userId: invitee.id } },

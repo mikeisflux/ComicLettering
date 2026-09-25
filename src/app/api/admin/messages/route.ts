@@ -18,7 +18,9 @@ export async function GET() {
 export async function PUT(req: Request) {
   if (!(await requireAdmin())) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   const { id, read } = await req.json();
-  await prisma.message.update({ where: { id: String(id) }, data: { read: !!read } });
+  if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
+  const r = await prisma.message.updateMany({ where: { id: String(id) }, data: { read: !!read } });
+  if (!r.count) return NextResponse.json({ error: "not found" }, { status: 404 });
   return NextResponse.json({ ok: true });
 }
 
@@ -44,13 +46,15 @@ export async function POST(req: Request) {
     });
     return NextResponse.json({ ok: true });
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    console.error(err);
+    return NextResponse.json({ error: "Something went wrong — please try again." }, { status: 500 });
   }
 }
 
 export async function DELETE(req: Request) {
   if (!(await requireAdmin())) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   const { id } = await req.json();
-  await prisma.message.delete({ where: { id: String(id) } });
+  if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
+  await prisma.message.deleteMany({ where: { id: String(id) } });
   return NextResponse.json({ ok: true });
 }

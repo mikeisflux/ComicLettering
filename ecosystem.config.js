@@ -41,7 +41,11 @@ module.exports = {
     {
       name: process.env.SERVICE || "lettermycomic",
       script: "node_modules/next/dist/bin/next",
-      args: `start -p ${PORT}`,
+      // loopback only: reached through Caddy, which writes X-Forwarded-For.
+      // Exposed on all interfaces, a direct hit could spoof that header and
+      // firewall arbitrary addresses through the honeypot, or brute-force
+      // logins with no throttle.
+      args: `start -H 127.0.0.1 -p ${PORT}`,
       cwd: __dirname,
       instances: 2,
       exec_mode: "cluster",

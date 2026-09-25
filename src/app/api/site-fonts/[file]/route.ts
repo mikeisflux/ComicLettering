@@ -13,7 +13,9 @@ const TYPES: Record<string, string> = {
    added after the app was built. */
 export async function GET(_req: Request, { params }: { params: Promise<{ file: string }> }) {
   const { file } = await params;
-  const name = path.basename(decodeURIComponent(file)); // no path traversal
+  let name: string;
+  try { name = path.basename(decodeURIComponent(file)); } // no path traversal
+  catch { return NextResponse.json({ error: "not found" }, { status: 404 }); }
   const ext = path.extname(name).toLowerCase();
   if (!TYPES[ext]) return NextResponse.json({ error: "not a font" }, { status: 404 });
   try {

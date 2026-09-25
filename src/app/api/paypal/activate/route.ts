@@ -33,7 +33,9 @@ export async function POST(req: Request) {
     const plan = sub.plan_id === monthly ? "monthly" : "yearly";
     await prisma.user.update({
       where: { id: user.id },
-      data: { subStatus: "active", subPlan: plan, subId: String(subscriptionId) },
+      /* a running pass's expiry must not outlive the upgrade: with subUntil
+         left set, the yearly subscriber was locked out on the pass's date */
+      data: { subStatus: "active", subPlan: plan, subId: String(subscriptionId), subUntil: null },
     });
     return NextResponse.json({ ok: true });
   } catch {

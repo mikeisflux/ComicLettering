@@ -37,7 +37,7 @@ import { PageSetupDialog } from "./editor/chrome";
 import { CollabState, EditorCtx, ExportProgress } from "./editor/ctx";
 import { renderCommentComposer, renderTeamDialog } from "./editor/collab";
 import {
-  addFromTray, alignSel, applyQuickFill, copySel, cutSel, deleteSel,
+  addFromTray, alignSel, applyQuickFill, copySel, cutSel, deleteSel, setLocked,
   duplicatePage, duplicateSel, growBalloonToFit, sizeTextToContent,
   fitBalloonToText, pasteClip,
   printPage, refitLegacyLettering, refreshProjects, reorder, saveProject,
@@ -567,7 +567,20 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     return () => document.removeEventListener("selectionchange", onSel);
   }, []);
 
+  /* an arrow-nudge commits 400ms later; Undo/Redo inside that window must
+     see it in history first, or the deferred commit lands AFTER the undo,
+     pushes the undone state as a new entry and kills Redo */
+  const nudgeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flushNudge = useCallback(() => {
+    if (nudgeTimer.current) { clearTimeout(nudgeTimer.current); nudgeTimer.current = null; commit(); }
+  }, [commit]);
+
   const undo = useCallback(() => {
+    /* words still being typed are a pending edit: land them (one history
+       entry, synchronously) so this Undo takes them back cleanly instead
+       of a deferred commit clobbering the restored state a tick later */
+    if (editingIdRef.current) keyFnsRef.current.finishEditing?.();
+    flushNudge();
     if (hIndexRef.current <= 0) return;
     hIndexRef.current--;
     docRef.current = JSON.parse(histRef.current[hIndexRef.current]);
@@ -575,9 +588,11 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     setSelId(null); setEditingId(null);
     setPageIndex((p) => clamp(p, 0, docRef.current!.pages.length - 1));
     autosave(); force();
-  }, [autosave]);
+  }, [autosave, flushNudge]);
 
   const redo = useCallback(() => {
+    if (editingIdRef.current) keyFnsRef.current.finishEditing?.();
+    flushNudge();
     if (hIndexRef.current >= histRef.current.length - 1) return;
     hIndexRef.current++;
     docRef.current = JSON.parse(histRef.current[hIndexRef.current]);
@@ -585,7 +600,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     setSelId(null); setEditingId(null);
     setPageIndex((p) => clamp(p, 0, docRef.current!.pages.length - 1));
     autosave(); force();
-  }, [autosave]);
+  }, [autosave, flushNudge]);
 
   /* Generated artwork — tuck cutouts and the like — arrives as a data URL and
      has to be handed to the artwork store, or the element it belongs to comes
@@ -834,8 +849,11 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
        ones — the model isn't updated as you type, only here. Doing the
        capture inside the setEditingId updater deferred it past that commit. */
     const eid = editingIdRef.current;
-    if (eid && captureEditing(eid)) setTimeout(commit, 0);
+    /* commit NOW: a deferred commit raced Undo (menu/toolbar) — the undo
+       ran first, then the stale commit pushed the undone document back */
+    if (eid && captureEditing(eid)) commit();
     setEditingId(null);
+    editingIdRef.current = null;
   }, [commit, captureEditing]);
 
   /* Write through now, taking any half-typed line with it. Saving the model
@@ -942,7 +960,15 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       const local = cx + curOff - s.off;
       if (local >= 0 && local <= d.pages[s.idx].w) return { idx: s.idx, shift: curOff - s.off };
     }
-    return { idx: pageIndex, shift: 0 };
+    /* centred over the gutter: land on the NEAREST page, not the current
+       one (which could put the new element clipped off its far edge) */
+    let best = { idx: pageIndex, shift: 0 }, bestD = Infinity;
+    for (const s of spreadLayout) {
+      const local = cx + curOff - s.off;
+      const dd = Math.abs(local - clamp(local, 0, d.pages[s.idx].w));
+      if (dd < bestD) { bestD = dd; best = { idx: s.idx, shift: curOff - s.off }; }
+    }
+    return best;
   };
 
   const startSketch = useSketchDraw({
@@ -982,8 +1008,10 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
 
   /* ---------------- keyboard (see useEditorKeys) ---------------- */
 
+  const toolArmedRef = useRef(false);
+  toolArmedRef.current = drawMode || penMode || !!shapeMode || tuckMode || commentMode;
   useEditorKeys({
-    demo, selId, editingId, docRef, pageIndexRef, selIdsRef, keyFnsRef,
+    demo, selId, editingId, docRef, pageIndexRef, selIdsRef, keyFnsRef, nudgeTimer, toolArmedRef,
     modalOpenRef, drawPtsRef, tuckPtsRef, dragTipRef, thumbTimer,
     setDrawMode, setTuckMode, setTuckAsk, setSelId, setPageIndex,
     setUserZoomed, setZoom, setShowFind, setShowExport, setStatus,
@@ -1101,6 +1129,10 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       return { ...base, ...JSON.parse(localStorage.getItem("lmc-window") || "{}") };
     } catch { return base; }
   });
+  const showTab = useCallback((k: typeof tab) => {
+    setTab(k);
+    setWinHide((h) => (h.right ? { ...h, right: false } : h));
+  }, []);
   const toggleWindow = useCallback((k: "left" | "right" | "tray" | "format" | "all") => {
     setWinHide((w) => {
       const next = k === "all"
@@ -1141,7 +1173,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     force, commit, autosave, undo, redo, setStatus, select, setSelId,
     setEditingId, finishEditing, mutateSel, startDrag, pagePoint, fitZoom, startTuck,
     selectAllOnPage, installApp, appInstalled, showInstallHelp, setShowInstallHelp,
-    showAssocHelp, setShowAssocHelp, showShortcuts, setShowShortcuts, winHide, toggleWindow, setAskAddPage,
+    showAssocHelp, setShowAssocHelp, showShortcuts, setShowShortcuts, winHide, toggleWindow, showTab, setAskAddPage,
     selIdsRef, editingIdRef, setSelIds,
     mutateText, mutateBalloon, mutateLettering, mutateArt, mutatePanel,
     tuckAsk, setTuckAsk, retuneTuck, runTuckAuto, applyTuck, tuckTool, setTuckTool,
@@ -1183,7 +1215,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     alignSel: (m) => alignSel(ed, m),
     addFromTray: (k) => addFromTray(ed, k),
     deleteSel: () => deleteSel(ed),
-    setLocked: (v) => mutateSel((x) => { x.locked = v; }),
+    setLocked: (v) => setLocked(ed, v),
     finishEditing: () => finishEditing(),
     reorder: (dir) => reorder(ed, dir),
     fitBalloonToText: () => fitBalloonToText(ed),
@@ -1195,6 +1227,10 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     closeTopDialog: () => {
       if (ctxMenu) { setCtxMenu(null); return true; }
       if (openMenu) { setOpenMenu(null); return true; }
+      if (showFill || showStroke || showTextColor || stampOpen) {
+        setShowFill(false); setShowStroke(false); setShowTextColor(false); setStampOpen(false); return true;
+      }
+      if (adjustEdit) { setAdjustEdit(null); return true; }
       if (showShortcuts) { setShowShortcuts(false); return true; }
       if (showAssocHelp) { setShowAssocHelp(false); return true; }
       if (showInstallHelp) { setShowInstallHelp(false); return true; }

@@ -1,6 +1,5 @@
 /* Right-panel tabs: Layouts, Layers, Proof, Photos, Library.
    Plain exported render functions taking the EditorCtx bag. */
-import { demoLock } from "@/lib/storeMode";
 import {
   LAYOUT_CATEGORIES, LayoutRect, PanelEl, SavedLayout, applyLayout, capturePageLayout, clamp, makeImage, uid,
 } from "@/lib/model";
@@ -347,6 +346,8 @@ export function renderLayersTab(ed: EditorCtx) {
                 <button className={"layerBtn" + (el.locked ? " lockOn" : "")} title={el.locked ? "Unlock" : "Lock"}
                   onClick={(e) => {
                     e.stopPropagation();
+                    /* the shared op acts on the SELECTION — target this row only */
+                    if (!ed.selIds.includes(el.id) || ed.selIds.length !== 1) ed.setSelIds([el.id]);
                     el.locked = !el.locked;
                     pendingLockRef.current.delete(el.id);
                     commit();
@@ -430,7 +431,7 @@ export function renderLayersTab(ed: EditorCtx) {
                 ))}
                 <button onClick={() => {
                   ed.setOpenMenu(null);
-                  ed.setTab("inspector");
+                  ed.showTab("inspector");
                   ed.setStatus("Adjustment layers live at the bottom of the Inspector — pick a tool there.");
                 }}>Adjustment layer…</button>
               </div>
@@ -523,7 +524,7 @@ export function renderPhotosTab(ed: EditorCtx) {
 }
 
 export function renderLibraryTab(ed: EditorCtx) {
-  const { fileOpenRef, demo, setStatus, docRef, assetsRef, current, dbError, projects } = ed;
+  const { fileOpenRef, setStatus, docRef, assetsRef, current, dbError, projects } = ed;
   return (
     <div className="inspBody">
       <div className="btnRow">
@@ -555,7 +556,7 @@ export function renderLibraryTab(ed: EditorCtx) {
             </div>
             <div className="projActs">
               <button onClick={() => loadProject(ed, p.id)}>Open</button>
-              {!p.sharedBy && <button onClick={() => deleteProject(ed, p.id)}>✕</button>}
+              {!p.sharedBy && <button title="Delete this book from the Library" onClick={() => deleteProject(ed, p.id)}>✕</button>}
             </div>
           </div>
         ))}

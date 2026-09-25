@@ -1,7 +1,7 @@
 "use client";
 /* ComicLettering Studio — editor chrome: rulers, toolbar/tray buttons and
    the Page Setup dialog, split out of Editor.tsx (module-level code, unchanged). */
-import { ReactNode, useEffect, useRef, useState } from "react";
+import React, { ReactNode, useEffect, useRef, useState } from "react";
 import { COMIC_H_IN, COMIC_W_IN, DPI, MARGIN_IN, PAPER_CATEGORIES, Page, PageMargin, bleedFor, clamp, pageBleed, pageMargins } from "@/lib/model";
 
 /* ---------------- rulers ---------------- */
@@ -72,39 +72,69 @@ export const STAGE_MY = 26;
    So: while the field has focus you are editing text, not a number. Values
    are pushed through live once they are legal on their own, and what you
    leave behind is clamped on blur or Enter. Escape puts it back. */
-export function NumField({ value, min, max, disabled, width, title, onCommit }: {
-  value: number; min: number; max: number;
-  disabled?: boolean; width?: number; title?: string;
+export function NumField({ value, min, max, step, disabled, width, title, className, onCommit, onLive }: {
+  value: number; min: number; max: number; step?: number;
+  disabled?: boolean; width?: number; title?: string; className?: string;
+  /* the settled value: on blur / Enter, clamped — ONE history entry */
   onCommit: (n: number) => void;
+  /* optional live preview while a legal number is being typed (no history);
+     without it the legal keystrokes commit as they always did */
+  onLive?: (n: number) => void;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
+  const parse = (s: string) => (step && step !== Math.floor(step) ? parseFloat(s) : parseInt(s, 10));
 
   const settle = (raw: string | null) => {
-    const n = parseInt(raw ?? "", 10);
+    const n = parse(raw ?? "");
     if (!isNaN(n)) onCommit(clamp(n, min, max));
     setDraft(null);
   };
 
   return (
     <input
-      type="number" min={min} max={max} disabled={disabled} title={title}
-      style={{ width: width ?? 56 }}
+      type="number" min={min} max={max} step={step} disabled={disabled} title={title} className={className}
+      style={width != null ? { width } : className ? undefined : { width: 56 }}
       value={draft ?? String(value)}
       onFocus={(e) => { setDraft(String(value)); e.currentTarget.select(); }}
       onChange={(e) => {
         const t = e.target.value;
         setDraft(t);
         /* live-update only while the typed number already stands on its own;
-           a half-typed one waits for blur rather than being clamped */
-        const n = parseInt(t, 10);
-        if (t !== "" && !isNaN(n) && n >= min && n <= max) onCommit(n);
+           a half-typed one (or a lone "-") waits for blur rather than being
+           clamped — the clamp-per-keystroke version made 1200, 24 and every
+           negative angle physically untypeable */
+        const n = parse(t);
+        if (t !== "" && !isNaN(n) && n >= min && n <= max) (onLive ?? onCommit)(n);
       }}
       onBlur={() => settle(draft)}
       onKeyDown={(e) => {
         if (e.key === "Enter") { settle(draft); e.currentTarget.blur(); }
         else if (e.key === "Escape") { setDraft(null); e.currentTarget.blur(); }
+        e.stopPropagation();
       }}
     />
+  );
+}
+
+/* A range slider whose history entry lands once, when the value actually
+   changed: on pointer release, on blur, and after each arrow-key nudge.
+   The plain `onPointerUp → commit()` pattern pushed an Undo step for a
+   click that moved nothing, and keyboard nudges never committed at all. */
+export function Slider({ onCommit, onPointerDown, onPointerUp, onFocus, onBlur, onKeyUp, ...props }:
+  React.InputHTMLAttributes<HTMLInputElement> & { onCommit: () => void }) {
+  const start = useRef<string | null>(null);
+  const begin = (v: string) => { if (start.current == null) start.current = v; };
+  const settle = (v: string, done: boolean) => {
+    if (start.current != null && start.current !== v) onCommit();
+    start.current = done ? null : v;
+  };
+  return (
+    <input type="range" {...props}
+      onPointerDown={(e) => { begin(e.currentTarget.value); onPointerDown?.(e); }}
+      onFocus={(e) => { begin(e.currentTarget.value); onFocus?.(e); }}
+      onPointerUp={(e) => { settle(e.currentTarget.value, false); onPointerUp?.(e); }}
+      onBlur={(e) => { settle(e.currentTarget.value, true); onBlur?.(e); }}
+      onKeyUp={(e) => { settle(e.currentTarget.value, false); onKeyUp?.(e); }} />
   );
 }
 

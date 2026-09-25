@@ -91,7 +91,7 @@ function CommentComposer({ ed }: { ed: EditorCtx }) {
   const c = ed.composer!;
   const [draft, setDraft] = useState("");
   return (
-    <div className="setupOverlay" onPointerDown={(e) => { if (e.target === e.currentTarget) ed.setComposer(null); }}>
+    <div className="setupOverlay" onPointerDown={(e) => { if (e.target === e.currentTarget && !draft.trim()) ed.setComposer(null); }}>
       <div className="setupDlg" style={{ width: 380 }}>
         <div className="setupTitle">Note on page {c.pageIdx + 1}</div>
         <div className="setupBody" style={{ flexDirection: "column", gap: 8 }}>

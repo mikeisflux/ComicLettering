@@ -25,7 +25,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "All 200 lifetime spots are taken." }, { status: 410 });
     }
   }
-  const order = await createPassOrder(String(tier));
+  const order = await createPassOrder(String(tier) as Parameters<typeof createPassOrder>[0], user.id);
   if ("error" in order) return NextResponse.json({ error: order.error }, { status: 502 });
   return NextResponse.json({ id: order.id });
 }

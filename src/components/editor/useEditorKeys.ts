@@ -39,6 +39,12 @@ export interface EditorKeyDeps {
   tuckPtsRef: Ref<number[][] | null>;
   dragTipRef: Ref<{ x: number; y: number; w: number; h: number; mode: string; live: boolean } | null>;
   thumbTimer: Ref<ReturnType<typeof setTimeout> | null>;
+  /* the arrow-nudge's deferred commit — its own timer (it used to share the
+     thumbnail timer, which page changes cleared, dropping the commit) */
+  nudgeTimer: Ref<ReturnType<typeof setTimeout> | null>;
+  /* a modal tool is armed (pen, marquee, tuck, sketch, note) — element
+     hotkeys must not insert things mid-trace */
+  toolArmedRef: Ref<boolean>;
   setDrawMode: (v: boolean) => void;
   setTuckMode: (v: boolean) => void;
   setTuckAsk: (t: TuckAsk | null) => void;
@@ -66,7 +72,7 @@ export function useEditorKeys(deps: EditorKeyDeps) {
     const onKey = (e: KeyboardEvent) => {
       const {
         demo, selId, editingId, docRef, pageIndexRef, selIdsRef, keyFnsRef,
-        modalOpenRef, drawPtsRef, tuckPtsRef, dragTipRef, thumbTimer,
+        modalOpenRef, drawPtsRef, tuckPtsRef, dragTipRef, nudgeTimer, toolArmedRef,
         setDrawMode, setTuckMode, setTuckAsk, setSelId, setPageIndex,
         setUserZoomed, setZoom, setShowFind, setShowExport, setStatus,
         select, selectAllOnPage, finishEditing, undo, redo, fitZoom, force, commit,
@@ -77,6 +83,9 @@ export function useEditorKeys(deps: EditorKeyDeps) {
         /* an open popup/dialog owns Escape — it used to deselect the element
            BEHIND the dialog and leave the dialog up */
         if (keyFnsRef.current.closeTopDialog()) { e.preventDefault(); return; }
+        /* Escape in a dialog's own field stays in the dialog: it used to
+           clear the canvas selection and drop the tools behind the modal */
+        if (inField && !t.isContentEditable) return;
         setDrawMode(false);
         drawPtsRef.current = null;
         setTuckMode(false);
@@ -107,7 +116,7 @@ export function useEditorKeys(deps: EditorKeyDeps) {
       if (mod && e.key.toLowerCase() === "z" && !e.shiftKey) { e.preventDefault(); undo(); return; }
       if (mod && (e.key.toLowerCase() === "y" || (e.key.toLowerCase() === "z" && e.shiftKey))) { e.preventDefault(); redo(); return; }
       if (mod && e.key.toLowerCase() === "d") { e.preventDefault(); fns.duplicateSel(); return; }
-      if (mod && e.key.toLowerCase() === "s") { e.preventDefault(); fns.saveProject(false); return; }
+      if (mod && !e.shiftKey && e.key.toLowerCase() === "s") { e.preventDefault(); fns.saveProject(false); return; }
       if (mod && e.key.toLowerCase() === "c") { e.preventDefault(); fns.copySel(); return; }
       if (mod && e.key.toLowerCase() === "x") { e.preventDefault(); fns.cutSel(); return; }
       if (mod && e.key.toLowerCase() === "v") { e.preventDefault(); fns.pasteClip(); return; }
@@ -172,8 +181,10 @@ export function useEditorKeys(deps: EditorKeyDeps) {
         select(els[next].id);
         return;
       }
-      /* letterer hotkeys: B balloon, T text, L lettering, P panel */
-      if (!mod && !e.altKey) {
+      /* letterer hotkeys: B balloon, T text, L lettering, P panel — not on
+         key repeat (a held B added a balloon per repeat) and not while a
+         trace tool owns the canvas */
+      if (!mod && !e.altKey && !e.repeat && !toolArmedRef.current) {
         const k = e.key.toLowerCase();
         if (k === "b") { e.preventDefault(); fns.addFromTray("speech"); return; }
         if (k === "t") { e.preventDefault(); fns.addFromTray("text"); return; }
@@ -213,8 +224,8 @@ export function useEditorKeys(deps: EditorKeyDeps) {
           }, 900);
         }
         force();
-        if (thumbTimer.current) clearTimeout(thumbTimer.current);
-        thumbTimer.current = setTimeout(commit, 400);
+        if (nudgeTimer.current) clearTimeout(nudgeTimer.current);
+        nudgeTimer.current = setTimeout(() => { nudgeTimer.current = null; commit(); }, 400);
       }
     };
     window.addEventListener("keydown", onKey);

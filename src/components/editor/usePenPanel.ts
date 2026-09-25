@@ -266,6 +266,8 @@ export function usePenPanel(deps: PenDeps) {
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
       const d = ref.current;
+      /* a cancelled sweep places nothing — the marquee tool stays armed */
+      if (ev.type === "pointercancel") { d.penBoxRef.current = null; d.force(); return; }
       const kind = d.shapeMode;
       d.penBoxRef.current = null;
       d.setShapeMode(null);

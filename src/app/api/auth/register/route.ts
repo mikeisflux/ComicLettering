@@ -2,12 +2,21 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { createSession, hashPassword } from "@/lib/auth";
 import { verifyCaptcha } from "@/lib/captcha";
+import { clientIp, isBlocked, noteSuspicious } from "@/lib/botblock";
 
 export async function POST(req: Request) {
   try {
+    const ip = clientIp(req);
+    const ua = req.headers.get("user-agent");
+    if (await isBlocked(ip)) return NextResponse.json({ error: "Too many attempts. Try again later." }, { status: 429 });
     const { email, name, password, captcha } = await req.json();
     const cap = await verifyCaptcha(captcha);
-    if (!cap.ok) return NextResponse.json({ error: cap.reason }, { status: 400 });
+    if (!cap.ok) {
+      await noteSuspicious(ip, "Failed captcha on sign-up", { userAgent: ua, path: "/api/auth/register" });
+      return NextResponse.json({ error: cap.reason }, { status: 400 });
+    }
+    /* a burst of sign-ups from one address is a bot, captcha or not */
+    await noteSuspicious(ip, "Sign-up", { userAgent: ua, path: "/api/auth/register" }, 20, 20);
     if (!email || !password || String(password).length < 8) {
       return NextResponse.json({ error: "Valid email and a password of at least 8 characters are required." }, { status: 400 });
     }

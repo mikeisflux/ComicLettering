@@ -3,12 +3,11 @@
 import { demoLock } from "@/lib/storeMode";
 import {
   BalloonEl, COLOR_PALETTE, DEFAULT_TEXT_SIZE, FONTS, GRADIENT_PRESETS,
-  MULTI_GRADIENTS, TextEl, clamp, reseedIds, starterDoc,
+  MULTI_GRADIENTS, TextEl, clamp,
 } from "@/lib/model";
 import { fillCss } from "@/lib/fills";
-import { NumField, ToolBtn } from "./chrome";
+import { NumField, ToolBtn, Slider } from "./chrome";
 import { FontMenu, SubtypeSelect, tsVariant } from "./FontMenu";
-import { clearArt, releaseAllArt } from "@/lib/assetStore";
 import { gradCss } from "./GradientMaker";
 import { BRUSHES } from "@/lib/brushes";
 import { GLOWS } from "@/lib/glows";
@@ -17,9 +16,9 @@ import {
   addFromTray, alignSel, applyQuickFill, applyQuickStroke, balanceRag, clipboardText,
   copySel, copyStyle, cutSel, deleteCustomFont, deleteSel, duplicatePage,
   duplicateSel, exportJSON, fitBalloonToText, pasteClip, pasteStyle,
-  printPage, reorder, rotateSel, runInstantAlpha, runProof, saveProject, toggleSelEmphasis,
-} from "./ops";
+  printPage, reorder, rotateSel, runInstantAlpha, runProof, saveProject, toggleSelEmphasis, setLocked } from "./ops";
 import { detectPanelsFromArt } from "./panelOps";
+import { newDocument } from "./projectOps";
 
 /* the menu-bar menus — the only openMenu values that own the menu-bar veil */
 const MENU_NAMES = new Set(["File", "Edit", "View", "Insert", "Format", "Arrange", "Window", "Help"]);
@@ -73,8 +72,8 @@ export function renderMenuBar(ed: EditorCtx) {
     {openMenu && MENU_NAMES.has(openMenu) && <div className="ctxBackdrop" style={{ zIndex: 179 }} onClick={() => setOpenMenu(null)} />}
     {([
       ["File", [
-        ["New Document", () => { if (window.confirm("Start a new document?")) { docRef.current = starterDoc(); assetsRef.current = {}; releaseAllArt(); clearArt(); reseedIds(docRef.current); histRef.current = [JSON.stringify(docRef.current)]; hIndexRef.current = 0; setCurrent(null); setSelId(null); setPageIndex(0); setThumbs({}); autosave(); force(); fitZoom(true); } }],
-        ["Open Library", () => setTab("library")],
+        ["New Document", () => newDocument(ed)],
+        ["Open Library", () => ed.showTab("library")],
         ["Save", () => saveProject(ed, false)],
         /* Save As… writes a real project FILE (.lmc) to disk, desktop-app
            style; the library copy lives under "Save a Copy to Library…" */
@@ -102,7 +101,7 @@ export function renderMenuBar(ed: EditorCtx) {
         ["Paste Style to Selection", () => pasteStyle(ed)],
         ["Find & Replace…", () => setShowFind(true)],
         ["—", null],
-        ["Check Spelling & Grammar", () => { setTab("proof"); runProof(ed); }],
+        ["Check Spelling & Grammar", () => { ed.showTab("proof"); runProof(ed); }],
       ]],
       ["View", [
         ["Zoom In", () => { setUserZoomed(true); setZoom((z) => clamp(z * 1.2, 0.05, 4)); }],
@@ -119,11 +118,11 @@ export function renderMenuBar(ed: EditorCtx) {
           setStatus("Print view joins facing pages at the spine — the bleed between them is dropped.");
         }],
         ["—", null],
-        ["Panel Layouts", () => setTab("layouts")],
-        ["Inspector", () => setTab("inspector")],
-        ["Layers", () => setTab("layers")],
-        ["Photos", () => setTab("photos")],
-        ["Library", () => setTab("library")],
+        ["Panel Layouts", () => ed.showTab("layouts")],
+        ["Inspector", () => ed.showTab("inspector")],
+        ["Layers", () => ed.showTab("layers")],
+        ["Photos", () => ed.showTab("photos")],
+        ["Library", () => ed.showTab("library")],
       ]],
       ["Insert", [
         ["New Page", () => ed.setAskAddPage(true)],
@@ -176,8 +175,8 @@ export function renderMenuBar(ed: EditorCtx) {
         ["Flip Horizontal", () => mutateSel((x) => { x.flipH = !x.flipH; })],
         ["Flip Vertical", () => mutateSel((x) => { x.flipV = !x.flipV; })],
         ["—", null],
-        ["Lock", () => mutateSel((x) => { x.locked = true; })],
-        ["Unlock", () => mutateSel((x) => { x.locked = false; })],
+        ["Lock", () => setLocked(ed, true)],
+        ["Unlock", () => setLocked(ed, false)],
       ]],
       /* per-panel visibility — each section hides on its own, so the
          artwork can take the whole window a piece at a time */
@@ -199,7 +198,11 @@ export function renderMenuBar(ed: EditorCtx) {
       ]],
     ] as [string, ([string, (() => void) | null])[]][]).map(([name, items]) => (
       <div key={name} className="menuWrap">
+        {/* never take focus: a click here blurred the lettering being edited,
+            which ended the edit before the item ran — Edit → Cut then cut
+            the whole balloon instead of the highlighted words */}
         <button className={"menuTop" + (openMenu === name ? " on" : "")}
+          onMouseDown={(e) => e.preventDefault()}
           onClick={() => setOpenMenu(openMenu === name ? null : name)}
           onMouseEnter={() => { if (openMenu) setOpenMenu(name); }}>
           {name}
@@ -208,7 +211,7 @@ export function renderMenuBar(ed: EditorCtx) {
           <div className="menuDrop">
             {items.map(([label, fn], i) => fn === null
               ? <div key={i} className="ctxSep" />
-              : <button key={i} onClick={() => { setOpenMenu(null); fn(); }}>{label}</button>)}
+              : <button key={i} onMouseDown={(e) => e.preventDefault()} onClick={() => { setOpenMenu(null); fn(); }}>{label}</button>)}
           </div>
         )}
       </div>
@@ -238,22 +241,9 @@ export function renderToolbar(ed: EditorCtx) {
   return (
   <header className="toolbar">
     <a className="brand" href="/" title="lettermycomic.com">Letter<span>My</span>Comic</a>
-    <ToolBtn label="New" icon="🗋" onClick={() => {
-      if (!window.confirm("Start a new document?")) return;
-      docRef.current = starterDoc();
-      assetsRef.current = {};
-      releaseAllArt(); clearArt();
-      reseedIds(docRef.current);
-      histRef.current = [JSON.stringify(docRef.current)];
-      hIndexRef.current = 0;
-      setCurrent(null); setSelId(null); setPageIndex(0); setThumbs({});
-      autosave(); force(); fitZoom(true);
-    }} />
+    <ToolBtn label="New" icon="🗋" onClick={() => newDocument(ed)} />
     <ToolBtn label="Save" icon="✔" accent onClick={() => saveProject(ed, false)} />
-    <ToolBtn label="Library" icon="🗀" onClick={() => {
-      setTab("library");
-      if (ed.winHide.right) ed.toggleWindow("right");   // panel hidden = show it
-    }} />
+    <ToolBtn label="Library" icon="🗀" onClick={() => ed.showTab("library")} />
     <ToolBtn label="New Page" icon="🗎+" onClick={() => ed.setAskAddPage(true)} />
     <span className="tbSep" />
     <ToolBtn label="Undo" icon="↶" disabled={hIndexRef.current <= 0} onClick={undo} />
@@ -289,10 +279,7 @@ export function renderToolbar(ed: EditorCtx) {
     <ToolBtn label="Page Setup" icon="📐" onClick={() => setShowSetup(true)} />
     <ToolBtn label="Print" icon="🖨" onClick={() => printPage(ed)} />
     <ToolBtn label="Export" icon="🖼⇩" accent onClick={() => demo ? setStatus(demoLock("Export is off in the demo — subscribe to unlock.", "Export")) : setShowExport(true)} />
-    <ToolBtn label="Inspector" icon="ⓘ" onClick={() => {
-      setTab("inspector");
-      if (ed.winHide.right) ed.toggleWindow("right");   // panel hidden = show it
-    }} />
+    <ToolBtn label="Inspector" icon="ⓘ" onClick={() => ed.showTab("inspector")} />
     <div className="tbSpacer" />
     <div className="tbHint">Runs entirely in your browser — nothing is uploaded.</div>
   </header>
@@ -416,7 +403,8 @@ export function renderFormatBar(ed: EditorCtx) {
             : selEl?.type === "text" ? selEl.ts.outlineC : "#111111",
         }}
         onClick={() => setShowStroke((s) => !s)} />
-      {showStroke && (
+      {showStroke && (<>
+        <div className="ctxBackdrop" style={{ zIndex: 149 }} onClick={() => setShowStroke(false)} />
         <div className="fillPop">
           <div className="fillPopHead">Stroke color</div>
           <div className="palGrid">
@@ -427,10 +415,10 @@ export function renderFormatBar(ed: EditorCtx) {
           </div>
           <div className="fld" style={{ marginTop: 6 }}>
             <label>Custom</label>
-            <input type="color" onChange={(e) => applyQuickStroke(ed, e.target.value)} />
+            <input type="color" title="Custom stroke color" onChange={(e) => applyQuickStroke(ed, e.target.value)} />
           </div>
         </div>
-      )}
+      </>)}
     </div>
     <span className="fbLabel">Fill:</span>
     <div style={{ position: "relative" }}>
@@ -441,8 +429,9 @@ export function renderFormatBar(ed: EditorCtx) {
             ? { background: `linear-gradient(180deg, ${selEl.ts.fillA}, ${selEl.ts.fillB})` }
             : { background: selEl?.type === "text" ? selEl.ts.fillA : "#ffffff" }}
         onClick={() => setShowFill((s) => !s)} />
-      {showFill && (
-        <div className="fillPop" onPointerLeave={() => { /* stay open until click */ }}>
+      {showFill && (<>
+        <div className="ctxBackdrop" style={{ zIndex: 149 }} onClick={() => setShowFill(false)} />
+        <div className="fillPop">
           <div className="fillPopCols">
             <div>
               <div className="fillPopHead">Colors</div>
@@ -454,14 +443,14 @@ export function renderFormatBar(ed: EditorCtx) {
               </div>
               <div className="fld" style={{ marginTop: 6 }}>
                 <label>Custom</label>
-                <input type="color" onChange={(e) => applyQuickFill(ed, { solidColor: e.target.value })} />
+                <input type="color" title="Custom fill color" onChange={(e) => applyQuickFill(ed, { solidColor: e.target.value })} />
               </div>
             </div>
             <div>
               <div className="fillPopHead">Gradients</div>
               <div className="palGrid grads">
                 {GRADIENT_PRESETS.map(([a, b], i) => (
-                  <button key={i} style={{ background: `linear-gradient(180deg, ${a}, ${b})` }}
+                  <button key={i} style={{ background: `linear-gradient(180deg, ${a}, ${b})` }} title={`${a} → ${b}`}
                     onClick={() => { applyQuickFill(ed, { gradient: [a, b] }); }} />
                 ))}
               </div>
@@ -492,7 +481,7 @@ export function renderFormatBar(ed: EditorCtx) {
             Applies to the selected balloon, panel or lettering — or the page background when nothing is selected.
           </div>
         </div>
-      )}
+      </>)}
     </div>
     <label className="fbCheck">
       <input type="checkbox" disabled={!selEl} checked={!!selEl?.shadow}
@@ -516,7 +505,8 @@ export function renderFormatBar(ed: EditorCtx) {
       <button className="fillSwatch" title="Text color" disabled={!selTs}
         style={{ background: selTs?.fillA || "#111111", width: 28 }}
         onClick={() => setShowTextColor((s) => !s)} />
-      {showTextColor && (
+      {showTextColor && (<>
+        <div className="ctxBackdrop" style={{ zIndex: 149 }} onClick={() => setShowTextColor(false)} />
         <div className="fillPop" style={{ width: 250 }}>
           <div className="fillPopHead">Text color</div>
           <div className="palGrid">
@@ -536,7 +526,7 @@ export function renderFormatBar(ed: EditorCtx) {
             }} />
           </div>
         </div>
-      )}
+      </>)}
     </div>
     <button className={"fbTog" + (selTs?.bold ? " on" : "")} disabled={!selTs}
       title="Bold — highlight words while editing to bold just those (Ctrl+B)"
@@ -626,10 +616,9 @@ export function renderFormatBar(ed: EditorCtx) {
     <span className="fbGroup fbOpacity"
       title="Opacity — lower it to see the art through the letters while lining up Tuck Back, then click the % to snap back to full">
       <span className="fbLeadIcon" aria-hidden>◐</span>
-      <input type="range" min={10} max={100} disabled={!selEl}
+      <Slider min={10} max={100} disabled={!selEl}
         value={Math.round((selEl?.opacity ?? 1) * 100)}
-        onChange={(e) => mutateSel((x) => { x.opacity = (+e.target.value) / 100; }, false)}
-        onPointerUp={() => commit()} />
+        onChange={(e) => mutateSel((x) => { x.opacity = (+e.target.value) / 100; }, false)} onCommit={() => commit()} />
       <button className="fbOpacityVal" disabled={!selEl}
         title="Back to fully opaque"
         onClick={() => { if ((selEl?.opacity ?? 1) < 1) mutateSel((x) => { x.opacity = 1; }); }}>

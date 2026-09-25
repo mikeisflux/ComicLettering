@@ -36,10 +36,24 @@ export async function POST(req: Request) {
       };
       const status = map[type];
       if (status) {
+        /* a cancellation keeps access to the end of the paid period; a
+           (re)activation clears any stale pass/period date */
+        const nb = Date.parse(event.resource?.billing_info?.next_billing_time || "");
+        const until = status === "cancelled" && Number.isFinite(nb) && nb > Date.now() ? { subUntil: new Date(nb) }
+          : status === "active" ? { subUntil: null } : {};
         await prisma.user.updateMany({
           where: { subId, ...timeGuard },
-          data: { subStatus: status, subUpdatedAt: eventTime },
+          data: { subStatus: status, subUpdatedAt: eventTime, ...until },
         });
+        /* activation for an account whose /activate call failed after
+           approval: the subscription was created with the user id as
+           custom_id, so link it here rather than billing a ghost */
+        if (status === "active" && typeof event.resource?.custom_id === "string") {
+          await prisma.user.updateMany({
+            where: { id: event.resource.custom_id, subId: null },
+            data: { subId, subStatus: "active", subUpdatedAt: eventTime, subUntil: null },
+          });
+        }
       }
     }
     if (type === "PAYMENT.SALE.DENIED" && event.resource?.billing_agreement_id) {
@@ -50,6 +64,7 @@ export async function POST(req: Request) {
     }
     return NextResponse.json({ ok: true });
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    console.error("paypal webhook", err);
+    return NextResponse.json({ error: "webhook failed" }, { status: 500 });
   }
 }

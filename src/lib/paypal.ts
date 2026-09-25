@@ -52,6 +52,7 @@ export async function getSubscription(id: string): Promise<{
   status: string; plan_id: string;
   subscriber?: { email_address?: string };
   billing_info?: { next_billing_time?: string };
+  status_update_time?: string;
 } | null> {
   const res = await pp(`/v1/billing/subscriptions/${encodeURIComponent(id)}`);
   if (!res.ok) return null;
@@ -161,7 +162,7 @@ export async function verifyWebhook(headers: Headers, rawBody: string): Promise<
    client-side) and captures it after approval. An order captures exactly
    once at PayPal, which also makes the activation replay-safe. */
 
-export async function createPassOrder(tier: keyof typeof PASSES): Promise<{ id: string } | { error: string }> {
+export async function createPassOrder(tier: keyof typeof PASSES, userId: string): Promise<{ id: string } | { error: string }> {
   const pass = PASSES[tier];
   if (!pass) return { error: "Unknown pass." };
   const res = await pp("/v2/checkout/orders", {
@@ -171,7 +172,9 @@ export async function createPassOrder(tier: keyof typeof PASSES): Promise<{ id: 
       purchase_units: [{
         amount: { currency_code: "USD", value: pass.price },
         description: pass.label,
-        custom_id: tier,
+        /* the tier AND the buyer: capture checks the order belongs to the
+           account that created it */
+        custom_id: `${tier}:${userId}`,
       }],
     }),
   });
@@ -181,17 +184,23 @@ export async function createPassOrder(tier: keyof typeof PASSES): Promise<{ id: 
 }
 
 export async function capturePassOrder(orderId: string): Promise<
-  { ok: true; tier: string; amount: string } | { ok: false; error: string }
+  { ok: true; tier: string; userId: string | null; amount: string } | { ok: false; error: string }
 > {
-  const res = await pp(`/v2/checkout/orders/${encodeURIComponent(orderId)}/capture`, { method: "POST" });
-  if (!res.ok) return { ok: false, error: `Capture failed: ${(await res.text()).slice(0, 200)}` };
+  const path = `/v2/checkout/orders/${encodeURIComponent(orderId)}`;
+  let res = await pp(`${path}/capture`, { method: "POST" });
+  if (!res.ok) {
+    /* the money was taken on an earlier attempt whose response was lost
+       (or whose database write failed): the order is captured at PayPal,
+       so read it back and unlock instead of returning 402 forever */
+    const txt = await res.text();
+    if (!txt.includes("ORDER_ALREADY_CAPTURED")) return { ok: false, error: `Capture failed: ${txt.slice(0, 200)}` };
+    res = await pp(path, { method: "GET" });
+    if (!res.ok) return { ok: false, error: "Could not read the captured order." };
+  }
   const data = await res.json();
   if (data.status !== "COMPLETED") return { ok: false, error: `Order is ${data.status}, not completed.` };
   const unit = (data.purchase_units || [])[0] || {};
   const cap = ((unit.payments || {}).captures || [])[0] || {};
-  return {
-    ok: true,
-    tier: String(unit.custom_id || cap.custom_id || ""),
-    amount: String(cap.amount?.value ?? ""),
-  };
+  const [tier, userId] = String(unit.custom_id || cap.custom_id || "").split(":");
+  return { ok: true, tier, userId: userId || null, amount: String(cap.amount?.value ?? "") };
 }

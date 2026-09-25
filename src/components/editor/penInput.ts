@@ -30,8 +30,12 @@ if (typeof window !== "undefined") {
   window.addEventListener("pointerdown", (e) => {
     if (e.pointerType === "touch") touches.add(e.pointerId);
   }, true);
-  window.addEventListener("pointerup", (e) => touches.delete(e.pointerId), true);
-  window.addEventListener("pointercancel", (e) => touches.delete(e.pointerId), true);
+  /* only REAL lifts uncount a finger: the pinch hook dispatches a synthetic
+     pointercancel to hand the first finger's drag over, and that finger is
+     still on the glass — uncounting it let the second finger pass the
+     two-finger guards and start a fresh drag on top of the pinch */
+  window.addEventListener("pointerup", (e) => { if (e.isTrusted) touches.delete(e.pointerId); }, true);
+  window.addEventListener("pointercancel", (e) => { if (e.isTrusted) touches.delete(e.pointerId); }, true);
   /* backstop: if the owning pointer ends and its tool somehow never
      released the claim (listener leak, thrown handler), release it here
      so input can never get stuck dead. Bubble phase — the tools' own

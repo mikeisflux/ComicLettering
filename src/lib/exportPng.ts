@@ -20,6 +20,11 @@ const imgCache = new Map<string, HTMLImageElement>();
    would otherwise pin a full-size page scan in memory for the whole session */
 export function forgetImage(src: string) { imgCache.delete(src); }
 
+/* the context's current uniform scale (page units → device pixels) */
+function ctxScale(ctx: CanvasRenderingContext2D): number {
+  try { const m = ctx.getTransform(); return Math.max(1, Math.hypot(m.a, m.b)); } catch { return 1; }
+}
+
 export function loadImage(src: string): Promise<HTMLImageElement> {
   const hit = imgCache.get(src);
   if (hit) return Promise.resolve(hit);
@@ -192,7 +197,10 @@ function drawRichText(
           ctx.save();
           ctx.shadowColor = ts.shadowC || "#00000088";
           ctx.shadowOffsetX = ts.size * 0.05; ctx.shadowOffsetY = ts.size * 0.05; ctx.shadowBlur = ts.size * 0.06;
-          ctx.fillStyle = fill; ctx.fillText(cl.ch, x, yGlyph(y));
+          /* cast from the outline when there is one — as the plain path and
+             the DOM do; a fill-only shadow was visibly smaller on bold runs */
+          if (ts.outlineW > 0) { ctx.lineWidth = ts.outlineW; ctx.strokeStyle = ts.outlineC; ctx.strokeText(cl.ch, x, yGlyph(y)); }
+          else { ctx.fillStyle = fill; ctx.fillText(cl.ch, x, yGlyph(y)); }
           ctx.restore();
         }
         if (ts.outlineW > 0) { ctx.lineWidth = ts.outlineW; ctx.strokeStyle = ts.outlineC; ctx.strokeText(cl.ch, x, yGlyph(y)); }
@@ -295,11 +303,15 @@ export function drawStyledText(
        onto that same box. A padded scratch shifted the warp origin by the
        pad and scaled the mesh, so pinned corners landed elsewhere in print. */
     const [rx, ry, rw, rh] = rect;
+    /* size the scratch by the context's real scale (print dpi), or the
+       warped block came out soft next to crisp plain lettering */
+    const k = ctxScale(ctx);
     const sc = document.createElement("canvas");
-    sc.width = Math.max(1, Math.ceil(rw));
-    sc.height = Math.max(1, Math.ceil(rh));
+    sc.width = Math.max(1, Math.ceil(rw * k));
+    sc.height = Math.max(1, Math.ceil(rh * k));
     const sctx = sc.getContext("2d");
     if (sctx) {
+      sctx.scale(k, k);
       sctx.translate(-rx, -ry);
       drawStyledText(sctx, { ...ts, env: undefined }, text, rect, warp, runs);
       ctx.save();
@@ -318,15 +330,18 @@ export function drawStyledText(
       const glowPad = glow.length ? Math.ceil(Math.max(...glow.map((g) => g.blur)) * 2.4) : 0;
       const pad = Math.ceil(ts.size * 0.8 + ts.outlineW * 2) + glowPad;
       const w = Math.max(1, Math.ceil(rw) + pad * 2), h = Math.max(1, Math.ceil(rh) + pad * 2);
+      /* scratch at the context's real scale — see the envelope branch */
+      const k = ctxScale(ctx);
       const sc = document.createElement("canvas");
-      sc.width = w; sc.height = h;
+      sc.width = Math.ceil(w * k); sc.height = Math.ceil(h * k);
       const sctx = sc.getContext("2d");
       if (sctx) {
+        sctx.scale(k, k);
         sctx.translate(pad - rx, pad - ry);
         drawStyledText(sctx, { ...ts, brush: "none", glow: "none" }, text, rect, warp, runs);
         sctx.setTransform(1, 0, 0, 1, 0, 0);
         if (tile) {
-          const px = brushScale(ts.size);
+          const px = brushScale(ts.size) * k;
           const pat = sctx.createPattern(tile, "repeat");
           if (pat) {
             /* scale the tile with the type size so the grain stays in
@@ -334,21 +349,22 @@ export function drawStyledText(
             pat.setTransform(new DOMMatrix([px / tile.width, 0, 0, px / tile.height, 0, 0]));
             sctx.globalCompositeOperation = "destination-in";
             sctx.fillStyle = pat;
-            sctx.fillRect(0, 0, w, h);
+            sctx.fillRect(0, 0, sc.width, sc.height);
             sctx.globalCompositeOperation = "source-over";
           }
         }
         /* stamp the halo behind the finished lettering — widest and coolest
-           first, so the ramp heats up as it closes on the ink */
+           first, so the ramp heats up as it closes on the ink. shadowBlur is
+           in device pixels, so it scales with the export too. */
         for (const g of glow) {
           ctx.save();
           ctx.shadowColor = g.color;
-          ctx.shadowBlur = g.blur;
-          ctx.drawImage(sc, rx - pad, ry - pad);
-          ctx.drawImage(sc, rx - pad, ry - pad);
+          ctx.shadowBlur = g.blur * k;
+          ctx.drawImage(sc, rx - pad, ry - pad, w, h);
+          ctx.drawImage(sc, rx - pad, ry - pad, w, h);
           ctx.restore();
         }
-        ctx.drawImage(sc, rx - pad, ry - pad);
+        ctx.drawImage(sc, rx - pad, ry - pad, w, h);
         return;
       }
     }
@@ -634,7 +650,12 @@ function drawEl(
       if (img) {
         c.save();
         c.clip(rectPath);
-        drawCoverWithFilter(c, img, el.w, el.h, el.filter, el.pan);
+        /* the DOM's border is inside the box (border-box), so the picture
+           cover-crops the CONTENT box — crop to the full box and the print
+           showed a slightly different slice of the art than the editor */
+        const bw = penD ? 0 : el.borderW;
+        c.translate(bw, bw);
+        drawCoverWithFilter(c, img, Math.max(1, el.w - 2 * bw), Math.max(1, el.h - 2 * bw), el.filter, el.pan);
         c.restore();
       }
       if (el.borderW > 0) {
@@ -780,14 +801,19 @@ export function balloonInkBounds(el: BalloonEl): TrimRect {
   if (el.tail) {
     const pts: [number, number][] = [[el.tail.dx, el.tail.dy]];
     if (el.tail.bx != null && el.tail.by != null) pts.push([el.tail.bx, el.tail.by]);
+    /* both renderers draw the tail flipped with the body — the bounds must
+       flip too, or a mirrored tail printed past the bleed line */
+    const fx = el.flipH ? -1 : 1, fy = el.flipV ? -1 : 1;
     for (const [dx, dy] of pts) {
-      const [px, py] = rotVec(dx, dy, el.rot);
+      const [px, py] = rotVec(dx * fx, dy * fy, el.rot);
       b.x0 = Math.min(b.x0, cx + px); b.x1 = Math.max(b.x1, cx + px);
       b.y0 = Math.min(b.y0, cy + py); b.y1 = Math.max(b.y1, cy + py);
     }
   }
   return b;
 }
+
+let arcMeasure: HTMLCanvasElement | null = null;
 
 /* TEXT BOXES & SFX LETTERING: the box — widened by the envelope warp when
    the ink has been bent outside it. Rotation happens about the ELEMENT's
@@ -798,8 +824,33 @@ export function textInkBounds(el: TextEl): TrimRect {
   const env = el.ts.env;
   if (env && isWarped(env as Warp)) {
     const wb = warpBounds(env as Warp);           // in units of the box
-    x = el.x + wb.x0 * el.w; w = (wb.x1 - wb.x0) * el.w;
-    y = el.y + wb.y0 * el.h; h = (wb.y1 - wb.y0) * el.h;
+    /* mirrored ink: the bounds mirror inside the box like the render does */
+    const bx0 = el.flipH ? 1 - wb.x1 : wb.x0, bx1 = el.flipH ? 1 - wb.x0 : wb.x1;
+    const by0 = el.flipV ? 1 - wb.y1 : wb.y0, by1 = el.flipV ? 1 - wb.y0 : wb.y1;
+    x = el.x + bx0 * el.w; w = (bx1 - bx0) * el.w;
+    y = el.y + by0 * el.h; h = (by1 - by0) * el.h;
+  } else if (el.warp && typeof document !== "undefined") {
+    /* arc-bent SFX bulges past its box (up to ~R above it): the same
+       layout the renderers use, so the bleed clip catches the arc too */
+    try {
+      const c = arcMeasure ??= document.createElement("canvas");
+      const cx2 = c.getContext("2d");
+      if (cx2) {
+        cx2.font = fontString(el.ts);
+        let t = (el.ts.caps ? el.text.toUpperCase() : el.text).replace(/\s*\n\s*/g, " ");
+        if (el.ts.crossbarI) t = applyCrossbarI(t);
+        const chars = t.match(/\P{M}\p{M}*/gu) || [];
+        const widths = chars.map((ch) => cx2.measureText(ch).width + (el.ts.tracking ?? 0));
+        let ex = el.w / 2, ey = el.h / 2;
+        arcTextLayout(widths, el.warp).forEach((q, i) => {
+          const hw = widths[i] / 2, hh = el.ts.size / 2, cs = Math.abs(Math.cos(q.rot)), sn = Math.abs(Math.sin(q.rot));
+          ex = Math.max(ex, Math.abs(q.x) + cs * hw + sn * hh);
+          ey = Math.max(ey, Math.abs(q.y) + sn * hw + cs * hh);
+        });
+        x = el.x + el.w / 2 - ex; w = ex * 2;
+        y = el.y + el.h / 2 - ey; h = ey * 2;
+      }
+    } catch { /* keep the box */ }
   }
   if (!el.rot) return { x0: x, x1: x + w, y0: y, y1: y + h };
   const cx = el.x + el.w / 2, cy = el.y + el.h / 2;
@@ -945,6 +996,20 @@ export async function renderPageToCanvas(
     if ((el.type === "panel" || el.type === "image" || el.type === "balloon") && el.img && assets[el.img]) srcs.push(assets[el.img]);
   }
   await Promise.all(srcs.map((s) => loadImage(s).catch(() => null)));
+  /* the fonts are font-display:swap web fonts the browser only fetches when
+     DOM text uses them; setting ctx.font never triggers a load and
+     fonts.ready resolves at once when nothing is in flight — so a page
+     never scrolled to this session exported in the fallback face */
+  if (typeof document !== "undefined" && document.fonts?.load) {
+    const want = new Set<string>();
+    for (const el of [...page.els, ...(neighbor?.page.els ?? [])]) {
+      if (el.type !== "balloon" && el.type !== "text") continue;
+      const fam = FONTS[el.ts.font]?.css || FONTS.comicneue.css;
+      want.add(`${el.ts.italic ? "italic " : ""}${el.ts.bold ? "700" : "400"} 16px ${fam}`);
+      if (el.runs?.length) for (const b of [false, true]) for (const i of [false, true]) want.add(`${i ? "italic " : ""}${b ? "700" : "400"} 16px ${fam}`);
+    }
+    try { await Promise.all([...want].map((f) => document.fonts.load(f).catch(() => []))); } catch { /* ignore */ }
+  }
   if (typeof document !== "undefined" && document.fonts?.ready) {
     try { await document.fonts.ready; } catch { /* ignore */ }
   }
@@ -971,8 +1036,8 @@ export async function renderPageToCanvas(
     const spineSide: 1 | -1 = neighbor.dx > 0 ? 1 : -1;
     ctx.save();
     const clip = new Path2D();
-    if (spineSide === 1) clip.rect(-page.w, trim.y0, trim.x1 + page.w, trim.y1 - trim.y0);
-    else clip.rect(trim.x0, trim.y0, page.w * 2, trim.y1 - trim.y0);
+    /* our exact trim rect — the DOM copy clips to the same rectangle */
+    clip.rect(trim.x0, trim.y0, trim.x1 - trim.x0, trim.y1 - trim.y0);
     ctx.clip(clip);
     ctx.translate(neighbor.dx, 0);
     /* partner's spine is on its opposite side */

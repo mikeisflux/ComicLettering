@@ -133,6 +133,9 @@ export function useStartDrag(deps: DragDeps) {
           .filter(Boolean) as { id: string; x0: number; y0: number }[]
       : [];
     let moved = false;
+    /* the join partner's tail as it was before this drag melted it — put
+       back on cancel, or the partner's curve vanished without a commit */
+    let partnerSnap: { id: string; tail: BalloonEl["tail"] } | null = null;
     let lastPt = start;   // where the pointer ends up — drop-to-join reads it
     let lastClient = { x: e.clientX, y: e.clientY };  // for cross-page drops
     const onMove = (ev: PointerEvent) => {
@@ -195,8 +198,10 @@ export function useStartDrag(deps: DragDeps) {
           /* snap to margins, page centre and other elements (Alt disables) */
           const tol = Math.max(4, 8 / zoom);
           const m = pageMargins(p);
-          const others = p.els.filter((o) => o.id !== cur.id);
-          /* snap targets: page bleed edges, margins, centre, other elements */
+          /* snap targets: page bleed edges, margins, centre, other VISIBLE
+             elements (hidden layers and page-wide adjustment layers have no
+             edges on screen to snap to) */
+          const others = p.els.filter((o) => o.id !== cur.id && !o.hidden && o.type !== "adjust");
           const vTargets = [0, p.w, m.l, p.w - m.r, p.w / 2, ...others.flatMap((o) => [o.x, o.x + o.w / 2, o.x + o.w])];
           const hTargets = [0, p.h, m.t, p.h - m.b, p.h / 2, ...others.flatMap((o) => [o.y, o.y + o.h / 2, o.y + o.h])];
           /* level/mirror helpers: same spot on the opposite side of the page */
@@ -255,6 +260,7 @@ export function useStartDrag(deps: DragDeps) {
             : p.els.find((o) => o.type === "balloon" && (o as BalloonEl).attachTo === cur.id)) as BalloonEl | undefined;
           if (partner && aabbOverlap(cur, partner)) {
             const owner = cur.attachTo ? (cur as BalloonEl) : partner; // the child owns the connector
+            if (owner.id !== cur.id && !partnerSnap) partnerSnap = { id: owner.id, tail: JSON.parse(JSON.stringify(owner.tail)) };
             if (owner.tail) {
               delete owner.tail.bx; delete owner.tail.by;
               delete owner.tail.tx; delete owner.tail.ty;
@@ -290,7 +296,7 @@ export function useStartDrag(deps: DragDeps) {
         if (!ev.altKey && cur.type !== "text") {
           const tol = Math.max(4, 8 / zoom);
           const m = pageMargins(p);
-          const others = p.els.filter((o) => o.id !== cur.id);
+          const others = p.els.filter((o) => o.id !== cur.id && !o.hidden && o.type !== "adjust");
           const vT = [0, p.w, m.l, p.w - m.r, p.w / 2, ...others.flatMap((o) => [o.x, o.x + o.w])];
           const hT = [0, p.h, m.t, p.h - m.b, p.h / 2, ...others.flatMap((o) => [o.y, o.y + o.h])];
           const near = (val: number, ts: number[]) => {
@@ -431,6 +437,10 @@ export function useStartDrag(deps: DragDeps) {
         for (const o of convoy) {
           const oe = p.els.find((x) => x.id === o.id);
           if (oe) { oe.x = o.x0; oe.y = o.y0; }
+        }
+        if (partnerSnap) {
+          const pe = p.els.find((x) => x.id === partnerSnap!.id);
+          if (pe && pe.type === "balloon") pe.tail = partnerSnap.tail;
         }
         dragTipRef.current = null;
         force();

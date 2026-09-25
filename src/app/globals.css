@@ -255,7 +255,13 @@ input[type="range"] { width: 110px; }
   background: #f4f5f8; border: 1px solid #8f96a1; border-radius: 8px;
   box-shadow: 0 10px 30px #0005; padding: 10px;
 }
-.fillPopCols { display: flex; gap: 14px; }
+.fillPopCols { display: flex; gap: 14px; flex-wrap: wrap; }
+/* never wider than the window: on a phone with the format bar shown the
+   460px popup ran off the right edge */
+.fillPop { max-width: calc(100vw - 16px); }
+/* inside the Inspector the 250px list opened at the button's left edge and
+   was cut off by the panel's scroll box — hang it from the right edge instead */
+.inspBody .fontMenu { left: auto; right: 0; width: min(250px, calc(100vw - 24px)); }
 .fillPopHead { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #37507a; margin-bottom: 6px; }
 .palGrid { display: grid; grid-template-columns: repeat(14, 15px); gap: 1px; }
 .palGrid button { width: 15px; height: 15px; border: 1px solid #0002; padding: 0; cursor: pointer; }
@@ -590,7 +596,8 @@ input[type="range"] { width: 110px; }
 /* the align group opens in place: a flyout would be clipped by the menu's
    own scroll container once the menu is tall enough to need one */
 .ctxSubMenu { display: none; flex-direction: column; }
-.ctxSub:hover .ctxSubMenu, .ctxSub:focus-within .ctxSubMenu { display: flex; }
+/* hover/focus for the mouse, .open for a tap on the head (touch has no hover) */
+.ctxSub:hover .ctxSubMenu, .ctxSub:focus-within .ctxSubMenu, .ctxSub.open .ctxSubMenu { display: flex; }
 .ctxSubMenu button { padding-left: 26px; color: #333; }
 .ctxSubHead { color: #555; }
 

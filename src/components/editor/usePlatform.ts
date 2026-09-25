@@ -62,17 +62,22 @@ export function usePinchZoom(
         if (owner !== null) {
           window.dispatchEvent(new PointerEvent("pointercancel", { pointerId: owner }));
         }
-        const [a, b] = [...pts.values()];
-        baseDist = Math.hypot(a.x - b.x, a.y - b.y) || 1;
-        baseZoom = zoomRef.current;
-        const r = area.getBoundingClientRect();
-        const m = mid();
-        /* document-space point currently under the finger midpoint */
-        baseDoc = {
-          x: (area.scrollLeft + m.x - r.left) / baseZoom,
-          y: (area.scrollTop + m.y - r.top) / baseZoom,
-        };
+        rebase();
       }
+    };
+    /* the pinch measures from the CURRENT two fingers — also after a third
+       finger lifts, or the next move jumped the zoom to a stale distance */
+    const rebase = () => {
+      const [a, b] = [...pts.values()];
+      baseDist = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+      baseZoom = zoomRef.current;
+      const r = area.getBoundingClientRect();
+      const m = mid();
+      /* document-space point currently under the finger midpoint */
+      baseDoc = {
+        x: (area.scrollLeft + m.x - r.left) / baseZoom,
+        y: (area.scrollTop + m.y - r.top) / baseZoom,
+      };
     };
     const move = (e: PointerEvent) => {
       if (!pts.has(e.pointerId)) return;
@@ -103,6 +108,7 @@ export function usePinchZoom(
     const up = (e: PointerEvent) => {
       pts.delete(e.pointerId);
       if (pts.size < 2) baseDist = 0;
+      else if (pts.size === 2) rebase();
       if (pts.size === 0) pan = null;
     };
     /* belt & braces: the canvas is touch-action none, but any browser that

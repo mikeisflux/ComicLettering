@@ -203,6 +203,8 @@ export function beginTuckLasso(d: TuckDragDeps, e: React.PointerEvent) {
     window.removeEventListener("pointermove", onMove);
     window.removeEventListener("pointerup", onUp);
     window.removeEventListener("pointercancel", onUp);
+    /* a cancelled trace (pinch, browser takeover) never opens the dialog */
+    if (ev.type === "pointercancel") { d.ptsRef.current = null; d.force(); return; }
     const raw = d.ptsRef.current;
     d.ptsRef.current = null;
     d.setTuckMode(false);

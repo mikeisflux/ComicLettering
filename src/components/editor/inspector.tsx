@@ -1,5 +1,6 @@
 /* Right-panel Inspector — page / element property editors.
    Plain exported render functions taking the EditorCtx bag. */
+import { NumField, Slider } from "./chrome";
 import {
   AdjustKind, BALLOON_KINDS, BLEED, BalloonEl, BalloonKind, FILTERS, FONTS, FadeDir, PAGE_SIZES,
   PanelEl, TAILLESS_KINDS, TextEl, TextStyle, clamp,
@@ -11,7 +12,7 @@ import { FillPicker } from "./FillPicker";
 import { EditorCtx } from "./ctx";
 import {
   applyBalloonPreset, deleteBalloonPreset, deleteCustomFont, deleteSel,
-  duplicateSel, fitBalloonToText, reorder, runInstantAlpha, saveBalloonPreset,
+  duplicateSel, fitBalloonToText, reorder, runInstantAlpha, saveBalloonPreset, setLocked,
 } from "./ops";
 
 
@@ -33,8 +34,8 @@ export function tsControls(ed: EditorCtx, el: BalloonEl | TextEl) {
       <Fld label="Face">
         <SubtypeSelect ts={ts} onSet={(bold, italic) => set({ bold, italic })} />
       </Fld>
-      <Fld label="Size"><input type="number" min={8} max={800} value={ts.size}
-        onChange={(e) => set({ size: clamp(+e.target.value || 8, 8, 800) })} /></Fld>
+      <Fld label="Size"><NumField min={8} max={800} value={ts.size}
+        onLive={(n) => set({ size: n }, false)} onCommit={(n) => set({ size: n })} /></Fld>
       <Fld label="ALL CAPS"><input type="checkbox" checked={ts.caps} onChange={(e) => set({ caps: e.target.checked })} /></Fld>
       <Fld label="Crossbar “I”"><input type="checkbox" checked={!!ts.crossbarI} onChange={(e) => set({ crossbarI: e.target.checked })} /></Fld>
       <Fld label="Underline"><input type="checkbox" checked={!!ts.underline} onChange={(e) => set({ underline: e.target.checked })} /></Fld>
@@ -57,8 +58,8 @@ export function tsControls(ed: EditorCtx, el: BalloonEl | TextEl) {
       </Fld>
       <Fld label="Outline">
         <span className="pair">
-          <input type="number" min={0} max={80} value={ts.outlineW} style={{ width: 52 }}
-            onChange={(e) => set({ outlineW: clamp(+e.target.value || 0, 0, 80) })} />
+          <NumField min={0} max={80} width={52} value={ts.outlineW}
+            onLive={(n) => set({ outlineW: n }, false)} onCommit={(n) => set({ outlineW: n })} />
           <input type="color" value={ts.outlineC} onChange={(e) => set({ outlineC: e.target.value })} />
         </span>
       </Fld>
@@ -230,10 +231,10 @@ export function renderInspector(ed: EditorCtx) {
               <option value="custom">Custom</option>
             </select>
           </Fld>
-          <Fld label="Width px"><input type="number" min={200} max={6000} value={p.w}
-            onChange={(e) => { p.w = clamp(+e.target.value || 200, 200, 6000); commit(); fitZoom(true); }} /></Fld>
-          <Fld label="Height px"><input type="number" min={200} max={6000} value={p.h}
-            onChange={(e) => { p.h = clamp(+e.target.value || 200, 200, 6000); commit(); fitZoom(true); }} /></Fld>
+          <Fld label="Width px"><NumField min={200} max={8000} value={p.w}
+            onLive={(n) => { p.w = n; force(); }} onCommit={(n) => { p.w = n; commit(); fitZoom(true); }} /></Fld>
+          <Fld label="Height px"><NumField min={200} max={8000} value={p.h}
+            onLive={(n) => { p.h = n; force(); }} onCommit={(n) => { p.h = n; commit(); fitZoom(true); }} /></Fld>
           <div className="btnRow">
             <button onClick={() => setShowSetup(true)}>Page Setup… (inches &amp; margins)</button>
           </div>
@@ -272,8 +273,9 @@ export function renderInspector(ed: EditorCtx) {
           </Fld>
           <Fld label="Outline">
             <span className="pair">
-              <input type="number" min={0} max={30} value={el.strokeW} style={{ width: 52 }}
-                onChange={(e) => ed.mutateBalloon((b) => { b.strokeW = clamp(+e.target.value || 0, 0, 30); })} />
+              <NumField min={0} max={30} width={52} value={el.strokeW}
+                onLive={(n) => ed.mutateBalloon((b) => { b.strokeW = n; }, false)}
+                onCommit={(n) => ed.mutateBalloon((b) => { b.strokeW = n; })} />
               <input type="color" value={el.stroke}
                 onChange={(e) => ed.mutateBalloon((b) => { b.stroke = e.target.value; })} />
             </span>
@@ -323,11 +325,11 @@ export function renderInspector(ed: EditorCtx) {
           <div className="inspHead">SFX warp</div>
           <Fld label="Arc">
             <span className="pair">
-              <input type="range" min={-100} max={100} step={1} value={el.warp ?? 0}
-                onChange={(e) => ed.mutateLettering((x) => { x.warp = +e.target.value; }, false)}
-                onPointerUp={() => commit()} style={{ width: 120 }} />
-              <input type="number" min={-100} max={100} value={el.warp ?? 0} style={{ width: 54 }}
-                onChange={(e) => ed.mutateLettering((x) => { x.warp = clamp(+e.target.value || 0, -100, 100); })} />
+              <Slider min={-100} max={100} step={1} value={el.warp ?? 0}
+                onChange={(e) => ed.mutateLettering((x) => { x.warp = +e.target.value; }, false)} style={{ width: 120 }} onCommit={() => commit()} />
+              <NumField min={-100} max={100} width={54} value={el.warp ?? 0}
+                onLive={(n) => ed.mutateLettering((x) => { x.warp = n; }, false)}
+                onCommit={(n) => ed.mutateLettering((x) => { x.warp = n; })} />
             </span>
           </Fld>
           <div className="btnRow">
@@ -342,8 +344,9 @@ export function renderInspector(ed: EditorCtx) {
             <div className="inspHead">{el.type === "panel" ? "Panel" : "Image"}</div>
             <Fld label="Border">
               <span className="pair">
-                <input type="number" min={0} max={40} value={el.borderW} style={{ width: 52 }}
-                  onChange={(e) => ed.mutateArt((b) => { b.borderW = clamp(+e.target.value || 0, 0, 40); })} />
+                <NumField min={0} max={40} width={52} value={el.borderW}
+                  onLive={(n) => ed.mutateArt((b) => { b.borderW = n; }, false)}
+                  onCommit={(n) => ed.mutateArt((b) => { b.borderW = n; })} />
                 <input type="color" value={el.borderC}
                   onChange={(e) => ed.mutateArt((b) => { b.borderC = e.target.value; })} />
               </span>
@@ -360,7 +363,7 @@ export function renderInspector(ed: EditorCtx) {
             <Fld label="Fade">
               <button className="fadePick" onClick={(e) => {
                 const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                fadePos = { x: Math.min(r.left - 120, innerWidth - 240), y: Math.min(r.bottom + 6, innerHeight - 330) };
+                fadePos = { x: Math.max(4, Math.min(r.left - 120, innerWidth - 240)), y: Math.max(4, Math.min(r.bottom + 6, innerHeight - 330)) };
                 ed.setOpenMenu(ed.openMenu === "fadeMenu" ? null : "fadeMenu");
               }}>
                 {el.fade ? `${el.fade.to === "black" ? "⬛ Black" : "⬜ White"} · ${FADE_DIR_LABEL[el.fade.dir]}` : "Fade tool…"}
@@ -393,9 +396,8 @@ export function renderInspector(ed: EditorCtx) {
                         ))}
                       </div>
                       <div className="lfLabel">Reach</div>
-                      <input type="range" min={5} max={100} value={el.fade.size}
-                        onChange={(e) => ed.mutateArt((b) => { if (b.fade) b.fade = { ...b.fade, size: +e.target.value }; }, false)}
-                        onPointerUp={() => ed.commit()} />
+                      <Slider min={5} max={100} value={el.fade.size}
+                        onChange={(e) => ed.mutateArt((b) => { if (b.fade) b.fade = { ...b.fade, size: +e.target.value }; }, false)} onCommit={() => ed.commit()} />
                       <div className="lfRow">
                         <button onClick={() => { ed.mutateArt((b) => { b.fade = undefined; }); ed.setOpenMenu(null); }}>Remove</button>
                         <button className="lfGo" onClick={() => ed.setOpenMenu(null)}>Done</button>
@@ -428,33 +430,30 @@ export function renderInspector(ed: EditorCtx) {
               <div className="inspHead">Picture in frame</div>
               <Fld label="Across">
                 <span className="pair">
-                  <input type="range" min={0} max={100} step={1}
+                  <Slider min={0} max={100} step={1}
                     value={Math.round((el.pan?.x ?? 0.5) * 100)}
                     onChange={(e) => ed.mutateArt((b) => {
                       b.pan = { x: +e.target.value / 100, y: b.pan?.y ?? 0.5, ...(b.pan?.z && b.pan.z !== 1 ? { z: b.pan.z } : {}) };
-                    }, false)}
-                    onPointerUp={() => commit()} style={{ width: 120 }} />
+                    }, false)} style={{ width: 120 }} onCommit={() => commit()} />
                 </span>
               </Fld>
               <Fld label="Down">
                 <span className="pair">
-                  <input type="range" min={0} max={100} step={1}
+                  <Slider min={0} max={100} step={1}
                     value={Math.round((el.pan?.y ?? 0.5) * 100)}
                     onChange={(e) => ed.mutateArt((b) => {
                       b.pan = { x: b.pan?.x ?? 0.5, y: +e.target.value / 100, ...(b.pan?.z && b.pan.z !== 1 ? { z: b.pan.z } : {}) };
-                    }, false)}
-                    onPointerUp={() => commit()} style={{ width: 120 }} />
+                    }, false)} style={{ width: 120 }} onCommit={() => commit()} />
                 </span>
               </Fld>
               <Fld label="Zoom">
                 <span className="pair">
-                  <input type="range" min={100} max={300} step={5}
+                  <Slider min={100} max={300} step={5}
                     value={Math.round(Math.max(1, el.pan?.z ?? 1) * 100)}
                     onChange={(e) => ed.mutateArt((b) => {
                       const z = +e.target.value / 100;
                       b.pan = { x: b.pan?.x ?? 0.5, y: b.pan?.y ?? 0.5, ...(z !== 1 ? { z } : {}) };
-                    }, false)}
-                    onPointerUp={() => commit()} style={{ width: 120 }} />
+                    }, false)} style={{ width: 120 }} onCommit={() => commit()} />
                   <span style={{ fontSize: 11, opacity: 0.75, width: 38 }}>{Math.round(Math.max(1, el.pan?.z ?? 1) * 100)}%</span>
                 </span>
               </Fld>
@@ -494,16 +493,15 @@ export function renderInspector(ed: EditorCtx) {
             <button onClick={() => mutateSel((b) => { b.flipV = !b.flipV; })}>Flip ↕</button>
           </div>
         )}
-        <Fld label="Rotation °"><input type="number" min={-180} max={180} value={Math.round(el.rot)}
-          onChange={(e) => mutateSel((b) => { b.rot = clamp(+e.target.value || 0, -180, 180); })} /></Fld>
+        <Fld label="Rotation °"><NumField min={-180} max={180} value={Math.round(el.rot)}
+          onLive={(n) => mutateSel((b) => { b.rot = n; }, false)} onCommit={(n) => mutateSel((b) => { b.rot = n; })} /></Fld>
         <Fld label="Opacity">
-          <input type="range" min={10} max={100} value={Math.round((el.opacity ?? 1) * 100)}
-            onChange={(e) => mutateSel((b) => { b.opacity = (+e.target.value) / 100; }, false)}
-            onPointerUp={() => commit()} />
+          <Slider min={10} max={100} value={Math.round((el.opacity ?? 1) * 100)}
+            onChange={(e) => mutateSel((b) => { b.opacity = (+e.target.value) / 100; }, false)} onCommit={() => commit()} />
         </Fld>
         <Fld label="Lock position">
           <input type="checkbox" checked={!!el.locked}
-            onChange={(e) => mutateSel((b) => { b.locked = e.target.checked; })} />
+            onChange={(e) => setLocked(ed, e.target.checked)} />
         </Fld>
       </div>
       {renderPageAdjustSection(ed)}

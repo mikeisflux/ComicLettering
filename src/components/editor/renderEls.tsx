@@ -465,6 +465,10 @@ export function renderEl(ed: EditorCtx, el: El) {
               left: cx0 + layout[i].x, top: cy0 + layout[i].y,
               transform: `translate(-50%, -50%) rotate(${layout[i].rot}rad)`,
               whiteSpace: "pre", lineHeight: 1,
+              /* widths already carry the tracking (arcTextLayout); a trailing
+                 letter-spacing on the span shifted every glyph by tracking/2
+                 relative to the export */
+              letterSpacing: "normal",
             }}>{ch}</span>
           ))}
         </div>
@@ -572,6 +576,15 @@ export function renderOverlay(ed: EditorCtx) {
     eb = warpInkBounds(el as TextEl, envW);
   } else if (el.type === "text" && !editingThis) {
     eb = textInkFractions(el as TextEl);
+  }
+  /* a flipped element draws its ink mirrored (scaleX/Y(-1) on the box), so
+     the selection rect mirrors too — otherwise the handles sat over empty
+     space and the resize pin (which does mirror) fought the finger */
+  if (eb && (el.flipH || el.flipV)) {
+    eb = {
+      x0: el.flipH ? 1 - eb.x1 : eb.x0, x1: el.flipH ? 1 - eb.x0 : eb.x1,
+      y0: el.flipV ? 1 - eb.y1 : eb.y0, y1: el.flipV ? 1 - eb.y0 : eb.y1,
+    };
   }
   const bx = eb ? el.x + eb.x0 * el.w : el.x;
   const by = eb ? el.y + eb.y0 * el.h : el.y;

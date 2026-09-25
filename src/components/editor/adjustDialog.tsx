@@ -9,6 +9,7 @@
    All widgets read/write the SAME params the shared filter engine
    (lib/pageAdjust) compiles, so the preview, the canvas and the exports
    can never disagree. */
+import { NumField, Slider } from "./chrome";
 import { removeEls } from "./ops";
 import React, { useEffect, useRef, useState } from "react";
 import { AdjustEl, clamp } from "@/lib/model";
@@ -334,9 +335,8 @@ function ThresholdPanel({ ed, el }: { ed: EditorCtx; el: AdjustEl }) {
       </svg>
       <div className="adjRow">
         <label>Threshold level</label>
-        <input type="number" className="adjNum" min={1} max={254}
-          value={Math.round(lvl * 255)}
-          onChange={(e) => set(clamp(+e.target.value || 128, 1, 254) / 255 * 100, true)} />
+        <NumField className="adjNum" min={1} max={254} value={Math.round(lvl * 255)}
+          onLive={(n) => set(n / 255 * 100, false)} onCommit={(n) => set(n / 255 * 100, true)} />
       </div>
       <div className="tips">Everything darker than the caret goes black, everything lighter goes white.</div>
     </div>
@@ -412,13 +412,11 @@ function ChannelMixerPanel({ ed, el }: { ed: EditorCtx; el: AdjustEl }) {
   const row = (srcC: "r" | "g" | "b", label: string, track: string) => (
     <div className="adjRow" key={srcC}>
       <label>{label}</label>
-      <input type="range" min={-200} max={200} className="adjTrack" style={{ background: track }}
+      <Slider min={-200} max={200} className="adjTrack" style={{ background: track }}
         value={val(srcC, defFor(srcC))}
-        onChange={(e) => set({ [key(srcC)]: +e.target.value }, false)}
-        onPointerUp={() => ed.commit()} />
-      <input type="number" className="adjNum" min={-200} max={200}
-        value={val(srcC, defFor(srcC))}
-        onChange={(e) => set({ [key(srcC)]: clamp(+e.target.value || 0, -200, 200) }, true)} />
+        onChange={(e) => set({ [key(srcC)]: +e.target.value }, false)} onCommit={() => ed.commit()} />
+      <NumField className="adjNum" min={-200} max={200} value={val(srcC, defFor(srcC))}
+        onLive={(n) => set({ [key(srcC)]: n }, false)} onCommit={(n) => set({ [key(srcC)]: n }, true)} />
     </div>
   );
   return (
@@ -462,13 +460,12 @@ function ChannelMixerPanel({ ed, el }: { ed: EditorCtx; el: AdjustEl }) {
       </div>
       <div className="adjRow">
         <label>Constant</label>
-        <input type="range" min={-200} max={200} className="adjTrack"
+        <Slider min={-200} max={200} className="adjTrack"
           style={{ background: "linear-gradient(90deg,#000,#8a8a8a,#fff)" }}
           value={val("k", 0)}
-          onChange={(e) => set({ [key("k")]: +e.target.value }, false)}
-          onPointerUp={() => ed.commit()} />
-        <input type="number" className="adjNum" min={-200} max={200} value={val("k", 0)}
-          onChange={(e) => set({ [key("k")]: clamp(+e.target.value || 0, -200, 200) }, true)} />
+          onChange={(e) => set({ [key("k")]: +e.target.value }, false)} onCommit={() => ed.commit()} />
+        <NumField className="adjNum" min={-200} max={200} value={val("k", 0)}
+          onLive={(n) => set({ [key("k")]: n }, false)} onCommit={(n) => set({ [key("k")]: n }, true)} />
       </div>
     </>
   );
@@ -504,13 +501,11 @@ function SelectiveColorPanel({ ed, el }: { ed: EditorCtx; el: AdjustEl }) {
   const row = (ch: "c" | "m" | "y" | "k", label: string, track: string) => (
     <div className="adjRow" key={ch}>
       <label>{label}</label>
-      <input type="range" min={-100} max={100} className="adjTrack" style={{ background: track }}
+      <Slider min={-100} max={100} className="adjTrack" style={{ background: track }}
         value={numOf(p[`${fam}_${ch}`], 0)}
-        onChange={(e) => set({ [`${fam}_${ch}`]: +e.target.value }, false)}
-        onPointerUp={() => ed.commit()} />
-      <input type="number" className="adjNum" min={-100} max={100}
-        value={numOf(p[`${fam}_${ch}`], 0)}
-        onChange={(e) => set({ [`${fam}_${ch}`]: clamp(+e.target.value || 0, -100, 100) }, true)} />
+        onChange={(e) => set({ [`${fam}_${ch}`]: +e.target.value }, false)} onCommit={() => ed.commit()} />
+      <NumField className="adjNum" min={-100} max={100} value={numOf(p[`${fam}_${ch}`], 0)}
+        onLive={(n) => set({ [`${fam}_${ch}`]: n }, false)} onCommit={(n) => set({ [`${fam}_${ch}`]: n }, true)} />
     </div>
   );
   return (
@@ -606,11 +601,10 @@ function GradientMapPanel({ ed, el }: { ed: EditorCtx; el: AdjustEl }) {
       </div>
       <div className="adjRow">
         <label>Blend</label>
-        <input type="range" min={0} max={100} value={numOf(p.amt, 100)}
-          onChange={(e) => set({ amt: +e.target.value }, false)}
-          onPointerUp={() => ed.commit()} />
-        <input type="number" className="adjNum" min={0} max={100} value={numOf(p.amt, 100)}
-          onChange={(e) => set({ amt: clamp(+e.target.value || 0, 0, 100) }, true)} />
+        <Slider min={0} max={100} value={numOf(p.amt, 100)}
+          onChange={(e) => set({ amt: +e.target.value }, false)} onCommit={() => ed.commit()} />
+        <NumField className="adjNum" min={0} max={100} value={numOf(p.amt, 100)}
+          onLive={(n) => set({ amt: n }, false)} onCommit={(n) => set({ amt: n }, true)} />
       </div>
     </>
   );
@@ -668,15 +662,14 @@ export function renderAdjustDialog(ed: EditorCtx) {
           onChange={(e) => set(spec.key, e.target.value, true)} />
       ) : (
         <>
-          <input type="range" min={spec.min} max={spec.max} step={spec.step ?? 1}
+          <Slider min={spec.min} max={spec.max} step={spec.step ?? 1}
             className={spec.track ? "adjTrack" : undefined}
             style={spec.track ? { background: spec.track } : undefined}
             value={Number(el.params[spec.key] ?? spec.def)}
-            onChange={(e) => set(spec.key, +e.target.value, false)}
-            onPointerUp={() => ed.commit()} />
-          <input type="number" className="adjNum" min={spec.min} max={spec.max} step={spec.step ?? 1}
+            onChange={(e) => set(spec.key, +e.target.value, false)} onCommit={() => ed.commit()} />
+          <NumField className="adjNum" min={spec.min ?? -1e9} max={spec.max ?? 1e9} step={spec.step ?? 1}
             value={Number(el.params[spec.key] ?? spec.def)}
-            onChange={(e) => set(spec.key, clamp(+e.target.value || 0, spec.min ?? -1e9, spec.max ?? 1e9), true)} />
+            onLive={(n) => set(spec.key, n, false)} onCommit={(n) => set(spec.key, n, true)} />
         </>
       )}
     </div>

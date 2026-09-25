@@ -31,7 +31,11 @@ self.addEventListener("fetch", (event) => {
     const res = await fetch(event.request);
     if (res.ok) {
       const cache = await caches.open(CACHE);
-      cache.put(event.request, res.clone());
+      await cache.put(event.request, res.clone());
+      /* every deploy adds new hashed chunks and nothing else ever evicts
+         the old ones — keep the store to a few hundred entries */
+      const keys = await cache.keys();
+      if (keys.length > 300) for (const k of keys.slice(0, keys.length - 300)) await cache.delete(k);
     }
     return res;
   })());
