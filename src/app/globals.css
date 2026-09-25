@@ -412,6 +412,7 @@ input[type="range"] { width: 110px; }
 .facingNum {
   position: absolute; top: 6px; left: 6px; font-size: 12px; font-weight: 700;
   color: #fff; background: #0008; padding: 1px 7px; border-radius: 10px;
+  pointer-events: none;   /* a press on the badge is a press on the page */
 }
 .page {
   position: absolute; left: 0; top: 0; overflow: hidden;
@@ -1521,3 +1522,18 @@ kbd.k {
 .scriptRecap.empty { background: #f4f5f7; border-color: var(--edge2); color: #6a7482; }
 .scriptCheat { font-size: 11.5px; color: #55606e; margin-top: 8px; line-height: 1.5; }
 .scriptCheat code { background: #e9ecf1; padding: 0 4px; border-radius: 3px; }
+
+/* ---- Gradient Maker: it used .modalBack/.modal classes that never had
+   rules, so it rendered in-flow under the tray and squashed the canvas ---- */
+.modalBack {
+  position: fixed; inset: 0; z-index: 320; background: #0b0f1a99;
+  backdrop-filter: blur(3px); display: flex; align-items: center; justify-content: center;
+}
+.modal {
+  background: #f0f1f4; color: #1c2432; border: 1px solid #8f96a1; border-radius: 10px;
+  padding: 16px 18px; max-width: 94vw; max-height: 90vh; overflow: auto;
+  box-shadow: 0 28px 90px #000000b3, inset 0 1px 0 #ffffffcc;
+  animation: lmcDlgIn .22s cubic-bezier(.18, .9, .32, 1.18);
+}
+.modalBtns { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; }
+.modalBtns button { min-width: 90px; padding: 7px 14px; background: #fff; border: 1px solid var(--edge2); border-radius: 6px; }

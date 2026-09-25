@@ -21,6 +21,9 @@ import {
 } from "./ops";
 import { detectPanelsFromArt } from "./panelOps";
 
+/* the menu-bar menus — the only openMenu values that own the menu-bar veil */
+const MENU_NAMES = new Set(["File", "Edit", "View", "Insert", "Format", "Arrange", "Window", "Help"]);
+
 /* Help → Check for Updates. The service worker only caches immutable
    hashed assets, so a plain reload always lands on the latest deploy —
    but an installed app window (Store/PWA) can sit open for days and never
@@ -61,7 +64,13 @@ export function renderMenuBar(ed: EditorCtx) {
   const page = ed.page!;
   return (
   <nav className="menuBar">
-    {openMenu && <div className="ctxBackdrop" style={{ zIndex: 179 }} onClick={() => setOpenMenu(null)} />}
+    {/* the click-away veil belongs to the MENU BAR's menus only. `openMenu`
+        is shared with the fade popup, layer menus and tuck flyout, whose
+        own backdrops live inside stacking contexts (the phone drawer)
+        that this z-179 veil painted over — every tap on those popups was
+        eaten here, and a popup unmounted by Esc/Delete left this veil up
+        invisibly, swallowing the next click anywhere. */}
+    {openMenu && MENU_NAMES.has(openMenu) && <div className="ctxBackdrop" style={{ zIndex: 179 }} onClick={() => setOpenMenu(null)} />}
     {([
       ["File", [
         ["New Document", () => { if (window.confirm("Start a new document?")) { docRef.current = starterDoc(); assetsRef.current = {}; releaseAllArt(); clearArt(); reseedIds(docRef.current); histRef.current = [JSON.stringify(docRef.current)]; hIndexRef.current = 0; setCurrent(null); setSelId(null); setPageIndex(0); setThumbs({}); autosave(); force(); fitZoom(true); } }],
@@ -140,13 +149,13 @@ export function renderMenuBar(ed: EditorCtx) {
         ["Italic", () => toggleSelEmphasis(ed, "italic")],
         ["Underline", () => toggleSelEmphasis(ed, "underline")],
         ["—", null],
-        ["Align Left", () => mutateSel<BalloonEl | TextEl>((x) => { if (x.ts) x.ts.align = "left"; })],
-        ["Align Center", () => mutateSel<BalloonEl | TextEl>((x) => { if (x.ts) x.ts.align = "center"; })],
-        ["Align Right", () => mutateSel<BalloonEl | TextEl>((x) => { if (x.ts) x.ts.align = "right"; })],
-        ["Justify", () => mutateSel<BalloonEl | TextEl>((x) => { if (x.ts) x.ts.align = "justify"; })],
+        ["Align Left", () => ed.mutateText((x) => { if (x.ts) x.ts.align = "left"; })],
+        ["Align Center", () => ed.mutateText((x) => { if (x.ts) x.ts.align = "center"; })],
+        ["Align Right", () => ed.mutateText((x) => { if (x.ts) x.ts.align = "right"; })],
+        ["Justify", () => ed.mutateText((x) => { if (x.ts) x.ts.align = "justify"; })],
         ["—", null],
-        ["Bigger", () => mutateSel<BalloonEl | TextEl>((x) => { if (x.ts) x.ts.size = clamp(Math.round(x.ts.size * 1.12), 8, 800); })],
-        ["Smaller", () => mutateSel<BalloonEl | TextEl>((x) => { if (x.ts) x.ts.size = clamp(Math.round(x.ts.size / 1.12), 8, 800); })],
+        ["Bigger", () => ed.mutateText((x) => { if (x.ts) x.ts.size = clamp(Math.round(x.ts.size * 1.12), 8, 800); })],
+        ["Smaller", () => ed.mutateText((x) => { if (x.ts) x.ts.size = clamp(Math.round(x.ts.size / 1.12), 8, 800); })],
 
       ]],
       ["Arrange", [
@@ -259,9 +268,9 @@ export function renderToolbar(ed: EditorCtx) {
     <ToolBtn label="Rotate ⟲" icon="↺" disabled={!selEl} onClick={() => rotateSel(ed, -15)} />
     <ToolBtn label="Rotate ⟳" icon="↻" disabled={!selEl} onClick={() => rotateSel(ed, 15)} />
     <ToolBtn label="Bigger" icon="A+" disabled={!selTs} onClick={() =>
-      mutateSel<BalloonEl | TextEl>((x) => { x.ts.size = clamp(Math.round(x.ts.size * 1.12), 8, 800); })} />
+      ed.mutateText((x) => { x.ts.size = clamp(Math.round(x.ts.size * 1.12), 8, 800); })} />
     <ToolBtn label="Smaller" icon="A−" disabled={!selTs} onClick={() =>
-      mutateSel<BalloonEl | TextEl>((x) => { x.ts.size = clamp(Math.round(x.ts.size / 1.12), 8, 800); })} />
+      ed.mutateText((x) => { x.ts.size = clamp(Math.round(x.ts.size / 1.12), 8, 800); })} />
     <span className="tbSep" />
     <ToolBtn label="Select" icon="↖"
       title="Selection tool — the normal mouse. Drops the pen, shape marquees, Tuck Back, balloon sketch and note tools."
@@ -338,7 +347,7 @@ function renderTuckBtn(ed: EditorCtx) {
     tuckHold = setTimeout(openFly, 450);
   };
   const disarm = () => { if (tuckHold) { clearTimeout(tuckHold); tuckHold = null; } };
-  const pick = (t: "lasso" | "pen") => { ed.setTuckTool(t); setOpenMenu(null); ed.startTuck(); };
+  const pick = (t: "lasso" | "pen") => { tuckFlyJustOpened = false; ed.setTuckTool(t); setOpenMenu(null); ed.startTuck(); };
   return (
     <span className="tuckWrap">
       <button className="toolBtn accent"
@@ -356,7 +365,10 @@ function renderTuckBtn(ed: EditorCtx) {
       </button>
       {openMenu === "tuckfly" && (
         <>
-          <div className="menuBackdrop" onPointerDown={() => setOpenMenu(null)} />
+          {/* the flag exists to swallow the click that ENDS a press-and-hold;
+              a right-click / long-press open produces no click, so clear it
+              here or the next plain click on the button did nothing */}
+          <div className="menuBackdrop" onPointerDown={() => { tuckFlyJustOpened = false; setOpenMenu(null); }} />
           <div className="tuckFly" style={{ left: tuckFlyPos.left, top: tuckFlyPos.top }}>
             <button className={!pen ? "on" : ""} onClick={() => pick("lasso")}
               title="Freehand trace that snaps to the art's edges — hold Alt while tracing for pure freehand">
@@ -490,16 +502,16 @@ export function renderFormatBar(ed: EditorCtx) {
     <FontMenu value={selTs?.font || "comicneue"} disabled={!selTs}
       onImport={() => fileFontRef.current?.click()}
       onDeleteFont={(k) => deleteCustomFont(ed, k)}
-      onPick={(k) => mutateSel<BalloonEl | TextEl>((x) => {
+      onPick={(k) => ed.mutateText((x) => {
         x.ts.font = k;
         const vars = FONTS[k]?.variants || ["regular"];
         if (!vars.includes(tsVariant(x.ts) as never)) { x.ts.bold = false; x.ts.italic = false; }
       })} />
     <SubtypeSelect ts={selTs}
-      onSet={(bold, italic) => mutateSel<BalloonEl | TextEl>((x) => { x.ts.bold = bold; x.ts.italic = italic; })} />
+      onSet={(bold, italic) => ed.mutateText((x) => { x.ts.bold = bold; x.ts.italic = italic; })} />
     <NumField min={8} max={800} width={56} disabled={!selTs} title="Font size"
       value={selTs?.size ?? DEFAULT_TEXT_SIZE}
-      onCommit={(v) => mutateSel<BalloonEl | TextEl>((x) => { x.ts.size = v; })} />
+      onCommit={(v) => ed.mutateText((x) => { x.ts.size = v; })} />
     <div style={{ position: "relative" }}>
       <button className="fillSwatch" title="Text color" disabled={!selTs}
         style={{ background: selTs?.fillA || "#111111", width: 28 }}
@@ -511,7 +523,7 @@ export function renderFormatBar(ed: EditorCtx) {
             {COLOR_PALETTE.flat().map((c, i) => (
               <button key={i} style={{ background: c }} title={c}
                 onClick={() => {
-                  mutateSel<BalloonEl | TextEl>((x) => { x.ts.fillA = c; x.ts.fillB = null; });
+                  ed.mutateText((x) => { x.ts.fillA = c; x.ts.fillB = null; });
                   setShowTextColor(false);
                 }} />
             ))}
@@ -519,7 +531,7 @@ export function renderFormatBar(ed: EditorCtx) {
           <div className="fld" style={{ marginTop: 6 }}>
             <label>Custom</label>
             <input type="color" onChange={(e) => {
-              mutateSel<BalloonEl | TextEl>((x) => { x.ts.fillA = e.target.value; x.ts.fillB = null; });
+              ed.mutateText((x) => { x.ts.fillA = e.target.value; x.ts.fillB = null; });
               setShowTextColor(false);
             }} />
           </div>
@@ -541,7 +553,7 @@ export function renderFormatBar(ed: EditorCtx) {
     {(["left", "center", "right", "justify"] as const).map((a) => (
       <button key={a} className={"fbTog" + (selTs?.align === a ? " on" : "")} disabled={!selTs}
         title={a[0].toUpperCase() + a.slice(1)}
-        onClick={() => mutateSel<BalloonEl | TextEl>((x) => { x.ts.align = a; })}>
+        onClick={() => ed.mutateText((x) => { x.ts.align = a; })}>
         {a === "left" ? "⯇" : a === "center" ? "≡" : a === "right" ? "⯈" : "☰"}
       </button>
     ))}
@@ -550,7 +562,7 @@ export function renderFormatBar(ed: EditorCtx) {
       <span className="fbLeadIcon" aria-hidden>≣</span>
       <select className="fbLeadSel" disabled={!selTs}
         value={String(selTs?.lineHeight ?? 1.05)}
-        onChange={(e) => mutateSel<BalloonEl | TextEl>((x) => { x.ts.lineHeight = parseFloat(e.target.value); })}>
+        onChange={(e) => ed.mutateText((x) => { x.ts.lineHeight = parseFloat(e.target.value); })}>
         <option value="0.9">0.9×</option>
         <option value="1">1.0×</option>
         <option value="1.1">1.1×</option>
@@ -565,7 +577,7 @@ export function renderFormatBar(ed: EditorCtx) {
       <span className="fbLeadIcon" aria-hidden>A↔A</span>
       <select className="fbLeadSel" disabled={!selTs}
         value={String(selTs?.tracking ?? 0)}
-        onChange={(e) => mutateSel<BalloonEl | TextEl>((x) => { x.ts.tracking = parseFloat(e.target.value); })}>
+        onChange={(e) => ed.mutateText((x) => { x.ts.tracking = parseFloat(e.target.value); })}>
         <option value="-2">Tight −2</option>
         <option value="-1">−1</option>
         <option value="0">Normal</option>
@@ -583,7 +595,7 @@ export function renderFormatBar(ed: EditorCtx) {
       <select className="fbBrushSel" disabled={!selTs}
         title={BRUSHES.find((b) => b.k === (selTs?.brush ?? "none"))?.hint || "Brush texture"}
         value={selTs?.brush ?? "none"}
-        onChange={(e) => mutateSel<BalloonEl | TextEl>((x) => { x.ts.brush = e.target.value; })}>
+        onChange={(e) => ed.mutateText((x) => { x.ts.brush = e.target.value; })}>
         {BRUSHES.map((b) => <option key={b.k} value={b.k} title={b.hint}>{b.label}</option>)}
       </select>
     </span>
@@ -593,7 +605,7 @@ export function renderFormatBar(ed: EditorCtx) {
       <span className="fbLeadIcon" aria-hidden>✨</span>
       <select className="fbGlowSel" disabled={!selTs} title="Glow around the lettering"
         value={selTs?.glow ?? "none"}
-        onChange={(e) => mutateSel<BalloonEl | TextEl>((x) => { x.ts.glow = e.target.value; })}>
+        onChange={(e) => ed.mutateText((x) => { x.ts.glow = e.target.value; })}>
         {GLOWS.map((g) => (
           <option key={g.k} value={g.k}>{g.label}</option>
         ))}
@@ -601,7 +613,7 @@ export function renderFormatBar(ed: EditorCtx) {
       <select className="fbGlowAmt" disabled={!selTs || (selTs.glow ?? "none") === "none"}
         title="How far the glow spreads"
         value={String(selTs?.glowW ?? 1)}
-        onChange={(e) => mutateSel<BalloonEl | TextEl>((x) => { x.ts.glowW = parseFloat(e.target.value); })}>
+        onChange={(e) => ed.mutateText((x) => { x.ts.glowW = parseFloat(e.target.value); })}>
         <option value="0.5">Soft</option>
         <option value="1">Normal</option>
         <option value="1.6">Strong</option>

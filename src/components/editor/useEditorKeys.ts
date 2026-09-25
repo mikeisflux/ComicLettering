@@ -157,7 +157,9 @@ export function useEditorKeys(deps: EditorKeyDeps) {
            toolbar button or link has focus, leave Tab to move between them */
         if (t.closest("button, a, select, [tabindex]")) return;
         e.preventDefault();
-        const els = docRef.current!.pages[pageIndexRef.current].els;
+        /* skip eyeballed-off layers and page-wide adjustment layers — there
+           is nothing on the canvas to land on */
+        const els = docRef.current!.pages[pageIndexRef.current].els.filter((x) => !x.hidden && x.type !== "adjust");
         if (!els.length) return;
         const at = els.findIndex((x) => x.id === selId);
         const next = e.shiftKey

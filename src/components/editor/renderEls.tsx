@@ -19,7 +19,7 @@ import {
 } from "@/lib/exportPng";
 import { pageBleed } from "@/lib/model";
 import { onLetteringInput, refitLetteringEl } from "./ops";
-import { dragInProgress, isDoubleTap } from "./penInput";
+import { dragInProgress, isDoubleTap, touchCount } from "./penInput";
 import { textInkFractions, warpInkBounds } from "./textInk";
 
 /* ---------- autoclipping self-replication ----------
@@ -59,8 +59,16 @@ export function renderCarriedLettering(ed: EditorCtx) {
   const srcIndex = pn % 2 === 0 ? ed.pageIndex + 1 : ed.pageIndex - 1;
   const edP: EditorCtx = {
     ...ed, page: nb.page, pageIndex: srcIndex,
-    bleedClip: null, selIds: [], editingId: null,
+    bleedClip: null, editingId: null,
+    /* the copies of the CURRENT page's lettering (shown on the other half)
+       must know the real selection, or a right-click / group-drag on a
+       copy collapses a multi-selection */
+    selIds: srcIndex === ed.pageIndexRef.current ? ed.selIdsRef.current : [],
   };
+  /* only the spread canvas edits through the copies — in single-page view
+     a press on the ghosted continuation flipped the whole canvas to the
+     facing page mid-press */
+  const live = ed.spreadLayout.length === 2;
   return (
     <div className="carriedLettering" style={{
       position: "absolute", left: nb.dx, top: 0,
@@ -74,7 +82,7 @@ export function renderCarriedLettering(ed: EditorCtx) {
         /* lettering shared across two pages is editable from EITHER half:
            this wrapper re-enables pointer events on the copy, and the
            copy's own handlers (with its source-page ctx) do the rest */
-        <div key={`carry-${el.id}`} style={{ pointerEvents: "auto" }}>
+        <div key={`carry-${el.id}`} style={{ pointerEvents: live ? "auto" : "none" }}>
           {renderEl(edP, el)}
         </div>
       ))}
@@ -200,13 +208,17 @@ export function renderEl(ed: EditorCtx, el: El) {
     else if (el.type === "image" && stampCrossesTrim(el, bc)) style.clipPath = bleedClipPath(el, bc);
   }
   const common = {
-    key: el.id,
     "data-id": el.id,
     onPointerDown: (e: React.PointerEvent) => {
-      if (editingId === el.id) return;
+      if (editingId === el.id || ed.editingIdRef.current === el.id) return;
       /* a second finger landing mid-drag must not re-select, switch the
          ops-target page, or start a competing drag */
       if (dragInProgress()) return;
+      if (e.pointerType === "touch" && touchCount() >= 2) return;
+      /* finish any edit in progress BEFORE the ops page moves: claimPage
+         retargets pageIndexRef, and capturing the typed words after that
+         looked on the wrong page and lost them (spread canvas) */
+      if (ed.editingIdRef.current) ed.finishEditing();
       const switched = claimPage(ed);
       /* A right-click fires pointerdown first. Left alone it collapsed the
          selection to one element before the context menu could open, so
@@ -214,6 +226,11 @@ export function renderEl(ed: EditorCtx, el: El) {
          started a drag with the wrong button on the way. */
       if (e.button === 2) {
         if (!ed.selIds.includes(el.id)) select(el.id);
+        /* inside a multi-selection the right-clicked item becomes the
+           PRIMARY (the set is kept): the menu's single-target actions —
+           Bring Forward, Fit, Fill Page… — act on the primary, and used
+           to hit whatever was picked last instead of what was clicked */
+        else if (ed.selId !== el.id) ed.setSelIds([...ed.selIds.filter((x) => x !== el.id), el.id]);
         return;
       }
       /* ctrl/cmd (or shift) adds to the selection instead of replacing it —
@@ -256,8 +273,10 @@ export function renderEl(ed: EditorCtx, el: El) {
       e.preventDefault();
       claimPage(ed);
       /* right-clicking inside an existing multi-selection keeps it, so the
-         menu acts on everything you picked rather than throwing it away */
+         menu acts on everything you picked rather than throwing it away —
+         with the clicked item promoted to primary (see pointerdown) */
       if (!ed.selIds.includes(el.id)) select(el.id);
+      else if (ed.selId !== el.id) ed.setSelIds([...ed.selIds.filter((x) => x !== el.id), el.id]);
       setCtxMenu({ x: e.clientX, y: e.clientY, id: el.id });
     },
   };
@@ -482,6 +501,9 @@ function enterWarp(ed: EditorCtx, el: El) {
 export function renderOverlay(ed: EditorCtx) {
   const { selEl, selEls, page, zoom, editingId, startDrag, warping, setWarping, tiltConn, setTiltConn } = ed;
   if (!selEl || !page) return null;
+  /* an eyeballed-off layer or a page-wide adjustment layer has nothing on
+     the canvas to grab — a handle set around nothing was just confusing */
+  if (selEl.hidden || selEl.type === "adjust") return null;
   /* With several picked, the extras get a plain outline and the primary keeps
      the handles — you can only resize or rotate one thing at a time, but you
      need to see everything that a move, lock or delete will reach. */
@@ -660,7 +682,7 @@ export function renderOverlay(ed: EditorCtx) {
               onDoubleClick={(e) => { e.stopPropagation(); setWarping(null); }} />
           );
         })
-      ) : handles.map(([k, hx, hy]) => {
+      ) : editingId === el.id ? null : handles.map(([k, hx, hy]) => {
         /* handles sit on the (possibly ink-hugged) selection rect itself —
            remapping them back into layout-box corners flung them far off the
            letters whenever the box was bigger than the ink. Handles past the
@@ -685,7 +707,7 @@ export function renderOverlay(ed: EditorCtx) {
             }} />
         );
       })}
-      {(() => {
+      {editingId !== el.id && (() => {
         const [rx, ry] = vis(bx + bw / 2, by);
         return (
           <div className="handle rot" title="Rotate (Shift snaps to 15°)"

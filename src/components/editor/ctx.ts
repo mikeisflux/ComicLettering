@@ -3,7 +3,7 @@
    functions (NOT components — reconciliation output is identical) receive
    it as their first argument. */
 import type React from "react";
-import type { Assets, Doc, El, FillStyle, GradStop, Page, SavedLayout, TextStyle } from "@/lib/model";
+import type { Assets, BalloonEl, Doc, El, FillStyle, GradStop, ImageEl, Page, PanelEl, SavedLayout, TextEl, TextStyle } from "@/lib/model";
 import type { ImageFormat } from "@/lib/exportPng";
 import type { BalloonPreset, ProjectMeta, ProofMatch } from "./textHelpers";
 import type { TuckAsk } from "./tuck";
@@ -69,7 +69,7 @@ export interface EditorCtx {
      after the click that pressed the button blurred the editor (tablet taps
      and menu clicks kill the DOM selection before the handler runs) */
   selRangeRef: React.RefObject<{ id: string; start: number; end: number } | null>;
-  clipboardRef: React.RefObject<El | null>;
+  clipboardRef: React.RefObject<El[] | null>;
   customFontIdsRef: React.RefObject<Record<string, string>>;
   fileImageRef: React.RefObject<HTMLInputElement | null>;
   filePanelImageRef: React.RefObject<HTMLInputElement | null>;
@@ -122,6 +122,11 @@ export interface EditorCtx {
   /* Help → Keyboard Shortcuts (a styled dialog, not a browser alert) */
   showShortcuts: boolean;
   setShowShortcuts: SetState<boolean>;
+  /* the live selection / editing ids — the per-half ctx copies on the
+     spread canvas blank out `selIds`/`editingId`, so handlers that must
+     see the REAL state (carried copies, cross-page presses) read these */
+  selIdsRef: React.RefObject<string[]>;
+  editingIdRef: React.RefObject<string | null>;
   /* Window menu: per-panel visibility (persisted per browser) */
   winHide: { left: boolean; right: boolean; tray: boolean; format: boolean };
   toggleWindow: (k: "left" | "right" | "tray" | "format" | "all") => void;
@@ -132,6 +137,14 @@ export interface EditorCtx {
   setEditingId: SetState<string | null>;
   finishEditing: () => void;
   mutateSel: <T extends El>(mut: (el: T) => void, final?: boolean) => void;
+  /* type-filtered variants: a mixed selection skips the elements the
+     control does not apply to instead of throwing on a missing field */
+  mutateText: (mut: (el: BalloonEl | TextEl) => void, final?: boolean) => void;
+  mutateBalloon: (mut: (el: BalloonEl) => void, final?: boolean) => void;
+  mutateLettering: (mut: (el: TextEl) => void, final?: boolean) => void;
+  mutateArt: (mut: (el: PanelEl | ImageEl) => void, final?: boolean) => void;
+  mutatePanel: (mut: (el: PanelEl) => void, final?: boolean) => void;
+  setSelIds: SetState<string[]>;
   startDrag: (
     e: React.PointerEvent, el: El,
     mode: "move" | "resize" | "rotate" | "tail" | "bow" | "tilt" | "envelope" | "panArt", handle?: string,

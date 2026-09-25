@@ -10,7 +10,7 @@ import { EditorCtx } from "./ctx";
 import {
   addFromTray, applyProofFix, assignImageToPanel, deleteProject, deleteSel,
   duplicateSel, exportAllPages,
-  exportJSON, loadProject, refreshProjects, runProof, saveProject,
+  exportJSON, loadProject, refreshProjects, removeEls, runExport, runProof, saveProject,
 } from "./ops";
 import { detectPanelsFromArt } from "./panelOps";
 
@@ -383,7 +383,8 @@ export function renderLayersTab(ed: EditorCtx) {
                   <button className="lfDanger" onClick={() => {
                     close();
                     if (el.locked) { ed.setStatus("This layer is locked — unlock it first."); return; }
-                    page.els = page.els.filter((x) => x.id !== el.id);
+                    removeEls(page, new Set([el.id]));
+                    if (ed.selIds.includes(el.id)) ed.setSelIds(ed.selIds.filter((x) => x !== el.id));
                     commit();
                   }}>Delete layer</button>
                 </>
@@ -536,17 +537,11 @@ export function renderLibraryTab(ed: EditorCtx) {
       </div>
       <div className="btnRow">
         <button onClick={() => exportAllPages(ed)}>Export all pages (PNG)</button>
-        <button onClick={async () => {
-          if (demo) { setStatus(demoLock("Export is off in the demo — subscribe to export print-ready pages.", "Export")); return; }
-          try {
-            const { exportPdf } = await import("@/lib/pdfExport");
-            await exportPdf(docRef.current!, assetsRef.current, (current?.name || "comic") + ".pdf",
-              (i, n) => setStatus(`Rendering PDF page ${i}/${n}…`));
-            setStatus("PDF exported.");
-          } catch (err) {
-            setStatus("PDF export failed: " + String(err).slice(0, 100));
-          }
-        }}>Export PDF (all pages)</button>
+        {/* the shared export op: loads every page's art first, shows the
+            progress bar, honours dpi/crop marks and carries cross-spine
+            lettering — the inline version here skipped all of that and
+            printed unvisited pages with blank artwork */}
+        <button onClick={() => runExport(ed, "pdf", "all", ed.exportDpi)}>Export PDF (all pages)</button>
       </div>
       {current && <div className="tips">Current: <b>{current.name}</b></div>}
       {dbError && <div className="tips error">{dbError}<br />Run <code>npm run setup</code> to create the database.</div>}

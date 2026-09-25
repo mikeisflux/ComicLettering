@@ -57,10 +57,19 @@ const pageRx = new RegExp(`^PA?GE?S?\\.?\\s*#?\\s*(\\d+|${NUMBER_WORDS})\\b`, "i
 const panelRx = new RegExp(`^(?:PANELS?|PNL|FRAME)\\.?\\s*#?\\s*(\\d+|${NUMBER_WORDS})?\\b`, "i");
 /* "3." alone on a line is a panel number in a lot of scripts */
 const barePanelRx = /^(\d{1,2})[.)]$/;
-const transitionRx = /^(SCENE|INT\b|EXT\b|CUT TO|FADE (IN|OUT|TO)|SMASH CUT|MATCH CUT|SPLASH\b|DOUBLE[- ]PAGE|SPREAD\b|TITLE PAGE|THE END\b|END\b|CREDITS|TO BE CONTINUED|NO (DIALOGUE|COPY|BALLOONS?)|SILENT)/i;
+const transitionRx = /^(SCENE|INT\b|EXT\b|CUT TO|FADE (IN|OUT|TO)|SMASH CUT|MATCH CUT|SPLASH\b|DOUBLE[- ]PAGE|SPREAD\b|TITLE PAGE|THE END\b|END\b|CREDITS|TO BE CONTINUED|NO (DIALOGUE|COPY|BALLOONS?)|SILENT)\b/i;
 /* ALL-CAPS panel description openers that would otherwise pass for a
    screenplay-style speaker line */
-const shotRx = /^(ESTABLISHING|CLOSE|WIDE|MEDIUM|LONG|TWO|EXTREME|HIGH|LOW|OVERHEAD|BIRD'?S|WORM'?S|REVERSE|ANGLE|INSERT|SHOT|CU\b|ECU\b|POV\b|SAME\b|LATER\b|CONTINUOUS|MEANWHILE|MOMENTS LATER|INTERIOR|EXTERIOR|DAY\b|NIGHT\b|DAWN\b|DUSK\b|FLASHBACK|DREAM|BIG PANEL|FULL PAGE|INSET|BACKGROUND|FOREGROUND|BG\b|FG\b)/i;
+const shotRx = /^(ESTABLISHING|CLOSE|WIDE|MEDIUM|LONG|TWO|EXTREME|HIGH|LOW|OVERHEAD|BIRD'?S|WORM'?S|REVERSE|ANGLE|INSERT|SHOT|CU\b|ECU\b|POV\b|SAME\b|LATER\b|CONTINUOUS|MEANWHILE|MOMENTS LATER|INTERIOR|EXTERIOR|DAY\b|NIGHT\b|DAWN\b|DUSK\b|FLASHBACK|DREAM|BIG PANEL|FULL PAGE|INSET|BACKGROUND|FOREGROUND|BG|FG)\b/i;
+/* a shot/transition line is ALL CAPS and either several words or ends in
+   punctuation — so a lone name (DAWN, TWO-FACE) stays a speaker, and
+   "Later that night…" dialogue is never mistaken for a header */
+const isShotLine = (line: string) => {
+  if (!(transitionRx.test(line) || shotRx.test(line))) return false;
+  if (line !== line.toUpperCase()) return false;
+  const words = line.split(/\s+/).length;
+  return words >= 2 || /[.:\-—]$/.test(line);
+};
 /* a stage direction on its own line — "(no balloons)", "(beat)" */
 const asideRx = /^\(.*\)$/;
 /* CHARACTER (cue): dialogue — speaker may carry a leading balloon number */
@@ -103,17 +112,16 @@ function resolveKind(speaker: string, cue: string, text: string): { kind: Script
 
   if (SFX_SPEAKER.test(speaker) || /\b(sfx|sound ?fx|sound effect)\b/.test(c)) kind = "sfx";
   else if (CAPTION_SPEAKER.test(speaker) || /\b(caption|cap|narration|narrat|v\.?o\.?|voice ?over|box|title)\b/.test(c)) kind = "caption";
-  else if (/thought|think|thinking|internal|inner|to (him|her|them)self/.test(c)) kind = "thought";
-  else if (/whisper|quiet|soft|small|mutter|hush|under (his|her|their) breath|low|sotto/.test(c)) kind = "whisper";
-  else if (/electronic|radio|phone|telephone|television|\btv\b|speaker|intercom|comm|static|broadcast|transmission|robot|computer|filtered|p\.?a\.?\b/.test(c)) kind = "double";
-  else if (/burst|roar|bellow|shriek|scream|yell|shout|loud|angry|furious|big|huge|explosive/.test(c)) kind = "shout";
-  else if (/weak|sick|dying|shaky|scared|nervous|trembling|frightened|terrified|strained|pained/.test(c)) kind = "rough";
-  else if (/buzz|electric|vibrat|jagged|distort/.test(c)) kind = "buzz";
+  else if (/\b(thought|thinks?|thinking|internal|inner|to (him|her|them)self)\b/.test(c)) kind = "thought";
+  else if (/\b(whisper(s|ing|ed)?|quiet(ly)?|soft(ly)?|small|mutter(s|ing|ed)?|hush(ed)?|under (his|her|their) breath|low|sotto)\b/.test(c)) kind = "whisper";
+  else if (/\b(electronic|radio|phone|telephone|television|tv|speaker|intercom|comms?|static|broadcast|transmission|robot(ic)?|computer|filtered|p\.a\.|pa)\b/.test(c)) kind = "double";
+  else if (/\b(burst|roar(s|ing)?|bellow(s|ing)?|shriek(s|ing)?|scream(s|ing)?|yell(s|ing)?|shout(s|ing)?|loud(ly)?|angry|furious|big|huge|explosive)\b/.test(c)) kind = "shout";
+  else if (/\b(weak(ly)?|sick|dying|shaky|scared|nervous(ly)?|trembling|frightened|terrified|strained|pained)\b/.test(c)) kind = "rough";
+  else if (/\b(buzz(ing)?|electric|vibrat(e|es|ing)|jagged|distort(ed)?)\b/.test(c)) kind = "buzz";
 
   /* text cues when the writer didn't use a parenthetical */
   if (kind === "speech") {
-    const bangs = (body.match(/!/g) || []).length;
-    if (bangs >= 2 || /!{2,}/.test(body)) kind = "shout";
+    if (/!{2,}/.test(body)) kind = "shout";
   }
   return { kind, link, off, text: body };
 }
@@ -133,7 +141,7 @@ export function parseScript(src: string): ScriptItem[] {
   let continuing = false;
 
   const nextNonBlank = (i: number) => { for (let j = i + 1; j < lines.length; j++) if (lines[j]) return lines[j]; return ""; };
-  const isHeader = (line: string) => pageRx.test(line) || panelRx.test(line) || barePanelRx.test(line) || transitionRx.test(line) || shotRx.test(line);
+  const isHeader = (line: string) => pageRx.test(line) || panelRx.test(line) || barePanelRx.test(line) || isShotLine(line);
 
   const push = (speaker: string, cue: string, rawText: string) => {
     const r = resolveKind(speaker, cue, rawText.trim());
@@ -160,14 +168,16 @@ export function parseScript(src: string): ScriptItem[] {
     }
     const bp = line.match(barePanelRx);
     if (bp) { panel = parseInt(bp[1], 10); pending = null; continuing = false; continue; }
-    if (transitionRx.test(line) || shotRx.test(line)) { pending = null; continuing = false; continue; }
+    if (isShotLine(line)) { pending = null; continuing = false; continue; }
     if (asideRx.test(line) && !pending) { continuing = false; continue; }
 
     /* dialogue waiting for a screenplay-style speaker */
     if (pending) {
       const cueLine = line.match(/^\(([^)]*)\)$/);
       if (cueLine) { pending.cue = (pending.cue ? pending.cue + " " : "") + cueLine[1]; continue; }
-      if (isHeader(line)) { pending = null; i--; continue; }
+      /* a header or a fresh "NAME:" line means the pending speaker never
+         got any words — drop it rather than eat the next character's line */
+      if (isHeader(line) || lineRx.test(line)) { pending = null; i--; continue; }
       push(pending.speaker, pending.cue, line);
       pending = null;
       continue;
@@ -179,6 +189,11 @@ export function parseScript(src: string): ScriptItem[] {
       /* "PANEL 2: description" never reaches here (headers above); a
          lone number speaker is a numbering artefact, not a character */
       if (!speaker || /^\d+$/.test(speaker)) { continuing = false; continue; }
+      if (!(m[5] || "").trim()) {
+        /* "JANE:" alone — the words are on the next line(s) */
+        if (!isShotLine(line)) pending = { speaker, cue: m[3] || "" };
+        continue;
+      }
       push(speaker, m[3] || "", m[5] || "");
       continue;
     }
@@ -190,7 +205,7 @@ export function parseScript(src: string): ScriptItem[] {
     const sm = line.match(speakerLineRx);
     if (sm) {
       const nxt = nextNonBlank(i);
-      if (nxt && !isHeader(nxt) && !looksLikeSfx(nxt) && !lineRx.test(nxt)) {
+      if (nxt && !isHeader(nxt) && !lineRx.test(nxt)) {
         pending = { speaker: cleanSpeaker(sm[1]), cue: sm[3] || "" };
         continue;
       }

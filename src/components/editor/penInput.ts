@@ -80,9 +80,13 @@ export function claimDrag(pointerId: number): boolean {
      the pinch hook (a deeper native listener) already cancelled the first
      drag — without this it would immediately claim a NEW drag and fight
      the pinch it just enabled. */
+  if (touches.size >= 2) return false;
   dragOwner = pointerId;
   return true;
 }
+/* how many fingers are on the glass right now — selection handlers use it
+   to ignore the second finger of a pinch */
+export const touchCount = () => touches.size;
 export function releaseDrag(pointerId: number) {
   if (dragOwner === pointerId) dragOwner = null;
 }

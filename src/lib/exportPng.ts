@@ -286,21 +286,22 @@ export function drawStyledText(
      editor uses, so screen and print cannot drift apart */
   const env = ts.env && isWarped(ts.env as Warp) ? (ts.env as Warp) : null;
   if (env) {
+    /* mirror WarpedText exactly: the flat block is rendered into a scratch
+       the size of the ELEMENT box and the envelope's unit square is mapped
+       onto that same box. A padded scratch shifted the warp origin by the
+       pad and scaled the mesh, so pinned corners landed elsewhere in print. */
     const [rx, ry, rw, rh] = rect;
-    const b = warpBounds(env);
     const sc = document.createElement("canvas");
-    const pad = Math.ceil(ts.size * 0.5);
-    sc.width = Math.max(1, Math.ceil(rw) + pad * 2);
-    sc.height = Math.max(1, Math.ceil(rh) + pad * 2);
+    sc.width = Math.max(1, Math.ceil(rw));
+    sc.height = Math.max(1, Math.ceil(rh));
     const sctx = sc.getContext("2d");
     if (sctx) {
-      sctx.translate(pad - rx, pad - ry);
+      sctx.translate(-rx, -ry);
       drawStyledText(sctx, { ...ts, env: undefined }, text, rect, warp, runs);
       ctx.save();
-      ctx.translate(rx - pad, ry - pad);
-      drawWarped(ctx, sc, sc.width, sc.height, env, sc.width, sc.height);
+      ctx.translate(rx, ry);
+      drawWarped(ctx, sc, sc.width, sc.height, env, rw, rh);
       ctx.restore();
-      void b;   /* bounds are the caller's business — the page is not clipped */
       return;
     }
   }
@@ -845,6 +846,10 @@ export function elCrossesSpine(el: El, trimX: number, side: 1 | -1): boolean {
 function drawPageEls(
   ctx: CanvasRenderingContext2D, page: Page, assets: Assets, letteringOnly: boolean,
   lc?: LetterClip | null,
+  /* with a spread partner the cutouts get their own final pass on top of
+     the partner's overhang — drawing them here too composited feathered
+     edges twice */
+  skipCutouts = false,
 ) {
   const links = joinLinks(page);
   const clipAtTrim = () => {
@@ -866,7 +871,10 @@ function drawPageEls(
     }
     const clip = lc?.mode === "clip" && elCrossesTrim(el, lc);
     if (clip) clipAtTrim();
-    if (!(letteringOnly && (el.type === "panel" || el.type === "image"))) {
+    /* lettering-only keeps SFX STAMPS — they follow the lettering rules */
+    const artOnly = el.type === "panel" || (el.type === "image" && !el.stamp);
+    const deferredCut = skipCutouts && el.type === "image" && el.cut;
+    if (!(letteringOnly && artOnly) && !deferredCut) {
       if (el.type === "balloon") {
         const { el: bEl, base } = resolveBalloon(page, el);
         let merge: MergeInfo | null = null;
@@ -949,7 +957,7 @@ export async function renderPageToCanvas(
      every render — each is cut at this page's trim rect (art is exempt) */
   const b = pageBleed(page);
   const trim: TrimRect = { x0: b, y0: b, x1: page.w - b, y1: page.h - b };
-  drawPageEls(ctx, page, assets, letteringOnly, { mode: "clip", ...trim });
+  drawPageEls(ctx, page, assets, letteringOnly, { mode: "clip", ...trim }, !!neighbor && !letteringOnly);
   if (neighbor) {
     /* Spread partner pass: ONLY the partner's balloons/text/stamps that
        cross ITS spine-side bleed line carry over — the partner's art stays

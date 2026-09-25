@@ -83,7 +83,7 @@ export function StylesPanel({ ed }: { ed: EditorCtx }) {
               onClick={() => {
                 setActiveStyle(s.name);
                 if (selEl && (selEl.type === "text" || selEl.type === "balloon")) {
-                  mutateSel<BalloonEl | TextEl>((x) => {
+                  ed.mutateText((x) => {
                     x.ts = applyLetterStyle(x.ts, s);
                     x.ts.outlineW = Math.round(x.ts.size * s.outlineF);
                   });
@@ -104,7 +104,7 @@ export function StylesPanel({ ed }: { ed: EditorCtx }) {
               onPick={() => {
                 setActiveShape(styleTab, s.name);
                 if (selEl && selEl.type === "balloon") {
-                  mutateSel<BalloonEl>((x) => applyShapeStyle(x, s));
+                  ed.mutateBalloon((x) => applyShapeStyle(x, s));
                 } else {
                   setStatus(`Style “${s.name}” selected — new ${kindWord} will use it.`);
                 }

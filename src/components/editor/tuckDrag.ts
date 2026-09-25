@@ -11,10 +11,10 @@
    dialog for the cases where they are quicker. */
 
 import type React from "react";
-import type { Assets, Doc } from "@/lib/model";
+import type { ArtPan, Assets, Doc } from "@/lib/model";
 import { loadImage } from "@/lib/exportPng";
 import { closeSketchLoop, resampleRing, smoothSketchRing } from "./sketch";
-import { TuckAsk, TuckSource, makeCutoutFromPath, pathBounds } from "./tuck";
+import { TuckAsk, TuckSource, makeCutoutFromPath, pathBounds, coverSource } from "./tuck";
 import { claimDrag, rejectPalm, releaseDrag } from "./penInput";
 
 export interface TuckDragDeps {
@@ -54,7 +54,7 @@ interface EdgeField {
 }
 
 function buildEdgeField(
-  img: HTMLImageElement, ex: number, ey: number, elW: number, elH: number,
+  img: HTMLImageElement, ex: number, ey: number, elW: number, elH: number, pan?: ArtPan,
 ): EdgeField | null {
   const scale = Math.min(1, 1100 / Math.max(elW, elH));
   const w = Math.max(2, Math.round(elW * scale));
@@ -63,11 +63,10 @@ function buildEdgeField(
   cv.width = w; cv.height = h;
   const ctx = cv.getContext("2d", { willReadFrequently: true });
   if (!ctx) return null;
-  /* same cover-crop the editor uses to show the artwork */
-  const natW = img.naturalWidth, natH = img.naturalHeight;
-  const s = Math.max(elW / natW, elH / natH);
-  const sw = elW / s, sh = elH / s;
-  ctx.drawImage(img, (natW - sw) / 2, (natH - sh) / 2, sw, sh, 0, 0, w, h);
+  /* same cover-crop the editor shows — pan/zoom included, or the magnet
+     snapped to edges the reader could not see */
+  const cs = coverSource(img.naturalWidth, img.naturalHeight, elW, elH, pan);
+  ctx.drawImage(img, cs.sx, cs.sy, cs.sw, cs.sh, 0, 0, w, h);
   let data: ImageData;
   try { data = ctx.getImageData(0, 0, w, h); } catch { return null; } // tainted
   const dpx = data.data;
@@ -274,6 +273,7 @@ export async function buildTuckAsk(d: TuckDragDeps, raw: number[][], clean = tru
       img, elW: target.w, elH: target.h,
       regionX: x0 - target.x, regionY: y0 - target.y,
       regionW: x1 - x0, regionH: y1 - y0,
+      pan: target.type === "balloon" ? undefined : target.pan,
     };
     /* the cutout works in element-local units, same space as regionX/regionY */
     const pts = ringIn.map(([x, y]) => [x - target.x, y - target.y]);

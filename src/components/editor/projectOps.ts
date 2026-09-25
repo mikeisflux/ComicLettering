@@ -406,6 +406,9 @@ export function applyProofFix(ed: EditorCtx, m: ProofMatch, rep: string) {
   if (!el) return;
   if (el.locked) { setStatus("That item is locked — unlock it to apply fixes."); return; }
   el.text = el.text.slice(0, m.offset) + rep + el.text.slice(m.offset + m.length);
+  /* the correction shifts every offset — inline bold/italic runs would
+     keep drawing the OLD words (both renderers prefer runs over text) */
+  el.runs = undefined;
   commit();
   setProof((p) => p ? { ...p, matches: p.matches.filter((x) => x !== m && x.elId !== m.elId) } : p);
 }

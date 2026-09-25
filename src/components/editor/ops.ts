@@ -90,6 +90,18 @@ export function resolveTailAsk(ed: EditorCtx, choice: "speech" | "thought" | "no
     : "Custom balloon created — double-click to type, drag the orange dot to aim the tail.");
 }
 
+/* The one way elements leave a page. A joined child whose parent is
+   removed keeps a dangling attachTo; ids are reissued after undo/redo, so
+   the next new balloon could inherit that id and the orphan would snap a
+   connector onto it. Every delete entry point (Delete key, context menu,
+   Layers trash, adjustment dialog) goes through here. */
+export function removeEls(page: Page, ids: Set<string>) {
+  page.els = page.els.filter((x) => !ids.has(x.id));
+  for (const b of page.els) {
+    if (b.type === "balloon" && b.attachTo && ids.has(b.attachTo)) b.attachTo = null;
+  }
+}
+
 export function deleteSel(ed: EditorCtx) {
   const { docRef, pageIndexRef, selIds, setStatus, pendingLockRef, setSelId, commit } = ed;
   const d = docRef.current!;
@@ -105,8 +117,7 @@ export function deleteSel(ed: EditorCtx) {
     return;
   }
   for (const el of free) pendingLockRef.current.delete(el.id);
-  const gone = new Set(free.map((x) => x.id));
-  p.els = p.els.filter((x) => !gone.has(x.id));
+  removeEls(p, new Set(free.map((x) => x.id)));
   setSelId(null);
   commit();
   if (locked) {
@@ -181,34 +192,44 @@ export function applyQuickStroke(ed: EditorCtx, color: string) {
   setShowStroke(false);
 }
 
+/* Copy / cut / paste carry the WHOLE selection (they used to take only the
+   primary, so Ctrl+X on five things deleted five and pasted one). Pasted
+   copies keep their joins to each other and drop joins to anything that
+   did not come along. */
 export function copySel(ed: EditorCtx) {
-  const { page, selId, clipboardRef, setStatus } = ed;
-  const el = page?.els.find((x) => x.id === selId);
-  if (!el) return;
-  clipboardRef.current = JSON.parse(JSON.stringify(el));
-  setStatus("Copied.");
+  const { page, selIds, clipboardRef, setStatus } = ed;
+  const els = page?.els.filter((x) => selIds.includes(x.id)) ?? [];
+  if (!els.length) return;
+  clipboardRef.current = JSON.parse(JSON.stringify(els));
+  setStatus(els.length > 1 ? `Copied ${els.length} items.` : "Copied.");
 }
 
 export function cutSel(ed: EditorCtx) {
-  const { page, selId, setStatus, clipboardRef } = ed;
-  const el = page?.els.find((x) => x.id === selId);
-  if (!el) return;
-  if (el.locked) { setStatus("This item is locked — unlock it to cut."); return; }
-  clipboardRef.current = JSON.parse(JSON.stringify(el));
+  const { page, selIds, setStatus, clipboardRef } = ed;
+  const els = page?.els.filter((x) => selIds.includes(x.id) && !x.locked) ?? [];
+  if (!els.length) {
+    if (selIds.length) setStatus("This item is locked — unlock it to cut.");
+    return;
+  }
+  clipboardRef.current = JSON.parse(JSON.stringify(els));
   deleteSel(ed);
 }
 
 export function pasteClip(ed: EditorCtx) {
-  const { clipboardRef, page, pendingLockRef, commit, setSelId } = ed;
-  if (!clipboardRef.current || !page) return;
-  const copy = JSON.parse(JSON.stringify(clipboardRef.current)) as El;
-  copy.id = uid();
-  copy.x += 30; copy.y += 30;
-  copy.locked = false;
-  page.els.push(copy);
-  pendingLockRef.current.add(copy.id);
+  const { clipboardRef, page, pendingLockRef, commit, setSelIds } = ed;
+  if (!clipboardRef.current?.length || !page) return;
+  const copies = JSON.parse(JSON.stringify(clipboardRef.current)) as El[];
+  const idMap = new Map<string, string>();
+  for (const c of copies) { const nid = uid(); idMap.set(c.id, nid); c.id = nid; }
+  for (const c of copies) {
+    c.x += 30; c.y += 30;
+    c.locked = false;
+    if (c.type === "balloon" && c.attachTo) c.attachTo = idMap.get(c.attachTo) ?? null;
+    page.els.push(c);
+    pendingLockRef.current.add(c.id);
+  }
   commit();
-  setSelId(copy.id);
+  setSelIds(copies.map((c) => c.id));
 }
 
 /* Cut/Copy/Paste mean two different things depending on where you are.
@@ -267,7 +288,7 @@ export function applyBalloonPreset(ed: EditorCtx, name: string) {
   const p = presets.find((x) => x.name === name);
   if (!p) return;
   if (!selEl || selEl.type !== "balloon") { setStatus("Select a balloon to apply the preset to."); return; }
-  mutateSel<BalloonEl>((b) => {
+  ed.mutateBalloon((b) => {
     b.kind = p.kind;
     if (TAILLESS_KINDS.includes(b.kind)) b.tail = null;
     else if (!b.tail) b.tail = { dx: -b.w * 0.25, dy: b.h * 0.85 };
@@ -301,7 +322,7 @@ export function pasteStyle(ed: EditorCtx) {
   const { styleClipRef, setStatus, mutateSel } = ed;
   const clip = styleClipRef.current;
   if (!clip) { setStatus("Copy a style first (Edit → Copy Style)."); return; }
-  mutateSel<BalloonEl | TextEl>((x) => {
+  ed.mutateText((x) => {
     const { fill, stroke, strokeW, ...ts } = clip;
     x.ts = { ...x.ts, ...ts };
     if (x.type === "balloon") {
@@ -327,7 +348,10 @@ export function doFindReplace(ed: EditorCtx, all: boolean) {
       if ((el.type === "text" || el.type === "balloon") && !el.locked && rx.test(el.text)) {
         const before = el.text;
         el.text = all ? el.text.replace(rx, replaceText)
-          : el.text.replace(rx, () => { if (count === 0) { count++; return replaceText; } return before.slice(0); });
+          /* replace-once: every match AFTER the first must be handed back
+             unchanged (`m`) — returning the whole original text here
+             duplicated the element's text into itself at each later hit */
+          : el.text.replace(rx, (m) => { if (count === 0) { count++; return replaceText; } return m; });
         if (all) count += (before.match(rx) || []).length;
         if (el.text !== before) el.runs = undefined; // positions changed → drop inline emphasis
         rx.lastIndex = 0;
@@ -394,7 +418,7 @@ export function toggleSelEmphasis(ed: EditorCtx, kind: "bold" | "italic" | "unde
       return;
     }
   }
-  ed.mutateSel<BalloonEl | TextEl>((x) => {
+  ed.mutateText((x) => {
     if (!x.ts) return;
     if (kind === "bold") x.ts.bold = !x.ts.bold;
     else if (kind === "italic") x.ts.italic = !x.ts.italic;
@@ -643,6 +667,9 @@ export function importScript(ed: EditorCtx) {
           (el as TextEl).ts = applyLetterStyle((el as TextEl).ts, st);
           (el as TextEl).ts.outlineW = Math.round((el as TextEl).ts.size * st.outlineF);
           el.text = it.text;
+          /* size the slab to the words, as the tray does — a fixed block
+             clipped long effects and swam around short ones */
+          sizeTextToContent(el as TextEl, p.w);
           prev = null; // an effect breaks a run of dialogue
         } else {
           /* every balloon kind the parser can name maps straight through;
@@ -971,7 +998,10 @@ export async function normalizeArtFile(f: File): Promise<Blob> {
 }
 
 export function placeAsset(ed: EditorCtx, aid: string, natW: number, natH: number, x?: number, y?: number, stamp = false) {
-  const { docRef, pageIndexRef, pendingLockRef, commit, setSelId } = ed;
+  const { docRef, pageIndexRef, pendingLockRef, commit, setSelId, setStatus } = ed;
+  /* an image with no intrinsic size (some SVGs) would place a 0×NaN
+     element — invisible and unclickable, and NaN poisons the document */
+  if (!natW || !natH) { setStatus("That image has no usable size — save it as PNG and import again."); return; }
   const d = docRef.current!;
   const p = d.pages[pageIndexRef.current];
   const w = Math.min(Math.round(p.w * 0.45), natW);
@@ -1212,10 +1242,12 @@ export async function onDrop(ed: EditorCtx, e: React.DragEvent) {
           continue;
         }
       }
-      const url = await readAsDataURL(blob);
-      const img = await loadImage(url);
+      /* into the art store, not just the in-memory map — autosave stores
+         only the doc, and a refresh rebuilds assets from the store; an
+         image that never reached it came back as an empty panel */
       const aid = nextAid(ed);
-      assetsRef.current[aid] = url;
+      const url = await stashArt(ed, aid, blob);
+      const img = await loadImage(url);
       target.img = aid;
       /* a bare image element is the picture, not a frame — see fitBoxToArt */
       if (target.type === "image") fitBoxToArt(target, img);
@@ -1256,8 +1288,18 @@ export async function assignImageToPanel(ed: EditorCtx, elId: string, aid: strin
   const p = d.pages[pageIndexRef.current];
   const el = p.els.find((x) => x.id === elId);
   if (!el || (el.type !== "panel" && el.type !== "image" && el.type !== "balloon")) return;
+  /* load BEFORE touching the element: an evicted asset used to leave the
+     doc changed outside history with an unhandled rejection */
+  let img: HTMLImageElement;
+  try {
+    const src = assetsRef.current[aid];
+    if (!src) throw new Error("missing");
+    img = await loadImage(src);
+  } catch {
+    setStatus("That photo is no longer available — import it again.");
+    return;
+  }
   el.img = aid;
-  const img = await loadImage(assetsRef.current[aid]);
   if (el.type === "image") fitBoxToArt(el, img);
   commit();
   /* the cover-crop centres automatically — say HOW to re-aim it right at

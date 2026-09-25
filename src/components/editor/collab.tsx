@@ -1,3 +1,4 @@
+import { useState } from "react";
 /* Collaboration UI: the Team dialog (sharing, review passes, the comment
    list), the pinned comment markers on the pages, and the note composer.
    Pins render on BOTH canvases — the single page and each spread half. */
@@ -76,21 +77,29 @@ export function renderCommentCatcher(ed: EditorCtx) {
   );
 }
 
-/* the note composer — a small modal so it works identically everywhere */
+/* the note composer — a small modal so it works identically everywhere.
+   A real component: the draft lives in state, because a plain render
+   function's `let draft` was recreated on every Editor re-render (the
+   status bar alone re-renders every few seconds) and the typed note was
+   silently thrown away on "Pin note". */
 export function renderCommentComposer(ed: EditorCtx) {
   if (!ed.composer) return null;
-  const c = ed.composer;
-  let draft = "";
+  return <CommentComposer ed={ed} />;
+}
+
+function CommentComposer({ ed }: { ed: EditorCtx }) {
+  const c = ed.composer!;
+  const [draft, setDraft] = useState("");
   return (
     <div className="setupOverlay" onPointerDown={(e) => { if (e.target === e.currentTarget) ed.setComposer(null); }}>
       <div className="setupDlg" style={{ width: 380 }}>
         <div className="setupTitle">Note on page {c.pageIdx + 1}</div>
         <div className="setupBody" style={{ flexDirection: "column", gap: 8 }}>
           <textarea autoFocus rows={4} style={{ width: "100%", resize: "vertical" }}
-            placeholder="What should change here?"
-            onChange={(e) => { draft = e.target.value; }} />
+            placeholder="What should change here?" value={draft}
+            onChange={(e) => setDraft(e.target.value)} />
           <div className="btnRow">
-            <button onClick={async () => {
+            <button disabled={!draft.trim()} onClick={async () => {
               const projectId = ed.current?.id;
               if (!projectId || !draft.trim()) { ed.setComposer(null); return; }
               const r = await collabOp(projectId, { op: "comment", pageIndex: c.pageIdx, x: c.x, y: c.y, body: draft });
@@ -236,8 +245,10 @@ function CommentsSection({ ed, c, projectId }: { ed: EditorCtx; c: CollabState; 
 }
 
 function ShareSection({ ed, c, projectId }: { ed: EditorCtx; c: CollabState; projectId: string }) {
-  let email = "";
-  let role = "letterer";
+  /* state, not `let` — a re-render mid-typing reset the address to "" and
+     the role back to letterer, so an Editor invite went out wrong */
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState("letterer");
   const act = async (payload: Record<string, unknown>) => {
     const r = await collabOp(projectId, payload);
     ed.setStatus(r.error ? r.error : "Team updated.");
@@ -248,12 +259,12 @@ function ShareSection({ ed, c, projectId }: { ed: EditorCtx; c: CollabState; pro
       <div className="sideTitle">Team</div>
       <div className="btnRow" style={{ marginBottom: 6 }}>
         <input type="email" placeholder="collaborator@email.com" style={{ flex: 1, minWidth: 0 }}
-          onChange={(e) => { email = e.target.value; }} />
-        <select defaultValue="letterer" onChange={(e) => { role = e.target.value; }}>
+          value={email} onChange={(e) => setEmail(e.target.value)} />
+        <select value={role} onChange={(e) => setRole(e.target.value)}>
           <option value="letterer">Letterer (edits)</option>
           <option value="editor">Editor (reviews)</option>
         </select>
-        <button onClick={() => { if (email.trim()) act({ op: "share", email, role }); }}>Invite</button>
+        <button disabled={!email.trim()} onClick={() => { if (email.trim()) { act({ op: "share", email, role }); setEmail(""); } }}>Invite</button>
       </div>
       {!c.shares.length && <div className="tips">Only you can see this book.</div>}
       {c.shares.map((s) => (

@@ -280,6 +280,6 @@ export function balanceRag(ed: EditorCtx) {
     else { out.push(cur); cur = words[i]; curW = wordW[i]; }
   }
   if (cur) out.push(cur);
-  mutateSel<BalloonEl | TextEl>((x) => { x.text = out.join("\n"); x.runs = undefined; });
+  ed.mutateText((x) => { x.text = out.join("\n"); x.runs = undefined; });
   setStatus(`Balanced into ${out.length} even line${out.length > 1 ? "s" : ""}.`);
 }

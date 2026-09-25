@@ -9,6 +9,7 @@
    All widgets read/write the SAME params the shared filter engine
    (lib/pageAdjust) compiles, so the preview, the canvas and the exports
    can never disagree. */
+import { removeEls } from "./ops";
 import React, { useEffect, useRef, useState } from "react";
 import { AdjustEl, clamp } from "@/lib/model";
 import {
@@ -741,7 +742,8 @@ export function renderAdjustDialog(ed: EditorCtx) {
         </div>
         <div className="setupFoot">
           <button onClick={() => {
-            page.els = page.els.filter((x) => x.id !== id);
+            removeEls(page, new Set([id]));
+            if (ed.selIds.includes(id)) ed.setSelIds(ed.selIds.filter((x) => x !== id));
             ed.setAdjustEdit(null);
             ed.commit();
           }}>Delete Layer</button>

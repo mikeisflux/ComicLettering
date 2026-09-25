@@ -248,7 +248,10 @@ function spreadHalf(ed: EditorCtx, sh: ShellProps, idx: number, off: number) {
            deselect or retarget the ops page under a running gesture */
         if (dragInProgress()) return;
         /* empty press on either page: it becomes the ops target (tray
-           inserts, paste, page setup) and the selection clears */
+           inserts, paste, page setup) and the selection clears. Any edit in
+           progress is captured FIRST — after the ref moves, the capture
+           looked on the wrong page and dropped the typed words. */
+        if (ed.editingIdRef.current) ed.finishEditing();
         if (ed.pageIndexRef.current !== idx) {
           (ed.pageIndexRef as React.RefObject<number>).current = idx;
           ed.setPageIndex(idx);

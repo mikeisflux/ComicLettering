@@ -6,6 +6,7 @@
    The cutout is generated at the artwork's native resolution for the region,
    so it stays sharp in print export. */
 
+import type { ArtPan } from "@/lib/model";
 import { SamMask } from "@/lib/sam";
 import { withBlur } from "@/lib/canvasCompat";
 
@@ -14,6 +15,8 @@ export interface TuckSource {
   elW: number; elH: number;      // the element's on-page size
   regionX: number; regionY: number; // region in ELEMENT-local page units
   regionW: number; regionH: number;
+  /* the frame's picture-in-frame pan/zoom — the crop the reader actually sees */
+  pan?: ArtPan;
 }
 
 /* How the foreground is decided.
@@ -58,16 +61,24 @@ export function tuckPreview(t: TuckAsk): string | null {
   return makeCutout(t.src, t.threshold, t.invert)?.url ?? null;
 }
 
-/* Replicates the editor's cover-crop: the image fills the element box like
+/* Replicates the editor's cover-crop, pan and zoom included (the same
+   math as drawCover in exportPng): the image fills the element box like
    CSS object-fit: cover. Returns the source-pixel rect for an element-local
    rect. */
 export function coverRect(s: TuckSource) { return coverMap(s); }
 
+export function coverSource(natW: number, natH: number, elW: number, elH: number, pan?: ArtPan) {
+  const z = Math.max(1, pan?.z ?? 1);
+  const scale = Math.max(elW / natW, elH / natH) * z;
+  const sw = elW / scale, sh = elH / scale;        // source pixels visible
+  const px = Math.min(1, Math.max(0, pan?.x ?? 0.5));
+  const py = Math.min(1, Math.max(0, pan?.y ?? 0.5));
+  return { sx: (natW - sw) * px, sy: (natH - sh) * py, sw, sh, scale };
+}
+
 function coverMap(s: TuckSource) {
   const natW = s.img.naturalWidth, natH = s.img.naturalHeight;
-  const scale = Math.max(s.elW / natW, s.elH / natH);
-  const sw = s.elW / scale, sh = s.elH / scale;
-  const sx = (natW - sw) / 2, sy = (natH - sh) / 2;
+  const { sx, sy, sw, sh, scale } = coverSource(natW, natH, s.elW, s.elH, s.pan);
   return {
     sx: sx + (s.regionX / s.elW) * sw,
     sy: sy + (s.regionY / s.elH) * sh,

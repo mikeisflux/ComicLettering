@@ -19,7 +19,7 @@ export function tsControls(ed: EditorCtx, el: BalloonEl | TextEl) {
   const { mutateSel, fileFontRef } = ed;
   const ts = el.ts;
   const set = (patch: Partial<TextStyle>, final = true) =>
-    mutateSel<BalloonEl | TextEl>((x) => { x.ts = { ...x.ts, ...patch }; }, final);
+    ed.mutateText((x) => { x.ts = { ...x.ts, ...patch }; }, final);
   return (
     <div className="inspSection">
       <div className="inspHead">Lettering</div>
@@ -262,7 +262,7 @@ export function renderInspector(ed: EditorCtx) {
         <div className="inspSection">
           <div className="inspHead">{BALLOON_KINDS[el.kind]} balloon</div>
           <Fld label="Type">
-            <select value={el.kind} onChange={(e) => mutateSel<BalloonEl>((b) => {
+            <select value={el.kind} onChange={(e) => ed.mutateBalloon((b) => {
               b.kind = e.target.value as BalloonKind;
               if (TAILLESS_KINDS.includes(b.kind)) b.tail = null;
               else if (!b.tail) b.tail = { dx: -b.w * 0.25, dy: b.h * 0.85 };
@@ -273,9 +273,9 @@ export function renderInspector(ed: EditorCtx) {
           <Fld label="Outline">
             <span className="pair">
               <input type="number" min={0} max={30} value={el.strokeW} style={{ width: 52 }}
-                onChange={(e) => mutateSel<BalloonEl>((b) => { b.strokeW = clamp(+e.target.value || 0, 0, 30); })} />
+                onChange={(e) => ed.mutateBalloon((b) => { b.strokeW = clamp(+e.target.value || 0, 0, 30); })} />
               <input type="color" value={el.stroke}
-                onChange={(e) => mutateSel<BalloonEl>((b) => { b.stroke = e.target.value; })} />
+                onChange={(e) => ed.mutateBalloon((b) => { b.stroke = e.target.value; })} />
             </span>
           </Fld>
           <Fld label="Shadow"><input type="checkbox" checked={el.shadow}
@@ -287,7 +287,7 @@ export function renderInspector(ed: EditorCtx) {
             <button onClick={() => { panelImageTarget.current = el.id; filePanelImageRef.current?.click(); }}>
               {el.img ? "Replace inner image…" : "Place image inside…"}
             </button>
-            {el.img && <button onClick={() => mutateSel<BalloonEl>((b) => { b.img = null; })}>Remove image</button>}
+            {el.img && <button onClick={() => ed.mutateBalloon((b) => { b.img = null; })}>Remove image</button>}
           </div>
           <Fld label="Presets">
             <span className="pair">
@@ -314,7 +314,7 @@ export function renderInspector(ed: EditorCtx) {
       {(el.type === "balloon") && (
         <div className="inspSection">
           <div className="inspHead">Balloon fill</div>
-          <FillPicker value={el.fill} onChange={(f, final) => mutateSel<BalloonEl>((b) => { b.fill = f; }, final)} />
+          <FillPicker value={el.fill} onChange={(f, final) => ed.mutateBalloon((b) => { b.fill = f; }, final)} />
         </div>
       )}
       {(el.type === "balloon" || el.type === "text") && tsControls(ed, el)}
@@ -324,14 +324,14 @@ export function renderInspector(ed: EditorCtx) {
           <Fld label="Arc">
             <span className="pair">
               <input type="range" min={-100} max={100} step={1} value={el.warp ?? 0}
-                onChange={(e) => mutateSel<TextEl>((x) => { x.warp = +e.target.value; }, false)}
+                onChange={(e) => ed.mutateLettering((x) => { x.warp = +e.target.value; }, false)}
                 onPointerUp={() => commit()} style={{ width: 120 }} />
               <input type="number" min={-100} max={100} value={el.warp ?? 0} style={{ width: 54 }}
-                onChange={(e) => mutateSel<TextEl>((x) => { x.warp = clamp(+e.target.value || 0, -100, 100); })} />
+                onChange={(e) => ed.mutateLettering((x) => { x.warp = clamp(+e.target.value || 0, -100, 100); })} />
             </span>
           </Fld>
           <div className="btnRow">
-            <button onClick={() => mutateSel<TextEl>((x) => { x.warp = 0; })}>Straighten</button>
+            <button onClick={() => ed.mutateLettering((x) => { x.warp = 0; })}>Straighten</button>
           </div>
           <div className="tips" style={{ fontSize: 11 }}>Bend SFX text along an arc — positive curves up, negative curves down. Double-click to edit, then release for the warped look.</div>
         </div>
@@ -343,13 +343,13 @@ export function renderInspector(ed: EditorCtx) {
             <Fld label="Border">
               <span className="pair">
                 <input type="number" min={0} max={40} value={el.borderW} style={{ width: 52 }}
-                  onChange={(e) => mutateSel<PanelEl>((b) => { b.borderW = clamp(+e.target.value || 0, 0, 40); })} />
+                  onChange={(e) => ed.mutateArt((b) => { b.borderW = clamp(+e.target.value || 0, 0, 40); })} />
                 <input type="color" value={el.borderC}
-                  onChange={(e) => mutateSel<PanelEl>((b) => { b.borderC = e.target.value; })} />
+                  onChange={(e) => ed.mutateArt((b) => { b.borderC = e.target.value; })} />
               </span>
             </Fld>
             <Fld label="Photo filter">
-              <select value={el.filter} onChange={(e) => mutateSel<PanelEl>((b) => { b.filter = e.target.value as PanelEl["filter"]; })}>
+              <select value={el.filter} onChange={(e) => ed.mutateArt((b) => { b.filter = e.target.value as PanelEl["filter"]; })}>
                 {Object.entries(FILTERS).map(([k, f]) => <option key={k} value={k}>{f.label}</option>)}
               </select>
             </Fld>
@@ -373,11 +373,11 @@ export function renderInspector(ed: EditorCtx) {
                   <div className="lfLabel">Fade the art into…</div>
                   <div className="fadeKinds">
                     <button className={el.fade && el.fade.to !== "black" ? "on" : ""}
-                      onClick={() => mutateSel<PanelEl>((b) => {
+                      onClick={() => ed.mutateArt((b) => {
                         b.fade = { to: "white", dir: b.fade?.dir ?? "br", size: b.fade?.size ?? 35 };
                       })}>⬜ White</button>
                     <button className={el.fade?.to === "black" ? "on" : ""}
-                      onClick={() => mutateSel<PanelEl>((b) => {
+                      onClick={() => ed.mutateArt((b) => {
                         b.fade = { to: "black", dir: b.fade?.dir ?? "br", size: b.fade?.size ?? 35 };
                       })}>⬛ Black</button>
                   </div>
@@ -387,17 +387,17 @@ export function renderInspector(ed: EditorCtx) {
                       <div className="fadeDirs">
                         {(["tl", "top", "tr", "left", "vignette", "right", "bl", "bottom", "br"] as FadeDir[]).map((d) => (
                           <button key={d} className={el.fade?.dir === d ? "on" : ""} title={FADE_DIR_LABEL[d]}
-                            onClick={() => mutateSel<PanelEl>((b) => { if (b.fade) b.fade = { ...b.fade, dir: d }; })}>
+                            onClick={() => ed.mutateArt((b) => { if (b.fade) b.fade = { ...b.fade, dir: d }; })}>
                             {FADE_DIR_GLYPH[d]}
                           </button>
                         ))}
                       </div>
                       <div className="lfLabel">Reach</div>
                       <input type="range" min={5} max={100} value={el.fade.size}
-                        onChange={(e) => mutateSel<PanelEl>((b) => { if (b.fade) b.fade = { ...b.fade, size: +e.target.value }; }, false)}
+                        onChange={(e) => ed.mutateArt((b) => { if (b.fade) b.fade = { ...b.fade, size: +e.target.value }; }, false)}
                         onPointerUp={() => ed.commit()} />
                       <div className="lfRow">
-                        <button onClick={() => { mutateSel<PanelEl>((b) => { b.fade = undefined; }); ed.setOpenMenu(null); }}>Remove</button>
+                        <button onClick={() => { ed.mutateArt((b) => { b.fade = undefined; }); ed.setOpenMenu(null); }}>Remove</button>
                         <button className="lfGo" onClick={() => ed.setOpenMenu(null)}>Done</button>
                       </div>
                     </>
@@ -410,7 +410,7 @@ export function renderInspector(ed: EditorCtx) {
                 {el.img ? "Replace image…" : "Set image…"}
               </button>
               {el.img && el.type === "panel" && (
-                <button onClick={() => mutateSel<PanelEl>((b) => { b.img = null; })}>Remove image</button>
+                <button onClick={() => ed.mutatePanel((b) => { b.img = null; })}>Remove image</button>
               )}
             </div>
             {el.img && (
@@ -430,7 +430,7 @@ export function renderInspector(ed: EditorCtx) {
                 <span className="pair">
                   <input type="range" min={0} max={100} step={1}
                     value={Math.round((el.pan?.x ?? 0.5) * 100)}
-                    onChange={(e) => mutateSel<PanelEl>((b) => {
+                    onChange={(e) => ed.mutateArt((b) => {
                       b.pan = { x: +e.target.value / 100, y: b.pan?.y ?? 0.5, ...(b.pan?.z && b.pan.z !== 1 ? { z: b.pan.z } : {}) };
                     }, false)}
                     onPointerUp={() => commit()} style={{ width: 120 }} />
@@ -440,7 +440,7 @@ export function renderInspector(ed: EditorCtx) {
                 <span className="pair">
                   <input type="range" min={0} max={100} step={1}
                     value={Math.round((el.pan?.y ?? 0.5) * 100)}
-                    onChange={(e) => mutateSel<PanelEl>((b) => {
+                    onChange={(e) => ed.mutateArt((b) => {
                       b.pan = { x: b.pan?.x ?? 0.5, y: +e.target.value / 100, ...(b.pan?.z && b.pan.z !== 1 ? { z: b.pan.z } : {}) };
                     }, false)}
                     onPointerUp={() => commit()} style={{ width: 120 }} />
@@ -450,7 +450,7 @@ export function renderInspector(ed: EditorCtx) {
                 <span className="pair">
                   <input type="range" min={100} max={300} step={5}
                     value={Math.round(Math.max(1, el.pan?.z ?? 1) * 100)}
-                    onChange={(e) => mutateSel<PanelEl>((b) => {
+                    onChange={(e) => ed.mutateArt((b) => {
                       const z = +e.target.value / 100;
                       b.pan = { x: b.pan?.x ?? 0.5, y: b.pan?.y ?? 0.5, ...(z !== 1 ? { z } : {}) };
                     }, false)}
@@ -460,7 +460,7 @@ export function renderInspector(ed: EditorCtx) {
               </Fld>
               {el.pan && (
                 <div className="btnRow">
-                  <button onClick={() => mutateSel<PanelEl>((b) => { b.pan = undefined; })}>Reset position</button>
+                  <button onClick={() => ed.mutateArt((b) => { b.pan = undefined; })}>Reset position</button>
                 </div>
               )}
               <div className="tips" style={{ fontSize: 11 }}>
@@ -471,7 +471,7 @@ export function renderInspector(ed: EditorCtx) {
           {el.type === "panel" && (
             <div className="inspSection">
               <div className="inspHead">Panel fill</div>
-              <FillPicker value={el.fill} onChange={(f, final) => mutateSel<PanelEl>((b) => { b.fill = f; }, final)} />
+              <FillPicker value={el.fill} onChange={(f, final) => ed.mutatePanel((b) => { b.fill = f; }, final)} />
             </div>
           )}
         </>

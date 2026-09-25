@@ -107,7 +107,12 @@ export function useStartDrag(deps: DragDeps) {
     e.preventDefault();
     e.stopPropagation();
     const start = pagePoint(e);
-    const orig = JSON.parse(JSON.stringify(el)) as El;
+    /* snapshot the LIVE document element, not the object the caller handed
+       over: the selection overlay passes a resolveBalloon() copy carrying
+       transient band/tail values, and a cancelled drag used to write that
+       copy back into the document */
+    const liveEl = docRef.current?.pages[pageIndexRef.current]?.els.find((x) => x.id === el.id) ?? el;
+    const orig = JSON.parse(JSON.stringify(liveEl)) as El;
     /* panArt: the artwork's natural size (already decoded — it's on the
        page) turns pointer movement into pan fractions of the crop slack */
     let panImg: HTMLImageElement | null = null;

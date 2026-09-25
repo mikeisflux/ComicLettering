@@ -9,7 +9,7 @@ import React, {
   useCallback, useEffect, useReducer, useRef, useState,
 } from "react";
 import {
-  Assets, BalloonEl, Doc, El, FillStyle, GradStop, Page, SavedLayout, TextEl,
+  Assets, BalloonEl, Doc, El, FillStyle, GradStop, ImageEl, Page, PanelEl, SavedLayout, TextEl,
   TextStyle, aabbOverlap, clamp, newPage, normalizeDoc, normalizeRuns,
   pageBleed, pageMargins, reseedIds, rotVec, runsToText, starterDoc,
 } from "@/lib/model";
@@ -516,10 +516,6 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   /* Is a blocking modal up? Read as a ref by the global key handler, which
      deliberately does not resubscribe on every state change. */
   const modalOpenRef = useRef(false);
-  useEffect(() => {
-    modalOpenRef.current =
-      showSetup || showExport || showFind || showScript || showGradMaker || !!tuckAsk || !!tailAsk || !!adjustEdit;
-  }, [showSetup, showExport, showFind, showScript, showGradMaker, tuckAsk, tailAsk, adjustEdit]);
   useEffect(() => { editingIdRef.current = editingId; }, [editingId]);
   useEffect(() => { currentRef.current = current; }, [current]);
 
@@ -533,7 +529,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     const onSel = () => {
       const id = editingIdRef.current;
       if (!id) return;
-      const root = document.querySelector(`.el[data-id="${id}"] .txt`) as HTMLElement | null;
+      const root = document.querySelector(`.el[data-id="${id}"] .txt[contenteditable="true"]`) as HTMLElement | null;
       if (!root) return;
       const off = domSelectionOffsets(root);
       if (off && off.end > off.start) selRangeRef.current = { id, ...off };
@@ -775,10 +771,22 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const captureEditing = useCallback((eid: string): boolean => {
     const d = docRef.current;
     if (!d) return false;
-    const p = d.pages[pageIndexRef.current];
-    const el = p.els.find((e) => e.id === eid) as BalloonEl | TextEl | undefined;
-    const dom = pageDivRef.current?.querySelector(`.el[data-id="${eid}"] .txt`) as HTMLElement | null;
-    if (!el || !dom) return false;
+    /* find the element across ALL pages: on the spread canvas a press on
+       the other page moves pageIndexRef before this runs (claimPage), and
+       the old current-page-only lookup then missed the element and threw
+       the typed words away */
+    let p = d.pages[pageIndexRef.current];
+    let el = p?.els.find((e) => e.id === eid) as BalloonEl | TextEl | undefined;
+    if (!el) {
+      for (const pg of d.pages) {
+        const f = pg.els.find((e) => e.id === eid);
+        if (f) { p = pg; el = f as BalloonEl | TextEl; break; }
+      }
+    }
+    /* the EDITABLE node only — the spread canvas also renders a static
+       carried copy of a spine-crossing element with the same data-id */
+    const dom = pageDivRef.current?.querySelector(`.el[data-id="${eid}"] .txt[contenteditable="true"]`) as HTMLElement | null;
+    if (!el || !p || !dom) return false;
     const rawRuns = domToRuns(dom);
     /* contentEditable leaves a trailing <div><br></div> behind, which
        became a phantom blank line that padded the balloon out */
@@ -838,12 +846,12 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
 
   useEffect(() => {
     if (!editingId) return;
-    const dom = pageDivRef.current?.querySelector(`.el[data-id="${editingId}"] .txt`) as HTMLElement | null;
+    const dom = pageDivRef.current?.querySelector(`.el[data-id="${editingId}"] .txt[contenteditable="true"]`) as HTMLElement | null;
     if (!dom) return;
     /* Seed the editable node. React renders no children while editing so that
        re-renders (balloon auto-grow) can never disturb the caret — which means
        the initial content has to be put here, emphasis and all. */
-    const eel = docRef.current?.pages[pageIndexRef.current].els.find((e) => e.id === editingId) as BalloonEl | TextEl | undefined;
+    const eel = docRef.current?.pages.flatMap((pg) => pg.els).find((e) => e.id === editingId) as BalloonEl | TextEl | undefined;
     if (eel && eel.runs && eel.runs.length) dom.innerHTML = runsToHtml(eel.runs);
     else if (eel) dom.textContent = eel.text;
     dom.focus();
@@ -983,7 +991,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   /* Applies to every selected element, so one edit reaches the whole set.
      Callers that only make sense for lettering guard on `el.ts` themselves —
      a selection can hold a panel and a balloon at once. */
-  const mutateSel = useCallback(<T extends El>(fn: (el: T) => void, final = true) => {
+  const mutateSelOf = useCallback(<T extends El>(types: El["type"][] | null, fn: (el: T) => void, final = true) => {
     const d = docRef.current!;
     const p = d.pages[pageIndexRef.current];
     const ids = selIdsRef.current;
@@ -991,14 +999,24 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     for (const id of ids) {
       const el = p.els.find((x) => x.id === id) as T | undefined;
       if (!el) continue;
+      /* a mixed selection (Ctrl+A) holds panels next to balloons: a
+         lettering control must skip the panels rather than throw on
+         `x.ts` — that crash left half the selection changed with no undo */
+      if (types && !types.includes(el.type)) continue;
       fn(el);
       hit++;
     }
     if (!hit) return;
     if (final) commit(); else force();
   }, [commit]);
+  const mutateSel = useCallback(<T extends El>(fn: (el: T) => void, final = true) => mutateSelOf<T>(null, fn, final), [mutateSelOf]);
+  const mutateText = useCallback((fn: (el: BalloonEl | TextEl) => void, final = true) => mutateSelOf<BalloonEl | TextEl>(["balloon", "text"], fn, final), [mutateSelOf]);
+  const mutateBalloon = useCallback((fn: (el: BalloonEl) => void, final = true) => mutateSelOf<BalloonEl>(["balloon"], fn, final), [mutateSelOf]);
+  const mutateLettering = useCallback((fn: (el: TextEl) => void, final = true) => mutateSelOf<TextEl>(["text"], fn, final), [mutateSelOf]);
+  const mutateArt = useCallback((fn: (el: PanelEl | ImageEl) => void, final = true) => mutateSelOf<PanelEl | ImageEl>(["panel", "image"], fn, final), [mutateSelOf]);
+  const mutatePanel = useCallback((fn: (el: PanelEl) => void, final = true) => mutateSelOf<PanelEl>(["panel"], fn, final), [mutateSelOf]);
 
-  const clipboardRef = useRef<El | null>(null);
+  const clipboardRef = useRef<El[] | null>(null);
 
   /* format painter: copy the look of the selected balloon/lettering and stamp
      it onto other elements */
@@ -1026,6 +1044,15 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
      once an association exists, and nothing tells the user that. */
   const [showAssocHelp, setShowAssocHelp] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  useEffect(() => {
+    /* the floating adjustment panel is deliberately NOT modal — Undo/Save
+       keep working while it floats; the true dialogs all block hotkeys.
+       Missing any dialog here meant Delete/Backspace typed into its field
+       removed the selected element behind it. */
+    modalOpenRef.current =
+      showSetup || showExport || showFind || showScript || showGradMaker || !!tuckAsk || !!tailAsk
+      || showTeam || !!composer || showAssocHelp || showShortcuts || showInstallHelp || askAddPage;
+  }, [showSetup, showExport, showFind, showScript, showGradMaker, tuckAsk, tailAsk, showTeam, composer, showAssocHelp, showShortcuts, showInstallHelp, askAddPage]);
   useEffect(() => {
     try {
       const installed = window.matchMedia?.("(display-mode: standalone)").matches
@@ -1087,6 +1114,8 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     setEditingId, finishEditing, mutateSel, startDrag, pagePoint, fitZoom, startTuck,
     selectAllOnPage, installApp, appInstalled, showInstallHelp, setShowInstallHelp,
     showAssocHelp, setShowAssocHelp, showShortcuts, setShowShortcuts, winHide, toggleWindow, setAskAddPage,
+    selIdsRef, editingIdRef, setSelIds,
+    mutateText, mutateBalloon, mutateLettering, mutateArt, mutatePanel,
     tuckAsk, setTuckAsk, retuneTuck, runTuckAuto, applyTuck, tuckTool, setTuckTool,
     adjustEdit, setAdjustEdit, resetTools,
     autosaveSoon,

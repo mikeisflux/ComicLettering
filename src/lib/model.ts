@@ -538,9 +538,11 @@ export function resolveBalloon(page: Page, el: BalloonEl): { el: BalloonEl; base
   }
 
   /* a balloon can only attach to a DIFFERENT balloon; a self-reference (from
-     a corrupt import or a future bug) would resolve to a degenerate self-merge */
+     a corrupt import or a future bug) would resolve to a degenerate self-merge.
+     A partner whose layer eyeball is off counts as absent — otherwise the
+     child lost its own tail to a band aimed at nothing. */
   const base = el.attachTo === el.id ? undefined
-    : page.els.find((e) => e.id === el.attachTo && e.type === "balloon") as BalloonEl | undefined;
+    : page.els.find((e) => e.id === el.attachTo && e.type === "balloon" && !e.hidden) as BalloonEl | undefined;
   if (!base) return { el: { ...el, attachTo: null }, base: null };
 
   /* overlapping → melt into one shape: no connector, fills union */
