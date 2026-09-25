@@ -9,24 +9,31 @@
     "start": "next start",
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
-    "db:seed": "node prisma/seed.mjs",
-    "setup": "prisma generate && prisma db push && node prisma/seed.mjs",
+    "db:seed": "node --experimental-strip-types prisma/seed.mjs",
+    "setup": "prisma generate && prisma db push && npm run db:seed",
     "fetch:sam": "bash scripts/fetch-sam.sh"
   },
   "dependencies": {
-    "@prisma/client": "^6.5.0",
+    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/client": "7.10.0",
+    "dotenv": "18.0.3",
     "next": "^15.3.0",
     "onnxruntime-web": "^1.23.0",
     "pdfjs-dist": "^6.1.200",
+    "pg": "8.23.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "utif2": "^4.1.0"
   },
   "devDependencies": {
-    "@types/node": "^22.13.0",
+    "@types/node": "^24.13.6",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "prisma": "^6.5.0",
+    "prisma": "7.10.0",
     "typescript": "^5.8.0"
+  },
+  "engines": {
+    "node": ">=22.12"
   }
 }

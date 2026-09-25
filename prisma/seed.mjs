@@ -1,9 +1,13 @@
 /* Seeds the site superuser: admin + lifetime pro access.
    Password comes from SEED_ADMIN_PASSWORD, or is generated and printed once. */
-import { PrismaClient } from "@prisma/client";
+/* Runs under Node's type stripping (`npm run db:seed`): the generated
+   client is TypeScript. Prisma 7 needs the pg driver adapter. */
+import "dotenv/config";
+import { PrismaClient } from "../src/generated/prisma/client.ts";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { randomBytes, scryptSync } from "crypto";
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL ?? "" }) });
 const EMAIL = "divinitycomicsinc@gmail.com";
 
 function hashPassword(password) {

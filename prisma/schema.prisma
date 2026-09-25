@@ -1,14 +1,22 @@
-// LetterMyComic — SQL schema (Prisma ORM).
+// LetterMyComic — SQL schema (Prisma ORM 7).
 // Runs on PostgreSQL. Set DATABASE_URL in .env, e.g.
 //   DATABASE_URL="postgresql://user:pass@localhost:5432/comiclettering"
+// The connection string is read by prisma.config.ts (CLI) and src/lib/db.ts
+// (runtime, through the pg driver adapter) — not by this file.
 
 generator client {
-  provider = "prisma-client-js"
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  runtime             = "nodejs"
+  moduleFormat        = "esm"
+  // explicit .ts imports so Node can run the generated client directly
+  // (seed / migration scripts under type stripping) as well as the bundler
+  generatedFileExtension = "ts"
+  importFileExtension    = "ts"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model User {

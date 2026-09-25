@@ -86,7 +86,7 @@ touch the server. No generative AI in the product.
 
 ## Stack
 
-Next.js 15 (App Router) · React 19 · TypeScript · Prisma (PostgreSQL; SQLite
+Next.js 15 (App Router) · React 19 · TypeScript · Node 24 · Prisma 7 (PostgreSQL via the pg driver adapter; SQLite
 for zero-config dev) · PayPal REST · SendGrid · PM2 cluster behind Caddy.
 
 ## Development
@@ -109,6 +109,11 @@ cluster (`ecosystem.config.js`, 2 instances), rolling back on a failed health
 check. The Help → **Check for Updates** menu item in the studio compares an
 open window's build stamp against `/api/version` so long-lived installed-app
 windows can pull a fresh deploy.
+
+The server needs Node ≥ 22.12 (Prisma 7); `./scripts/deploy.sh node` installs
+Node 24 LTS in place and restarts PM2 on it, and a plain deploy refuses to run
+on an older Node rather than failing halfway. Fresh servers get Node 24 from
+`./scripts/deploy.sh setup`.
 
 ## Repository layout
 

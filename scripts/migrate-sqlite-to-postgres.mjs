@@ -3,15 +3,17 @@
  * the current (PostgreSQL) database via Prisma.
  *
  *   SQLITE_PATH=prisma/dev.db DATABASE_URL="postgresql://…" \
- *     node scripts/migrate-sqlite-to-postgres.mjs
+ *     node --experimental-strip-types scripts/migrate-sqlite-to-postgres.mjs
  *
  * Safe to re-run: rows are upserted by primary key, so an interrupted or
  * repeated migration converges instead of duplicating. Reads are done with
  * Node's built-in SQLite (no extra dependency); writes use the generated
  * Prisma client, which is now pointed at PostgreSQL.
  */
+import "dotenv/config";
 import { DatabaseSync } from "node:sqlite";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "../src/generated/prisma/client.ts";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { existsSync } from "node:fs";
 
 const SQLITE_PATH = process.env.SQLITE_PATH || "prisma/dev.db";
@@ -21,7 +23,7 @@ if (!existsSync(SQLITE_PATH)) {
 }
 
 const sqlite = new DatabaseSync(SQLITE_PATH, { readOnly: true });
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL ?? "" }) });
 
 const bool = (v) => v === 1 || v === true || v === "1";
 const date = (v) => (v == null ? undefined : new Date(v));

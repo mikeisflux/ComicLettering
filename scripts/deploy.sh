@@ -118,7 +118,7 @@ CRON
 migrate_legacy_sqlite() {
   if [ -f "$APP_DIR/prisma/dev.db" ]; then
     log "Legacy SQLite database found — migrating its data into PostgreSQL…"
-    ( cd "$APP_DIR" && SQLITE_PATH=prisma/dev.db node scripts/migrate-sqlite-to-postgres.mjs )
+    ( cd "$APP_DIR" && SQLITE_PATH=prisma/dev.db node --experimental-strip-types scripts/migrate-sqlite-to-postgres.mjs )
     mv "$APP_DIR/prisma/dev.db" "$APP_DIR/prisma/dev.db.migrated"
     log "Legacy SQLite archived to prisma/dev.db.migrated"
   fi
@@ -202,6 +202,27 @@ pm2_up() {
   pm2 save >/dev/null
 }
 
+# Node 24 LTS from NodeSource. Prisma 7 needs ^22.12 or 24+, and the seed /
+# migration scripts run the generated TypeScript client under Node's type
+# stripping. `deploy.sh node` upgrades an existing server in place.
+install_node() {
+  [ "$(id -u)" -eq 0 ] || fail "Installing Node needs root (sudo)."
+  log "Installing Node.js 24…"
+  curl -fsSL https://deb.nodesource.com/setup_24.x | bash - >/dev/null
+  apt-get install -y -qq nodejs >/dev/null
+  log "Node $(node -v), npm $(npm -v)"
+  npm install -g pm2 >/dev/null 2>&1 || true   # pm2 binary lives with the Node install
+  pm2 update >/dev/null 2>&1 || true            # restart the daemon on the new runtime
+}
+
+# true when the installed Node can run this app (Prisma 7: ^22.12 or >=24)
+node_ok() {
+  command -v node >/dev/null || return 1
+  local v major minor
+  v="$(node -v | cut -c2-)"; major="${v%%.*}"; minor="$(echo "$v" | cut -d. -f2)"
+  [ "$major" -ge 24 ] || { [ "$major" -eq 22 ] && [ "$minor" -ge 12 ]; }
+}
+
 cmd_setup() {
   [ "$(id -u)" -eq 0 ] || fail "Run setup as root (sudo)."
 
@@ -209,10 +230,8 @@ cmd_setup() {
   apt-get update -qq
   apt-get install -y -qq git curl ca-certificates >/dev/null
 
-  if ! command -v node >/dev/null || [ "$(node -v | cut -c2-3 | tr -d .)" -lt 20 ]; then
-    log "Installing Node.js 22…"
-    curl -fsSL https://deb.nodesource.com/setup_22.x | bash - >/dev/null
-    apt-get install -y -qq nodejs >/dev/null
+  if ! command -v node >/dev/null || [ "$(node -v | cut -c2- | cut -d. -f1)" -lt 24 ]; then
+    install_node
   fi
   log "Node $(node -v), npm $(npm -v)"
   ensure_pm2
@@ -231,7 +250,7 @@ cmd_setup() {
   migrate_legacy_sqlite
 
   log "Seeding database (superuser)…"
-  node prisma/seed.mjs
+  npm run db:seed
 
   pm2_up
   provision_botblock
@@ -274,6 +293,9 @@ cmd_deploy() {
   prev=$(git rev-parse HEAD)
   log "Current version: ${prev:0:10}"
 
+  # refuse early rather than fail halfway through npm ci / prisma generate
+  node_ok || fail "Node $(node -v 2>/dev/null || echo '(none)') is too old for this build — run: ./scripts/deploy.sh node"
+
   log "Pulling latest ${BRANCH}…"
   git fetch origin "$BRANCH"
   git checkout "$BRANCH"
@@ -315,7 +337,8 @@ cmd_deploy() {
 case "${1:-deploy}" in
   setup)  cmd_setup ;;
   deploy) cmd_deploy ;;
+  node)   install_node ;;
   logs)   ensure_pm2; pm2 logs "$SERVICE" ;;
   status) ensure_pm2; pm2 status; curl -s -o /dev/null -w "HTTP %{http_code}\n" "http://localhost:${PORT}/" ;;
-  *) echo "Usage: $0 [setup|deploy|logs|status]"; exit 1 ;;
+  *) echo "Usage: $0 [setup|deploy|node|logs|status]"; exit 1 ;;
 esac

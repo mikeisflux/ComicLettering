@@ -4,7 +4,7 @@ import { createHash, createHmac, randomBytes, scrypt as scryptCb, timingSafeEqua
 import { promisify } from "util";
 import { cookies } from "next/headers";
 import { prisma } from "./db";
-import type { User } from "@prisma/client";
+import type { User } from "@/generated/prisma/client";
 
 const scrypt = promisify(scryptCb) as (p: string, s: string, n: number) => Promise<Buffer>;
 const COOKIE = "lmc_session";
