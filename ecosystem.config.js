@@ -41,11 +41,11 @@ module.exports = {
     {
       name: process.env.SERVICE || "lettermycomic",
       script: "node_modules/next/dist/bin/next",
-      // loopback only: reached through Caddy, which writes X-Forwarded-For.
-      // Exposed on all interfaces, a direct hit could spoof that header and
-      // firewall arbitrary addresses through the honeypot, or brute-force
-      // logins with no throttle.
-      args: `start -H 127.0.0.1 -p ${PORT}`,
+      // NOTE: do not add `-H 127.0.0.1` here — under PM2 cluster mode the
+      // workers errored at startup and the deploy rolled back. Keep port
+      // 3000 off the public internet with the host/cloud firewall instead
+      // (only 80/443 need to be open); Caddy proxies to localhost.
+      args: `start -p ${PORT}`,
       cwd: __dirname,
       instances: 2,
       exec_mode: "cluster",
