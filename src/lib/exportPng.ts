@@ -66,12 +66,16 @@ function wrapLines(
   const hard: boolean[] = [];
   const paras = String(text).split("\n");
   for (let pi = 0; pi < paras.length; pi++) {
-    const words = paras[pi].split(/\s+/).filter(Boolean);
-    if (!words.length) lines.push("");
+    /* split on single spaces and KEEP the empties: "a  b" is two spaces in
+       the editor (white-space: pre-wrap) and must measure as two here */
+    const words = paras[pi].split(" ");
+    if (!words.some(Boolean)) lines.push(paras[pi]);
     else {
       let line = "";
+      let started = false;
       for (const w of words) {
-        const test = line ? line + " " + w : w;
+        const test = started ? line + " " + w : w;
+        started = true;
         if (ctx.measureText(test).width <= maxWidth) { line = test; continue; }
         if (line) lines.push(line);
         if (ctx.measureText(w).width <= maxWidth) { line = w; continue; }
@@ -140,14 +144,21 @@ function drawRichText(
       }
       curLine.push({ type: "word", clusters: part, w: partW }); curLineW += partW;
     } else {
-      if (curLine.length > 0) { curLine.push({ type: "space", w: spaceW }); curLineW += spaceW; }
+      if (curLine.length > 0 && curLine[curLine.length - 1].type !== "space") { curLine.push({ type: "space", w: spaceW }); curLineW += spaceW; }
       curLine.push({ type: "word", clusters: word, w: wordW }); curLineW += wordW;
     }
     word = []; wordW = 0;
   };
   for (const cl of clusters) {
     if (cl.ch === "\n") { flushWord(); pushLine(true); continue; }
-    if (/^\s+$/.test(cl.ch)) { flushWord(); continue; }
+    if (/^\s+$/.test(cl.ch)) {
+      /* one space token per space character (pre-wrap keeps them all) —
+         the first one between words was implied by flushWord already */
+      flushWord();
+      if (curLine.length && curLine[curLine.length - 1].type === "space") { curLine.push({ type: "space", w: spaceW }); curLineW += spaceW; }
+      else if (!curLine.length) { curLine.push({ type: "space", w: spaceW }); curLineW += spaceW; }
+      continue;
+    }
     word.push(cl); wordW += measure(cl);
   }
   flushWord();
@@ -196,7 +207,7 @@ function drawRichText(
         if (ts.shadow) {
           ctx.save();
           ctx.shadowColor = ts.shadowC || "#00000088";
-          ctx.shadowOffsetX = ts.size * 0.05; ctx.shadowOffsetY = ts.size * 0.05; ctx.shadowBlur = ts.size * 0.06;
+          { const k = ctxScale(ctx); ctx.shadowOffsetX = ts.size * 0.05 * k; ctx.shadowOffsetY = ts.size * 0.05 * k; ctx.shadowBlur = ts.size * 0.06 * k; }
           /* cast from the outline when there is one — as the plain path and
              the DOM do; a fill-only shadow was visibly smaller on bold runs */
           if (ts.outlineW > 0) { ctx.lineWidth = ts.outlineW; ctx.strokeStyle = ts.outlineC; ctx.strokeText(cl.ch, x, yGlyph(y)); }
@@ -271,7 +282,7 @@ function drawWarpedText(
     if (ts.shadow) {
       ctx.save();
       ctx.shadowColor = ts.shadowC || "#00000088";
-      ctx.shadowOffsetX = ts.size * 0.05; ctx.shadowOffsetY = ts.size * 0.05; ctx.shadowBlur = ts.size * 0.06;
+      { const k = ctxScale(ctx); ctx.shadowOffsetX = ts.size * 0.05 * k; ctx.shadowOffsetY = ts.size * 0.05 * k; ctx.shadowBlur = ts.size * 0.06 * k; }
       ctx.fillStyle = fill; ctx.fillText(ch, 0, 0);
       ctx.restore();
     }
@@ -429,9 +440,10 @@ export function drawStyledText(
     if (ts.shadow) {
       ctx.save();
       ctx.shadowColor = ts.shadowC || "#00000088";
-      ctx.shadowOffsetX = ts.size * 0.05;
-      ctx.shadowOffsetY = ts.size * 0.05;
-      ctx.shadowBlur = ts.size * 0.06;
+      { const k = ctxScale(ctx);
+        ctx.shadowOffsetX = ts.size * 0.05 * k;
+        ctx.shadowOffsetY = ts.size * 0.05 * k;
+        ctx.shadowBlur = ts.size * 0.06 * k; }
       if (ts.outlineW > 0) {
         ctx.lineWidth = ts.outlineW;
         ctx.strokeStyle = ts.outlineC;
@@ -542,7 +554,10 @@ function withFilter(ctx: CanvasRenderingContext2D, filterKey: string, fn: () => 
 function drawCoverFiltered(
   ctx: CanvasRenderingContext2D, img: HTMLImageElement, w: number, h: number, filterKey: string, pan?: ArtPan,
 ) {
-  const pw = Math.max(1, Math.round(w)), ph = Math.max(1, Math.round(h));
+  /* scratch at the context's real scale, or a 450 dpi export upscaled a
+     page-unit render and came out soft on Safari */
+  const k = ctxScale(ctx);
+  const pw = Math.max(1, Math.round(w * k)), ph = Math.max(1, Math.round(h * k));
   const t = document.createElement("canvas");
   t.width = pw; t.height = ph;
   const tc = t.getContext("2d");
@@ -565,12 +580,17 @@ function drawCoverWithFilter(
   else withFilter(ctx, filterKey, () => drawCover(ctx, img, w, h, pan));
 }
 
-function shapeShadow(ctx: CanvasRenderingContext2D, on: boolean, size: number) {
+/* Canvas shadows are in DEVICE pixels — the CTM does not scale them — so
+   every offset/blur is multiplied by the context's scale, or a 450 dpi
+   export had shadows half the size the editor showed (and thumbnails
+   had giant ones). Values match the DOM: art 8/8/12, balloons 8/8/10. */
+function shapeShadow(ctx: CanvasRenderingContext2D, on: boolean, offset: number, blur: number) {
   if (!on) return;
+  const k = ctxScale(ctx);
   ctx.shadowColor = "#00000059";
-  ctx.shadowOffsetX = size;
-  ctx.shadowOffsetY = size;
-  ctx.shadowBlur = size * 1.4;
+  ctx.shadowOffsetX = offset * k;
+  ctx.shadowOffsetY = offset * k;
+  ctx.shadowBlur = blur * k;
 }
 function clearShadow(ctx: CanvasRenderingContext2D) {
   ctx.shadowColor = "transparent";
@@ -592,25 +612,32 @@ function fadeErase(c: CanvasRenderingContext2D, fade: Fade, w: number, h: number
   c.globalCompositeOperation = fade.to ? "source-atop" : "destination-out";
   let g: CanvasGradient;
   if (fade.dir === "vignette") {
-    const r = Math.hypot(w, h) / 2;
-    g = c.createRadialGradient(w / 2, h / 2, Math.max(0, r * (1 - s)), w / 2, h / 2, r);
+    /* CSS `radial-gradient(ellipse at center …)`: an ellipse with the box's
+       aspect ratio reaching the farthest corner — draw a circle through a
+       scaled context so the canvas matches (a plain circle faded the short
+       sides far less than the editor) */
+    const d = Math.hypot(w, h) || 1;
+    const R = d / Math.SQRT2;
+    c.scale(w / d, h / d);
+    const cx = (w / 2) * (d / w), cy = (h / 2) * (d / h);
+    g = c.createRadialGradient(cx, cy, Math.max(0, R * (1 - s)), cx, cy, R);
     g.addColorStop(0, clear);
     g.addColorStop(1, solid);
-  } else {
-    /* diagonal reach matches the CSS gradient-line length closely enough
-       for a soft feather */
-    const d = 0.85;
-    const ends: Record<string, [number, number, number, number]> = {
-      left: [0, 0, w * s, 0], right: [w, 0, w - w * s, 0],
-      top: [0, 0, 0, h * s], bottom: [0, h, 0, h - h * s],
-      tl: [0, 0, w * s * d, h * s * d], tr: [w, 0, w - w * s * d, h * s * d],
-      bl: [0, h, w * s * d, h - h * s * d], br: [w, h, w - w * s * d, h - h * s * d],
-    };
-    const [x0, y0, x1, y1] = ends[fade.dir] ?? ends.left;
-    g = c.createLinearGradient(x0, y0, x1, y1);
-    g.addColorStop(0, solid);
-    g.addColorStop(1, clear);
+    c.fillStyle = g;
+    c.fillRect(0, 0, d, d);
+    c.restore();
+    return;
   }
+  /* CSS linear-gradient(<angle>): the gradient line runs through the
+     centre with length |w·sinθ| + |h·cosθ|, from the start point outward */
+  const angles: Record<string, number> = { top: 180, bottom: 0, left: 90, right: 270, tl: 135, tr: 225, bl: 45, br: 315 };
+  const th = ((angles[fade.dir] ?? 90) * Math.PI) / 180;
+  const dx = Math.sin(th), dy = -Math.cos(th);
+  const L = Math.abs(w * dx) + Math.abs(h * dy);
+  const x0 = w / 2 - dx * L / 2, y0 = h / 2 - dy * L / 2;
+  g = c.createLinearGradient(x0, y0, x0 + dx * L * s, y0 + dy * L * s);
+  g.addColorStop(0, solid);
+  g.addColorStop(1, clear);
   c.fillStyle = g;
   c.fillRect(0, 0, w, h);
   c.restore();
@@ -637,9 +664,10 @@ function drawEl(
       const penD = el.type === "panel" ? panelPathD(el) : null;
       const rectPath = penD ? new Path2D(penD) : new Path2D();
       if (!penD) rectPath.rect(0, 0, el.w, el.h);
-      if (el.shadow) {
+      /* the DOM drops the shadow under a legacy transparent fade */
+      if (el.shadow && !(el.fade && !el.fade.to)) {
         c.save();
-        shapeShadow(c, true, 10);
+        shapeShadow(c, true, 8, 12);
         c.fillStyle = el.type === "panel" ? "#ffffff" : "#00000001";
         c.fill(rectPath);
         c.restore();
@@ -699,7 +727,7 @@ function drawEl(
     const path = new Path2D(g.d);
     if (el.shadow) {
       ctx.save();
-      shapeShadow(ctx, true, 8);
+      shapeShadow(ctx, true, 8, 10);
       ctx.fillStyle = "#ffffff";
       ctx.fill(path);
       ctx.restore();
@@ -1070,7 +1098,7 @@ export async function renderPageToCanvas(
      grade (they hand clean lettering back to production) */
   if (!letteringOnly) {
     const grade = pageAdjustLayers(page);
-    if (grade.length) return pageAdjustCanvas(canvas, grade);
+    if (grade.length) return pageAdjustCanvas(canvas, grade, scale);
   }
   return canvas;
 }
@@ -1159,7 +1187,7 @@ function encodeTiff(img: ImageData, dpi: number): Uint8Array {
   const { width: w, height: h, data } = img;
   const pixBytes = w * h * 3;
   const headerSize = 8;
-  const bpsOff = headerSize + pixBytes;          // BitsPerSample [8,8,8]
+  const bpsOff = headerSize + pixBytes + (pixBytes % 2);   // BitsPerSample [8,8,8], word-aligned
   const xResOff = bpsOff + 6;                    // rational
   const yResOff = xResOff + 8;
   const ifdOff = yResOff + 8;

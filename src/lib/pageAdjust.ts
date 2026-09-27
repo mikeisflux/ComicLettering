@@ -394,7 +394,11 @@ export function sampleCurve(pts: [number, number][], n: number): number[] {
   return out;
 }
 
-function stageMarkup(el: AdjustEl, src: string, out: string): string {
+/* `k` = device pixels per page unit. The editor filters the page BEFORE its
+   zoom transform (page units); the export filters the finished device-pixel
+   canvas, so anything with a length (blur radius, noise frequency) has to
+   be scaled or the grade changes with the DPI. */
+function stageMarkup(el: AdjustEl, src: string, out: string, k = 1): string {
   const p = el.params || {};
   switch (el.kind) {
     case "brightness": {
@@ -647,7 +651,7 @@ function stageMarkup(el: AdjustEl, src: string, out: string): string {
       const k = clamp(num(p.amt, 35), 0, 100) / 100 * 0.55;
       const freq = 0.9 / clamp(num(p.size, 10), 1, 40) * 10;   // bigger size → coarser noise
       const oct = Math.round(clamp(num(p.rough, 2), 1, 4));
-      return `<feTurbulence type="fractalNoise" baseFrequency="${F(freq)}" numOctaves="${oct}" seed="7" stitchTiles="stitch" result="${out}n"/>` +
+      return `<feTurbulence type="fractalNoise" baseFrequency="${F(freq / k)}" numOctaves="${oct}" seed="7" stitchTiles="stitch" result="${out}n"/>` +
         `<feColorMatrix in="${out}n" type="matrix" result="${out}g" values="` +
         `0.33 0.33 0.34 0 0 0.33 0.33 0.34 0 0 0.33 0.33 0.34 0 0 0 0 0 0 1"/>` +
         `<feComposite in="${src}" in2="${out}g" operator="arithmetic" ` +
@@ -657,7 +661,7 @@ function stageMarkup(el: AdjustEl, src: string, out: string): string {
       /* clarity: unsharp local contrast; dehaze: contrast + black depth +
          a saturation lift (the classic haze cut), both signed */
       const k = clamp(num(p.clarity, num(p.amt, 0)), -100, 100) / 100 * 1.4;
-      const un = `<feGaussianBlur in="${src}" stdDeviation="3" result="${out}b"/>` +
+      const un = `<feGaussianBlur in="${src}" stdDeviation="${F(3 * k)}" result="${out}b"/>` +
         `<feComposite in="${src}" in2="${out}b" operator="arithmetic" ` +
         `k1="0" k2="${F(1 + k)}" k3="${F(-k)}" k4="0" result="${out}c"/>`;
       const d = clamp(num(p.dehaze, 0), -100, 100) / 100;
@@ -668,13 +672,13 @@ function stageMarkup(el: AdjustEl, src: string, out: string): string {
 }
 
 /* the page's whole grade as ONE <filter> element (empty string if none) */
-export function adjustFilterMarkup(id: string, layers: AdjustEl[]): string {
+export function adjustFilterMarkup(id: string, layers: AdjustEl[], k = 1): string {
   if (!layers.length) return "";
   let src = "SourceGraphic";
   let body = "";
   layers.forEach((el, i) => {
     const out = `a${i}`;
-    body += stageMarkup(el, src, out);
+    body += stageMarkup(el, src, out, k);
     src = out;
   });
   return `<filter id="${id}" color-interpolation-filters="sRGB">${body}</filter>`;
@@ -684,7 +688,7 @@ export function adjustFilterMarkup(id: string, layers: AdjustEl[]): string {
    lives in the document so ctx.filter's url() can resolve it. Browsers
    without canvas filters (Safari) return the canvas ungraded — the same
    degradation the per-element photo filters already have there. */
-export function pageAdjustCanvas(canvas: HTMLCanvasElement, layers: AdjustEl[]): HTMLCanvasElement {
+export function pageAdjustCanvas(canvas: HTMLCanvasElement, layers: AdjustEl[], k = 1): HTMLCanvasElement {
   if (!layers.length || typeof document === "undefined") return canvas;
   const out = document.createElement("canvas");
   out.width = canvas.width;
@@ -698,7 +702,7 @@ export function pageAdjustCanvas(canvas: HTMLCanvasElement, layers: AdjustEl[]):
     host.style.cssText = "position:absolute;width:0;height:0;overflow:hidden";
     document.body.appendChild(host);
   }
-  host.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0">${adjustFilterMarkup("lmcAdjX", layers)}</svg>`;
+  host.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0">${adjustFilterMarkup("lmcAdjX", layers, k)}</svg>`;
   ctx.filter = "url(#lmcAdjX)";
   ctx.drawImage(canvas, 0, 0);
   ctx.filter = "none";

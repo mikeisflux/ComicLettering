@@ -241,6 +241,14 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const [spreadPrint, setSpreadPrint] = useState(false);
   const [exportFrom, setExportFrom] = useState(1);
   const [exportTo, setExportTo] = useState(1);
+  /* the range defaults to the whole book each time the dialog opens — a
+     leftover "to 1" exported a single page after picking From/To */
+  useEffect(() => {
+    if (!showExport || !docRef.current) return;
+    setExportFrom(1);
+    setExportTo(docRef.current.pages.length);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showExport]);
   const [stampOpen, setStampOpen] = useState(false);
   const [showFill, setShowFill] = useState(false);
   const [showStroke, setShowStroke] = useState(false);

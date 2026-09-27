@@ -534,6 +534,7 @@ input[type="range"] { width: 110px; }
   background-size: cover; background-position: center; background-color: #fff;
 }
 .photoBtn:hover { border-color: var(--sel); }
+.photoBtn img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
 
 .projList { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
 .projRow {

@@ -41,14 +41,18 @@ function halftoneCoverage(v: HalftoneVariant, fx: number, fy: number): number {
   }
 }
 
-function halftoneTile(dot: string, cell: number, variant: HalftoneVariant): HTMLCanvasElement {
-  const key = `ht|${dot}|${cell}|${variant}`;
+/* Stretched tiles (halftone, speedlines) are drawn at a resolution that
+   suits where they land: the editor's 1024/1200 px is plenty on screen, but
+   a 450 dpi export stretched it 4.5× across the page. `S` is the tile's
+   pixel size; the dot/line geometry scales with it so the LOOK is the same
+   at every resolution. */
+function halftoneTile(dot: string, cell: number, variant: HalftoneVariant, S = 1024): HTMLCanvasElement {
+  const key = `ht|${dot}|${cell}|${variant}|${S}`;
   const hit = cache.get(key);
   if (hit) return hit;
-  const S = 1024;
   const [c, ctx] = makeCanvas(S, S);
   ctx.fillStyle = dot;
-  const step = cell * 2;
+  const step = cell * 2 * (S / 1024);
   for (let row = 0, y = step / 2; y < S + step; y += step, row++) {
     const off = row % 2 ? step / 2 : 0;
     for (let x = step / 2 + off; x < S + step; x += step) {
@@ -180,11 +184,11 @@ function patternTile(fg: string, variant: PatternVariant, scale: number): HTMLCa
 
 /* ---------------- speedlines (stretched tile) ---------------- */
 
-function speedTile(line: string, variant: SpeedlineVariant): HTMLCanvasElement {
-  const key = `sp|${line}|${variant}`;
+function speedTile(line: string, variant: SpeedlineVariant, S = 1200): HTMLCanvasElement {
+  const key = `sp|${line}|${variant}|${S}`;
   const hit = cache.get(key);
   if (hit) return hit;
-  const S = 1200;
+  const q = S / 1200;   // line thickness scales with the tile
   const [c, ctx] = makeCanvas(S, S);
   ctx.fillStyle = line;
   const rnd = mulberry32(variant === "burst2" ? 99 : variant === "ring" ? 42 : variant === "corner" ? 7 : 5);
@@ -193,7 +197,7 @@ function speedTile(line: string, variant: SpeedlineVariant): HTMLCanvasElement {
     const n = 260;
     for (let i = 0; i < n; i++) {
       const y = rnd() * S;
-      const th = 0.6 + rnd() * 2.6;
+      const th = (0.6 + rnd() * 2.6) * q;
       const alpha = 0.25 + rnd() * 0.75;
       ctx.globalAlpha = alpha;
       if (variant === "horiz") {
@@ -204,7 +208,7 @@ function speedTile(line: string, variant: SpeedlineVariant): HTMLCanvasElement {
         const len = S * (0.12 + rnd() * 0.3);
         ctx.fillRect(0, y, len, th);
         const y2 = rnd() * S, len2 = S * (0.12 + rnd() * 0.3);
-        ctx.fillRect(S - len2, y2, len2, 0.6 + rnd() * 2.6);
+        ctx.fillRect(S - len2, y2, len2, (0.6 + rnd() * 2.6) * q);
       }
     }
     ctx.globalAlpha = 1;
@@ -294,12 +298,14 @@ function hexToRgb(hex: string): [number, number, number] {
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 
-export function fillOverlayTile(f: FillStyle): HTMLCanvasElement | null {
+/* `px` = the size the stretched tile will be drawn at, in device pixels */
+export function fillOverlayTile(f: FillStyle, px?: number): HTMLCanvasElement | null {
   if (typeof document === "undefined") return null;
+  const S = px ? Math.min(4096, Math.max(1024, 1 << Math.ceil(Math.log2(px)))) : undefined;
   switch (f.kind) {
-    case "halftone": return halftoneTile(f.dot, f.cell, f.variant);
+    case "halftone": return halftoneTile(f.dot, f.cell, f.variant, S ?? 1024);
     case "pattern": return patternTile(f.fg, f.variant, f.scale);
-    case "speedlines": return speedTile(f.line, f.variant);
+    case "speedlines": return speedTile(f.line, f.variant, S ? Math.round(S * 1200 / 1024) : 1200);
     case "texture": return textureTile(f.fg, f.variant);
     default: return null;
   }
@@ -376,7 +382,10 @@ export function paintFill(
   } else {
     ctx.fillStyle = f.a;
     ctx.fillRect(X, Y, W, H);
-    const tile = fillOverlayTile(f);
+    /* at export resolution the tile is drawn at w·k device pixels */
+    let k = 1;
+    try { const m = ctx.getTransform(); k = Math.max(1, Math.hypot(m.a, m.b)); } catch { /* old engine */ }
+    const tile = fillOverlayTile(f, isRepeating(f) ? undefined : Math.max(w, h) * k);
     if (tile) {
       if (isRepeating(f)) {
         const pat = ctx.createPattern(tile, "repeat");

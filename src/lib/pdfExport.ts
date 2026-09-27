@@ -1,14 +1,20 @@
 /* Dependency-free multi-page PDF export: each page rendered to JPEG and
-   embedded via DCTDecode. Output sized in points from the page's DPI. */
+   embedded via DCTDecode. Output sized in points from the page's DPI.
+
+   Every object is written to the output as soon as it exists (the object
+   numbering is fixed by the page count up front), and page images go in as
+   Blob parts — the file is never held twice in JavaScript memory. */
 import { Assets, DPI, Doc, Page, pageBleed } from "./model";
 import { renderPageToCanvas } from "./exportPng";
 
 const enc = new TextEncoder();
 
-/* printer's crop marks at the four trim corners, drawn in the bleed margin.
-   x,y = a trim corner in points; sx,sy = outward direction (±1). */
-function cornerMarks(x: number, y: number, sx: number, sy: number): string {
-  const g = 3, len = 12;
+/* printer's crop marks at the four trim corners. They start OUTSIDE the
+   bleed (a mark inked over bleed artwork is rejected by print shops) and run
+   12pt out from there. x,y = a trim corner in points; sx,sy = outward
+   direction (±1); b = the bleed width in points. */
+function cornerMarks(x: number, y: number, sx: number, sy: number, b: number): string {
+  const g = b + 3, len = 12;
   const h = `${(x + sx * g).toFixed(2)} ${y.toFixed(2)} m ${(x + sx * (g + len)).toFixed(2)} ${y.toFixed(2)} l\n`;
   const v = `${x.toFixed(2)} ${(y + sy * g).toFixed(2)} m ${x.toFixed(2)} ${(y + sy * (g + len)).toFixed(2)} l\n`;
   return h + v;
@@ -23,67 +29,61 @@ export async function exportPdf(
      compute these against the FULL document so pairing stays correct */
   neighbors?: ({ page: Page; dx: number } | null)[],
 ) {
-  const images: { bytes: Uint8Array; w: number; h: number }[] = [];
-  for (let i = 0; i < doc.pages.length; i++) {
-    await onProgress?.(i + 1, doc.pages.length);
-    const canvas = await renderPageToCanvas(doc.pages[i], assets, dpi / DPI, false, neighbors?.[i] ?? null);
-    const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", 0.92));
-    if (!blob) throw new Error("page render failed");
-    images.push({ bytes: new Uint8Array(await blob.arrayBuffer()), w: canvas.width, h: canvas.height });
-  }
-  const outDpi = dpi;
-
-  const chunks: Uint8Array[] = [];
+  const parts: BlobPart[] = [];
   let offset = 0;
   const offsets: number[] = [];
-  const push = (data: Uint8Array | string) => {
+  const push = (data: Uint8Array | string | Blob) => {
+    if (data instanceof Blob) { parts.push(data); offset += data.size; return; }
     const bytes = typeof data === "string" ? enc.encode(data) : data;
-    chunks.push(bytes);
+    parts.push(bytes as BlobPart);
     offset += bytes.length;
   };
   const beginObj = (num: number) => { offsets[num] = offset; push(`${num} 0 obj\n`); };
 
-  push("%PDF-1.4\n%\xB5\xB5\n");
-
-  const n = images.length;
+  const n = doc.pages.length;
   const pageObj = (i: number) => 3 + i * 3;
   const contObj = (i: number) => 4 + i * 3;
   const imgObj = (i: number) => 5 + i * 3;
 
+  push("%PDF-1.4\n%\xB5\xB5\n");
   beginObj(1);
   push(`<< /Type /Catalog /Pages 2 0 R >>\nendobj\n`);
   beginObj(2);
-  push(`<< /Type /Pages /Count ${n} /Kids [${images.map((_, i) => `${pageObj(i)} 0 R`).join(" ")}] >>\nendobj\n`);
+  push(`<< /Type /Pages /Count ${n} /Kids [${doc.pages.map((_, i) => `${pageObj(i)} 0 R`).join(" ")}] >>\nendobj\n`);
 
-  const M = cropMarks ? 18 : 0; // 0.25in quiet margin around the sheet, in points
-  images.forEach((img, i) => {
-    const W = (img.w * 72) / outDpi;
-    const H = (img.h * 72) / outDpi;
+  for (let i = 0; i < n; i++) {
+    await onProgress?.(i + 1, n);
+    const canvas = await renderPageToCanvas(doc.pages[i], assets, dpi / DPI, false, neighbors?.[i] ?? null);
+    const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", 0.92));
+    if (!blob) throw new Error(`Page ${i + 1} could not be rendered at ${dpi} dpi (${canvas.width}×${canvas.height} px) — try a lower DPI.`);
+    const W = (canvas.width * 72) / dpi;
+    const H = (canvas.height * 72) / dpi;
+    /* the page already carries its bleed, so the trim is INSIDE the sheet:
+       marks at the sheet corners would cut on the bleed line. With crop
+       marks the sheet grows by a quiet margin that holds the marks
+       (bleed + 3pt gap + 12pt mark + 6pt clearance). */
+    const b = cropMarks ? (pageBleed(doc.pages[i]) / DPI) * 72 : 0;
+    const M = cropMarks ? Math.max(18, b + 21) : 0;
     const MW = W + 2 * M, MH = H + 2 * M;
     beginObj(pageObj(i));
     push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${MW.toFixed(2)} ${MH.toFixed(2)}] /Contents ${contObj(i)} 0 R /Resources << /XObject << /Im0 ${imgObj(i)} 0 R >> >> >>\nendobj\n`);
-    let content = `q ${W.toFixed(2)} 0 0 ${H.toFixed(2)} ${M} ${M} cm /Im0 Do Q`;
+    let content = `q ${W.toFixed(2)} 0 0 ${H.toFixed(2)} ${M.toFixed(2)} ${M.toFixed(2)} cm /Im0 Do Q`;
     if (cropMarks) {
-      /* The page already carries its bleed, so the trim is INSIDE the sheet.
-         Marks drawn at the sheet corners would tell the printer to cut on the
-         bleed line and hand back a book an eighth of an inch too big on
-         every edge. */
-      const b = (pageBleed(doc.pages[i]) / DPI) * 72;
       const x0 = M + b, y0 = M + b, x1 = M + W - b, y1 = M + H - b;
       const marks =
-        cornerMarks(x0, y0, -1, -1) +   // bottom-left
-        cornerMarks(x1, y0, 1, -1) +    // bottom-right
-        cornerMarks(x0, y1, -1, 1) +    // top-left
-        cornerMarks(x1, y1, 1, 1);      // top-right
+        cornerMarks(x0, y0, -1, -1, b) +   // bottom-left
+        cornerMarks(x1, y0, 1, -1, b) +    // bottom-right
+        cornerMarks(x0, y1, -1, 1, b) +    // top-left
+        cornerMarks(x1, y1, 1, 1, b);      // top-right
       content += `\n0 0 0 RG 0.5 w\n${marks}S`;
     }
     beginObj(contObj(i));
-    push(`<< /Length ${content.length} >>\nstream\n${content}\nendstream\nendobj\n`);
+    push(`<< /Length ${enc.encode(content).length} >>\nstream\n${content}\nendstream\nendobj\n`);
     beginObj(imgObj(i));
-    push(`<< /Type /XObject /Subtype /Image /Width ${img.w} /Height ${img.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${img.bytes.length} >>\nstream\n`);
-    push(img.bytes);
+    push(`<< /Type /XObject /Subtype /Image /Width ${canvas.width} /Height ${canvas.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${blob.size} >>\nstream\n`);
+    push(blob);
     push(`\nendstream\nendobj\n`);
-  });
+  }
 
   const totalObjs = 2 + n * 3;
   const xrefStart = offset;
@@ -94,9 +94,9 @@ export async function exportPdf(
   push(xref);
   push(`trailer\n<< /Size ${totalObjs + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF\n`);
 
-  const blob = new Blob(chunks as BlobPart[], { type: "application/pdf" });
+  const out = new Blob(parts, { type: "application/pdf" });
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
+  a.href = URL.createObjectURL(out);
   a.download = filename;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);

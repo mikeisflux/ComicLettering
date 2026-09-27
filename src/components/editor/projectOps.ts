@@ -396,18 +396,37 @@ export async function importJSON(ed: EditorCtx, f: File) {
 }
 
 export async function printPage(ed: EditorCtx) {
-  const { demo, setStatus, page, assetsRef } = ed;
+  const { demo, setStatus, page, assetsRef, docRef, pageIndexRef } = ed;
   if (demo) { setStatus(demoLock("Printing is off in the demo — subscribe to print your pages.", "Printing")); return; }
   if (!page) return;
+  const d = docRef.current!;
   setStatus("Preparing print…");
-  const { renderPageToCanvas } = await import("@/lib/exportPng");
-  const canvas = await renderPageToCanvas(page, assetsRef.current, 1);
-  const url = canvas.toDataURL("image/png");
-  const w = window.open("", "_blank");
-  if (!w) { setStatus("Pop-up blocked — allow pop-ups to print."); return; }
-  w.document.write(`<!doctype html><title>Print — LetterMyComic</title><style>body{margin:0}img{width:100%}</style><img src="${url}" onload="setTimeout(function(){window.print()},150)">`);
-  w.document.close();
-  setStatus("Sent to print.");
+  const { renderPageToCanvas, spreadNeighbor } = await import("@/lib/exportPng");
+  /* the two-page print view prints both pages of the spread; otherwise the
+     one page — either way WITH its spread partner's cross-spine lettering,
+     which the old print cut off at the trim */
+  const idxs = ed.spreadPrint && ed.spreadLayout.length === 2
+    ? [...ed.spreadLayout].sort((a, b) => a.off - b.off).map((s) => s.idx)
+    : [pageIndexRef.current];
+  try {
+    await ensureDocFonts(d);
+    const urls: string[] = [];
+    for (const i of idxs) {
+      const canvas = await renderPageToCanvas(d.pages[i], assetsRef.current, 1, false, spreadNeighbor(d, i));
+      const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/png"));
+      if (!blob) throw new Error("render failed");
+      urls.push(URL.createObjectURL(blob));
+    }
+    const w = window.open("", "_blank");
+    if (!w) { setStatus("Pop-up blocked — allow pop-ups to print."); urls.forEach((u) => URL.revokeObjectURL(u)); return; }
+    const imgs = urls.map((u) => `<img src="${u}">`).join("");
+    w.document.write(`<!doctype html><title>Print — LetterMyComic</title><style>@page{margin:0}html,body{margin:0;height:100%}img{display:block;width:100%;height:100vh;object-fit:contain;page-break-after:always;break-after:page}img:last-child{page-break-after:auto;break-after:auto}</style>${imgs}<script>var n=${urls.length},k=0;document.querySelectorAll("img").forEach(function(i){i.onload=function(){if(++k===n)setTimeout(function(){window.print()},150)}})</script>`);
+    w.document.close();
+    setTimeout(() => urls.forEach((u) => URL.revokeObjectURL(u)), 60_000);
+    setStatus(idxs.length > 1 ? "Sent the spread to print." : "Sent to print.");
+  } catch (err) {
+    setStatus("Print failed: " + (err instanceof Error ? err.message : String(err)).slice(0, 140));
+  }
 }
 
 export async function exportAllPages(ed: EditorCtx) {

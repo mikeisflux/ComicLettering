@@ -77,6 +77,19 @@ export async function loadSam(onProgress?: SamProgress): Promise<boolean> {
 }
 
 export const samReady = () => !!(encoder && decoder);
+
+/* the encoder holds hundreds of MB of WASM heap after one run — let it go
+   after ten idle minutes (the next tuck reloads it, from the HTTP cache) */
+let idleTimer: ReturnType<typeof setTimeout> | null = null;
+function touchIdle() {
+  if (idleTimer) clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => {
+    idleTimer = null;
+    try { encoder?.release(); decoder?.release(); } catch { /* ignore */ }
+    encoder = null; decoder = null;
+    embeddings.clear();
+  }, 10 * 60_000);
+}
 let lastError = "";
 export const samError = () => lastError;
 
@@ -125,6 +138,7 @@ export async function encodeImage(
   try {
     const input = new ort.Tensor("float32", chw, [1, 3, SIDE, SIDE]);
     const out = await encoder.run({ image: input });
+    touchIdle();
     const emb: Embedding = { data: out.embedding as Tensor, scale, origW: W, origH: H };
     embeddings.set(key, emb);
     /* one page's embedding is ~4MB; a long book would add up */
@@ -145,7 +159,12 @@ export async function segmentBox(
   emb: Embedding, x0: number, y0: number, x1: number, y1: number,
 ): Promise<SamMask | null> {
   const ort = await getOrt();
-  if (!ort || !decoder) return null;
+  if (!ort || !decoder) {
+    /* released while idle — bring it back for this segment */
+    if (!(await loadSam())) return null;
+    return segmentBox(emb, x0, y0, x1, y1);
+  }
+  touchIdle();
   /* labels 2 and 3 are SAM's "this is a box corner" markers, and the points
      are given in the encoder's 1024-space, not the original image's */
   const coords = Float32Array.from([

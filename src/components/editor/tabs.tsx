@@ -498,7 +498,7 @@ export function renderPhotosTab(ed: EditorCtx) {
       {entries.length === 0 && <div className="tips">Import photos (or drop them onto the page). They appear here so you can reuse them: select a panel, then click a photo to place it inside.</div>}
       <div className="photoGrid">
         {entries.map(([aid, url]) => (
-          <button key={aid} className="photoBtn" style={{ backgroundImage: `url(${url})` }}
+          <button key={aid} className="photoBtn"
             title="Click: fill selected panel (or add to page)"
             onClick={() => {
               if (selEl && (selEl.type === "panel" || selEl.type === "image" || selEl.type === "balloon")) assignImageToPanel(ed, selEl.id, aid);
@@ -514,7 +514,10 @@ export function renderPhotosTab(ed: EditorCtx) {
                   setSelId(el.id);
                 });
               }
-            }} />
+            }} >
+            {/* lazy, async decode: the grid used to decode every full-size scan at once as CSS backgrounds */}
+            <img src={url} alt="" loading="lazy" decoding="async" draggable={false} />
+          </button>
         ))}
       </div>
     </div>
