@@ -6,6 +6,7 @@ import {
 import { loadImage } from "@/lib/exportPng";
 import { elLabel } from "./textHelpers";
 import { EditorCtx } from "./ctx";
+import { askText } from "./askText";
 import {
   addFromTray, applyProofFix, assignImageToPanel, deleteProject, deleteSel,
   duplicateSel, exportAllPages,
@@ -50,11 +51,11 @@ export function renderLayoutsTab(ed: EditorCtx) {
     });
     commit();
   };
-  const saveCurrent = () => {
+  const saveCurrent = async () => {
     if (!page) return;
     const cap = capturePageLayout(page);
     if (!cap) { setStatus("No panels on this page yet — apply a layout or draw panels, arrange them, then save."); return; }
-    const name = window.prompt("Name this layout:", "My layout");
+    const name = (await askText(ed, "Name this layout:", "My layout", { ok: "Save" }))?.trim();
     if (!name) return;
     setMyLayouts([...myLayouts.filter((l) => l.name !== name), { name, fracs: cap.fracs, pts: cap.pts }]);
     setLayoutCat(MY);
@@ -174,8 +175,8 @@ export function renderLayersTab(ed: EditorCtx) {
     p.els.splice(clamp(i + delta, 0, p.els.length), 0, el);
     commit();
   };
-  const rename = (el: (typeof els)[number]) => {
-    const n = window.prompt("Layer name:", el.name ?? elLabel(el));
+  const rename = async (el: (typeof els)[number]) => {
+    const n = await askText(ed, "Layer name:", el.name ?? elLabel(el), { ok: "Rename" });
     if (n === null) return;
     el.name = n.trim() || undefined;
     commit();
@@ -198,14 +199,14 @@ export function renderLayersTab(ed: EditorCtx) {
       ? `Copied “${elLabel(el)}” onto ${count} page${count === 1 ? "" : "s"}.`
       : "No other pages in that range.");
   };
-  const groupSelected = () => {
+  const groupSelected = async () => {
     const ids = new Set(ed.selIds);
     const members = page.els.filter((e) => ids.has(e.id));
     if (members.length < 2) {
       ed.setStatus("Pick at least two layers first (Ctrl+click rows adds to the selection), then group.");
       return;
     }
-    const gname = window.prompt("Group name:", "Group");
+    const gname = await askText(ed, "Group name:", "Group", { ok: "Group" });
     if (gname === null) return;
     const g = gname.trim() || "Group";
     const top = Math.max(...members.map((e) => page.els.indexOf(e)));
@@ -287,8 +288,8 @@ export function renderLayersTab(ed: EditorCtx) {
               rows.push(
                 <div key={`grp-${g}-${rows.length}`} className="layerGroupRow"
                   onClick={() => { if (shut) collapsedGroups.delete(g); else collapsedGroups.add(g); ed.force(); }}
-                  onDoubleClick={() => {
-                    const n = window.prompt("Group name:", g);
+                  onDoubleClick={async () => {
+                    const n = await askText(ed, "Group name:", g, { ok: "Rename" });
                     if (n === null) return;
                     const name = n.trim() || g;
                     for (const m of members) m.group = name;

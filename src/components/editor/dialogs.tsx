@@ -390,6 +390,35 @@ export function renderTailAsk(ed: EditorCtx) {
   );
 }
 
+/* The studio's own prompt() — see askText.ts for why the browser's is not
+   used. Uncontrolled input: Enter/OK resolve with the text, Escape (via
+   closeTopDialog), Cancel and the backdrop resolve with null. */
+export function renderTextAsk(ed: EditorCtx) {
+  const { textAsk, setTextAsk } = ed;
+  if (!textAsk) return null;
+  const done = (v: string | null) => { setTextAsk(null); textAsk.resolve(v); };
+  return (
+    <div className="setupOverlay" onPointerDown={(e) => { if (e.target === e.currentTarget) done(null); }}>
+      <form className="setupDlg" style={{ width: 360 }} onSubmit={(e) => {
+        e.preventDefault();
+        done(String(new FormData(e.currentTarget).get("v") ?? ""));
+      }}>
+        <div className="setupTitle">{textAsk.title}</div>
+        <div className="setupBody" style={{ flexDirection: "column", gap: 8 }}>
+          <input name="v" defaultValue={textAsk.value} placeholder={textAsk.placeholder}
+            autoFocus autoComplete="off" spellCheck={false}
+            onFocus={(e) => e.currentTarget.select()}
+            style={{ width: "100%", fontSize: 16, padding: "8px 10px", boxSizing: "border-box" }} />
+        </div>
+        <div className="setupFoot">
+          <button type="button" className="okBtn" onClick={() => done(null)}>Cancel</button>
+          <button type="submit" className="okBtn primary">{textAsk.ok || "OK"}</button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 /* Install-as-app instructions — shown when the browser gives us no native
    install prompt to fire (Firefox, Safari, or Chromium withholding it).
    The steps match the browser actually being used; every path ends with a

@@ -1184,6 +1184,7 @@ input[type="range"].adjTrack::-moz-range-thumb {
   overflow: hidden; display: flex; flex-direction: column;
 }
 .setupTitle, .setupFoot { flex: 0 0 auto; }
+form.setupDlg { margin: 0; }
 .setupBody { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .setupTitle {
   background: linear-gradient(#e8eaee, #d3d7dd); border-bottom: 1px solid var(--edge2);

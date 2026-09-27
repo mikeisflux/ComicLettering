@@ -24,7 +24,7 @@ also work as extra phone/tablet screenshots on Play — mix in as many as you li
 ## Full description (4000 chars max)
 
     LetterMyComic is a complete comic-book lettering studio. Word balloons that
-    behave like ink, display lettering with real warps, 600+ comic fonts, and
+    behave like ink, display lettering with real warps, 150+ comic fonts, and
     pages that come out print-ready — on a tablet, with a pen, or on any
     computer.
 
@@ -37,7 +37,7 @@ also work as extra phone/tablet screenshots on Play — mix in as many as you li
       consistent
 
     TYPE BUILT FOR COMICS
-    • 600+ comic fonts plus import for your own
+    • 150+ comic fonts (600+ font files) plus import for your own
     • Per-word bold, italic and underline, automatic comic grammar including
       the crossbar-I rule
     • Arc and envelope warping, gradient and texture fills, brush edges, glows

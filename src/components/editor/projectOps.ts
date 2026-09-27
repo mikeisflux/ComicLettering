@@ -11,6 +11,7 @@ import {
   ImageFormat, docThumbnail, exportPageImage, exportPagePNG, spreadNeighbor, download, pageImageBlob } from "@/lib/exportPng";
 import { LT_URL, ProofMatch } from "./textHelpers";
 import { EditorCtx } from "./ctx";
+import { askText } from "./askText";
 import { ensureAllArt, refitLegacyLettering, releaseOffscreenArt } from "./ops";
 import { launchFireworks } from "./fireworks";
 
@@ -133,7 +134,7 @@ export async function saveProject(ed: EditorCtx, saveAs: boolean) {
   let target = current;
   let name = current?.name;
   if (saveAs || !target) {
-    const entered = window.prompt("Project name:", name || "My comic");
+    const entered = (await askText(ed, "Project name:", name || "My comic", { ok: "Save" }))?.trim();
     if (!entered) return;
     name = entered;
     target = null;

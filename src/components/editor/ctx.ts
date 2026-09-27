@@ -7,6 +7,7 @@ import type { Assets, BalloonEl, Doc, El, FillStyle, GradStop, ImageEl, Page, Pa
 import type { ImageFormat } from "@/lib/exportPng";
 import type { BalloonPreset, ProjectMeta, ProofMatch } from "./textHelpers";
 import type { TuckAsk } from "./tuck";
+import type { TextAsk } from "./askText";
 
 type SetState<T> = React.Dispatch<React.SetStateAction<T>>;
 
@@ -220,6 +221,8 @@ export interface EditorCtx {
   setShapeMode: SetState<"rect" | "oval" | "circle" | null>;
   tailAsk: string | null;
   setTailAsk: SetState<string | null>;
+  textAsk: TextAsk | null;
+  setTextAsk: SetState<TextAsk | null>;
   ctxMenu: { x: number; y: number; id: string } | null;
   setCtxMenu: SetState<{ x: number; y: number; id: string } | null>;
   setShowSetup: SetState<boolean>;

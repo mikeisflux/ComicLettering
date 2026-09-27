@@ -27,6 +27,7 @@ import {
 } from "./editor/textHelpers";
 import { SmartTip, pickTip } from "./editor/smartTips";
 import { TuckAsk } from "./editor/tuck";
+import type { TextAsk } from "./editor/askText";
 import { makeTuckHandlers } from "./editor/tuckOps";
 import { makeCrossPageDrop } from "./editor/spreadOps";
 import { KeyFns, useEditorKeys } from "./editor/useEditorKeys";
@@ -54,7 +55,7 @@ import { renderFormatBar, renderMenuBar, renderToolbar } from "./editor/chromeBa
 import {
   renderAssocHelp, renderContextMenu, renderExportDialog, renderExportProgress, renderShortcutsDialog,
   renderFindDialog, renderInstallHelp,
-  renderScriptDialog, renderTailAsk, renderTray, renderTuckDialog,
+  renderScriptDialog, renderTailAsk, renderTextAsk, renderTray, renderTuckDialog,
 } from "./editor/dialogs";
 import { renderAdjustDialog } from "./editor/adjustDialog";
 
@@ -176,6 +177,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const [tuckMode, setTuckMode] = useState(false);
   const tuckPtsRef = useRef<number[][] | null>(null);
   const [tuckAsk, setTuckAsk] = useState<TuckAsk | null>(null);
+  const [textAsk, setTextAsk] = useState<TextAsk | null>(null);
   /* collaboration (shared books): team, pinned notes, review passes */
   const [collab, setCollab] = useState<CollabState | null>(null);
   const [collabTick, setCollabTick] = useState(0);
@@ -1128,9 +1130,9 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
        Missing any dialog here meant Delete/Backspace typed into its field
        removed the selected element behind it. */
     modalOpenRef.current =
-      showSetup || showExport || showFind || showScript || showGradMaker || !!tuckAsk || !!tailAsk
+      showSetup || showExport || showFind || showScript || showGradMaker || !!tuckAsk || !!tailAsk || !!textAsk
       || showTeam || !!composer || showAssocHelp || showShortcuts || showInstallHelp || askAddPage;
-  }, [showSetup, showExport, showFind, showScript, showGradMaker, tuckAsk, tailAsk, showTeam, composer, showAssocHelp, showShortcuts, showInstallHelp, askAddPage]);
+  }, [showSetup, showExport, showFind, showScript, showGradMaker, tuckAsk, tailAsk, textAsk, showTeam, composer, showAssocHelp, showShortcuts, showInstallHelp, askAddPage]);
   useEffect(() => {
     try {
       const installed = window.matchMedia?.("(display-mode: standalone)").matches
@@ -1209,6 +1211,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     selIdsRef, editingIdRef, setSelIds,
     mutateText, mutateBalloon, mutateLettering, mutateArt, mutatePanel,
     tuckAsk, setTuckAsk, retuneTuck, runTuckAuto, applyTuck, tuckTool, setTuckTool,
+    textAsk, setTextAsk,
     adjustEdit, setAdjustEdit, resetTools,
     autosaveSoon,
     rebuildThumbs, reseedAids, setThumbs, setPageIndex, setUserZoomed,
@@ -1261,6 +1264,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       if (ctxMenu) { setCtxMenu(null); return true; }
       if (openMenu) { setOpenMenu(null); return true; }
       if (tuckAsk) { setTuckAsk(null); return true; }
+      if (textAsk) { setTextAsk(null); textAsk.resolve(null); return true; }
       if (typeof window !== "undefined" && window.innerWidth < 700 && (!winHide.left || !winHide.right)) {
         setWinHide((h) => ({ ...h, left: true, right: true })); return true;
       }
@@ -1350,6 +1354,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       {!winHide.tray && renderTray(ed)}
       {renderContextMenu(ed)}
       {renderTailAsk(ed)}
+      {renderTextAsk(ed)}
       {renderExportDialog(ed)}
       {renderExportProgress(ed)}
       {renderFindDialog(ed)}

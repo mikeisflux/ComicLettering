@@ -4,6 +4,7 @@ import { useState } from "react";
    Pins render on BOTH canvases — the single page and each spread half. */
 import React from "react";
 import { CollabState, EditorCtx } from "./ctx";
+import { askText } from "./askText";
 
 export async function collabOp(
   projectId: string, payload: Record<string, unknown>,
@@ -173,8 +174,8 @@ function ReviewSection({ ed, c, projectId }: { ed: EditorCtx; c: CollabState; pr
           {(c.role === "owner" || c.role === "editor") && (
             <div className="btnRow" style={{ marginTop: 6 }}>
               <button onClick={() => act({ op: "close", status: "approved" })}>Approve</button>
-              <button onClick={() => {
-                const note = window.prompt("What needs to change?") ?? "";
+              <button onClick={async () => {
+                const note = (await askText(ed, "What needs to change?", "", { ok: "Request changes" })) ?? "";
                 if (note.trim()) act({ op: "close", status: "changes", note });
               }}>Request changes</button>
             </div>
@@ -184,8 +185,9 @@ function ReviewSection({ ed, c, projectId }: { ed: EditorCtx; c: CollabState; pr
       ) : (
         (c.role === "owner" || c.role === "letterer") && (
           <div className="btnRow" style={{ marginBottom: 6 }}>
-            <button onClick={() => {
-              const note = window.prompt("Anything the reviewer should focus on? (optional)") ?? "";
+            <button onClick={async () => {
+              const note = await askText(ed, "Anything the reviewer should focus on? (optional)", "", { ok: "Request review" });
+              if (note === null) return;
               act({ op: "review", note });
             }}>Request review</button>
           </div>

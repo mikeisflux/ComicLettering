@@ -21,6 +21,7 @@ import {
 import { forgetImage, loadImage, spreadNeighbor } from "@/lib/exportPng";
 import { BalloonPreset, measureBlock, measureCharWidths, parseScript, toggleEmphasis } from "./textHelpers";
 import { EditorCtx } from "./ctx";
+import { askText } from "./askText";
 import { remapComments } from "./spreadOps";
 import { FontRec, ensureDocFonts, fontKeyFor } from "./useFontsStamps";
 
@@ -288,10 +289,10 @@ export function rotateSel(ed: EditorCtx, delta: number) {
   });
 }
 
-export function saveBalloonPreset(ed: EditorCtx) {
+export async function saveBalloonPreset(ed: EditorCtx) {
   const { selEl, setStatus, savePresets, presets } = ed;
   if (!selEl || selEl.type !== "balloon") { setStatus("Select a balloon to save as a preset."); return; }
-  const name = (window.prompt("Name this balloon preset:", "My balloon") || "").trim();
+  const name = ((await askText(ed, "Name this balloon preset:", "My balloon", { ok: "Save" })) || "").trim();
   if (!name) return;
   const s = selEl;
   const preset: BalloonPreset = {
@@ -1148,7 +1149,7 @@ let askedToPersist = false;
 /* Instant Alpha: flood-remove the background color from the image edges. */
 export async function runInstantAlpha(ed: EditorCtx, elId: string, aid: string) {
   const { assetsRef, setStatus, aidRef, docRef, pageIndexRef, commit } = ed;
-  const tolStr = window.prompt("Background removal strength (1–100):", "30");
+  const tolStr = await askText(ed, "Background removal strength (1–100):", "30", { ok: "Remove background" });
   if (!tolStr) return;
   const tol = clamp(+tolStr || 30, 1, 100);
   const src = assetsRef.current[aid];
