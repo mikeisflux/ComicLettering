@@ -156,7 +156,9 @@ export function renderTray(ed: EditorCtx) {
               <span key={s.id} className="stampThumb">
                 <button style={{ backgroundImage: `url(${s.url})` }} title="Place stamp"
                   onClick={() => insertCustomStamp(ed, s.url)} />
-                <i title="Remove from library" onClick={() => removeCustomStamp(ed, s.id)}>✕</i>
+                <i className="stampDel" role="button" tabIndex={0} aria-label="Remove this stamp from your library" title="Remove from library"
+                  onClick={() => removeCustomStamp(ed, s.id)}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); removeCustomStamp(ed, s.id); } }}>✕</i>
               </span>
             ))}
             <button className="stampImport" onClick={() => fileStampRef.current?.click()}>＋ Import stamps…</button>

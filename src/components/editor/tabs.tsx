@@ -316,6 +316,8 @@ export function renderLayersTab(ed: EditorCtx) {
             rows.push(
               <div key={el.id}
                 className={"layerRow" + (ed.selIds.includes(el.id) ? " on" : "") + (el.hidden ? " off" : "") + (g ? " inGroup" : "")}
+                role="button" tabIndex={0} aria-pressed={ed.selIds.includes(el.id)}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(el.id, e.ctrlKey || e.metaKey || e.shiftKey); } }}
                 onClick={(e) => select(el.id, e.ctrlKey || e.metaKey || e.shiftKey)}
                 onDoubleClick={() => rename(el)}
                 onContextMenu={(e) => {
@@ -473,7 +475,8 @@ export function renderProofTab(ed: EditorCtx) {
         <div className="tips" style={{ color: "#1d8a3c", fontWeight: 600 }}>No issues found on this page ✓</div>
       )}
       {proof?.matches.map((m, i) => (
-        <div key={i} className="proofCard" onClick={() => select(m.elId)}>
+        <div key={i} className="proofCard" role="button" tabIndex={0} onClick={() => select(m.elId)}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(m.elId); } }}>
           <div className="proofMsg">{m.message}</div>
           <div className="proofCtx">…{m.context}…</div>
           <div className="btnRow">

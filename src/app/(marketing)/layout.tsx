@@ -1,9 +1,12 @@
 import Link from "next/link";
+import { preload } from "react-dom";
 import "../marketing.css";
 import { getSessionUser } from "@/lib/auth";
 import MobileNav from "./_components/MobileNav";
 
 export default async function MarketingLayout({ children }: { children: React.ReactNode }) {
+  /* the headline face — fetched before the H1 paints, or it flashes the fallback */
+  preload("/fonts/Bangers-400.woff2", { as: "font", type: "font/woff2", crossOrigin: "anonymous" });
   const user = await getSessionUser();
   return (
     <div className="mkt">

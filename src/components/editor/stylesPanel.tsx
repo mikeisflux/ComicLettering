@@ -26,10 +26,14 @@ function ShapeSwatch({ s, on, box, mine, onPick, onRemove }: {
   onPick: () => void; onRemove?: () => void;
 }) {
   return (
-    <button className={"styleBtn shapeBtn" + (on ? " on" : "") + (mine ? " mine" : "")}
-      title={mine ? `${s.name} — saved in this book (right-click to remove)` : s.name}
+    <button className={"styleBtn shapeSwatchBtn" + (on ? " on" : "") + (mine ? " mine" : "")}
+      title={mine ? `${s.name} — saved in this book (✕ or right-click to remove)` : s.name}
       onContextMenu={(e) => { if (!mine) return; e.preventDefault(); onRemove?.(); }}
       onClick={onPick}>
+      {mine && onRemove && (
+        <span className="styleDel" role="button" aria-label={`Remove saved style ${s.name}`}
+          onClick={(e) => { e.stopPropagation(); onRemove(); }}>✕</span>
+      )}
       <span className={"shapeSw" + (box ? " box" : "") + (s.none ? " none" : "")}
         style={{ background: shapeCss(s), borderColor: s.stroke, borderWidth: Math.max(1, Math.round(s.strokeW / 1.6)) }}>
         {/* a saved style carries its bubble's font — preview it live */}
@@ -74,7 +78,7 @@ export function StylesPanel({ ed }: { ed: EditorCtx }) {
           ? letters.map((s) => (
             <button key={s.name}
               className={"styleBtn" + (activeStyle === s.name ? " on" : "") + (isMine(s.name) ? " mine" : "")}
-              title={isMine(s.name) ? `${s.name} — saved in this book (right-click to remove)` : s.name}
+              title={isMine(s.name) ? `${s.name} — saved in this book (✕ or right-click to remove)` : s.name}
               onContextMenu={(e) => {
                 if (!isMine(s.name)) return;
                 e.preventDefault();
@@ -91,6 +95,10 @@ export function StylesPanel({ ed }: { ed: EditorCtx }) {
                   setStatus(`Style “${s.name}” selected — new lettering will use it.`);
                 }
               }}>
+              {isMine(s.name) && (
+                <span className="styleDel" role="button" aria-label={`Remove saved style ${s.name}`}
+                  onClick={(e) => { e.stopPropagation(); if (window.confirm(`Remove the saved style “${s.name}”?`)) deleteSavedStyle(ed, "letters", s.name); }}>✕</span>
+              )}
               <span style={letterStyleCss(s, 21)}>ABC</span>
             </button>
           ))

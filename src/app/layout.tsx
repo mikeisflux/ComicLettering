@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./fonts.css";
 import "./globals.css";
 
@@ -38,6 +38,15 @@ export const metadata: Metadata = {
     images: ["/og.png"],
   },
   robots: { index: true, follow: true },
+};
+
+/* theme-color tints browser chrome before the app is installed; viewport-fit
+   lets the editor pad itself past a phone's notch (see globals.css) */
+export const viewport: Viewport = {
+  themeColor: "#24303f",
+  viewportFit: "cover",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

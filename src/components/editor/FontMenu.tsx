@@ -36,8 +36,9 @@ export function FontMenu({ value, disabled, onPick, onImport, onDeleteFont }: {
                         {x.label}
                       </button>
                       {gr === "My Fonts" && onDeleteFont && (
-                        <i className="fontDel" title="Remove from your library"
-                          onClick={(e) => { e.stopPropagation(); onDeleteFont(k); }}>✕</i>
+                        <i className="fontDel" role="button" tabIndex={0} aria-label={`Remove ${x.label} from your library`} title="Remove from your library"
+                          onClick={(e) => { e.stopPropagation(); onDeleteFont(k); }}
+                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); onDeleteFont(k); } }}>✕</i>
                       )}
                     </span>
                   ))}

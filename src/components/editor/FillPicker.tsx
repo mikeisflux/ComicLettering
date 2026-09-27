@@ -66,7 +66,7 @@ export function FillPicker({ value, onChange }: { value: FillStyle; onChange: (f
           </div>
           <div className="variantGrid">
             {GRADIENT_PRESETS.map(([a, b], i) => (
-              <button key={i} className="variantBtn" style={{ background: `linear-gradient(180deg, ${a}, ${b})` }}
+              <button key={i} className="variantBtn" style={{ background: `linear-gradient(180deg, ${a}, ${b})` }} title={`${a} → ${b}`}
                 onClick={() => onChange({ kind: "gradient", a, b, angle: 180 }, true)} />
             ))}
           </div>

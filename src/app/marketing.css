@@ -270,7 +270,7 @@
 .mktFooter .cols { display: flex; flex-wrap: wrap; gap: 40px; max-width: 1120px; margin: 0 auto; }
 .mktFooter a { color: #cdd6e2; display: block; margin-bottom: 6px; }
 .mktFooter .foot-brand { font-family: "Bangers", cursive; font-size: 22px; color: #fff; }
-.mktFooter .legal { margin-top: 18px; text-align: center; color: #6d7b8d; font-size: 12px; }
+.mktFooter .legal { margin-top: 18px; text-align: center; color: #a3aec0; font-size: 12px; }
 /* the legal links sit INLINE in the copyright line, unlike the column links */
 .mktFooter .legal a { display: inline; margin: 0; color: #93a1b3; }
 

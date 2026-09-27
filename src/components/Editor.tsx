@@ -1151,6 +1151,15 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       return { ...base, ...JSON.parse(localStorage.getItem("lmc-window") || "{}") };
     } catch { return base; }
   });
+  /* crossing into phone width after load: the rails turn into drawers over
+     the canvas, so hide them (winHide was computed once at mount) */
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(max-width: 699.98px)");
+    const on = () => { if (mq.matches) setWinHide((h) => (h.left || h.right ? { ...h, left: true, right: true } : { ...h, left: true, right: true })); };
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
   const showTab = useCallback((k: typeof tab) => {
     setTab(k);
     setWinHide((h) => (h.right ? { ...h, right: false } : h));
@@ -1252,6 +1261,9 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       if (ctxMenu) { setCtxMenu(null); return true; }
       if (openMenu) { setOpenMenu(null); return true; }
       if (tuckAsk) { setTuckAsk(null); return true; }
+      if (typeof window !== "undefined" && window.innerWidth < 700 && (!winHide.left || !winHide.right)) {
+        setWinHide((h) => ({ ...h, left: true, right: true })); return true;
+      }
       if (showFill || showStroke || showTextColor || stampOpen) {
         setShowFill(false); setShowStroke(false); setShowTextColor(false); setStampOpen(false); return true;
       }
@@ -1322,9 +1334,9 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
         {!winHide.right && <aside className="rightbar">
           {/* phone drawer: the rail floats over the canvas and needs a way out */}
           <button className="railClose" onClick={() => toggleWindow("right")}>✕ Close</button>
-          <div className="tabs">
+          <div className="tabs" role="tablist" aria-label="Right panel">
             {([["layouts", "Layouts"], ["inspector", "Inspect"], ["layers", "Layers"], ["photos", "Photos"], ["library", "Library"], ["proof", "Proof"]] as const).map(([k, label]) => (
-              <button key={k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{label}</button>
+              <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{label}</button>
             ))}
           </div>
           {tab === "layouts" && renderLayoutsTab(ed)}

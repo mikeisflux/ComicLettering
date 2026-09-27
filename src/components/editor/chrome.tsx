@@ -224,6 +224,8 @@ export function PageSetupDialog({ page, onClose, onApply }: {
             <div className="sizeList">
               {PAPER_CATEGORIES[cat].sizes.map(([name, w, h], i) => (
                 <div key={name} className={"sizeRow" + (i === selSize ? " on" : "")}
+                  role="option" aria-selected={i === selSize} tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); (e.currentTarget as HTMLElement).click(); } }}
                   onClick={() => {
                     setSelSize(i);
                     if (landscape) { setWIn(h.toFixed(3)); setHIn(w.toFixed(3)); }
