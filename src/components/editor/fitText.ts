@@ -20,6 +20,9 @@ function makeMeasurer(ts: TextStyle): HTMLDivElement {
     lineHeight: `${ts.lineHeight ?? 1.05}`,
     letterSpacing: ts.tracking ? `${ts.tracking}px` : "normal",
     textTransform: ts.caps ? "uppercase" : "none",
+    /* the canvas breaks an over-long word mid-word; measuring it unbroken
+       flagged balloons as overflowing when they visibly fit */
+    wordBreak: "break-word",
   } as CSSStyleDeclaration);
   document.body.appendChild(meas);
   return meas;
@@ -145,7 +148,10 @@ function applyLineBreaks(el: BalloonEl | TextEl, lines: string[][]) {
       if (newText[i] !== el.text[i]) {
         let acc = 0;
         for (const r of runs) {
-          if (i < acc + r.t.length) { r.t = r.t.slice(0, i - acc) + "\n" + r.t.slice(i - acc + 1); break; }
+          /* write the NEW character — a break becoming a space as well as
+             a space becoming a break (writing "\n" for both left the old
+             break in the runs, which the renderers prefer over the text) */
+          if (i < acc + r.t.length) { r.t = r.t.slice(0, i - acc) + newText[i] + r.t.slice(i - acc + 1); break; }
           acc += r.t.length;
         }
       }
@@ -248,6 +254,9 @@ export function balanceRag(ed: EditorCtx) {
     fontStyle: ts.italic ? "italic" : "normal",
     letterSpacing: ts.tracking ? `${ts.tracking}px` : "normal",
     textTransform: ts.caps ? "uppercase" : "none",
+    /* the canvas breaks an over-long word mid-word; measuring it unbroken
+       flagged balloons as overflowing when they visibly fit */
+    wordBreak: "break-word",
   } as CSSStyleDeclaration);
   document.body.appendChild(meas);
   const measure = (s: string) => { meas.textContent = s; return meas.scrollWidth; };

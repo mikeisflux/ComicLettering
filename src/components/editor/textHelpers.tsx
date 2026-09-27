@@ -164,7 +164,9 @@ export function domToRuns(root: HTMLElement): TextRun[] {
   const walk = (node: Node, b: boolean, i: boolean, u: boolean) => {
     node.childNodes.forEach((child) => {
       if (child.nodeType === 3) {
-        const txt = (child.textContent || "").replace(/\u200b/g, "");
+        /* contentEditable writes non-breaking spaces; the text model gets
+           plain spaces, so the runs must too or they render differently */
+        const txt = (child.textContent || "").replace(/\u200b/g, "").replace(/\u00a0/g, " ");
         if (txt) runs.push({ t: txt, ...(b ? { b: true } : {}), ...(i ? { i: true } : {}), ...(u ? { u: true } : {}) });
       } else if (child.nodeType === 1) {
         const e = child as HTMLElement;
@@ -177,7 +179,7 @@ export function domToRuns(root: HTMLElement): TextRun[] {
         const fw = e.style?.fontWeight; if (fw === "bold" || (fw && +fw >= 600)) nb = true;
         if (e.style?.fontStyle === "italic") ni = true;
         if (e.style?.textDecoration?.includes("underline") || e.style?.textDecorationLine?.includes("underline")) nu = true;
-        if ((tag === "div" || tag === "p") && runs.length && runs[runs.length - 1].t !== "\n") runs.push({ t: "\n" });
+        if ((tag === "div" || tag === "p") && runs.length && !runs[runs.length - 1].t.endsWith("\n")) runs.push({ t: "\n" });
         walk(e, nb, ni, nu);
       }
     });
@@ -274,7 +276,7 @@ function measNode(ts: TextStyle): HTMLDivElement {
   d.style.lineHeight = `${ts.lineHeight ?? 1.05}`;
   d.style.letterSpacing = ts.tracking ? `${ts.tracking}px` : "normal";
   d.style.textTransform = ts.caps ? "uppercase" : "none";
-  d.style.wordBreak = "normal";
+  d.style.wordBreak = "break-word";   // as the canvas renders (.el .txt)
   return d;
 }
 

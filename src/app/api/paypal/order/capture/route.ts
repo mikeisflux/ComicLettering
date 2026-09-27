@@ -33,13 +33,18 @@ export async function POST(req: Request) {
       data: { subStatus: "active", subPlan: "lifetime", subUntil: null, subId: null },
     });
   } else {
-    /* stack passes: extend from the current expiry when one is still running */
-    const base = user.subUntil && user.subUntil.getTime() > Date.now() && user.subStatus === "active"
+    /* stack passes: extend from the current expiry when one is still
+       running — a CANCELLED subscription's paid-through date counts too */
+    const base = user.subUntil && user.subUntil.getTime() > Date.now()
+      && (user.subStatus === "active" || user.subStatus === "cancelled")
       ? new Date(user.subUntil) : new Date();
     base.setMonth(base.getMonth() + pass.months);
     await prisma.user.update({
       where: { id: user.id },
-      data: { subStatus: "active", subPlan: cap.tier, subUntil: base },
+      /* a lapsed PayPal subscription id is dropped: left in place, the
+         account page's self-heal rewrote the pass back to "yearly /
+         cancelled" on the next visit */
+      data: { subStatus: "active", subPlan: cap.tier, subUntil: base, ...(user.subStatus !== "active" ? { subId: null } : {}) },
     });
   }
   return NextResponse.json({ ok: true });

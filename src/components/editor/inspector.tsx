@@ -26,6 +26,7 @@ export function tsControls(ed: EditorCtx, el: BalloonEl | TextEl) {
       <div className="inspHead">Lettering</div>
       <Fld label="Font">
         <FontMenu value={ts.font} onImport={() => fileFontRef.current?.click()} onDeleteFont={(k) => deleteCustomFont(ed, k)} onPick={(k) => {
+          void ed.ensureCustomFont(k);
           const vars = FONTS[k]?.variants || ["regular"];
           const keep = vars.includes(tsVariant(ts) as never);
           set({ font: k, ...(keep ? {} : { bold: false, italic: false }) });

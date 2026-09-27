@@ -41,7 +41,7 @@ export function renderLayoutsTab(ed: EditorCtx) {
   const cat = mine ? null : LAYOUT_CATEGORIES[layoutCat];
   const apply = (fracs: LayoutRect[], pts?: SavedLayout["pts"]) => {
     if (!page) return;
-    applyLayout(page, fracs);
+    applyLayout(page, fracs, pts);
     /* applyLayout puts the fresh panels at the head of els in fracs order —
        hand pen-drawn outlines back to their panels */
     if (pts) pts.forEach((pp, i) => {
@@ -346,8 +346,6 @@ export function renderLayersTab(ed: EditorCtx) {
                 <button className={"layerBtn" + (el.locked ? " lockOn" : "")} title={el.locked ? "Unlock" : "Lock"}
                   onClick={(e) => {
                     e.stopPropagation();
-                    /* the shared op acts on the SELECTION — target this row only */
-                    if (!ed.selIds.includes(el.id) || ed.selIds.length !== 1) ed.setSelIds([el.id]);
                     el.locked = !el.locked;
                     pendingLockRef.current.delete(el.id);
                     commit();

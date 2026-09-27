@@ -123,7 +123,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
       { ul: [
         "Insert → Import Script → Balloons… breaks a whole comic script into balloons automatically, page by page.",
         "The Proof tab checks every balloon and lettering item with LanguageTool (free & open source); typos get red underlines while you type.",
-        "Edit → Find & Replace… works across the page or the whole book.",
+        "Edit → Find & Replace… searches every balloon and lettering item in the whole book.",
         "Arrange → Balance Line Breaks evens out a balloon's rag the way letterers break dialogue by hand.",
       ] },
     ],
@@ -174,7 +174,8 @@ export const GUIDE_SECTIONS: GuideSection[] = [
       { ul: [
         "Selecting — Ctrl+A select all · Ctrl+Shift+A deselect · Ctrl+click add/remove one · Tab / Shift+Tab step through · Esc deselect or finish editing",
         "Adding — B balloon · T text · L lettering · P panel",
-        "Editing — Ctrl+Z / Ctrl+Y undo, redo · Ctrl+D duplicate · Ctrl+C/X/V copy, cut, paste · Del delete",
+        "Editing — Ctrl+Z / Ctrl+Y undo, redo · Ctrl+D duplicate · Ctrl+C/X/V copy, cut, paste · Del delete · Ctrl+L lock, Ctrl+Shift+L unlock",
+        "Arranging — Ctrl+[ / Ctrl+] centre horizontally / vertically · Ctrl+Shift+] to front, Ctrl+Shift+[ to back · Ctrl+\\ fit balloon to text",
         "While dragging — Shift keeps proportions resizing and snaps 15° rotating · Alt ignores snapping",
         "Text — double-click to edit · Ctrl+B / Ctrl+I bold or italic the selected words",
         "Pages & view — PageUp / PageDown pages · Ctrl+Shift+N duplicate page · Ctrl+= / Ctrl+- zoom · Ctrl+0 fit",

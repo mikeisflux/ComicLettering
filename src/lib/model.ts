@@ -722,8 +722,10 @@ export const pageBleed = (p: Page) => p.bleed ?? BLEED;
 export function pageMargins(p: Page): PageMargin {
   if (p.margin) return p.margin;
   /* not rounded to whole pixels: 0.130in is 29.25 at 225dpi, and rounding it
-     makes Page Setup read the value back as 0.129 */
-  const s = MARGIN_IN * DPI;
+     makes Page Setup read the value back as 0.129. The margin can never sit
+     inside the bleed: on oversize paper (0.1875in bleed) the default
+     0.13in put layouts and balloons where the blade lands. */
+  const s = Math.max(MARGIN_IN * DPI, pageBleed(p) + 1);
   return { t: s, r: s, b: s, l: s };
 }
 
@@ -784,6 +786,8 @@ export interface Doc {
      → Save Style. They live in the document, so they travel with the project
      and are still there after a refresh. */
   styles?: { shapes?: unknown[]; letters?: unknown[] };
+  /* the one-time legacy lettering refit has run on this book */
+  refit?: number;
 }
 export type Assets = Record<string, string>;
 
@@ -1307,15 +1311,18 @@ export function capturePageLayout(page: Page): { fracs: LayoutRect[]; pts: ([num
   return { fracs, pts: panels.map((p) => p.pts ?? null) };
 }
 
-export function applyLayout(page: Page, fracs: LayoutRect[]) {
+export function applyLayout(page: Page, fracs: LayoutRect[], pts?: (number[][] | null)[]) {
   const mg = pageMargins(page);
   const g = Math.round(page.w * 0.02);
   const cw = page.w - mg.l - mg.r, ch = page.h - mg.t - mg.b;
-  const panels = fracs.map(([fx, fy, fw, fh, rot]) => {
-    const x0 = mg.l + fx * cw + (fx > 0.001 ? g / 2 : 0);
-    const x1 = mg.l + (fx + fw) * cw - (fx + fw < 0.999 ? g / 2 : 0);
-    const y0 = mg.t + fy * ch + (fy > 0.001 ? g / 2 : 0);
-    const y1 = mg.t + (fy + fh) * ch - (fy + fh < 0.999 ? g / 2 : 0);
+  const panels = fracs.map(([fx, fy, fw, fh, rot], i) => {
+    /* pen-drawn shapes were captured WITHOUT the gutter inset (see
+       capturePageLayout) — re-applying it shrank the outline every round trip */
+    const shaped = !!pts?.[i];
+    const x0 = mg.l + fx * cw + (!shaped && fx > 0.001 ? g / 2 : 0);
+    const x1 = mg.l + (fx + fw) * cw - (!shaped && fx + fw < 0.999 ? g / 2 : 0);
+    const y0 = mg.t + fy * ch + (!shaped && fy > 0.001 ? g / 2 : 0);
+    const y1 = mg.t + (fy + fh) * ch - (!shaped && fy + fh < 0.999 ? g / 2 : 0);
     const p = makePanel(Math.round(x0), Math.round(y0), Math.round(x1 - x0), Math.round(y1 - y0));
     if (rot) p.rot = rot;
     return p;

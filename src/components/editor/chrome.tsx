@@ -83,8 +83,12 @@ export function NumField({ value, min, max, step, disabled, width, title, classN
 }) {
   const [draft, setDraft] = useState<string | null>(null);
   const parse = (s: string) => (step && step !== Math.floor(step) ? parseFloat(s) : parseInt(s, 10));
+  /* Escape: the blur it triggers must not settle the draft — put the
+     original value back (undoing any live preview) instead */
+  const cancelRef = useRef(false);
 
   const settle = (raw: string | null) => {
+    if (cancelRef.current) { cancelRef.current = false; setDraft(null); return; }
     const n = parse(raw ?? "");
     if (!isNaN(n)) onCommit(clamp(n, min, max));
     setDraft(null);
@@ -109,7 +113,7 @@ export function NumField({ value, min, max, step, disabled, width, title, classN
       onBlur={() => settle(draft)}
       onKeyDown={(e) => {
         if (e.key === "Enter") { settle(draft); e.currentTarget.blur(); }
-        else if (e.key === "Escape") { setDraft(null); e.currentTarget.blur(); }
+        else if (e.key === "Escape") { cancelRef.current = true; if (onLive) onLive(value); setDraft(null); e.currentTarget.blur(); }
         e.stopPropagation();
       }}
     />
@@ -162,7 +166,9 @@ export function TrayBtn({ children, label, onClick, active }: { children: ReactN
 
 /* ---------------- Page Setup dialog (paper sizes, orientation, margins) ---------------- */
 
-const inch = (px: number) => (px / DPI).toFixed(3);
+/* four decimals: the oversize bleed is 0.1875in, which three rounded to
+   0.188 and drifted the page by a third of a pixel on every OK */
+const inch = (px: number) => (px / DPI).toFixed(4);
 
 export function PageSetupDialog({ page, onClose, onApply }: {
   page: Page;

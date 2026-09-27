@@ -22,6 +22,8 @@ export interface KeyFns {
   fitBalloonToText: () => void; printPage: () => void;
   duplicatePage: () => void;
   closeTopDialog: () => boolean;
+  /* the as-you-type autosave (a B/I/U toggle changes the model too) */
+  autosaveSoon: () => void;
 }
 
 interface Ref<T> { current: T }
@@ -95,13 +97,14 @@ export function useEditorKeys(deps: EditorKeyDeps) {
         else setSelId(null);
         return;
       }
+      const fns = keyFnsRef.current;
       /* take Ctrl+B / Ctrl+I over from the browser while lettering is being
          edited — its own handling strands the caret inside the run it just
          closed (see toggleEmphasis) */
       if ((e.ctrlKey || e.metaKey) && !e.altKey && t.isContentEditable &&
           ["b", "i", "u"].includes(e.key.toLowerCase())) {
         const kind = e.key.toLowerCase() === "b" ? "bold" : e.key.toLowerCase() === "i" ? "italic" : "underline";
-        if (toggleEmphasis(t, kind)) e.preventDefault();
+        if (toggleEmphasis(t, kind)) { e.preventDefault(); fns.autosaveSoon(); }
         return;
       }
       if (inField) return;
@@ -111,7 +114,6 @@ export function useEditorKeys(deps: EditorKeyDeps) {
          shortcuts below would still fire — Delete would remove the element
          behind the dialog, B/T/L/P would add one. Block them. */
       if (modalOpenRef.current) return;
-      const fns = keyFnsRef.current;
       const mod = e.ctrlKey || e.metaKey;
       if (mod && e.key.toLowerCase() === "z" && !e.shiftKey) { e.preventDefault(); undo(); return; }
       if (mod && (e.key.toLowerCase() === "y" || (e.key.toLowerCase() === "z" && e.shiftKey))) { e.preventDefault(); redo(); return; }

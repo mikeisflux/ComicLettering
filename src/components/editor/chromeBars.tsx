@@ -491,11 +491,11 @@ export function renderFormatBar(ed: EditorCtx) {
     <FontMenu value={selTs?.font || "comicneue"} disabled={!selTs}
       onImport={() => fileFontRef.current?.click()}
       onDeleteFont={(k) => deleteCustomFont(ed, k)}
-      onPick={(k) => ed.mutateText((x) => {
+      onPick={(k) => { void ed.ensureCustomFont(k); ed.mutateText((x) => {
         x.ts.font = k;
         const vars = FONTS[k]?.variants || ["regular"];
         if (!vars.includes(tsVariant(x.ts) as never)) { x.ts.bold = false; x.ts.italic = false; }
-      })} />
+      }); }} />
     <SubtypeSelect ts={selTs}
       onSet={(bold, italic) => ed.mutateText((x) => { x.ts.bold = bold; x.ts.italic = italic; })} />
     <NumField min={8} max={800} width={56} disabled={!selTs} title="Font size"

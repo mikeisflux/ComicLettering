@@ -75,7 +75,7 @@ export function FillPicker({ value, onChange }: { value: FillStyle; onChange: (f
       {v.kind === "halftone" && (
         <>
           <div className="fld"><label>Dots</label>
-            <input type="color" value={v.dot} onChange={(e) => set({ dot: e.target.value } as Partial<FillStyle>)} /></div>
+            <input type="color" value={v.dot} onInput={(e) => set({ dot: (e.target as HTMLInputElement).value } as Partial<FillStyle>, false)} onChange={(e) => set({ dot: e.target.value } as Partial<FillStyle>)} /></div>
           <div className="fld"><label>Cell</label>
             <select value={v.cell} onChange={(e) => set({ cell: +e.target.value as 8 | 16 | 32 } as Partial<FillStyle>)}>
               <option value={8}>Fine (8)</option><option value={16}>Medium (16)</option><option value={32}>Coarse (32)</option>
@@ -86,7 +86,7 @@ export function FillPicker({ value, onChange }: { value: FillStyle; onChange: (f
       {v.kind === "pattern" && (
         <>
           <div className="fld"><label>Ink</label>
-            <input type="color" value={v.fg} onChange={(e) => set({ fg: e.target.value } as Partial<FillStyle>)} /></div>
+            <input type="color" value={v.fg} onInput={(e) => set({ fg: (e.target as HTMLInputElement).value } as Partial<FillStyle>, false)} onChange={(e) => set({ fg: e.target.value } as Partial<FillStyle>)} /></div>
           <div className="fld"><label>Scale</label>
             <input type="range" min={8} max={64} value={v.scale} onChange={(e) => set({ scale: +e.target.value } as Partial<FillStyle>)} /></div>
           {variantSwatches(PATTERN_VARIANTS, v.variant, (key) => ({ ...v, variant: key } as FillStyle))}
@@ -95,14 +95,14 @@ export function FillPicker({ value, onChange }: { value: FillStyle; onChange: (f
       {v.kind === "speedlines" && (
         <>
           <div className="fld"><label>Lines</label>
-            <input type="color" value={v.line} onChange={(e) => set({ line: e.target.value } as Partial<FillStyle>)} /></div>
+            <input type="color" value={v.line} onInput={(e) => set({ line: (e.target as HTMLInputElement).value } as Partial<FillStyle>, false)} onChange={(e) => set({ line: e.target.value } as Partial<FillStyle>)} /></div>
           {variantSwatches(SPEEDLINE_VARIANTS, v.variant, (key) => ({ ...v, variant: key } as FillStyle))}
         </>
       )}
       {v.kind === "texture" && (
         <>
           <div className="fld"><label>Grain</label>
-            <input type="color" value={v.fg} onChange={(e) => set({ fg: e.target.value } as Partial<FillStyle>)} /></div>
+            <input type="color" value={v.fg} onInput={(e) => set({ fg: (e.target as HTMLInputElement).value } as Partial<FillStyle>, false)} onChange={(e) => set({ fg: e.target.value } as Partial<FillStyle>)} /></div>
           {variantSwatches(TEXTURE_VARIANTS, v.variant, (key) => ({ ...v, variant: key } as FillStyle))}
         </>
       )}

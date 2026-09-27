@@ -595,8 +595,10 @@ export function renderExportProgress(ed: EditorCtx) {
             aria-valuenow={pct ?? undefined} aria-label={p.label}>
             <div className="progFill" style={pct === null ? undefined : { width: pct + "%" }} />
           </div>
-          <div style={{ fontSize: 12, color: "#667", textAlign: "right" }}>
-            {pct === null ? "Preparing…" : `${p.done} of ${p.total} done — ${pct}%`}
+          <div style={{ fontSize: 12, color: "#667", display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ flex: 1 }}>{pct === null ? "Preparing…" : `${p.done} of ${p.total} done — ${pct}%`}</span>
+            <button onClick={() => { ed.exportCancelRef.current = true; }}
+              title="Stop after the current page">Cancel</button>
           </div>
         </div>
       </div>

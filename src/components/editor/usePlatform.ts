@@ -175,9 +175,11 @@ export function useOpenFileBridge(ed: EditorCtx) {
   const edRef = useRef<EditorCtx>(ed);
   edRef.current = ed;
   useEffect(() => {
-    (window as unknown as { lmcOpenProject?: (text: string, name?: string) => void }).lmcOpenProject =
-      (text, name = "project.lmc") => {
-        importJSON(edRef.current, new File([text], name, { type: "application/x-lettermycomic" }));
+    (window as unknown as { lmcOpenProject?: (text: string, name?: string, encoding?: string) => void }).lmcOpenProject =
+      (text, name = "project.lmc", encoding) => {
+        /* the .lmc container is binary: the wrapper sends it base64-encoded */
+        const bytes = encoding === "base64" ? Uint8Array.from(atob(text), (c) => c.charCodeAt(0)) : null;
+        importJSON(edRef.current, new File([bytes ?? text], name, { type: "application/x-lettermycomic" }));
       };
     const lq = (window as unknown as {
       launchQueue?: { setConsumer: (cb: (p: { files?: { getFile: () => Promise<File> }[] }) => void) => void };

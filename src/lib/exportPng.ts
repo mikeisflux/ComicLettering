@@ -1017,6 +1017,15 @@ export async function renderPageToCanvas(
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, Math.round(page.w * scale));
   canvas.height = Math.max(1, Math.round(page.h * scale));
+  /* pre-flight the size: past the engine's canvas limit toBlob returns null
+     and the export failed with a bare "render failed" — say what the
+     limit is and what to do (iOS Safari caps a canvas at ~16.7 Mpx) */
+  const px = canvas.width * canvas.height;
+  const ios = typeof navigator !== "undefined" && (/iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
+  const cap = ios ? 16_777_216 : 268_435_456;
+  if (px > cap) {
+    throw new Error(`This page would be ${canvas.width}×${canvas.height} px, more than ${ios ? "iOS" : "this browser"} can render in one canvas — export at a lower DPI${ios ? " or from a desktop browser" : ""}.`);
+  }
   const ctx = canvas.getContext("2d")!;
   ctx.scale(scale, scale);
   // lettering-only export: transparent background, no panels/artwork —
@@ -1202,28 +1211,32 @@ function encodeTiff(img: ImageData, dpi: number): Uint8Array {
 export type ImageFormat = "png" | "jpg" | "tiff";
 
 /* dpi controls output resolution: scale = dpi / 225 (the native page dpi). */
-export async function exportPageImage(page: Page, assets: Assets, filename: string, format: ImageFormat, dpi = 225, letteringOnly = false, neighbor?: { page: Page; dx: number } | null) {
+export async function pageImageBlob(page: Page, assets: Assets, format: ImageFormat, dpi = 225, letteringOnly = false, neighbor?: { page: Page; dx: number } | null): Promise<Blob> {
   const canvas = await renderPageToCanvas(page, assets, dpi / 225, letteringOnly, neighbor);
   if (format === "tiff") {
     const ctx = canvas.getContext("2d")!;
     const tiff = encodeTiff(ctx.getImageData(0, 0, canvas.width, canvas.height), dpi);
-    download(new Blob([tiff.buffer as ArrayBuffer], { type: "image/tiff" }), filename);
-    return;
+    return new Blob([tiff.buffer as ArrayBuffer], { type: "image/tiff" });
   }
-  return new Promise<void>((res, rej) => {
-    canvas.toBlob((blob) => {
-      if (!blob) { rej(new Error("render failed")); return; }
-      download(blob, filename);
-      res();
-    }, format === "jpg" ? "image/jpeg" : "image/png", 0.92);
-  });
+  const blob = await new Promise<Blob | null>((res) =>
+    canvas.toBlob(res, format === "jpg" ? "image/jpeg" : "image/png", 0.92));
+  if (!blob) throw new Error(`The page could not be rendered at ${dpi} dpi (${canvas.width}×${canvas.height} px) — try a lower DPI.`);
+  return blob;
+}
+
+export async function exportPageImage(page: Page, assets: Assets, filename: string, format: ImageFormat, dpi = 225, letteringOnly = false, neighbor?: { page: Page; dx: number } | null) {
+  download(await pageImageBlob(page, assets, format, dpi, letteringOnly, neighbor), filename);
+}
+
+export async function pageJpegBlob(page: Page, assets: Assets, dpi = 225, neighbor?: { page: Page; dx: number } | null): Promise<Blob> {
+  const canvas = await renderPageToCanvas(page, assets, dpi / 225, false, neighbor);
+  const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", 0.9));
+  if (!blob) throw new Error(`The page could not be rendered at ${dpi} dpi (${canvas.width}×${canvas.height} px) — try a lower DPI.`);
+  return blob;
 }
 
 export async function pageJpegBytes(page: Page, assets: Assets, dpi = 225, neighbor?: { page: Page; dx: number } | null): Promise<Uint8Array> {
-  const canvas = await renderPageToCanvas(page, assets, dpi / 225, false, neighbor);
-  const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", 0.9));
-  if (!blob) throw new Error("render failed");
-  return new Uint8Array(await blob.arrayBuffer());
+  return new Uint8Array(await (await pageJpegBlob(page, assets, dpi, neighbor)).arrayBuffer());
 }
 
 export { download };

@@ -1,10 +1,28 @@
 /* Two-up spread + page-list helpers, split from Editor.tsx (1500-line cap):
    where the facing page sits on screen, the cross-page drop that moves a
    dragged selection onto it, and the add-page insert. */
+import { collabOp } from "./collab";
 import type React from "react";
 import { Doc, El, newPage, pageBleed } from "@/lib/model";
 import { elCrossesSpine, spreadNeighbor } from "@/lib/exportPng";
 import type { EditorCtx } from "./ctx";
+
+/* Review notes (collab comments) are keyed by page index. Every op that
+   reorders pages tells the server how the indices moved, so a note stays
+   on the page it was pinned to. Best effort — a failure just leaves the
+   note on its old index, which is what always happened before. */
+export function remapComments(ed: EditorCtx, map: (i: number) => number) {
+  const c = ed.collab;
+  const pid = ed.current?.id;
+  if (!c || !pid || !c.comments.length) return;
+  const moves = c.comments
+    .map((cm) => [cm.pageIndex, map(cm.pageIndex)] as [number, number])
+    .filter(([a, b]) => a !== b);
+  if (!moves.length) return;
+  const pairs: Record<string, number> = {};
+  for (const [a, b] of moves) pairs[String(a)] = b;
+  collabOp(pid, { op: "remapPages", map: pairs }).then(() => ed.reloadCollab()).catch(() => { });
+}
 
 /* Insert a blank page (same size/margins as the current one) at `at`, jump
    to it, and refresh every thumbnail — inserting shifts the pages after it,
@@ -15,7 +33,16 @@ export function addPageAt(ed: EditorCtx, at: number, count = 1) {
   const cur = d.pages[ed.pageIndexRef.current];
   const n = Math.max(1, Math.min(200, Math.round(count) || 1));
   /* one fresh page object each — a shared object would alias every copy */
-  d.pages.splice(at, 0, ...Array.from({ length: n }, () => newPage(cur.w, cur.h, cur.margin)));
+  d.pages.splice(at, 0, ...Array.from({ length: n }, () => {
+    /* a fresh margin object per page (a shared one aliased every copy) and
+       the book's bleed — a new page used to fall back to the default bleed
+       on oversize paper, so facing pages disagreed about the trim */
+    const pg = newPage(cur.w, cur.h, cur.margin && { ...cur.margin });
+    pg.bleed = cur.bleed;
+    return pg;
+  }));
+  /* review notes are pinned by page number — shift the ones after the insert */
+  remapComments(ed, (i) => (i >= at ? i + n : i));
   ed.setAskAddPage(false);
   ed.setPageIndex(at);
   ed.setSelId(null);

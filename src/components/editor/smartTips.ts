@@ -29,7 +29,7 @@ const TIPS: { tip: SmartTip; when: (c: TipContext) => boolean }[] = [
     tip: {
       id: "joined-handles",
       title: "Shaping the connector",
-      text: "Drag the connector's middle handle to bend it; the side handles tilt the curve. Push the bubbles together and they melt into one shape — pull them apart to bring the band back.",
+      text: "Drag the connector's middle handle to bend it; double-click that handle for two tilt dots that angle the curve. Push the bubbles together and they melt into one shape — pull them apart to bring the band back.",
     },
     when: (c) => c.selJoined,
   },

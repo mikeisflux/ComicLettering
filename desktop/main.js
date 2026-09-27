@@ -25,11 +25,12 @@ function flushFiles() {
   if (!win) return;
   while (pendingFiles.length) {
     const p = pendingFiles.shift();
-    let text;
-    try { text = fs.readFileSync(p, "utf8"); } catch { continue; }
+    let b64;
+    /* .lmc files are binary containers now — hand the bytes over base64-encoded */
+    try { b64 = fs.readFileSync(p).toString("base64"); } catch { continue; }
     const name = path.basename(p);
     win.webContents.executeJavaScript(
-      `window.lmcOpenProject && window.lmcOpenProject(${JSON.stringify(text)}, ${JSON.stringify(name)})`
+      `window.lmcOpenProject && window.lmcOpenProject(${JSON.stringify(b64)}, ${JSON.stringify(name)}, "base64")`
     ).catch(() => {});
   }
 }

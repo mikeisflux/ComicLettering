@@ -13,19 +13,21 @@ import { balloonGeom, arcTextLayout } from "@/lib/geometry";
 import { Warp, isWarped } from "@/lib/warp";
 import {
   artIdTaken, artUrl, ensureArt, fmtBytes, holdArt, noteArtId, putArt,
-  requestPersistence, storageEstimate,
-} from "@/lib/assetStore";
+  requestPersistence, storageEstimate, kvGet, kvSet, releaseArt } from "@/lib/assetStore";
 import { LETTER_STYLES, LetterStyle, applyLetterStyle, captureLetterStyle } from "@/lib/presets";
 import {
   BALLOON_STYLES, BOX_STYLES, ShapeStyle, applyShapeStyle, captureShapeStyle,
 } from "@/lib/balloonStyles";
-import { loadImage } from "@/lib/exportPng";
+import { forgetImage, loadImage, spreadNeighbor } from "@/lib/exportPng";
 import { BalloonPreset, measureBlock, measureCharWidths, parseScript, toggleEmphasis } from "./textHelpers";
 import { EditorCtx } from "./ctx";
+import { remapComments } from "./spreadOps";
+import { FontRec, ensureDocFonts, fontKeyFor } from "./useFontsStamps";
 
 /* fit-to-text & line balancing live in fitText.ts (1500-line cap);
    re-exported here so every call site keeps importing from ops */
 export { balanceRag, fitBalloonToText } from "./fitText";
+export * from "./assetOps";
 
 
 /* Dedicated add-on bubble: a linked balloon that inherits the parent's
@@ -152,7 +154,9 @@ export function duplicateSel(ed: EditorCtx) {
   for (const c of copies) {
     c.x += 40; c.y += 40;
     c.locked = false;
-    if (c.type === "balloon" && c.attachTo) c.attachTo = idMap.get(c.attachTo) ?? null;
+    /* a copied pair stays joined to each other; a child copied alone stays
+       joined to the ORIGINAL parent (two children on one balloon) */
+    if (c.type === "balloon" && c.attachTo) c.attachTo = idMap.get(c.attachTo) ?? c.attachTo;
     p.els.push(c);
     pendingLockRef.current.add(c.id);
   }
@@ -390,6 +394,7 @@ export function duplicatePage(ed: EditorCtx) {
     if (el.type === "balloon" && el.attachTo) el.attachTo = idMap.get(el.attachTo) ?? null;
   }
   d.pages.splice(pageIndexRef.current + 1, 0, copy);
+  remapComments(ed, (i) => (i > pageIndexRef.current ? i + 1 : i));
   setPageIndex(pageIndexRef.current + 1);
   setSelId(null);
   commit();
@@ -403,6 +408,7 @@ export function movePage(ed: EditorCtx, dir: -1 | 1) {
   const i = pageIndexRef.current, j = i + dir;
   if (j < 0 || j >= d.pages.length) return;
   [d.pages[i], d.pages[j]] = [d.pages[j], d.pages[i]];
+  remapComments(ed, (k) => (k === i ? j : k === j ? i : k));
   setPageIndex(j);
   commit();
   rebuildThumbs();
@@ -497,9 +503,15 @@ export function sizeTextToContent(el: TextEl, pageW: number) {
    resizing it would reshape the artwork. Returns how many boxes changed. */
 export async function refitLegacyLettering(doc: Doc): Promise<number> {
   if (typeof document === "undefined") return 0;
+  /* a one-time migration: once a book has been refitted it is never touched
+     again (it used to re-run on every restored session) */
+  if (doc.refit) return 0;
   /* measure with the real fonts — a fallback-font measurement would bake a
-     wrong box into the document permanently */
+     wrong box into the document permanently. Custom fonts are fetched on
+     demand, so bring the ones this book uses in first. */
+  const ready = new Set<string>();
   try {
+    await ensureDocFonts(doc);
     const fams = new Set<string>();
     for (const p of doc.pages) for (const el of p.els) {
       if (el.type === "text" && el.text.trim()) fams.add(el.ts.font);
@@ -514,14 +526,25 @@ export async function refitLegacyLettering(doc: Doc): Promise<number> {
       ]).catch(() => []);
     }));
     await document.fonts.ready;
+    for (const k of fams) {
+      const css = FONTS[k]?.css;
+      const fam = css ? css.split(",")[0].replace(/['"]/g, "").trim() : "";
+      /* system stacks report false here; only a named face that is truly
+         absent (a custom font that failed to load) is skipped */
+      const named = !!fam && !/^(sans-serif|serif|monospace|cursive|fantasy|system-ui)$/i.test(fam);
+      if (!named || document.fonts.check(`16px "${fam}"`)) ready.add(k);
+    }
   } catch { /* measure with whatever is loaded */ }
 
   let changed = 0;
+  let skipped = 0;
   for (const p of doc.pages) {
     for (const el of p.els) {
+      if (el.type === "text" && !ready.has(el.ts.font)) { skipped++; continue; }
       if (el.type === "text" && refitLetteringEl(el)) changed++;
     }
   }
+  if (!skipped) doc.refit = 1;   // fonts still missing? try again next time
   return changed;
 }
 
@@ -657,7 +680,11 @@ export function importScript(ed: EditorCtx) {
 
   let count = 0, madePages = 0;
   for (const [off, group] of [...byPage.entries()].sort((a, bb) => a[0] - bb[0])) {
-    while (d.pages.length <= start + off) { d.pages.push(newPage(first.w, first.h)); madePages++; }
+    while (d.pages.length <= start + off) {
+      const np = newPage(first.w, first.h, first.margin && { ...first.margin });
+      np.bleed = first.bleed;
+      d.pages.push(np); madePages++;
+    }
     const p = d.pages[start + off];
     const m = pageMargins(p);
     const colW = Math.round((p.w - m.l - m.r) * 0.46);
@@ -871,110 +898,6 @@ export function addFromTray(ed: EditorCtx, kind: string) {
   }
 }
 
-export async function uploadAsset(kind: "font" | "stamp", name: string, data: string): Promise<string | null> {
-  try {
-    const res = await fetch("/api/assets", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind, name, data }),
-    });
-    if (!res.ok) return null;
-    return (await res.json()).id as string;
-  } catch { return null; }
-}
-
-export async function importFontFiles(ed: EditorCtx, files: File[]) {
-  const { registerRuntimeFont, setStatus, customFontIdsRef } = ed;
-  let list: { key: string; label: string; family: string; data: string }[] = [];
-  try { list = JSON.parse(localStorage.getItem("lmc.fonts") || "[]"); } catch { /* ignore */ }
-  for (const f of files) {
-    const label = f.name.replace(/\.(ttf|otf|woff2?)$/i, "");
-    const key = "custom_" + label.toLowerCase().replace(/\W+/g, "");
-    const family = "LMC " + label;
-    const data = await readAsDataURL(f);
-    const rec = { key, label, family, data };
-    await registerRuntimeFont(rec);
-    if (!FONTS[key]) { setStatus(`Could not load font "${f.name}".`); continue; }
-    list = [...list.filter((x) => x.key !== key), rec];
-    const serverId = await uploadAsset("font", label, data);
-    if (serverId) customFontIdsRef.current[key] = serverId;
-  }
-  try { localStorage.setItem("lmc.fonts", JSON.stringify(list)); } catch { /* cache only */ }
-  setStatus("Font imported — find it under “My Fonts”. It's saved to your account and follows you to any computer.");
-}
-
-export async function deleteCustomFont(ed: EditorCtx, key: string) {
-  const { customFontIdsRef, bumpFonts } = ed;
-  const serverId = customFontIdsRef.current[key];
-  if (serverId) fetch(`/api/assets/${serverId}`, { method: "DELETE" }).catch(() => { });
-  delete customFontIdsRef.current[key];
-  delete FONTS[key];
-  bumpFonts();
-  try {
-    const list = JSON.parse(localStorage.getItem("lmc.fonts") || "[]").filter((x: { key: string }) => x.key !== key);
-    localStorage.setItem("lmc.fonts", JSON.stringify(list));
-  } catch { /* ignore */ }
-}
-
-export async function importStampFiles(ed: EditorCtx, files: File[]) {
-  const { customStamps, setCustomStamps, setStatus } = ed;
-  const list = [...customStamps];
-  for (const f of files) {
-    if (!isSupportedArtFile(f) || f.type === "application/pdf" || /\.pdf$/i.test(f.name)) {
-      setStatus(`"${f.name}" isn't a supported stamp image — use ${ART_FORMATS_LABEL.replace(" or PDF", "")}.`);
-      continue;
-    }
-    let blob: Blob = f;
-    if (isTiffFile(f)) {
-      try { blob = await normalizeArtFile(f); }
-      catch { setStatus(`Could not read "${f.name}" — save that TIFF as PNG first.`); continue; }
-    }
-    const url = await readAsDataURL(blob);
-    const serverId = await uploadAsset("stamp", f.name.replace(/\.\w+$/, ""), url);
-    list.push({ id: serverId || crypto.randomUUID(), url, serverId: serverId || undefined });
-  }
-  setCustomStamps(list);
-  try { localStorage.setItem("lmc.stamps", JSON.stringify(list)); } catch { /* cache only */ }
-  setStatus("Stamps added — saved to your account library.");
-}
-
-/* Drop a built-in SFX stamp on the page. It is fetched once and then kept in
-   the local artwork store like any other image, so the page still renders it
-   after a refresh without going back to the network. */
-export async function insertSfxStamp(ed: EditorCtx, slug: string, label: string) {
-  const { aidRef, setStampOpen, setStatus } = ed;
-  setStampOpen(false);
-  try {
-    const res = await fetch(`/stamps/${slug}.png`);
-    if (!res.ok) throw new Error(res.statusText);
-    const blob = await res.blob();
-    const aid = nextAid(ed);
-    const url = await stashArt(ed, aid, blob);
-    const img = await loadImage(url);
-    placeAsset(ed, aid, img.naturalWidth, img.naturalHeight, undefined, undefined, true);
-  } catch {
-    setStatus(`Could not load the “${label}” stamp.`);
-  }
-}
-
-export async function insertCustomStamp(ed: EditorCtx, url: string) {
-  const { aidRef, setStampOpen } = ed;
-  const img = await loadImage(url);
-  const aid = nextAid(ed);
-  await stashDataUrl(ed, aid, url);
-  placeAsset(ed, aid, img.naturalWidth, img.naturalHeight, undefined, undefined, true);
-  setStampOpen(false);
-}
-
-export function removeCustomStamp(ed: EditorCtx, id: string) {
-  const { customStamps, setCustomStamps } = ed;
-  const gone = customStamps.find((s) => s.id === id);
-  if (gone?.serverId) fetch(`/api/assets/${gone.serverId}`, { method: "DELETE" }).catch(() => { });
-  const list = customStamps.filter((s) => s.id !== id);
-  setCustomStamps(list);
-  try { localStorage.setItem("lmc.stamps", JSON.stringify(list)); } catch { /* ignore */ }
-}
-
 export const readAsDataURL = (f: Blob) => new Promise<string>((res, rej) => {
   const r = new FileReader();
   r.onload = () => res(r.result as string);
@@ -1055,13 +978,17 @@ export async function importPdfFile(ed: EditorCtx, f: File, x?: number, y?: numb
   setStatus("Rendering PDF…");
   const pdfjs = await import("pdfjs-dist");
   pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
-  const pdf = await pdfjs.getDocument({ data: await f.arrayBuffer() }).promise;
+  const task = pdfjs.getDocument({ data: await f.arrayBuffer() });
+  const pdf = await task.promise;
   const n = Math.min(pdf.numPages, 10);
   let first: { aid: string; w: number; h: number } | null = null;
+  try {
   for (let i = 1; i <= n; i++) {
     const pg = await pdf.getPage(i);
     const vp1 = pg.getViewport({ scale: 1 });
-    const scale = Math.min(3, 1600 / vp1.width);
+    /* rasterise to the PAGE's pixel width (native 225 dpi), not a fixed
+       1600 px — the old size printed soft at 300/450 dpi */
+    const scale = Math.max(1, Math.min(4, (ed.page?.w ?? 1500) / vp1.width));
     const vp = pg.getViewport({ scale });
     const c = document.createElement("canvas");
     c.width = Math.round(vp.width); c.height = Math.round(vp.height);
@@ -1072,6 +999,10 @@ export async function importPdfFile(ed: EditorCtx, f: File, x?: number, y?: numb
     if (!blob) assetsRef.current[aid] = url;
     await loadImage(url);
     if (!first) first = { aid, w: c.width, h: c.height };
+  }
+  } finally {
+    /* each import used to leak a worker and the parsed document */
+    await task.destroy().catch(() => { });
   }
   if (first) placeAsset(ed, first.aid, first.w, first.h, x, y);
   setStatus(`Imported ${n} PDF page${n > 1 ? "s" : ""} — extra pages are in the Photos tab.`);
@@ -1110,19 +1041,44 @@ export async function importImageFile(ed: EditorCtx, f: File, x?: number, y?: nu
 /* Export walks every page, but pages only materialise their artwork as they
    are visited — so bring the whole book in first or the unvisited pages render
    blank. */
-export async function ensureAllArt(ed: EditorCtx) {
+export async function ensureAllArt(ed: EditorCtx): Promise<string[]> {
   const { docRef, assetsRef } = ed;
   const d = docRef.current;
-  if (!d) return;
-  const want: string[] = [];
+  if (!d) return [];
+  const want = new Set<string>();
   for (const pg of d.pages) {
     for (const e of pg.els) {
       const id = "img" in e ? (e.img as string | null) : null;
-      if (id && !assetsRef.current[id]) want.push(id);
+      if (id && !assetsRef.current[id]) want.add(id);
     }
   }
-  if (!want.length) return;
-  for (const id of await ensureArt(want)) assetsRef.current[id] = artUrl(id)!;
+  if (!want.size) return [];
+  const got = new Set(await ensureArt([...want]));
+  for (const id of got) assetsRef.current[id] = artUrl(id)!;
+  /* referenced by the book but not on this computer — the caller warns
+     rather than exporting blank frames with a success message */
+  return [...want].filter((id) => !got.has(id));
+}
+
+/* After an export or a project save the whole book's artwork is decoded in
+   memory. Drop everything that is not on the page being looked at (or its
+   spread partner) — the rule the rest of the editor lives by. */
+export function releaseOffscreenArt(ed: EditorCtx) {
+  const { docRef, pageIndexRef, assetsRef } = ed;
+  const d = docRef.current;
+  if (!d) return;
+  const keep = new Set<string>();
+  const nb = spreadNeighbor(d, pageIndexRef.current);
+  for (const pg of [d.pages[pageIndexRef.current], nb?.page]) {
+    if (!pg) continue;
+    for (const e of pg.els) if ("img" in e && e.img) keep.add(e.img as string);
+  }
+  for (const [id, url] of Object.entries(assetsRef.current)) {
+    if (keep.has(id) || typeof url !== "string" || !url.startsWith("blob:")) continue;
+    forgetImage(url);
+    releaseArt([id]);
+    delete assetsRef.current[id];
+  }
 }
 
 /* Generated artwork (tuck cutouts, instant-alpha copies, stamps) arrives as a

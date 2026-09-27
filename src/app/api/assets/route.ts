@@ -8,9 +8,12 @@ const MAX_DATA = { font: 4_000_000, stamp: 2_000_000 }; // dataURL length caps
 export async function GET() {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  /* names only — a font's bytes are fetched from /api/assets/[id] the first
+     time it is needed. Shipping every asset's data on every editor boot was
+     tens of megabytes and a multi-second freeze for a modest library. */
   const assets = await prisma.userAsset.findMany({
     where: { userId: user.id },
-    select: { id: true, kind: true, name: true, data: true },
+    select: { id: true, kind: true, name: true },
     orderBy: { createdAt: "asc" },
   });
   return NextResponse.json(assets);

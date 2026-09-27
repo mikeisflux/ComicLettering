@@ -17,6 +17,7 @@ import { LETTER_STYLES } from "@/lib/presets";
 import { BALLOON_STYLES, BOX_STYLES } from "@/lib/balloonStyles";
 import { StyleTab, tabForSelection } from "./editor/stylesPanel";
 import { GradientMaker, loadCustomGrads } from "./editor/GradientMaker";
+import { ensureDocFonts } from "./editor/useFontsStamps";
 import { FLAT } from "@/lib/warp";
 import { ImageFormat, forgetImage, pageThumbnail, spreadNeighbor } from "@/lib/exportPng";
 import { artUrl, ensureArt, getArt, holdArt, listArtIds, primeArtIds, putArt, requestPersistence } from "@/lib/assetStore";
@@ -252,7 +253,8 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   useEffect(() => {
     try {
       const s = localStorage.getItem("lmc.style");
-      if (s && LETTER_STYLES.some((x) => x.name === s)) { activeStyleRef.current = s; setActiveStyleState(s); }
+      const mine = ((docRef.current?.styles?.letters ?? []) as { name: string }[]).map((x) => x.name);
+      if (s && (LETTER_STYLES.some((x) => x.name === s) || mine.includes(s))) { activeStyleRef.current = s; setActiveStyleState(s); }
     } catch { /* ignore */ }
   }, []);
   const setActiveStyle = (name: string) => {
@@ -510,7 +512,8 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
 
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const autosave = useCallback(() => {
+  const autosaveBrokenRef = useRef(false);
+  const autosave = useCallback((docJson?: string) => {
     if (autosaveTimer.current) { clearTimeout(autosaveTimer.current); autosaveTimer.current = null; }
     /* Only the document goes here — it is small, and it is the one thing that
        has to be written synchronously while the tab is closing. Artwork went
@@ -518,11 +521,18 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
        full-size scans is gigabytes and has no business anywhere near the ~5MB
        localStorage budget. */
     try {
-      localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({
-        doc: docRef.current,
-        at: { page: pageIndexRef.current, project: currentRef.current },
-      }));
-    } catch { /* even the document alone will not fit — library/save still works */ }
+      localStorage.setItem(AUTOSAVE_KEY,
+        `{"doc":${docJson ?? JSON.stringify(docRef.current)},"at":${JSON.stringify({ page: pageIndexRef.current, project: currentRef.current })}}`);
+      autosaveBrokenRef.current = false;
+    } catch {
+      /* the document alone no longer fits the ~5 MB budget: say so ONCE
+         rather than silently restoring an old session after the next
+         refresh — the library and .lmc files are the way to keep the work */
+      if (!autosaveBrokenRef.current) {
+        autosaveBrokenRef.current = true;
+        setStatus("Autosave is off — this book is too large for the browser's local storage. Save it to the Library (Ctrl+S) or as an .lmc file to keep your work.");
+      }
+    }
   }, []);
 
   const commit = useCallback(() => {
@@ -532,7 +542,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     h.push(j);
     if (h.length > 50) h.shift();
     hIndexRef.current = h.length - 1;
-    autosave();
+    autosave(j);
     scheduleThumb(pageIndexRef.current);
     force();
   }, [autosave, scheduleThumb]);
@@ -698,6 +708,9 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
         }
       } catch { /* no artwork store — the lettering still came back */ }
       const d = docRef.current!;
+      /* the custom fonts this book uses — fetched on demand — before the
+         refit measures anything and before the rail renders in a fallback */
+      try { await ensureDocFonts(d); bumpFonts(); } catch { /* offline — fallback faces */ }
       /* legacy lettering slabs refit to their ink once the real fonts are in —
          old documents behave like freshly lettered ones (see refitLegacyLettering) */
       try {
@@ -1089,7 +1102,8 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const fileFontRef = useRef<HTMLInputElement>(null);
   const fileStampRef = useRef<HTMLInputElement>(null);
   /* custom fonts & stamps — see useFontsStamps */
-  const { customStamps, setCustomStamps, bumpFonts, customFontIdsRef, registerRuntimeFont } = useFontsStamps();
+  const { customStamps, setCustomStamps, bumpFonts, customFontIdsRef, registerRuntimeFont, ensureCustomFont } = useFontsStamps();
+  const exportCancelRef = useRef(false);
 
   /* Tablet pinch-zoom and the PWA install prompt — see usePlatform.ts */
   usePinchZoom(areaRef, zoom, setZoom, setUserZoomed, mounted && !!doc && !!page);
@@ -1174,6 +1188,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     setEditingId, finishEditing, mutateSel, startDrag, pagePoint, fitZoom, startTuck,
     selectAllOnPage, installApp, appInstalled, showInstallHelp, setShowInstallHelp,
     showAssocHelp, setShowAssocHelp, showShortcuts, setShowShortcuts, winHide, toggleWindow, showTab, setAskAddPage,
+    thumbOf, exportCancelRef, ensureCustomFont,
     selIdsRef, editingIdRef, setSelIds,
     mutateText, mutateBalloon, mutateLettering, mutateArt, mutatePanel,
     tuckAsk, setTuckAsk, retuneTuck, runTuckAuto, applyTuck, tuckTool, setTuckTool,
@@ -1224,9 +1239,11 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     /* Escape closes whatever is on top — one popup per press, menus and
        context menu first, then dialogs. Returns false when nothing was open
        so the key falls through to its canvas meaning (finish edit/deselect). */
+    autosaveSoon: () => autosaveSoon(),
     closeTopDialog: () => {
       if (ctxMenu) { setCtxMenu(null); return true; }
       if (openMenu) { setOpenMenu(null); return true; }
+      if (tuckAsk) { setTuckAsk(null); return true; }
       if (showFill || showStroke || showTextColor || stampOpen) {
         setShowFill(false); setShowStroke(false); setShowTextColor(false); setStampOpen(false); return true;
       }
@@ -1345,6 +1362,9 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
               p.w = w; p.h = h; p.bleed = bleed;
               if (margin) p.margin = { ...margin }; else delete p.margin;
             }
+            /* a smaller page strands elements past the edge — invisible and
+               un-grabbable until a reload ran normalizeDoc; run it now */
+            normalizeDoc(d);
             setShowSetup(false);
             commit();
             fitZoom(true);

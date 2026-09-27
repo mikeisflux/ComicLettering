@@ -20,7 +20,10 @@ export async function GET() {
   let status = user.subStatus;
   let nextBilling: string | null = null;
 
-  if (user.subId && (await paypalConfigured())) {
+  /* passes, lifetime and comped access are managed here, not by PayPal —
+     a stale subscription id must not overwrite them */
+  const managedHere = !!plan && (plan.startsWith("pass") || plan === "lifetime" || plan === "comp");
+  if (user.subId && !managedHere && (await paypalConfigured())) {
     const sub = await getSubscription(user.subId);
     if (sub) {
       const monthlyPlan = await getSetting("PAYPAL_PLAN_MONTHLY");

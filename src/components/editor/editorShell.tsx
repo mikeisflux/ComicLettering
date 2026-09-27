@@ -12,7 +12,7 @@ import { EditorCtx } from "./ctx";
 import { renderCarriedLettering, renderEl, renderJoinBands, renderOverlay } from "./renderEls";
 import { renderCommentCatcher, renderCommentPins } from "./collab";
 import { StylesPanel } from "./stylesPanel";
-import { addPageAt } from "./spreadOps";
+import { addPageAt, remapComments } from "./spreadOps";
 import { dragInProgress } from "./penInput";
 import { PenPt, ShapeBox, flattenPen } from "./usePenPanel";
 import { adjustFilterMarkup, pageAdjustLayers } from "@/lib/pageAdjust";
@@ -160,6 +160,9 @@ export function renderPagesPanel(ed: EditorCtx, sh: ShellProps) {
           if (d.pages.length <= 1) { setStatus("A document needs at least one page."); return; }
           if (!window.confirm(`Delete page ${pageIndex + 1}?`)) return;
           d.pages.splice(pageIndex, 1);
+          /* notes on later pages shift down; notes on the deleted page stay
+             at that index (they now sit on the page that took its place) */
+          remapComments(ed, (i) => (i > pageIndex ? i - 1 : i));
           setPageIndex((p) => clamp(p, 0, d.pages.length - 1));
           setSelId(null);
           commit();

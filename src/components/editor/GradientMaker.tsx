@@ -115,7 +115,7 @@ export function GradientMaker({ initial, onApply, onClose, onSaved }: {
             {ordered.map(({ s, i }) => (
               <button key={i} className={"gmStop" + (i === sel ? " on" : "")}
                 style={{ left: `${s[1] * 100}%`, background: s[0] }}
-                onPointerDown={dragStop(i)} title={`${Math.round(s[1] * 100)}%`} />
+                onPointerDown={dragStop(i)} onDoubleClick={(e) => e.stopPropagation()} title={`${Math.round(s[1] * 100)}%`} />
             ))}
           </div>
         </div>

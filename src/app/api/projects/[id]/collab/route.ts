@@ -94,6 +94,25 @@ export async function POST(req: Request, { params }: Params) {
       });
       return NextResponse.json({ ok: true, id: c.id });
     }
+    /* page insert/move/delete on the client: shift the pinned notes with
+       their pages. `map` is { oldIndex: newIndex } for the ones that moved. */
+    if (op === "remapPages") {
+      if (!canEdit(role)) return NextResponse.json({ error: "forbidden" }, { status: 403 });
+      const map = (body.map && typeof body.map === "object" ? body.map : {}) as Record<string, unknown>;
+      const moves = Object.entries(map)
+        .map(([a, b]) => [Number(a), Number(b)] as [number, number])
+        .filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b) && a >= 0 && b >= 0)
+        .slice(0, 500);
+      if (moves.length) {
+        /* two passes through a temporary offset so a swap cannot collide */
+        const OFF = 1_000_000;
+        await prisma.$transaction([
+          ...moves.map(([a, b]) => prisma.pageComment.updateMany({ where: { projectId: id, pageIndex: a }, data: { pageIndex: b + OFF } })),
+          prisma.pageComment.updateMany({ where: { projectId: id, pageIndex: { gte: OFF } }, data: { pageIndex: { decrement: OFF } } }),
+        ]);
+      }
+      return NextResponse.json({ ok: true });
+    }
     if (op === "resolve") {
       await prisma.pageComment.updateMany({
         where: { id: String(body.commentId || ""), projectId: id },

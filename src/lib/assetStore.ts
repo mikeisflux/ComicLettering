@@ -16,7 +16,11 @@
 
 const DB_NAME = "lettermycomic";
 const STORE = "art";
-const VERSION = 2;
+/* small key/value store beside the art: the custom font and stamp caches
+   moved here out of localStorage, where their data URLs shared the ~5 MB
+   budget with the autosave and silently broke it */
+const KV = "kv";
+const VERSION = 3;
 
 let dbPromise: Promise<IDBDatabase | null> | null = null;
 
@@ -31,6 +35,7 @@ function openDb(): Promise<IDBDatabase | null> {
       /* v1 kept data-URL strings under "assets"; the blob store replaces it */
       if (db.objectStoreNames.contains("assets")) db.deleteObjectStore("assets");
       if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
+      if (!db.objectStoreNames.contains(KV)) db.createObjectStore(KV);
     };
     req.onsuccess = () => {
       const db = req.result;
@@ -115,6 +120,36 @@ export async function clearArt(): Promise<void> {
     } catch { resolve(); }
   });
 }
+
+export function kvGet<T>(key: string): Promise<T | null> {
+  return openDb().then((db) => {
+    if (!db) return null;
+    return new Promise<T | null>((resolve) => {
+      try {
+        const req = db.transaction(KV, "readonly").objectStore(KV).get(key) as IDBRequest<T>;
+        req.onsuccess = () => resolve(req.result ?? null);
+        req.onerror = () => resolve(null);
+      } catch { resolve(null); }
+    });
+  });
+}
+
+export async function kvSet(key: string, value: unknown): Promise<boolean> {
+  const db = await openDb();
+  if (!db) return false;
+  return new Promise((resolve) => {
+    try {
+      const s = db.transaction(KV, "readwrite").objectStore(KV);
+      s.transaction.oncomplete = () => resolve(true);
+      s.transaction.onerror = () => resolve(false);
+      s.transaction.onabort = () => resolve(false);
+      s.put(value, key);
+    } catch { resolve(false); }
+  });
+}
+
+/* the byte size of a materialised blob, without reading it back */
+export const artSize = (id: string): number | undefined => held.get(id)?.size;
 
 /* Ask the browser to stop treating this origin's storage as evictable. Without
    it a large book can be cleared out from under the user when the disk fills. */

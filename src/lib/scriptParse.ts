@@ -45,7 +45,8 @@ const WORD_NUM: Record<string, number> = {
 const num = (s: string | undefined): number | null => {
   if (!s) return null;
   const t = s.trim().toLowerCase().replace(/-/g, " ");
-  if (/^\d+$/.test(t)) return parseInt(t, 10);
+  /* "1B", "2a" — a lettered sub-panel keeps its number */
+  if (/^\d+[a-z]?$/.test(t)) return parseInt(t, 10);
   const parts = t.split(/\s+/);
   let v = 0;
   for (const p of parts) { if (!(p in WORD_NUM)) return null; v += WORD_NUM[p]; }
@@ -56,7 +57,7 @@ const NUMBER_WORDS = "one|two|three|four|five|six|seven|eight|nine|ten|eleven|tw
 const pageRx = new RegExp(`^PA?GE?S?\\.?\\s*#?\\s*(\\d+|${NUMBER_WORDS})\\b`, "i");
 /* a panel header carries a number, or stands alone / ends in a colon —
    "Frame it and hang it." mid-dialogue is not a panel break */
-const panelRx = new RegExp(`^(?:PANELS?|PNL|FRAME)\\.?\\s*#?\\s*(?:(\\d+|${NUMBER_WORDS})\\b|(?=[:\\-—]|$))`, "i");
+const panelRx = new RegExp(`^(?:PANELS?|PNL|FRAME)\\.?\\s*#?\\s*(?:(\\d+[A-Za-z]?|[A-Z]|${NUMBER_WORDS})\\b|(?=[:\\-—]|$))`, "i");
 /* "3." alone on a line is a panel number in a lot of scripts */
 const barePanelRx = /^(\d{1,2})[.)]$/;
 const transitionRx = /^(SCENE|INT\b|EXT\b|CUT TO|FADE (IN|OUT|TO)|SMASH CUT|MATCH CUT|SPLASH\b|DOUBLE[- ]PAGE|SPREAD\b|TITLE PAGE|THE END\b|END\b|CREDITS|TO BE CONTINUED|NO (DIALOGUE|COPY|BALLOONS?)|SILENT)\b/i;

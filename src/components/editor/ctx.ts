@@ -171,6 +171,12 @@ export interface EditorCtx {
   runTuckAuto: () => void;
   applyTuck: (t: TuckAsk) => void;
   rebuildThumbs: () => void;
+  /* one page's rail thumbnail, with its art pulled from the store as needed */
+  thumbOf: (pi: number) => Promise<string>;
+  /* set by the Cancel button on the export progress bar; checked between pages */
+  exportCancelRef: React.RefObject<boolean>;
+  /* fetch a custom font's bytes on demand (see useFontsStamps) */
+  ensureCustomFont: (key: string) => Promise<boolean>;
   reseedAids: () => void;
   setThumbs: SetState<Record<number, string>>;
   setPageIndex: SetState<number>;
