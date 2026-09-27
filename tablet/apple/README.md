@@ -46,7 +46,12 @@ webView.evaluateJavaScript(
 
 ## No Mac? Two paths that never touch one
 
-### A. Build it ON the iPad (free)
+### A. Build it ON the iPad (free) — EXPERIMENTAL
+
+> The shipping iOS pipeline is the Xcode project in `/ios` (built by
+> `.github/workflows/ios.yml` with fastlane). The Swift Playgrounds
+> package below is a fallback for people without a Mac; it is not what
+> the App Store build is made from and lags behind the `/ios` shell.
 
 `LetterMyComic.swiftpm/` in this folder is a complete Swift Playgrounds
 app package:

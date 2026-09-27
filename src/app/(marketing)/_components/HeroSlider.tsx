@@ -8,7 +8,7 @@ const SLIDES = [
   "No AI art. No AI lettering. Every page is 100% yours.",
   "Speech balloons that behave like ink — aimed, joined, melted.",
   "Your pages never train anything. Your art never leaves your browser.",
-  "600+ comic fonts, 100+ lettering styles, print-ready export.",
+  "150+ comic fonts, nearly 100 lettering styles, print-ready export.",
   "No generative AI — this is a pen, not a ghostwriter.",
   "Runs in any browser. Never crashes. Never installs.",
 ];
@@ -29,7 +29,7 @@ export default function HeroSlider() {
     <div className="heroSlider" role="region" aria-label="What makes LetterMyComic different"
       onMouseEnter={() => { pausedRef.current = true; }}
       onMouseLeave={() => { pausedRef.current = false; }}>
-      <div className="heroSlides">
+      <div className="heroSlides" aria-live="polite" aria-atomic="true">
         {SLIDES.map((s, i) => (
           <p key={s} className={"heroSlide" + (i === at ? " on" : "")} aria-hidden={i !== at}>
             {s}

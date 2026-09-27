@@ -1,7 +1,7 @@
 # LetterMyComic — [lettermycomic.com](https://lettermycomic.com)
 
 **Professional comic lettering in the browser.** Word balloons that behave like
-hand-inked lettering, 600+ comic fonts, SFX warps, Tuck Back clipping masks,
+hand-inked lettering, 150+ comic fonts, SFX warps, Tuck Back clipping masks,
 panel layouts, page grading and print-ready export — one web codebase that
 ships as the website, the installed desktop app, the Windows Store app, the
 Android app and (in progress) the iOS app.
@@ -32,7 +32,7 @@ regenerating when the manifest changes).
   band (no stroke across the junction, like hand-inked lettering); overlapping
   joined balloons melt into one shape. Fit-to-text (Ctrl+\\), saved presets,
   custom hand-drawn balloons.
-- **Lettering** — 600+ comic fonts across genre groups plus custom font
+- **Lettering** — 150+ comic fonts (600+ font files) across genre groups plus custom font
   import, 90+ SFX style presets, per-word bold/italic/underline, smart
   crossbar-I, arc/bend warping with a full envelope warp tool, tracking, rag
   balancing, find & replace, spell/grammar proofing.
@@ -86,14 +86,13 @@ touch the server. No generative AI in the product.
 
 ## Stack
 
-Next.js 15 (App Router) · React 19 · TypeScript · Node 24 · Prisma 7 (PostgreSQL via the pg driver adapter; SQLite
-for zero-config dev) · PayPal REST · SendGrid · PM2 cluster behind Caddy.
+Next.js 15 (App Router) · React 19 · TypeScript · Node 24 · Prisma 7 (PostgreSQL via the pg driver adapter) · PayPal REST · SendGrid · PM2 cluster behind Caddy.
 
 ## Development
 
 ```bash
 npm install        # deps + Prisma client
-npm run db:push    # create the dev database
+npm run db:push    # create the tables in your PostgreSQL dev database (DATABASE_URL in .env)
 npm run dev        # http://localhost:3000
 ```
 

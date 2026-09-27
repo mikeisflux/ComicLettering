@@ -14,6 +14,7 @@ export const SETTING_KEYS = [
   { key: "PAYPAL_WEBHOOK_ID", label: "PayPal webhook ID", hint: "for signature verification" },
   { key: "RECAPTCHA_SITE_KEY", label: "reCAPTCHA v3 site key", hint: "from google.com/recaptcha" },
   { key: "RECAPTCHA_SECRET_KEY", label: "reCAPTCHA v3 secret key", secret: true },
+  { key: "INBOUND_EMAIL_KEY", label: "Inbound email key", secret: true, hint: "any long random string; append ?key=<it> to the SendGrid Inbound Parse URL" },
 ] as const;
 
 export async function getSetting(key: string): Promise<string> {

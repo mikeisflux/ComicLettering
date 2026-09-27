@@ -46,7 +46,7 @@ const GROUPS: { h: string; items: [string, string][] }[] = [
     h: "Lettering & Fonts",
     items: [
       ["150+ comic fonts", "A huge bundled library of open-licensed dialogue, display, horror, sci-fi and marker faces — plus original LetterMyComic faces made in-house — all load instantly and export perfectly."],
-      ["28 style presets", "Sunburst, Chrome, Gold, Blood, Ice, Toxic and more — gradient fills, chunky outlines and shadows applied with one click."],
+      ["Nearly 100 style presets", "Sunburst, Chrome, Gold, Blood, Ice, Toxic and more — gradient fills, chunky outlines and shadows applied with one click."],
       ["Pro text control", "Size, bold, italic, ALL-CAPS, alignment, gradient fills, outline width and color, shadows — for balloons, captions and standalone SFX."],
     ],
   },
@@ -79,7 +79,7 @@ const GROUPS: { h: string; items: [string, string][] }[] = [
 export default function Features() {
   return (
     <main className="mktSection">
-      <h2>Every Feature, Ready to Letter</h2>
+      <h1 className="mktH1">Every Feature, Ready to Letter</h1>
       <p className="sub">A complete comic lettering toolkit — modern, fast and crash-proof.</p>
       {GROUPS.map((g) => (
         <section key={g.h} style={{ marginBottom: 38 }}>

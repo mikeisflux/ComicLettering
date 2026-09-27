@@ -15,7 +15,7 @@ export const metadata: Metadata = {
     title: "Manga Lettering Program — Letter Manga & Webtoons Online",
     description: "A browser-based manga lettering program: manga bubbles, SFX, webtoon pages, manga fonts and print- or web-ready export.",
     url: "https://lettermycomic.com/manga-lettering",
-    images: [{ url: "/shots/studio.png", width: 1600, height: 1000, alt: "LetterMyComic manga lettering program" }],
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: "LetterMyComic — comic lettering studio" }],
   },
 };
 

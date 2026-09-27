@@ -70,7 +70,7 @@ export async function signToken(uid: string, passwordHash?: string): Promise<str
   return `${payload}.${sig}`;
 }
 
-export async function verifyToken(token: string): Promise<{ uid: string; pv?: string } | null> {
+export async function verifyToken(token: string): Promise<{ uid: string; pv?: string; exp: number } | null> {
   const [payload, sig] = token.split(".");
   if (!payload || !sig) return null;
   const expect = createHmac("sha256", await authSecret()).update(payload).digest("base64url");
@@ -79,7 +79,7 @@ export async function verifyToken(token: string): Promise<{ uid: string; pv?: st
   try {
     const data = JSON.parse(Buffer.from(payload, "base64url").toString());
     if (typeof data.uid !== "string" || data.exp < Date.now() / 1000) return null;
-    return { uid: data.uid, pv: typeof data.pv === "string" ? data.pv : undefined };
+    return { uid: data.uid, pv: typeof data.pv === "string" ? data.pv : undefined, exp: Number(data.exp) };
   } catch { return null; }
 }
 
@@ -95,6 +95,24 @@ export async function createSession(uid: string, passwordHash?: string) {
     secure: process.env.NODE_ENV === "production",
     maxAge: WEEK,
   });
+}
+
+/* Sliding renewal: a session used in its second half is re-issued for a
+   fresh week, so a daily user never gets logged out mid-save on day 7.
+   Only route handlers may set cookies (server components can't), so the
+   API routes the studio hits on boot call this. Silent on any failure. */
+export async function touchSession(): Promise<void> {
+  try {
+    const jar = await cookies();
+    const token = jar.get(COOKIE)?.value;
+    if (!token) return;
+    const t = await verifyToken(token);
+    if (!t) return;
+    if (t.exp - Date.now() / 1000 > WEEK / 2) return;
+    const u = await prisma.user.findUnique({ where: { id: t.uid }, select: { passwordHash: true } });
+    if (!u || (t.pv && t.pv !== pwVersion(u.passwordHash))) return;
+    await createSession(t.uid, u.passwordHash);
+  } catch { /* renewal is best-effort */ }
 }
 
 export async function destroySession() {

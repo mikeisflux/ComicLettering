@@ -38,8 +38,9 @@ one.
 Then remove the browser bar for released builds by proving site/app
 ownership: create `public/.well-known/assetlinks.json` with the SHA-256
 from `assetlinks-fingerprint.txt` (after Play processes the upload, use
-the fingerprint from *Play Console → Setup → App signing* instead) and
-deploy the site:
+the fingerprint from *Play Console → Setup → App signing* **as well** —
+list BOTH fingerprints, because sideloaded/internal-test builds are signed
+with the upload key and store installs with Play's key) and deploy the site:
 
 ```json
 [{
@@ -47,7 +48,7 @@ deploy the site:
   "target": {
     "namespace": "android_app",
     "package_name": "com.lettermycomic.app",
-    "sha256_cert_fingerprints": ["…SHA256 fingerprint…"]
+    "sha256_cert_fingerprints": ["…upload key SHA256…", "…Play app-signing key SHA256…"]
   }
 }]
 ```

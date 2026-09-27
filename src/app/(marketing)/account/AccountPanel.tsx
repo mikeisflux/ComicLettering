@@ -25,6 +25,9 @@ export default function AccountPanel() {
   const [sub, setSub] = useState<Sub | null>(null);
   const [busy, setBusy] = useState("");
   const [note, setNote] = useState("");
+  /* window.prompt is blocked in installed-app and Android shells — the
+     password confirmation is an inline form instead */
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const load = useCallback(async () => {
     const res = await fetch("/api/account/subscription");
@@ -55,10 +58,10 @@ export default function AccountPanel() {
     setNote("Your plan has been changed."); await load(); setBusy("");
   }
 
-  async function deleteAccount() {
-    if (!window.confirm("Permanently delete your account? Every saved project, imported font and stamp goes with it, and any active subscription is cancelled. This cannot be undone.")) return;
-    const password = window.prompt("Type your password to confirm deletion:");
-    if (!password) return;
+  async function deleteAccount(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const password = String(new FormData(e.currentTarget).get("password") || "");
+    if (!password) { setNote("Type your password to confirm deletion."); return; }
     setBusy("delete"); setNote("");
     const res = await fetch("/api/account/delete", {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password }),
@@ -125,6 +128,17 @@ export default function AccountPanel() {
             </button>
           </div>
         </>
+      ) : sub.status === "cancelled" && sub.accessUntil && new Date(sub.accessUntil).getTime() > Date.now() ? (
+        <>
+          {/* cancelled but paid through — the Terms promise access until the
+              period ends; this used to fall into "No active subscription" */}
+          <div className="acctRow"><span>Plan</span><b>{sub.plan === "monthly" ? "Monthly" : "Yearly"} — cancelled</b></div>
+          <div className="acctRow"><span>Access until</span><b>{new Date(sub.accessUntil).toLocaleDateString()}</b></div>
+          <p className="acctHint" data-extpay>Your subscription won't renew. You keep full Studio access until that date — subscribe again from the <a href="/pricing">pricing page</a> whenever you're ready.</p>
+          <div className="acctActions">
+            <a className="acctBtn primary" href="/pricing" data-extpay>Choose a plan</a>
+          </div>
+        </>
       ) : (
         <>
           <div className="acctRow"><span>Plan</span><b>No active subscription</b></div>
@@ -150,11 +164,23 @@ export default function AccountPanel() {
         imported fonts and stamps, shared-book access and comments, and cancels
         any active subscription. This cannot be undone.
       </p>
-      <div className="acctActions">
-        <button className="acctBtn danger" disabled={!!busy} onClick={deleteAccount}>
-          {busy === "delete" ? "Deleting…" : "Delete my account"}
-        </button>
-      </div>
+      {confirmDelete ? (
+        <form className="acctActions" onSubmit={deleteAccount} style={{ alignItems: "center" }}>
+          <input className="admInput" name="password" type="password" autoComplete="current-password"
+            placeholder="Your password" required autoFocus
+            style={{ flex: "1 1 180px", padding: "8px 10px", fontSize: 15, borderRadius: 8, border: "1px solid #c8ced6" }} />
+          <button className="acctBtn danger" disabled={!!busy}>
+            {busy === "delete" ? "Deleting…" : "Permanently delete"}
+          </button>
+          <button className="acctBtn" type="button" disabled={!!busy} onClick={() => { setConfirmDelete(false); setNote(""); }}>Keep my account</button>
+        </form>
+      ) : (
+        <div className="acctActions">
+          <button className="acctBtn danger" disabled={!!busy} onClick={() => { setNote(""); setConfirmDelete(true); }}>
+            Delete my account
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getSessionUser, hasAccess } from "@/lib/auth";
+import { touchSession, getSessionUser, hasAccess } from "@/lib/auth";
 import { MAX_DATA_BYTES, MAX_THUMB_BYTES, tooLarge } from "@/lib/projectLimits";
 
 export async function GET() {
+  await touchSession();
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: "Sign in to use the project library." }, { status: 401 });
   try {

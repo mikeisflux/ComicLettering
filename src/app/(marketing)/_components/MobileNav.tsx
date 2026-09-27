@@ -11,18 +11,21 @@ export default function MobileNav({ signedIn, isAdmin }: { signedIn: boolean; is
   /* no page scroll behind the drawer */
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
-    return () => { document.body.style.overflow = ""; };
+    if (!open) return () => { document.body.style.overflow = ""; };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => { document.body.style.overflow = ""; window.removeEventListener("keydown", onKey); };
   }, [open]);
 
   const close = () => setOpen(false);
   return (
     <>
       <button className={"mktBurger" + (open ? " open" : "")} aria-label={open ? "Close menu" : "Open menu"}
-        aria-expanded={open} onClick={() => setOpen(!open)}>
+        aria-expanded={open} aria-controls="mktMobileMenu" onClick={() => setOpen(!open)}>
         <span /><span /><span />
       </button>
       {open && <div className="mktMenuBackdrop" onClick={close} />}
-      <nav className={"mktMenu" + (open ? " open" : "")} aria-label="Mobile">
+      <nav id="mktMobileMenu" className={"mktMenu" + (open ? " open" : "")} aria-label="Mobile" aria-hidden={!open}>
         <Link href="/features" onClick={close}>Features</Link>
         <Link href="/pricing" onClick={close}>Pricing</Link>
         <Link href="/get-the-app" onClick={close}>Get the App</Link>

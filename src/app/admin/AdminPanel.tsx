@@ -89,7 +89,9 @@ function Inbox() {
         <p className="hint">
           Contact-form submissions and inbound email land here. Replies send through
           SendGrid (configure the API key in Settings). For site email, point your
-          domain&apos;s MX at SendGrid Inbound Parse → <code>/api/inbound-email</code>.
+          domain&apos;s MX at SendGrid Inbound Parse → <code>/api/inbound-email?key=…</code>
+          with the value of <code>INBOUND_EMAIL_KEY</code> from Settings (without the key
+          the endpoint rejects every delivery, so nobody can inject fake mail).
         </p>
         <table className="admTable">
           <thead><tr><th>From</th><th>Subject</th><th>Via</th><th>Date</th><th /></tr></thead>
@@ -169,6 +171,17 @@ function Settings() {
             <input className="admInput" name="v" placeholder={s.set ? s.value : s.hint || ""}
               type={s.secret ? "password" : "text"} autoComplete="off" />
             <button className="admBtn">Save</button>
+            {/* an empty submit is ignored (the field is a placeholder-only
+                preview), so a saved value needs its own way out */}
+            {s.set && (
+              <button className="admBtn" type="button" title="Remove the saved value (falls back to the .env value, if any)"
+                onClick={async () => {
+                  if (!window.confirm(`Clear ${s.key}?`)) return;
+                  await fetch("/api/admin/settings", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: s.key }) });
+                  setNote(`Cleared ${s.key} ✓`);
+                  load();
+                }}>Clear</button>
+            )}
           </form>
         ))}
         {note && <p className={note.includes("✓") ? "okNote" : "errNote"}>{note}</p>}
@@ -313,7 +326,10 @@ function Users({ adminEmail }: { adminEmail: string }) {
                 <button className="admBtn" onClick={() => { setNote(""); setEditId(u.id); }}>Edit</button>
                 {u.subStatus !== "active"
                   ? <button className="admBtn" onClick={() => api("PUT", { id: u.id, subStatus: "active" })}>Activate</button>
-                  : <button className="admBtn" onClick={() => api("PUT", { id: u.id, subStatus: "suspended" })}>Suspend</button>}
+                  : <button className="admBtn" onClick={() => {
+                    if (window.confirm(`Suspend ${u.email}? They lose studio access until reactivated.`))
+                      api("PUT", { id: u.id, subStatus: "suspended" });
+                  }}>Suspend</button>}
                 {u.email !== adminEmail && (
                   <button className="admBtn danger" onClick={() => {
                     if (window.confirm(`Delete ${u.email}? Their projects and uploads are removed too. This cannot be undone.`))
@@ -340,8 +356,8 @@ function Payments() {
       <p className="hint">
         1) Enter <code>PAYPAL_CLIENT_ID</code>, <code>PAYPAL_CLIENT_SECRET</code> and
         <code> PAYPAL_MODE</code> (sandbox/live) in Settings. 2) Click the button below to
-        create the product and both billing plans ($20/month, $160/year — no trials) in your
-        PayPal account automatically. 3) In the PayPal dashboard add a webhook pointing at
+        create the product and the $160/year billing plan (plus the retired $20/month plan,
+        kept only for existing subscribers — no trials) in your PayPal account automatically. 3) In the PayPal dashboard add a webhook pointing at
         <code> /api/paypal/webhook</code> (subscribe to Billing subscription events) and save
         its ID as <code>PAYPAL_WEBHOOK_ID</code>.
       </p>

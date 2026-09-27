@@ -22,7 +22,7 @@ archiving (the GitHub Actions `ios.yml` build picks it up from the project).
 
 ## Promotional text (170 chars max)
 
-    Word balloons that behave like ink, 600+ comic fonts, SFX warps, Tuck
+    Word balloons that behave like ink, 150+ comic fonts, SFX warps, Tuck
     Back, and print-ready export — pen-first comic lettering on iPad.
 
 ## Description
@@ -47,6 +47,8 @@ Use the full description from `../playstore/LISTING.md` — it fits Apple's
 - **Review notes:** mention the demo account so the reviewer can open the
   studio without paying, and that the app is a native shell around the
   LetterMyComic studio with pen-first input (palm rejection, pinch zoom),
-  offline autosave, and OS file handling for .lmc projects. Apple guideline
-  4.2 (minimum functionality) pushes back on bare wrappers — the .lmc file
-  handling, pen input and installed-app behaviours are the points to make.
+  offline autosave, and Files-app import/export of .lmc projects through the
+  studio's Open/Save. Apple guideline 4.2 (minimum functionality) pushes back
+  on bare wrappers — pen input, offline autosave and the installed-app
+  behaviours are the points to make. (The iOS shell does NOT register the
+  .lmc document type — don't claim OS-level file association.)

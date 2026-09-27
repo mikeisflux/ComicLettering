@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { STORE_LINKS } from "@/lib/storeLinks";
 
 export const metadata: Metadata = {
   title: "Get the App — LetterMyComic on Android, iPad & desktop",
@@ -8,17 +9,17 @@ export const metadata: Metadata = {
   alternates: { canonical: "/get-the-app" },
 };
 
-const PLAY_URL = "https://play.google.com/store/apps/details?id=com.lettermycomic.app";
-const APK_URL = "https://github.com/mikeisflux/ComicLettering/releases/download/android-latest/app-release-signed.apk";
+const PLAY_URL = STORE_LINKS.play;
+const APK_URL = STORE_LINKS.apk;
 
 /* Store listing URLs — flip each from null to its live URL as the store
    approves the listing (null renders an "In review — link coming soon"
    badge, so the card ships before the store does). */
 const STORE_URLS: Record<string, string | null> = {
-  windows: "https://apps.microsoft.com/detail/9N61LFGVKNDM",   // Microsoft Store — LIVE
-  chrome: null,    // Chrome Web Store (submitted)
-  edge: "https://microsoftedge.microsoft.com/addons/detail/lettermycomic-%E2%80%94-comic-let/mddigefnnjoickpabmiikhakjoeonafb",   // Edge Add-ons — LIVE
-  firefox: "https://addons.mozilla.org/addon/lettermycomic-lettering-studio/",   // Firefox Add-ons — LIVE
+  windows: STORE_LINKS.windows,
+  chrome: STORE_LINKS.chrome,
+  edge: STORE_LINKS.edge,
+  firefox: STORE_LINKS.firefox,
 };
 
 /* one card per platform: the store path plus whatever works TODAY */
@@ -71,7 +72,7 @@ export default function GetTheAppPage() {
             Get the LetterMyComic app
           </h1>
           <p style={{ fontSize: 17, color: "#3c4654" }}>
-            The full lettering studio — word balloons, 600+ fonts, SFX warps,
+            The full lettering studio — word balloons, 150+ comic fonts, SFX warps,
             Tuck Back and print-ready export — as a real app on your tablet,
             phone or Chromebook. Pen-first with palm rejection, and your work
             follows your account everywhere.

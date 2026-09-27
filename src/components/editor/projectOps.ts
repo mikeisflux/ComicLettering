@@ -57,11 +57,22 @@ async function confirmMissingArt(ed: EditorCtx): Promise<boolean> {
 
 /* ---------------- project library (SQL) ---------------- */
 
+/* the library's HTTP failures as sentences a letterer can act on: an
+   expired session used to surface as "Unauthorized" mid-save */
+async function libraryError(res: Response): Promise<Error> {
+  if (res.status === 401) return new Error("Your sign-in has expired — sign in again (File → Sign in) and save once more. Your work is still open here.");
+  if (res.status === 402) return new Error("Saving to the library needs an active subscription. Export the .lmc file to keep your work.");
+  let msg = "";
+  try { msg = (await res.clone().json())?.error || ""; } catch { /* not json */ }
+  if (!msg) { try { msg = (await res.text()).slice(0, 140); } catch { /* ignore */ } }
+  return new Error(msg || res.statusText || `HTTP ${res.status}`);
+}
+
 export async function refreshProjects(ed: EditorCtx) {
   const { setProjects, setDbError } = ed;
   try {
     const res = await fetch("/api/projects");
-    if (!res.ok) throw new Error(await res.text());
+    if (!res.ok) throw await libraryError(res);
     setProjects(await res.json());
     setDbError(null);
   } catch (err) {
@@ -140,7 +151,7 @@ export async function saveProject(ed: EditorCtx, saveAs: boolean) {
     const res = target
       ? await fetch(`/api/projects/${target.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) })
       : await fetch("/api/projects", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-    if (!res.ok) throw new Error((await res.json())?.error || res.statusText);
+    if (!res.ok) throw await libraryError(res);
     const meta = await res.json();
     if (typeof meta.updatedAt === "string") openedAt = { id: meta.id, at: meta.updatedAt };
     setCurrent({ id: meta.id, name: meta.name });
@@ -182,7 +193,7 @@ export async function loadProject(ed: EditorCtx, id: string) {
   setStatus("Loading project…");
   try {
     const res = await fetch(`/api/projects/${id}`);
-    if (!res.ok) throw new Error(res.statusText);
+    if (!res.ok) throw await libraryError(res);
     const p = await res.json();
     const payload = p.data;
     if (!payload?.doc?.pages) throw new Error("bad project data");

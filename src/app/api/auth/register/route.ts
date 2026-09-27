@@ -10,7 +10,7 @@ export async function POST(req: Request) {
     const ua = req.headers.get("user-agent");
     if (await isBlocked(ip)) return NextResponse.json({ error: "Too many attempts. Try again later." }, { status: 429 });
     const { email, name, password, captcha } = await req.json();
-    const cap = await verifyCaptcha(captcha);
+    const cap = await verifyCaptcha(captcha, "signup");
     if (!cap.ok) {
       await noteSuspicious(ip, "Failed captcha on sign-up", { userAgent: ua, path: "/api/auth/register" });
       return NextResponse.json({ error: cap.reason }, { status: 400 });

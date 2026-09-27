@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 const FEATURES = [
   "The full lettering studio — balloons, styles, fonts, layouts, fills",
   "Cloud project library with thumbnails",
-  "Full-resolution PNG page export",
+  "Print-ready PNG, JPG, TIFF, PDF and CBZ export at up to 450 dpi",
   "Unlimited pages and projects",
   "All future features included",
 ];
@@ -33,7 +33,7 @@ export default async function Pricing() {
       <script dangerouslySetInnerHTML={{ __html:
         "if(document.documentElement.classList.contains('iosStore'))location.replace('/app')",
       }} />
-      <h2 style={{ textAlign: "center" }}>Simple, Honest Pricing</h2>
+      <h1 className="mktH1" style={{ textAlign: "center" }}>Simple, Honest Pricing</h1>
       <p className="sub" style={{ textAlign: "center", margin: "0 auto 36px" }}>
         Everything included on every plan. Pay securely with PayPal — subscribe and cancel
         anytime, or pay once for a pass with no auto-renew.

@@ -31,7 +31,7 @@ export async function POST(req: Request) {
           `Click the link below to choose a new password. It expires in 1 hour.\n\n${link}\n\n` +
           `If you didn't request this, you can ignore this email — your password won't change.`;
         const html =
-          `<p>Hi${user.name ? " " + user.name : ""},</p>` +
+          `<p>Hi${user.name ? " " + user.name.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c] as string)) : ""},</p>` +
           `<p>We received a request to reset your <strong>LetterMyComic</strong> password. ` +
           `Click the button below to choose a new one. This link expires in 1 hour.</p>` +
           `<p><a href="${link}" style="display:inline-block;background:#f0812c;color:#1d1105;` +

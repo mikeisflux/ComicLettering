@@ -20,7 +20,7 @@ const fmtDate = (iso: string) =>
 export default function BlogIndex() {
   return (
     <main className="mktSection">
-      <h2>The Lettering Blog</h2>
+      <h1 className="mktH1">The Lettering Blog</h1>
       <p className="sub">
         Tutorials on the craft of comic lettering — balloons, tails, captions, sound
         effects and print prep — from the team behind LetterMyComic.

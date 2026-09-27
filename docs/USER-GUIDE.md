@@ -47,6 +47,10 @@ Already have the page drawn? Right-click the artwork → Detect Panels From Art 
 
 Import photos and artwork in PNG, JPG, WebP, GIF, AVIF, BMP, SVG, TIFF or PDF — from the Photos tab, Insert → Image…, or by dropping files straight onto the page. Select a panel first and a clicked photo fills it (cover-cropped); filters (B&W, sepia, vivid, faded, noir) apply per image. Instant Alpha removes flat backgrounds from a stamp or logo.
 
+### Position the picture in its frame
+
+A filled panel crops the art to fit automatically, centred. To choose which part shows: select the panel and open Inspector → Picture in frame — the Across and Down sliders pan the crop, Zoom punches in tighter (up to 3×), and Reset position returns to the automatic centre. Faster by hand: hold Alt and drag the panel and the PICTURE slides inside the frame instead of the frame moving. Both are also one right-click away: Position Picture In Frame… in the context menu. The same controls appear on plain image elements, and everything pans identically in exports and print.
+
 Page art is the ONLY thing allowed past the bleed line — balloons, text and stamps clip hard at the trim (see The bleed line below).
 
 ## Word balloons
@@ -71,7 +75,7 @@ The Styles panel applies whole colourways; right-click → Save Style captures a
 
 ## Text and display lettering
 
-Text boxes hold captions and credits; Lettering is display type for titles and sound effects. Both use the studio's 600+ comic fonts (Insert → Import Custom Font… adds your own), with per-word bold, italic and underline exactly as emphasis is done on the printed page. Dialogue follows comic grammar automatically, including the crossbar-I rule.
+Text boxes hold captions and credits; Lettering is display type for titles and sound effects. Both use the studio's 150+ comic fonts (Insert → Import Custom Font… adds your own), with per-word bold, italic and underline exactly as emphasis is done on the printed page. Dialogue follows comic grammar automatically, including the crossbar-I rule.
 
 ### Warping
 
@@ -79,7 +83,7 @@ Lettering warps two ways: arc/bend controls in the format bar, and the envelope 
 
 ### Fills, outlines, glows
 
-Letters take solid colours, two-colour and multi-stop gradients, textures and halftones; outlines have their own width and colour; brush edges and glows finish the look. 100+ ready lettering styles apply from the Styles panel.
+Letters take solid colours, two-colour and multi-stop gradients, textures and halftones; outlines have their own width and colour; brush edges and glows finish the look. Nearly 100 ready lettering styles apply from the Styles panel.
 
 ### Stamps
 
@@ -103,7 +107,7 @@ Whatever part of those items crosses the SPINE-side bleed line continues on the 
 
 - Insert → Import Script → Balloons… breaks a whole comic script into balloons automatically, page by page.
 - The Proof tab checks every balloon and lettering item with LanguageTool (free & open source); typos get red underlines while you type.
-- Edit → Find & Replace… works across the page or the whole book.
+- Edit → Find & Replace… searches every balloon and lettering item in the whole book.
 - Arrange → Balance Line Breaks evens out a balloon's rag the way letterers break dialogue by hand.
 
 ## Layers, selection and arranging
@@ -142,7 +146,8 @@ File → Install as App… installs the studio as a real app (Add to Home Screen
 
 - Selecting — Ctrl+A select all · Ctrl+Shift+A deselect · Ctrl+click add/remove one · Tab / Shift+Tab step through · Esc deselect or finish editing
 - Adding — B balloon · T text · L lettering · P panel
-- Editing — Ctrl+Z / Ctrl+Y undo, redo · Ctrl+D duplicate · Ctrl+C/X/V copy, cut, paste · Del delete
+- Editing — Ctrl+Z / Ctrl+Y undo, redo · Ctrl+D duplicate · Ctrl+C/X/V copy, cut, paste · Del delete · Ctrl+L lock, Ctrl+Shift+L unlock
+- Arranging — Ctrl+[ / Ctrl+] centre horizontally / vertically · Ctrl+Shift+] to front, Ctrl+Shift+[ to back · Ctrl+\ fit balloon to text
 - While dragging — Shift keeps proportions resizing and snaps 15° rotating · Alt ignores snapping
 - Text — double-click to edit · Ctrl+B / Ctrl+I bold or italic the selected words
 - Pages & view — PageUp / PageDown pages · Ctrl+Shift+N duplicate page · Ctrl+= / Ctrl+- zoom · Ctrl+0 fit

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { getSetting } from "@/lib/settings";
 
 /* SendGrid Inbound Parse webhook — set your domain's MX to mx.sendgrid.net
    and point the Inbound Parse URL at /api/inbound-email?key=<INBOUND_EMAIL_KEY>.
@@ -7,7 +8,7 @@ import { prisma } from "@/lib/db";
    (with spoofed senders) into the admin inbox. */
 export async function POST(req: Request) {
   try {
-    const expected = process.env.INBOUND_EMAIL_KEY || "";
+    const expected = await getSetting("INBOUND_EMAIL_KEY");
     const got = new URL(req.url).searchParams.get("key") || "";
     if (!expected || got !== expected) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });

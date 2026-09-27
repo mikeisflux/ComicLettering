@@ -14,7 +14,7 @@ export const metadata: Metadata = {
     title: "Comic Book Fonts — 150+ Comic Fonts, Letter Online",
     description: "150+ comic book fonts with live previews, original typefaces and custom upload — letter and export online.",
     url: "https://lettermycomic.com/comic-book-fonts",
-    images: [{ url: "/shots/fonts.png", width: 250, height: 480, alt: "Comic book fonts menu with live previews" }],
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: "LetterMyComic — comic lettering studio" }],
   },
 };
 
@@ -76,7 +76,7 @@ export default function Page() {
         { t: "Bold & italic weights", d: "Subtype picker for regular, bold, italic and bold-italic where available." },
         { t: "Original typefaces", d: "Exclusive comic lettering fonts designed in-house and cleared for your work." },
         { t: "Custom font upload", d: "Add your own font files to your account and use them across projects." },
-        { t: "56 lettering styles", d: "Turn any font into a BOOM with one-click gradient, outline and shadow presets." },
+        { t: "Nearly 100 lettering styles", d: "Turn any font into a BOOM with one-click gradient, outline and shadow presets." },
         { t: "Print-ready output", d: "Fonts render crisply on export to PNG, JPG, TIFF, PDF and CBZ up to 450 DPI." },
       ]}
       faqs={[

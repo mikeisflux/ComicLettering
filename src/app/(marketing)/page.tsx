@@ -3,6 +3,7 @@ import Link from "next/link";
 import HeroSlider from "./_components/HeroSlider";
 
 export const metadata: Metadata = {
+  openGraph: { url: "https://lettermycomic.com/" },
   title: "LetterMyComic — Comic Lettering Software in Your Browser",
   description:
     "Letter your comic book online: speech balloons with draggable tails, thought bubbles, SFX lettering styles, panel layouts, halftones and speedlines. Runs in your browser — export print-ready pages.",
@@ -32,7 +33,7 @@ const jsonLd = {
       operatingSystem: "Web browser",
       applicationCategory: "DesignApplication",
       description:
-        "Browser-based comic lettering studio: word balloons, lettering styles, panel layouts, halftone and speedline fills, PNG export.",
+        "Browser-based comic lettering studio: word balloons, lettering styles, panel layouts, halftone and speedline fills, print-ready PNG, JPG, TIFF, PDF and CBZ export.",
       offers: [
         { "@type": "Offer", price: "160.00", priceCurrency: "USD", description: "Yearly subscription" },
         { "@type": "Offer", price: "40.00", priceCurrency: "USD", description: "3-month pass (one-time)" },
@@ -46,7 +47,7 @@ const FEATURES = [
   { e: "🅰️", t: "Pro lettering tools", d: "Inline bold & italic, crossbar-I, fit-to-text and rag balancing, line spacing and tracking, rotation, a format painter, presets, and find & replace across your whole book — the touches that make lettering look professional." },
   { e: "💥", t: "SFX, scripts & spreads", d: "Warp sound effects along an arc, paste a comic script to auto-build balloons, and work in a two-page spread view that reads right across the gutter." },
   { e: "🪄", t: "Tuck Back", d: "Clipping masks built in: draw around the part of your artwork that should come forward and it is cut out and placed in front of your lettering — big sound effects sit behind characters like hand-traced masks, no Photoshop required." },
-  { e: "🔤", t: "150+ comic fonts & styles", d: "90+ pro SFX presets with gradient fills, outlines and drop shadows, plus 150+ built-in comic fonts — including original typefaces you won't find anywhere else." },
+  { e: "🔤", t: "150+ comic fonts & styles", d: "Nearly 100 one-click lettering styles with gradient fills, outlines and drop shadows, plus 150+ built-in comic fonts — including original typefaces you won't find anywhere else." },
   { e: "🗒️", t: "60+ panel layouts", d: "Golden-age grids to modern widescreen, manga, Euro album and tilted action layouts — applied in one click. Duplicate and reorder pages as your story grows." },
   { e: "🎯", t: "Halftones & speedlines", d: "Classic print halftones, motion lines, bursts, tile screens and textures — generated sharp at any size." },
   { e: "🖼️", t: "Your art, your pages", d: "Drop artwork straight onto panels — PNG, JPG, WebP, TIFF, even PDF — it resizes proportionally and snaps to the border. Apply photo filters and letter over it. Nothing is ever uploaded." },

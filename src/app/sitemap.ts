@@ -3,8 +3,16 @@ import { BLOG_POSTS } from "@/lib/blogPosts";
 
 const BASE = "https://lettermycomic.com";
 
+/* lastModified must not be "now": a date that changes on every crawl is
+   ignored by search engines. The build stamp (YYYY-MM-DD.sha) changes only
+   when the site is deployed, which is when pages can have changed. */
+const BUILT = (() => {
+  const m = (process.env.NEXT_PUBLIC_LMC_BUILD || "").match(/^(\d{4}-\d{2}-\d{2})/);
+  return new Date(`${m ? m[1] : "2026-09-27"}T00:00:00Z`);
+})();
+
 export default function sitemap(): MetadataRoute.Sitemap {
-  const now = new Date();
+  const now = BUILT;
   return [
     { url: `${BASE}/`, lastModified: now, changeFrequency: "weekly", priority: 1 },
     // keyword landing pages

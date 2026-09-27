@@ -15,7 +15,7 @@ export const metadata: Metadata = {
     title: "Comic Book Lettering — Letter Your Comic Online",
     description: "Professional comic book lettering online: balloons, captions, SFX, layouts and print-ready export.",
     url: "https://lettermycomic.com/comic-book-lettering",
-    images: [{ url: "/shots/page.png", width: 492, height: 738, alt: "Comic book lettering example" }],
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: "LetterMyComic — comic lettering studio" }],
   },
 };
 
@@ -64,7 +64,7 @@ export default function Page() {
           p: (
             <>
               <p>
-                Letter your SFX with 56 one-click styles — gradients, outlines and shadows — and 150+
+                Letter your SFX with nearly 100 one-click styles — gradients, outlines and shadows — and 150+
                 comic fonts. When the page is done, export it print-ready as PNG, JPG, TIFF, PDF or CBZ
                 at up to 450&nbsp;DPI, or print directly. Your projects save to a cloud library so a
                 whole book stays organized.

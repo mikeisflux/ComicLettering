@@ -19,7 +19,7 @@ export const BLOG_POSTS: BlogPost[] = [
     slug: "introducing-lettermycomic",
     title: "LetterMyComic Launches: Professional Comic Lettering in Your Browser",
     description:
-      "LetterMyComic.com is live — a complete comic-lettering studio that runs in any browser: word balloons that behave like ink, 600+ comic fonts, SFX warping, tuck-behind-art lettering, and print-ready export.",
+      "LetterMyComic.com is live — a complete comic-lettering studio that runs in any browser: word balloons that behave like ink, 150+ comic fonts, SFX warping, tuck-behind-art lettering, and print-ready export.",
     date: "2026-08-01",
     minutes: 5,
     kicker: "Press release",
@@ -35,7 +35,7 @@ export const BLOG_POSTS: BlogPost[] = [
         "Micro-nudge positioning with arrow keys for print-precise placement",
       ] },
       { h: "Type built for comics" },
-      { p: "The studio ships with 600+ comic fonts and 100+ ready lettering styles, plus import for a letterer's own fonts. Dialogue follows comic-grammar conventions automatically, including the crossbar-I rule. Individual words can be bolded, italicised or underlined inline, exactly as emphasis is done on the printed page. A full comic script can be imported and broken into balloons automatically, and built-in spelling and grammar proofing checks every balloon on the page." },
+      { p: "The studio ships with 150+ comic fonts (600+ font files) and nearly 100 ready lettering styles, plus import for a letterer's own fonts. Dialogue follows comic-grammar conventions automatically, including the crossbar-I rule. Individual words can be bolded, italicised or underlined inline, exactly as emphasis is done on the printed page. A full comic script can be imported and broken into balloons automatically, and built-in spelling and grammar proofing checks every balloon on the page." },
       { h: "Sound effects and lettering that sits inside the art" },
       { p: "Display lettering gets arc and envelope warping, gradient and texture fills, brush edges and glows. The studio's Tuck Back tool slips a sound effect behind foreground artwork — its magnetic tracer snaps to the art's own edges, so a KRAKOOM can dive behind a character's arm in seconds and read like it was painted there." },
       { h: "From artwork to the printer" },

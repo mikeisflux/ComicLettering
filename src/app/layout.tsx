@@ -21,19 +21,18 @@ export const metadata: Metadata = {
     apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
   appleWebApp: { capable: true, title: "LetterMyComic", statusBarStyle: "default" },
-  alternates: { canonical: "/" },
+  /* no `title`/`url` here: each page's own title (via the template) and
+     path must flow through, or every share card said "LetterMyComic —
+     Comic Lettering Software" and pointed at the home page */
   openGraph: {
     type: "website",
     siteName: "LetterMyComic",
-    url: "https://lettermycomic.com",
-    title: "LetterMyComic — Comic Lettering Software in Your Browser",
     description:
       "Professional comic lettering in your browser: balloons, lettering styles, panel layouts, halftones, speedlines and print-ready export.",
     images: [{ url: "/og.png", width: 1200, height: 630, alt: "LetterMyComic — comic lettering studio" }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "LetterMyComic — Comic Lettering Software in Your Browser",
     description: "Letter your comic online: balloons, SFX styles, layouts, halftones and print-ready export.",
     images: ["/og.png"],
   },

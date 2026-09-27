@@ -30,7 +30,7 @@ export default function manifest(): MetadataRoute.Manifest {
       { src: "/shots/app/pages.webp", sizes: "1400x788", type: "image/webp", form_factor: "wide", label: "Pages and layouts" },
       { src: "/shots/app/pen.webp", sizes: "1400x788", type: "image/webp", form_factor: "wide", label: "Pen-first tablet lettering" },
       { src: "/shots/app/hero.webp", sizes: "720x1280", type: "image/webp", form_factor: "narrow", label: "Word balloons on your art" },
-      { src: "/shots/app/type.webp", sizes: "720x1280", type: "image/webp", form_factor: "narrow", label: "600+ comic fonts" },
+      { src: "/shots/app/type.webp", sizes: "720x1280", type: "image/webp", form_factor: "narrow", label: "150+ comic fonts" },
     ],
     icons: [
       { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },

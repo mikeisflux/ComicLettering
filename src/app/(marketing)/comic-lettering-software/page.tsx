@@ -15,7 +15,7 @@ export const metadata: Metadata = {
     title: "Comic Lettering Software — Online Comic Lettering Program",
     description: "Professional comic lettering software in your browser: balloons, SFX styles, layouts, halftones and print-ready export.",
     url: "https://lettermycomic.com/comic-lettering-software",
-    images: [{ url: "/shots/studio.png", width: 1600, height: 1000, alt: "LetterMyComic comic lettering software" }],
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: "LetterMyComic — comic lettering studio" }],
   },
 };
 
@@ -78,7 +78,7 @@ export default function Page() {
       ]}
       bullets={[
         { t: "19 word balloon types", d: "Speech, thought, whisper, shout, radio, TV, dotted and more — with aimable tails, or hand-drawn." },
-        { t: "56 lettering styles", d: "One-click gradient, outline and shadow presets to letter sound effects and titles." },
+        { t: "Nearly 100 lettering styles", d: "One-click gradient, outline and shadow presets to letter sound effects and titles." },
         { t: "150+ comic fonts", d: "Bundled comic book fonts with live previews, plus custom font upload." },
         { t: "Panel layouts", d: "60+ page templates from golden-age grids to modern widescreen and manga." },
         { t: "Halftones & speedlines", d: "Classic print halftones, motion lines, bursts and textures, sharp at any size." },

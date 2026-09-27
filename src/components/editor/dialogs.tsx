@@ -1,6 +1,7 @@
 /* Balloon tray (bottom bar), context menu and modal dialogs.
    Plain exported render functions taking the EditorCtx bag. */
 import { clamp, makeText } from "@/lib/model";
+import { STORE_LINKS } from "@/lib/storeLinks";
 import { LETTER_STYLES, applyLetterStyle } from "@/lib/presets";
 import { STAMPS, WORD_STAMPS, letterStyleCss } from "./textHelpers";
 import { describeScript, parseScript } from "@/lib/scriptParse";
@@ -444,14 +445,14 @@ export function renderInstallHelp(ed: EditorCtx) {
         <div className="setupFoot">
           {/Windows/.test(ua) && (
             <a className="okBtn" style={{ textDecoration: "none" }}
-              href="https://apps.microsoft.com/detail/9N61LFGVKNDM"
+              href={STORE_LINKS.windows}
               target="_blank" rel="noreferrer">
               Microsoft Store
             </a>
           )}
           {isFirefox && (
             <a className="okBtn" style={{ textDecoration: "none" }}
-              href="https://addons.mozilla.org/en-US/firefox/addon/lettermycomic-comic-lettering-studio/"
+              href={STORE_LINKS.firefox}
               target="_blank" rel="noreferrer">
               Get the Firefox Add-on
             </a>

@@ -15,7 +15,7 @@ export async function POST(req: Request) {
       await blockIP(ip || "", "Honeypot triggered on contact form", { userAgent: ua, path: "/api/contact" });
       return NextResponse.json({ ok: true });
     }
-    const cap = await verifyCaptcha(captcha);
+    const cap = await verifyCaptcha(captcha, "contact");
     if (!cap.ok) {
       await noteSuspicious(ip, "Failed captcha on contact form", { userAgent: ua, path: "/api/contact" });
       return NextResponse.json({ error: cap.reason }, { status: 400 });

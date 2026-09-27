@@ -22,7 +22,7 @@ export default async function CreditsPage() {
 
   return (
     <main className="mktSection" style={{ maxWidth: 720 }}>
-      <h2>Credits</h2>
+      <h1 className="mktH1">Credits</h1>
       <p className="sub">
         LetterMyComic exists because people believed in a real lettering tool for
         the open web. These lifetime supporters put their money where the word
