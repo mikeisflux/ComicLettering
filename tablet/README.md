@@ -20,10 +20,20 @@ Artifacts:
 - `app-release-bundle.aab` — upload this to the Play Console
 - `app-release-signed.apk` — sideload onto a tablet to try it today
 - `assetlinks-fingerprint.txt` — see below
-- first run only: `android-keystore-KEEP-SAFE` — your signing key.
-  Download it, keep it somewhere safe, then store it in the repo secrets
-  (`ANDROID_KEYSTORE_B64` = the file base64-encoded, and
-  `ANDROID_KEYSTORE_PASSWORD`) so every future build signs identically.
+
+The workflow only runs with the signing secrets set (`ANDROID_KEYSTORE_B64`
+= your upload keystore base64-encoded, `ANDROID_KEYSTORE_PASSWORD`). Make
+the key on your own machine — never in CI, this repo is public:
+
+```
+keytool -genkeypair -v -keystore android.keystore -alias lettermycomic \
+  -keyalg RSA -keysize 2048 -validity 10000
+base64 -w0 android.keystore      # → ANDROID_KEYSTORE_B64
+```
+
+Every build gets `versionCode` = the workflow run number (Play refuses a
+re-used code) and `versionName` from a `tablet-v1.2.3` tag when built from
+one.
 
 Then remove the browser bar for released builds by proving site/app
 ownership: create `public/.well-known/assetlinks.json` with the SHA-256

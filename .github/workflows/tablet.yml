@@ -3,10 +3,17 @@
 # sideloadable .apk as workflow artifacts. Run from the Actions tab or push
 # a tablet-v* tag.
 #
-# Signing: set the ANDROID_KEYSTORE_B64 + ANDROID_KEYSTORE_PASSWORD secrets
-# to use your upload key. With no secrets set, the workflow GENERATES a
-# keystore and attaches it as an artifact — download and keep it, then store
-# it in the secrets so every future build signs with the same key.
+# Signing: the ANDROID_KEYSTORE_B64 + ANDROID_KEYSTORE_PASSWORD secrets hold
+# the upload key. The job REFUSES to run without them — this repo is public,
+# and a generated key attached as an artifact is downloadable by anyone
+# (which is exactly what happened once; that key must never sign again).
+# Generate the key locally, never in CI:
+#   keytool -genkeypair -v -keystore android.keystore -alias lettermycomic \
+#     -keyalg RSA -keysize 2048 -validity 10000
+#   base64 -w0 android.keystore   → ANDROID_KEYSTORE_B64
+# Version code: the workflow run number, so every build is newer than the
+# last (Play refuses a re-used version code). Version name: the tablet-v*
+# tag when the build comes from one, else the manifest's.
 name: Tablet app (Android)
 
 on:
@@ -25,8 +32,14 @@ jobs:
       run:
         working-directory: tablet/droid
     env:
-      KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD || 'lettermycomic-dev' }}
+      KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
     steps:
+      - name: Refuse to build without the signing secrets
+        run: |
+          if [ -z "${{ secrets.ANDROID_KEYSTORE_B64 }}" ] || [ -z "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" ]; then
+            echo "::error::ANDROID_KEYSTORE_B64 and ANDROID_KEYSTORE_PASSWORD must be set — CI never generates signing keys."
+            exit 1
+          fi
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
@@ -52,19 +65,18 @@ jobs:
           "$SDK/tools/bin/sdkmanager" --version
           mkdir -p ~/.bubblewrap
           printf '{"jdkPath": "%s", "androidSdkPath": "%s"}\n' "$JAVA_HOME" "$SDK" > ~/.bubblewrap/config.json
-      - name: Keystore (from secret, or generate a fresh one)
+      - name: Keystore from the secret
         run: |
-          if [ -n "${{ secrets.ANDROID_KEYSTORE_B64 }}" ]; then
-            echo "${{ secrets.ANDROID_KEYSTORE_B64 }}" | base64 -d > android.keystore
-          else
-            keytool -genkeypair -v -keystore android.keystore -alias lettermycomic \
-              -keyalg RSA -keysize 2048 -validity 10000 \
-              -storepass "$KS_PASS" -keypass "$KS_PASS" \
-              -dname "CN=LetterMyComic"
-            echo "GENERATED_KEYSTORE=1" >> "$GITHUB_ENV"
-          fi
+          echo "${{ secrets.ANDROID_KEYSTORE_B64 }}" | base64 -d > android.keystore
           keytool -list -v -keystore android.keystore -alias lettermycomic -storepass "$KS_PASS" \
             | grep -E "SHA256:" > assetlinks-fingerprint.txt || true
+      - name: Stamp the version (code = run number, name = tag when tagged)
+        run: |
+          CODE=${{ github.run_number }}
+          NAME=$(node -p "require('./twa-manifest.json').appVersionName")
+          case "${{ github.ref }}" in refs/tags/tablet-v*) NAME="${GITHUB_REF#refs/tags/tablet-v}";; esac
+          node -e "const f='twa-manifest.json',m=require('./'+f);m.appVersionCode=$CODE;m.appVersionName='$NAME';require('fs').writeFileSync(f,JSON.stringify(m,null,2)+'\n')"
+          echo "versionCode=$CODE versionName=$NAME"
       - name: Generate the Android project from twa-manifest.json
         run: bubblewrap update --skipVersionUpgrade
         env:
@@ -83,12 +95,6 @@ jobs:
             tablet/droid/*.apk
             tablet/droid/assetlinks-fingerprint.txt
           if-no-files-found: error
-      - name: Attach the generated keystore (KEEP THIS — it is your signing key)
-        if: env.GENERATED_KEYSTORE == '1'
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-keystore-KEEP-SAFE
-          path: tablet/droid/android.keystore
       # publish the signed APK at a stable URL so the site's Get the App
       # page can offer a direct Android download (sideload) alongside Play
       - name: Publish APK to the android-latest release

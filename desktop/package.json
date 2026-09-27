@@ -2,7 +2,7 @@
   "name": "lettermycomic-desktop",
   "productName": "LetterMyComic",
   "version": "1.0.0",
-  "description": "LetterMyComic desktop app — comic lettering studio with native .lmc project files",
+  "description": "LetterMyComic desktop app \u2014 comic lettering studio with native .lmc project files",
   "author": "LetterMyComic <hello@lettermycomic.com>",
   "license": "UNLICENSED",
   "private": true,
@@ -12,13 +12,15 @@
     "dist": "electron-builder --publish never"
   },
   "devDependencies": {
-    "electron": "^33.2.0",
-    "electron-builder": "^25.1.8"
+    "electron": "^38.0.0",
+    "electron-builder": "^26.0.12"
   },
   "build": {
     "appId": "com.lettermycomic.app",
     "productName": "LetterMyComic",
-    "files": ["main.js"],
+    "files": [
+      "main.js"
+    ],
     "icon": "build/icon.png",
     "fileAssociations": [
       {
@@ -30,8 +32,16 @@
         "icon": "build/icon.png"
       }
     ],
-    "win": { "target": ["nsis", "appx"] },
-    "nsis": { "oneClick": true, "perMachine": false },
+    "win": {
+      "target": [
+        "nsis",
+        "appx"
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false
+    },
     "appx": {
       "identityName": "REPLACE.WITH.PartnerCenter.IdentityName",
       "publisher": "CN=REPLACE-WITH-PARTNER-CENTER-PUBLISHER-GUID",
@@ -40,7 +50,18 @@
       "displayName": "LetterMyComic",
       "backgroundColor": "#24303f"
     },
-    "mac": { "target": ["dmg", "zip"], "category": "public.app-category.graphics-design" },
-    "linux": { "target": ["AppImage"], "category": "Graphics" }
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.graphics-design"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Graphics"
+    }
   }
 }

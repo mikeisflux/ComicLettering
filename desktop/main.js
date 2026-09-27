@@ -42,10 +42,23 @@ function createWindow() {
     autoHideMenuBar: true,            // the studio has its own menu bar
     webPreferences: { sandbox: true },
   });
-  /* outbound links (pricing, blog, PayPal…) belong in the real browser */
+  /* outbound links (pricing, blog, PayPal…) belong in the real browser —
+     and only web links: a target=_blank pointing at another protocol must
+     not launch a handler on the user's machine */
+  const external = (url) => { if (/^https?:/i.test(url)) shell.openExternal(url); };
+  const isOurs = (url) => {
+    try { const u = new URL(url); return u.protocol === "https:" && (u.hostname === "lettermycomic.com" || u.hostname.endsWith(".lettermycomic.com")); }
+    catch { return false; }
+  };
   win.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    external(url);
     return { action: "deny" };
+  });
+  /* same-window navigation stays on the site; anything else opens outside */
+  win.webContents.on("will-navigate", (e, url) => {
+    if (process.env.LMC_URL || isOurs(url)) return;
+    e.preventDefault();
+    external(url);
   });
   win.webContents.on("did-finish-load", () => { ready = true; flushFiles(); });
   win.on("closed", () => { win = null; ready = false; });

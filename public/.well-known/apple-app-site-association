@@ -1,0 +1,23 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "9J83P53KKJ.com.lettermycomic.app",
+        "paths": [
+          "/app",
+          "/app/*",
+          "/pricing",
+          "/account",
+          "/guide",
+          "/blog/*"
+        ]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": [
+      "9J83P53KKJ.com.lettermycomic.app"
+    ]
+  }
+}

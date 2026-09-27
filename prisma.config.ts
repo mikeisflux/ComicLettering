@@ -13,6 +13,6 @@ export default defineConfig({
     url: process.env.DATABASE_URL ?? "postgresql://unset:unset@localhost:5432/unset",
   },
   migrations: {
-    seed: "node prisma/seed.mjs",
+    seed: "node --experimental-strip-types prisma/seed.mjs",
   },
 });

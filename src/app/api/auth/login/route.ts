@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { createSession, verifyPassword } from "@/lib/auth";
+import { createSession, hasAccess, verifyPassword } from "@/lib/auth";
 import { verifyCaptcha } from "@/lib/captcha";
 import { clientIp, isBlocked, noteSuspicious } from "@/lib/botblock";
 
@@ -21,8 +21,8 @@ export async function POST(req: Request) {
       await noteSuspicious(ip, "Failed login", { userAgent: ua, path: "/api/auth/login" }, 10, 10);
       return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
     }
-    await createSession(user.id);
-    return NextResponse.json({ ok: true, isAdmin: user.isAdmin, subStatus: user.subStatus });
+    await createSession(user.id, user.passwordHash);
+    return NextResponse.json({ ok: true, isAdmin: user.isAdmin, subStatus: user.subStatus, access: hasAccess(user) });
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: "Something went wrong — please try again." }, { status: 500 });

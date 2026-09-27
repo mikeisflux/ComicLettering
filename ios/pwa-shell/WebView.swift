@@ -39,7 +39,7 @@ func createWebView(container: UIView, WKSMH: WKScriptMessageHandler, WKND: WKNav
     let deviceModel = UIDevice.current.model
     let osVersion = UIDevice.current.systemVersion
     webView.configuration.applicationNameForUserAgent = "Safari/604.1"
-    webView.customUserAgent = "Mozilla/5.0 (\(deviceModel); CPU \(deviceModel) OS \(osVersion.replacingOccurrences(of: ".", with: "_")) like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/\(osVersion) Mobile/15E148 Safari/604.1 PWAShell"
+    webView.customUserAgent = "Mozilla/5.0 (\(deviceModel); CPU \(deviceModel) OS \(osVersion.replacingOccurrences(of: ".", with: "_")) like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/\(osVersion) Mobile/15E148 Safari/604.1 PWAShell LmcIOS"
 
     webView.addObserver(NSO, forKeyPath: #keyPath(WKWebView.estimatedProgress), options: NSKeyValueObservingOptions.new, context: nil)
     
@@ -64,7 +64,7 @@ func setCustomCookie(webView: WKWebView) {
         .path: "/",
         .name: platformCookie.name,
         .value: platformCookie.value,
-        .secure: "FALSE",
+        .secure: "TRUE",
         .expires: NSDate(timeIntervalSinceNow: 31556926)
     ])!
 
@@ -120,7 +120,10 @@ extension ViewController: WKUIDelegate, WKDownloadDelegate {
         if let requestUrl = navigationAction.request.url{
             if let requestHost = requestUrl.host {
                 // NOTE: Match auth origin first, because host origin may be a subset of auth origin and may therefore always match
-                let matchingAuthOrigin = authOrigins.first(where: { requestHost.range(of: $0) != nil })
+                // exact host or a subdomain — a substring match let
+                // "lettermycomic.com.evil.tld" through
+                let sameOrigin: (String) -> Bool = { requestHost == $0 || requestHost.hasSuffix("." + $0) }
+                let matchingAuthOrigin = authOrigins.first(where: sameOrigin)
                 if (matchingAuthOrigin != nil) {
                     decisionHandler(.allow)
                     if (toolbarView.isHidden) {
@@ -130,7 +133,7 @@ extension ViewController: WKUIDelegate, WKDownloadDelegate {
                     return
                 }
 
-                let matchingHostOrigin = allowedOrigins.first(where: { requestHost.range(of: $0) != nil })
+                let matchingHostOrigin = allowedOrigins.first(where: sameOrigin)
                 if (matchingHostOrigin != nil) {
                     // Open in main webview
                     decisionHandler(.allow)

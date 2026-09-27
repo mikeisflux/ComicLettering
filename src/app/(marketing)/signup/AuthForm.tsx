@@ -7,7 +7,10 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const params = useSearchParams();
-  const next = params.get("next");
+  /* only a same-origin path may be a return target: "https://evil.example"
+     or "javascript:…" in ?next= must never be followed after sign-in */
+  const rawNext = params.get("next");
+  const next = rawNext && /^\/(?!\/)/.test(rawNext) ? rawNext : null;
   const isDemo = params.get("demo") === "1";
   const getCaptcha = useCaptcha();
   const suffix = `${next ? `?next=${encodeURIComponent(next)}` : ""}${isDemo ? `${next ? "&" : "?"}demo=1` : ""}`;
@@ -38,7 +41,9 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
     if (!res.ok) { setErr(data.error || "Something went wrong."); setBusy(false); return; }
     if (next) window.location.href = next;
     else if (data.isAdmin) window.location.href = "/admin";
-    else if (data.subStatus === "active") window.location.href = "/app";
+    /* `access` is the server's full rule (passes, cancelled-but-paid-through) —
+       a plain status check sent entitled users to the pricing page */
+    else if (data.access ?? data.subStatus === "active") window.location.href = "/app";
     else window.location.href = "/pricing";
   }
 

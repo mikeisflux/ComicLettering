@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSessionUser, hashPassword } from "@/lib/auth";
+import { createSession, getSessionUser, hashPassword } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
 async function requireAdmin() {
@@ -83,6 +83,9 @@ export async function PUT(req: Request) {
   }
   if (typeof isAdmin === "boolean") data.isAdmin = isAdmin;
   await prisma.user.update({ where: { id: String(id) }, data });
+  /* sessions are bound to the password: an admin changing their OWN gets a
+     fresh cookie here instead of being logged out on the next request */
+  if (String(id) === admin.id && typeof data.passwordHash === "string") await createSession(admin.id, data.passwordHash);
   return NextResponse.json({ ok: true });
 }
 

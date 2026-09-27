@@ -29,7 +29,10 @@ platform :ios do
       git_url: "https://x-access-token:#{ENV['GITHUB_TOKEN']}@github.com/mikeisflux/ComicLettering.git",
       git_branch: "ios-certs",
       api_key: api_key,
-      readonly: false,
+      # read-only in CI: the store lives in a branch of a PUBLIC repo, so a
+      # runner must never be able to mint new certificates/profiles. Run
+      # `fastlane match appstore` locally (readonly false) to renew them.
+      readonly: true,
     )
 
     update_code_signing_settings(

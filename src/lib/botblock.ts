@@ -20,6 +20,18 @@ function isValidIPv4(ip: string): boolean {
   if (!IPV4.test(ip)) return false;
   return ip.split(".").every((o) => +o <= 255);
 }
+const IPV6 = /^[0-9a-f:]+$/i;
+const isValidIPv6 = (ip: string) => ip.includes(":") && IPV6.test(ip) && ip.length <= 45;
+/* loopback, link-local and RFC1918 space must never reach the firewall: a
+   misconfigured proxy (or a local probe) reporting 127.0.0.1 as the client
+   would otherwise DROP Caddy→Next and app→Postgres traffic */
+function isPrivate(ip: string): boolean {
+  if (ip === "::1" || ip.startsWith("fe80:") || ip.startsWith("fc") || ip.startsWith("fd")) return true;
+  const o = ip.split(".").map(Number);
+  if (o.length !== 4) return false;
+  return o[0] === 127 || o[0] === 10 || o[0] === 0 || (o[0] === 169 && o[1] === 254)
+    || (o[0] === 172 && o[1] >= 16 && o[1] <= 31) || (o[0] === 192 && o[1] === 168);
+}
 
 /* Legitimate search-engine and social crawlers we must NEVER block —
    blocking these would remove the site from Google/Bing and break link
@@ -69,7 +81,9 @@ export interface BlockMeta {
 export async function blockIP(
   ip: string, reason: string, meta: BlockMeta = {}, hours = 24
 ): Promise<void> {
-  if (!ip || !isValidIPv4(ip)) return; // only firewall real IPv4 addresses
+  if (!ip || isPrivate(ip)) return;
+  const v4 = isValidIPv4(ip);
+  if (!v4 && !isValidIPv6(ip)) return;
   if (isGoodBot(meta.userAgent)) return; // never block Google/Bing/Yahoo/FB/X crawlers
   const expiresAt = new Date(Date.now() + hours * 3600_000);
   try {
@@ -91,7 +105,9 @@ export async function blockIP(
   } catch {
     /* DB unavailable — still notify the firewall below */
   }
-  await notifyFirewall(ip);
+  /* the iptables watcher handles IPv4 only; IPv6 offenders are refused by
+     the app-level isBlocked() check on every guarded route */
+  if (v4) await notifyFirewall(ip);
 }
 
 /* Is this IP currently blocked? (fast app-level check before the firewall

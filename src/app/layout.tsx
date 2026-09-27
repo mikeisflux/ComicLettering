@@ -50,12 +50,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html:
           "if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(function(){})}",
         }} />
-        {/* iOS App Store build (guideline 3.1.1): the wrapper launches with
-            ?store=ios — persist the flag and stamp <html class="iosStore">
-            BEFORE first paint so pricing/purchase surfaces never flash.
+        {/* iOS App Store build (guideline 3.1.1): the wrapper's user agent
+            carries "LmcIOS" (and it launches with ?store=ios) — stamp
+            <html class="iosStore"> BEFORE first paint so pricing/purchase
+            surfaces never flash. The UA is the source of truth, so a
+            universal-link launch without the query still gets store mode,
+            and nothing is persisted: opening ?store=ios once in Safari used
+            to hide pricing in that browser forever.
             See src/lib/storeMode.ts for what the class hides. */}
         <script dangerouslySetInnerHTML={{ __html:
-          "try{if(new URLSearchParams(location.search).get('store')==='ios')localStorage.setItem('lmc.store','ios');if(localStorage.getItem('lmc.store')==='ios'||/LmcIOS/.test(navigator.userAgent))document.documentElement.classList.add('iosStore')}catch(e){}",
+          "try{var w=/LmcIOS|PWAShell/.test(navigator.userAgent),q=new URLSearchParams(location.search).get('store')==='ios';if(w||q)document.documentElement.classList.add('iosStore')}catch(e){}",
         }} />
         {children}
       </body>

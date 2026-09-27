@@ -15,8 +15,6 @@ export async function POST(req: Request) {
       await noteSuspicious(ip, "Failed captcha on sign-up", { userAgent: ua, path: "/api/auth/register" });
       return NextResponse.json({ error: cap.reason }, { status: 400 });
     }
-    /* a burst of sign-ups from one address is a bot, captcha or not */
-    await noteSuspicious(ip, "Sign-up", { userAgent: ua, path: "/api/auth/register" }, 20, 20);
     if (!email || !password || String(password).length < 8) {
       return NextResponse.json({ error: "Valid email and a password of at least 8 characters are required." }, { status: 400 });
     }
@@ -45,7 +43,10 @@ export async function POST(req: Request) {
       }
       throw e;
     }
-    await createSession(user.id);
+    /* a burst of CREATED accounts from one address is a bot (fumbled
+       submissions are not counted — a school NAT must not lock itself out) */
+    await noteSuspicious(ip, "Sign-up", { userAgent: ua, path: "/api/auth/register" }, 20, 20);
+    await createSession(user.id, user.passwordHash);
     return NextResponse.json({ ok: true, isAdmin: user.isAdmin });
   } catch {
     return NextResponse.json({ error: "Sign-up failed — please try again." }, { status: 500 });

@@ -47,8 +47,10 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             comps?.scheme = "https"
 
             if let url = comps?.url {
-                // Handle it inside our web view in a SPA-friendly way.
-                PWAShell.webView.evaluateJavaScript("location.href = '\(url)'")
+                // A real navigation, never string-built JavaScript: a quote in
+                // the URL used to break out of the literal and run script in
+                // the app's origin.
+                PWAShell.webView.load(URLRequest(url: url))
             }
         }
     }
@@ -65,8 +67,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             return
         }
 
-        // Handle it inside our web view in a SPA-friendly way.
-        PWAShell.webView.evaluateJavaScript("location.href = '\(universalLink)'")
+        PWAShell.webView.load(URLRequest(url: universalLink))
     }
 
     // This function is called if our app is already loaded and the user activates the app via shortcut
@@ -74,7 +75,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
                      performActionFor shortcutItem: UIApplicationShortcutItem,
                      completionHandler: @escaping (Bool) -> Void) {
         if let shortcutUrl = URL.init(string: shortcutItem.type) {
-            PWAShell.webView.evaluateJavaScript("location.href = '\(shortcutUrl)'");
+            PWAShell.webView.load(URLRequest(url: shortcutUrl))
         }
     }
 

@@ -21,6 +21,27 @@ const build = process.env.NEXT_PUBLIC_LMC_BUILD || (() => {
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   env: { NEXT_PUBLIC_LMC_BUILD: build },
+  /* the deploy script builds into a side directory and swaps it in, so the
+     live workers keep a complete .next until the reload (see deploy.sh) */
+  distDir: process.env.NEXT_DIST_DIR || ".next",
+  async headers() {
+    const security = [
+      { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+      { key: "X-Content-Type-Options", value: "nosniff" },
+      { key: "X-Frame-Options", value: "SAMEORIGIN" },
+      { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
+      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+      { key: "Permissions-Policy", value: "geolocation=(), microphone=(), payment=(self \"https://www.paypal.com\")" },
+    ];
+    return [
+      { source: "/(.*)", headers: security },
+      /* the ~40MB segmentation model + ONNX runtime never change without a
+         file rename — let browsers keep them */
+      { source: "/models/:path*", headers: [{ key: "Cache-Control", value: "public, max-age=2592000, immutable" }] },
+      { source: "/ort/:path*", headers: [{ key: "Cache-Control", value: "public, max-age=2592000, immutable" }] },
+      { source: "/.well-known/apple-app-site-association", headers: [{ key: "Content-Type", value: "application/json" }] },
+    ];
+  },
 };
 
 export default nextConfig;

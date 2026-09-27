@@ -13,6 +13,8 @@
 # Configuration can be overridden via environment variables:
 #   APP_DIR=/opt/lettermycomic BRANCH=main DOMAIN=lettermycomic.com ./scripts/deploy.sh
 set -euo pipefail
+# everything this script creates (.env, database dumps) is private to root
+umask 077
 
 APP_DIR="${APP_DIR:-/opt/lettermycomic}"
 REPO_URL="${REPO_URL:-https://github.com/mikeisflux/ComicLettering.git}"
@@ -53,6 +55,7 @@ provision_postgres() {
   systemctl enable --now postgresql >/dev/null 2>&1 || true
 
   touch "$APP_DIR/.env"
+  chmod 600 "$APP_DIR/.env"
   if grep -qE '^DATABASE_URL="postgresql://' "$APP_DIR/.env"; then
     log "PostgreSQL DATABASE_URL already configured — reusing."
     return
@@ -145,7 +148,31 @@ build_app() {
   # one build stamp for every bundle — see next.config.ts
   NEXT_PUBLIC_LMC_BUILD="$(date -u +%Y-%m-%d).$(git rev-parse --short=10 HEAD 2>/dev/null || date +%s)"
   export NEXT_PUBLIC_LMC_BUILD
-  npm run build
+  # Build into a SIDE directory: building straight into .next replaced the
+  # chunks the live workers were serving, so visitors mid-deploy got 404s
+  # and a failed build left a half-written .next behind. The finished build
+  # is swapped in just before the reload; the previous one is kept for a
+  # fast rollback.
+  rm -rf "$APP_DIR/.next-build"
+  NEXT_DIST_DIR=.next-build npm run build
+}
+
+# put the freshly built directory live (the reload that follows picks it up)
+swap_build_in() {
+  cd "$APP_DIR"
+  [ -d .next-build ] || fail "no .next-build to swap in"
+  rm -rf .next-prev
+  [ -d .next ] && mv .next .next-prev
+  mv .next-build .next
+}
+
+# rollback: the previous build directory goes back, no rebuild needed
+swap_build_back() {
+  cd "$APP_DIR"
+  [ -d .next-prev ] || return 1
+  rm -rf .next-failed
+  [ -d .next ] && mv .next .next-failed
+  mv .next-prev .next
 }
 
 backup_db() {
@@ -161,13 +188,19 @@ backup_db() {
         > "$APP_DIR/backups/sqlite-${stamp}.json" ) \
       && log "SQLite backup: backups/sqlite-${stamp}.db + .json (complete)" \
       || log "SQLite backup: backups/sqlite-${stamp}.db"
+    # keep the 10 most recent legacy copies
+    ls -1t "$APP_DIR"/backups/sqlite-*.db 2>/dev/null | tail -n +11 | xargs -r rm -f
+    ls -1t "$APP_DIR"/backups/sqlite-*.json 2>/dev/null | tail -n +11 | xargs -r rm -f
   fi
-  # PostgreSQL dump
+  # PostgreSQL dump — a schema push follows, so no dump means no deploy
   if command -v pg_dump >/dev/null && [[ "${DATABASE_URL:-}" == postgresql://* ]]; then
-    if pg_dump "$DATABASE_URL" > "$APP_DIR/backups/pg-${stamp}.sql" 2>/dev/null; then
+    if pg_dump "$DATABASE_URL" > "$APP_DIR/backups/pg-${stamp}.sql" 2>"$APP_DIR/backups/pg-${stamp}.err"; then
+      rm -f "$APP_DIR/backups/pg-${stamp}.err"
+      chmod 600 "$APP_DIR/backups/pg-${stamp}.sql"
       log "PostgreSQL backup: backups/pg-${stamp}.sql"
     else
       rm -f "$APP_DIR/backups/pg-${stamp}.sql"
+      fail "PostgreSQL backup FAILED — not deploying without one. See backups/pg-${stamp}.err"
     fi
     # keep the 30 most recent dumps
     ls -1t "$APP_DIR"/backups/pg-*.sql 2>/dev/null | tail -n +31 | xargs -r rm -f
@@ -186,7 +219,7 @@ pm2_up() {
   if pm2 describe "$SERVICE" >/dev/null 2>&1; then
     # if any instance is errored/stopped, a plain reload won't recover it —
     # fall back to a clean delete + start
-    if pm2 jlist 2>/dev/null | grep -q "\"status\":\"errored\"\|\"status\":\"stopped\""; then
+    if pm2 describe "$SERVICE" 2>/dev/null | grep -qE "status[^a-z]+(errored|stopped)"; then
       log "PM2 process in a bad state — restarting it cleanly…"
       pm2 delete "$SERVICE" >/dev/null 2>&1 || true
       pm2 start ecosystem.config.js --update-env
@@ -290,21 +323,26 @@ cmd_deploy() {
   cd "$APP_DIR"
 
   local prev
-  prev=$(git rev-parse HEAD)
+  prev="${LMC_PREV:-$(git rev-parse HEAD)}"
   log "Current version: ${prev:0:10}"
 
-  # refuse early rather than fail halfway through npm ci / prisma generate
-  node_ok || fail "Node $(node -v 2>/dev/null || echo '(none)') is too old for this build — run: ./scripts/deploy.sh node"
-
-  log "Pulling latest ${BRANCH}…"
-  git fetch origin "$BRANCH"
-  git checkout "$BRANCH"
-  git pull --ff-only origin "$BRANCH"
+  if [ "${LMC_REEXEC:-}" != "1" ]; then
+    log "Pulling latest ${BRANCH}…"
+    git fetch origin "$BRANCH"
+    git checkout "$BRANCH"
+    git pull --ff-only origin "$BRANCH"
+    # the rest of this deploy runs with the freshly pulled copy of THIS
+    # script (its checks and steps may have changed with the code)
+    LMC_REEXEC=1 LMC_PREV="$prev" exec bash "$0" deploy
+  fi
   local next_rev
   next_rev=$(git rev-parse HEAD)
   if [ "$prev" = "$next_rev" ]; then
     log "Already up to date — rebuilding anyway."
   fi
+
+  # refuse early rather than fail halfway through npm ci / prisma generate
+  node_ok || fail "Node $(node -v 2>/dev/null || echo '(none)') is too old for this build — run: ./scripts/deploy.sh node"
 
   provision_postgres   # installs PG + writes DATABASE_URL on the first run
   load_env
@@ -315,6 +353,7 @@ cmd_deploy() {
   migrate_legacy_sqlite # one-time: copy SQLite rows into PG, then archive it
 
   # Swap workers only now that the new build is ready.
+  swap_build_in
   pm2_up
   provision_botblock
 
@@ -325,7 +364,11 @@ cmd_deploy() {
 
   log "Health check FAILED — rolling back to ${prev:0:10}…"
   git reset --hard "$prev"
-  build_app
+  npm ci --no-fund --no-audit
+  if ! swap_build_back; then
+    build_app
+    swap_build_in
+  fi
   pm2_up
   if health_check; then
     fail "Deploy failed; rolled back to previous version (now healthy). Check: pm2 logs ${SERVICE}"
