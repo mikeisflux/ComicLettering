@@ -184,6 +184,9 @@ export function runsToHtml(runs: TextRun[]): string {
    built here is what `document.execCommand("insertHTML")` gets instead. */
 const BLOCK_TAGS = new Set(["div", "p", "li", "tr", "h1", "h2", "h3", "h4", "h5", "h6", "blockquote", "pre", "section", "article", "header", "footer", "table", "ul", "ol", "dd", "dt"]);
 const SKIP_TAGS = new Set(["style", "script", "meta", "head", "title", "link", "template", "noscript"]);
+/* "BR" is an explicit <br>; "BLK" is a block edge (a <p>/<div> boundary) —
+   a blank line typed as <br><br> survives, but block edges never stack */
+type PasteTok = { t: string; b: boolean; i: boolean; u: boolean } | "BR" | "BLK";
 export function pasteMarkup(html: string, text: string): string {
   const BR = "<br>";
   if (!html) {
@@ -191,25 +194,24 @@ export function pasteMarkup(html: string, text: string): string {
     return escapeHtml(plain).replace(/\n/g, BR);
   }
   const doc = new DOMParser().parseFromString(html, "text/html");
-  let out = "";
-  const breakLine = () => { if (out && !out.endsWith(BR)) out += BR; };
+  /* pass 1: a flat token stream — text with its emphasis, and line breaks
+     (one per <br>, one at each block edge) */
+  const toks: PasteTok[] = [];
+  const isBreak = (k: PasteTok | undefined) => k === "BR" || k === "BLK";
+  const breakLine = () => { if (toks.length && !isBreak(toks[toks.length - 1])) toks.push("BLK"); };
   const walk = (node: Node, b: boolean, i: boolean, u: boolean) => {
     node.childNodes.forEach((child) => {
       if (child.nodeType === 3) {
-        /* source-formatting newlines are spaces in HTML; <br>/blocks carry
+        /* source-formatting newlines are spaces in HTML (Windows wraps the
+           clipboard in "\r\n<!--StartFragment-->…"); <br>/blocks carry
            the real line breaks */
-        const t = (child.textContent || "").replace(/\u200b/g, "").replace(/[\r\n\t]+/g, " ").replace(/\u00a0/g, " ");
-        if (!t) return;
-        let piece = escapeHtml(t);
-        if (b) piece = `<b>${piece}</b>`;
-        if (i) piece = `<i>${piece}</i>`;
-        if (u) piece = `<u>${piece}</u>`;
-        out += piece;
+        const t = (child.textContent || "").replace(/\u200b/g, "").replace(/[\s\u00a0]+/g, " ");
+        if (t) toks.push({ t, b, i, u });
       } else if (child.nodeType === 1) {
         const e = child as HTMLElement;
         const tag = e.tagName.toLowerCase();
         if (SKIP_TAGS.has(tag)) return;
-        if (tag === "br") { out += BR; return; }
+        if (tag === "br") { toks.push("BR"); return; }
         let nb = b, ni = i, nu = u;
         const fw = e.style?.fontWeight;
         /* Google Docs wraps its whole clipboard in <b style="font-weight:
@@ -228,10 +230,37 @@ export function pasteMarkup(html: string, text: string): string {
     });
   };
   walk(doc.body, false, false, false);
-  /* a copied paragraph ends with its own break — pasting it must not open
-     a fresh line after the caret */
-  while (out.endsWith(BR)) out = out.slice(0, -BR.length);
-  while (out.startsWith(BR)) out = out.slice(BR.length);
+  /* pass 2: whitespace discipline — a space never sits at a line's start or
+     end, never doubles up, and a space-only token next to a break is the
+     clipboard's formatting, not content. Then no leading/trailing breaks. */
+  const atLineStart = (k: number) => k === 0 || isBreak(toks[k - 1]);
+  const atLineEnd = (k: number) => k === toks.length - 1 || isBreak(toks[k + 1]);
+  for (let pass = 0; pass < 2; pass++) {
+    for (let k = 0; k < toks.length; k++) {
+      const tok = toks[k];
+      if (isBreak(tok)) continue;
+      if (atLineStart(k)) tok.t = tok.t.replace(/^ +/, "");
+      if (atLineEnd(k)) tok.t = tok.t.replace(/ +$/, "");
+      const prev = k > 0 ? toks[k - 1] : null;
+      if (prev && !isBreak(prev) && (prev as Exclude<PasteTok, string>).t.endsWith(" ") && tok.t.startsWith(" ")) tok.t = tok.t.slice(1);
+      if (!tok.t) { toks.splice(k, 1); k--; }
+    }
+  }
+  /* a block edge next to any other break is the same line break */
+  for (let k = 0; k < toks.length; k++) {
+    if (toks[k] === "BLK" && (isBreak(toks[k - 1]) || isBreak(toks[k + 1]))) { toks.splice(k, 1); k--; }
+  }
+  while (toks.length && isBreak(toks[0])) toks.shift();
+  while (toks.length && isBreak(toks[toks.length - 1])) toks.pop();
+  let out = "";
+  for (const tok of toks) {
+    if (isBreak(tok)) { out += BR; continue; }
+    let piece = escapeHtml(tok.t);
+    if (tok.b) piece = `<b>${piece}</b>`;
+    if (tok.i) piece = `<i>${piece}</i>`;
+    if (tok.u) piece = `<u>${piece}</u>`;
+    out += piece;
+  }
   if (!out.replace(/<[^>]+>/g, "").trim()) return pasteMarkup("", text);
   return out;
 }
