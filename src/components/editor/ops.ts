@@ -23,6 +23,7 @@ import { BalloonPreset, measureBlock, measureCharWidths, parseScript, toggleEmph
 import { EditorCtx } from "./ctx";
 import { askText } from "./askText";
 import { beginClipboardRead, endClipboardRead } from "./editGuard";
+import { bringGroupIntoView, spawnAt } from "./viewSpot";
 import { remapComments } from "./spreadOps";
 import { FontRec, ensureDocFonts, fontKeyFor } from "./useFontsStamps";
 
@@ -247,6 +248,11 @@ export function pasteClip(ed: EditorCtx) {
     c.x += 30; c.y += 30;
     c.locked = false;
     if (c.type === "balloon" && c.attachTo) c.attachTo = idMap.get(c.attachTo) ?? null;
+  }
+  /* copied on one part of the page, pasted while looking at another: the
+     copies come to the view instead of landing off-screen */
+  bringGroupIntoView(ed, copies);
+  for (const c of copies) {
     page.els.push(c);
     pendingLockRef.current.add(c.id);
   }
@@ -880,9 +886,10 @@ export function addFromTray(ed: EditorCtx, kind: string) {
       return;
     }
   }
+  /* new things land in the middle of what is on SCREEN (viewSpot.ts),
+     staggered a little so five quick adds do not stack exactly */
   const n = p.els.length % 5;
-  const spawn = (w: number, h: number) =>
-    ({ x: Math.round(p.w / 2 - w / 2 + n * 40), y: Math.round(p.h * 0.3 + n * 40), w, h });
+  const spawn = (w: number, h: number) => ({ ...spawnAt(ed, w, h, n * 40), w, h });
   let el: El | null = null;
   if (kind === "panel") {
     const w = Math.round(p.w * 0.42), h = Math.round(w * 0.75);
@@ -1001,7 +1008,9 @@ export function placeAsset(ed: EditorCtx, aid: string, natW: number, natH: numbe
   const p = d.pages[pageIndexRef.current];
   const w = Math.min(Math.round(p.w * 0.45), natW);
   const h = Math.round(w * (natH / natW));
-  const el = makeImage(Math.round((x ?? p.w / 2) - w / 2), Math.round((y ?? p.h / 2) - h / 2), w, h, aid);
+  /* dropped at a point: there; otherwise in the middle of the view */
+  const at = x === undefined || y === undefined ? spawnAt(ed, w, h) : { x: Math.round(x - w / 2), y: Math.round(y - h / 2) };
+  const el = makeImage(at.x, at.y, w, h, aid);
   if (stamp) el.stamp = true;
   p.els.push(el);
   pendingLockRef.current.add(el.id);

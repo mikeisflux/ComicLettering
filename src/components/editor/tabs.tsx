@@ -7,6 +7,7 @@ import { loadImage } from "@/lib/exportPng";
 import { elLabel } from "./textHelpers";
 import { EditorCtx } from "./ctx";
 import { askText } from "./askText";
+import { spawnAt } from "./viewSpot";
 import {
   addFromTray, applyProofFix, assignImageToPanel, deleteProject, deleteSel,
   duplicateSel, exportAllPages,
@@ -512,7 +513,8 @@ export function renderPhotosTab(ed: EditorCtx) {
                 loadImage(url).then((img) => {
                   const w = Math.min(Math.round(p.w * 0.45), img.naturalWidth);
                   const h = Math.round(w * (img.naturalHeight / img.naturalWidth));
-                  const el = makeImage(Math.round(p.w / 2 - w / 2), Math.round(p.h / 2 - h / 2), w, h, aid);
+                  const at = spawnAt(ed, w, h);
+                  const el = makeImage(at.x, at.y, w, h, aid);
                   p.els.push(el);
                   commit();
                   setSelId(el.id);

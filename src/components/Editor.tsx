@@ -1207,7 +1207,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     setEditingId, finishEditing, mutateSel, startDrag, pagePoint, fitZoom, startTuck,
     selectAllOnPage, installApp, appInstalled, showInstallHelp, setShowInstallHelp,
     showAssocHelp, setShowAssocHelp, showShortcuts, setShowShortcuts, winHide, toggleWindow, showTab, setAskAddPage,
-    thumbOf, exportCancelRef, ensureCustomFont,
+    thumbOf, exportCancelRef, ensureCustomFont, areaRef, pageDivRef,
     selIdsRef, editingIdRef, setSelIds,
     mutateText, mutateBalloon, mutateLettering, mutateArt, mutatePanel,
     tuckAsk, setTuckAsk, retuneTuck, runTuckAuto, applyTuck, tuckTool, setTuckTool,

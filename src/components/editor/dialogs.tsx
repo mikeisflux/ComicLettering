@@ -2,6 +2,7 @@
    Plain exported render functions taking the EditorCtx bag. */
 import { clamp, makeText } from "@/lib/model";
 import { STORE_LINKS } from "@/lib/storeLinks";
+import { spawnAt } from "./viewSpot";
 import { LETTER_STYLES, applyLetterStyle } from "@/lib/presets";
 import { STAMPS, WORD_STAMPS, letterStyleCss } from "./textHelpers";
 import { describeScript, parseScript } from "@/lib/scriptParse";
@@ -122,7 +123,8 @@ export function renderTray(ed: EditorCtx) {
                 <button key={word} title={word} onClick={() => {
                   const p = page!;
                   const w = Math.round(p.w * 0.34), h = Math.round(p.w * 0.14);
-                  const el = makeText(Math.round(p.w / 2 - w / 2), Math.round(p.h * 0.32), w, h, true);
+                  const at = spawnAt(ed, w, h);
+                  const el = makeText(at.x, at.y, w, h, true);
                   el.text = word;
                   el.rot = tilt;
                   el.ts = applyLetterStyle({ ...el.ts, size: Math.round(p.w * 0.075) }, st);
@@ -169,7 +171,8 @@ export function renderTray(ed: EditorCtx) {
               <button key={s} onClick={() => {
                 const p = page!;
                 const size = Math.round(p.w * 0.16);
-                const el = makeText(Math.round(p.w / 2 - size / 2), Math.round(p.h * 0.35), size, size, true);
+                const at = spawnAt(ed, size, size);
+                const el = makeText(at.x, at.y, size, size, true);
                 el.text = s;
                 el.ts = { ...el.ts, size: Math.round(size * 0.7), outlineW: 0, shadow: false, caps: false };
                 p.els.push(el);

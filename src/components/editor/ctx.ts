@@ -59,6 +59,10 @@ export interface EditorCtx {
   hIndexRef: React.RefObject<number>;
   pageIndexRef: React.RefObject<number>;
   pendingLockRef: React.RefObject<Set<string>>;
+  /* the scroll container and the on-screen page box — what is in VIEW
+     (viewSpot.ts), so new elements land where the letterer is looking */
+  areaRef: React.RefObject<HTMLDivElement | null>;
+  pageDivRef: React.RefObject<HTMLDivElement | null>;
   panelImageTarget: React.RefObject<string | null>;
   aidRef: React.RefObject<number>;
   activeStyleRef: React.RefObject<string>;
