@@ -8,7 +8,7 @@ import {
 } from "@/lib/model";
 import { arcTextLayout, balloonGeom, connectorMid } from "@/lib/geometry";
 import { fillCss } from "@/lib/fills";
-import { displayText, measureBlock, measureCharWidths, renderRuns, textCss, textOverflows } from "./textHelpers";
+import { displayText, measureBlock, measureCharWidths, onLetteringPaste, renderRuns, textCss, textOverflows } from "./textHelpers";
 import { BalloonShape, JoinBandShape, MergeBaseInfo } from "./BalloonShape";
 import { EditorCtx } from "./ctx";
 import { WarpedText } from "./WarpedText";
@@ -19,6 +19,7 @@ import {
 } from "@/lib/exportPng";
 import { pageBleed } from "@/lib/model";
 import { onLetteringInput, refitLetteringEl } from "./ops";
+import { clipboardReadInFlight } from "./editGuard";
 import { dragInProgress, isDoubleTap, touchCount } from "./penInput";
 import { textInkFractions, warpInkBounds } from "./textInk";
 
@@ -402,8 +403,9 @@ export function renderEl(ed: EditorCtx, el: El) {
           contentEditable={editing}
           suppressContentEditableWarning
           spellCheck={editing}
-          onBlur={() => editing && finishEditing()}
+          onBlur={() => editing && !clipboardReadInFlight() && finishEditing()}
           onInput={editing ? (e) => onLetteringInput(ed, el.id, e.currentTarget) : undefined}
+          onPaste={editing ? onLetteringPaste : undefined}
         >{editing ? null : el.runs ? renderRuns(el.runs, el.ts) : displayText(el.text, el.ts, false)}</div>
         {!editing && textOverflows(el.ts, el.text, tw, th) && (
           /* chrome, not artwork: counter-scale so it stays legible at any zoom */
@@ -484,8 +486,9 @@ export function renderEl(ed: EditorCtx, el: El) {
         contentEditable={editing}
         suppressContentEditableWarning
         spellCheck={editing}
-        onBlur={() => editing && finishEditing()}
+        onBlur={() => editing && !clipboardReadInFlight() && finishEditing()}
         onInput={editing ? (e) => onLetteringInput(ed, el.id, e.currentTarget) : undefined}
+        onPaste={editing ? onLetteringPaste : undefined}
       >{editing ? null : el.runs ? renderRuns(el.runs, el.ts) : displayText(el.text, el.ts, false)}</div>
     </div>
   );

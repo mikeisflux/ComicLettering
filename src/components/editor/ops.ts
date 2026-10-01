@@ -22,6 +22,7 @@ import { forgetImage, loadImage, spreadNeighbor } from "@/lib/exportPng";
 import { BalloonPreset, measureBlock, measureCharWidths, parseScript, toggleEmphasis } from "./textHelpers";
 import { EditorCtx } from "./ctx";
 import { askText } from "./askText";
+import { beginClipboardRead, endClipboardRead } from "./editGuard";
 import { remapComments } from "./spreadOps";
 import { FontRec, ensureDocFonts, fontKeyFor } from "./useFontsStamps";
 
@@ -263,14 +264,48 @@ export function pasteClip(ed: EditorCtx) {
 export async function clipboardText(ed: EditorCtx, mode: "cut" | "copy" | "paste") {
   const { setStatus } = ed;
   if (mode === "paste") {
-    try {
-      const t = await navigator.clipboard.readText();
-      if (!t) { setStatus("Nothing on the clipboard."); return; }
-      document.execCommand("insertText", false, t);
-    } catch {
+    /* The caret is captured NOW, synchronously in the click: the clipboard
+       read below is async and may move focus (permission sheet), after
+       which the live selection is gone. The copy of the range is what the
+       text is inserted into once it arrives. */
+    const sel = window.getSelection();
+    const anchor = sel?.anchorNode;
+    const root = (anchor instanceof Element ? anchor : anchor?.parentElement)?.closest("[contenteditable=\"true\"]") as HTMLElement | null;
+    const range = sel && sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
+    if (!root || !range) { setStatus("Click where the words should go first, then paste."); return; }
+    const keyHint = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘V" : "Ctrl+V";
+    let t = "";
+    beginClipboardRead();
+    try { t = await navigator.clipboard.readText(); }
+    catch {
       /* reading the clipboard from a menu is blocked in some browsers; the
          keystroke is never blocked */
-      setStatus("This browser won't let a menu read the clipboard — press Ctrl+V.");
+      endClipboardRead();
+      setStatus(`This browser won't let a menu read the clipboard — press ${keyHint} instead.`);
+      return;
+    }
+    endClipboardRead();
+    if (!t) { setStatus("Nothing on the clipboard."); return; }
+    if (!root.isConnected || root.contentEditable !== "true") {
+      setStatus(`The edit ended before the clipboard answered — click into the text and press ${keyHint}.`);
+      return;
+    }
+    root.focus({ preventScroll: true });
+    const live = window.getSelection();
+    if (live) { live.removeAllRanges(); live.addRange(range); }
+    let ok = false;
+    try { ok = document.execCommand("insertText", false, t); } catch { ok = false; }
+    if (!ok) {
+      /* no execCommand (or it refused): splice the text in by hand and
+         raise the same input event the keystroke would, so the element's
+         model and auto-grow follow */
+      range.deleteContents();
+      const node = document.createTextNode(t);
+      range.insertNode(node);
+      range.setStartAfter(node);
+      range.collapse(true);
+      live?.removeAllRanges(); live?.addRange(range);
+      root.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: t }));
     }
     return;
   }

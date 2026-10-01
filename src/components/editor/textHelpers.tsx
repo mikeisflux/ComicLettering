@@ -1,7 +1,7 @@
 "use client";
 /* ComicLettering Studio — shared text/lettering helpers, constants and types
    split out of Editor.tsx (module-level code, unchanged). */
-import { CSSProperties, ReactNode } from "react";
+import React, { CSSProperties, ReactNode } from "react";
 import {
   BalloonKind, El, FONTS, FillStyle, TextRun, TextStyle, applyCrossbarI, lightenHex,
 } from "@/lib/model";
@@ -159,6 +159,81 @@ export function runsToHtml(runs: TextRun[]): string {
     return h;
   }).join("");
 }
+/* What a paste may bring into an editable: the words, their line breaks
+   and bold/italic/underline — nothing else.
+
+   A native paste (Ctrl+V) drops the clipboard's HTML straight in. Copied
+   text almost always arrives wrapped in a block (<div>, <p>, a whole
+   document from a web page or another balloon) and Chrome starts a block
+   on a NEW LINE, so every paste began with an empty line; the inline
+   styles that rode along (font, size, colour from wherever it was copied)
+   then fought the balloon's own style until the edit ended. The markup
+   built here is what `document.execCommand("insertHTML")` gets instead. */
+const BLOCK_TAGS = new Set(["div", "p", "li", "tr", "h1", "h2", "h3", "h4", "h5", "h6", "blockquote", "pre", "section", "article", "header", "footer", "table", "ul", "ol", "dd", "dt"]);
+const SKIP_TAGS = new Set(["style", "script", "meta", "head", "title", "link", "template", "noscript"]);
+export function pasteMarkup(html: string, text: string): string {
+  const BR = "<br>";
+  if (!html) {
+    const plain = text.replace(/\r\n?/g, "\n").replace(/^\n+|\n+$/g, "");
+    return escapeHtml(plain).replace(/\n/g, BR);
+  }
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  let out = "";
+  const breakLine = () => { if (out && !out.endsWith(BR)) out += BR; };
+  const walk = (node: Node, b: boolean, i: boolean, u: boolean) => {
+    node.childNodes.forEach((child) => {
+      if (child.nodeType === 3) {
+        /* source-formatting newlines are spaces in HTML; <br>/blocks carry
+           the real line breaks */
+        const t = (child.textContent || "").replace(/\u200b/g, "").replace(/[\r\n\t]+/g, " ").replace(/\u00a0/g, " ");
+        if (!t) return;
+        let piece = escapeHtml(t);
+        if (b) piece = `<b>${piece}</b>`;
+        if (i) piece = `<i>${piece}</i>`;
+        if (u) piece = `<u>${piece}</u>`;
+        out += piece;
+      } else if (child.nodeType === 1) {
+        const e = child as HTMLElement;
+        const tag = e.tagName.toLowerCase();
+        if (SKIP_TAGS.has(tag)) return;
+        if (tag === "br") { out += BR; return; }
+        let nb = b, ni = i, nu = u;
+        const fw = e.style?.fontWeight;
+        /* Google Docs wraps its whole clipboard in <b style="font-weight:
+           normal"> — the explicit weight wins over the tag */
+        if ((tag === "b" || tag === "strong") && !(fw === "normal" || (fw && +fw > 0 && +fw < 600))) nb = true;
+        if (tag === "i" || tag === "em") ni = true;
+        if (tag === "u") nu = true;
+        if (fw === "bold" || (fw && +fw >= 600)) nb = true;
+        if (e.style?.fontStyle === "italic") ni = true;
+        if (e.style?.textDecoration?.includes("underline") || e.style?.textDecorationLine?.includes("underline")) nu = true;
+        const block = BLOCK_TAGS.has(tag);
+        if (block) breakLine();
+        walk(e, nb, ni, nu);
+        if (block) breakLine();
+      }
+    });
+  };
+  walk(doc.body, false, false, false);
+  /* a copied paragraph ends with its own break — pasting it must not open
+     a fresh line after the caret */
+  while (out.endsWith(BR)) out = out.slice(0, -BR.length);
+  while (out.startsWith(BR)) out = out.slice(BR.length);
+  if (!out.replace(/<[^>]+>/g, "").trim()) return pasteMarkup("", text);
+  return out;
+}
+
+/* the editables' onPaste: both the balloon and the caption box route here */
+export function onLetteringPaste(e: React.ClipboardEvent<HTMLElement>) {
+  const html = e.clipboardData.getData("text/html");
+  const text = e.clipboardData.getData("text/plain");
+  if (!html && !text) return;          // files/images: nothing to put in text
+  e.preventDefault();
+  const out = pasteMarkup(html, text);
+  if (!out) return;
+  document.execCommand("insertHTML", false, out);
+}
+
 export function domToRuns(root: HTMLElement): TextRun[] {
   const runs: TextRun[] = [];
   const walk = (node: Node, b: boolean, i: boolean, u: boolean) => {
