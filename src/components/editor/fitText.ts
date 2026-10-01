@@ -1,8 +1,11 @@
 /* Fit-to-text & line-balance engine — split from ops.ts (1500-line cap).
    Balloons re-wrap by SHAPE alone (most-oval block wins, no word counts);
-   text boxes get sentence-aware lines (a sentence of ≤7 words on its own
-   line, longer ones balanced at ~5-7 words). ops.ts re-exports these, so
-   call sites are unchanged. */
+   caption boxes keep the width the letterer gave them and hug the text's
+   natural wrap. NOTHING here writes line breaks into the words: Fit used
+   to rewrite captions as "a sentence per line, ~6 words a line" with real
+   newlines, which read as stacked words and had to be deleted by hand
+   after every script import. Only the explicit "Balance Line Breaks"
+   command (balanceRag) changes the text. ops.ts re-exports these. */
 import { BalloonEl, FONTS, TAILLESS_KINDS, TextEl, TextStyle, clamp } from "@/lib/model";
 import { balloonGeom } from "@/lib/geometry";
 import { EditorCtx } from "./ctx";
@@ -99,74 +102,12 @@ function planOvalWrap(el: BalloonEl): number | null {
   return bestW;
 }
 
-/* sentence split: a sentence ends at a word ending . ! ? … (quotes allowed) */
-function splitSentences(words: string[]): string[][] {
-  const out: string[][] = [];
-  let cur: string[] = [];
-  for (const w of words) {
-    cur.push(w);
-    if (/[.!?…]["”')\]]*$/.test(w)) { out.push(cur); cur = []; }
-  }
-  if (cur.length) out.push(cur);
-  return out;
-}
-
-/* TEXT BOXES: sentence-aware lines — a sentence of ≤7 words gets its OWN
-   line; longer ones break into balanced lines of at most ~6 words. Returns
-   the planned lines as word arrays. */
-function planCaptionLines(el: BalloonEl | TextEl, maxW: number): string[][] {
-  const words = el.text.replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
-  const lines: string[][] = [];
-  for (const s of splitSentences(words)) {
-    const { wW, spaceW } = wordWidths(s, el.ts);
-    const oneLineW = wW.reduce((a, b) => a + b, 0) + spaceW * (wW.length - 1);
-    if (s.length <= 7 && oneLineW <= maxW) { lines.push(s); continue; }
-    /* balanced even-rag split, ~6 words a line (more lines if width-capped) */
-    const L = Math.max(Math.ceil(s.length / 6), Math.ceil(oneLineW / maxW));
-    const W = widthForLines(wW, spaceW, L, oneLineW);
-    let cur: string[] = [], curW = 0;
-    for (let i = 0; i < s.length; i++) {
-      if (!cur.length) { cur = [s[i]]; curW = wW[i]; }
-      else if (curW + spaceW + wW[i] <= W) { cur.push(s[i]); curW += spaceW + wW[i]; }
-      else { lines.push(cur); cur = [s[i]]; curW = wW[i]; }
-    }
-    if (cur.length) lines.push(cur);
-  }
-  return lines;
-}
-
-/* write planned lines into the element as real line breaks. When the text's
-   whitespace is already single spaces the newlines land 1:1 on them, so any
-   bold/italic runs survive untouched; otherwise the runs are dropped (same
-   trade balanceRag makes — the reflow changes the text). */
-function applyLineBreaks(el: BalloonEl | TextEl, lines: string[][]) {
-  const newText = lines.map((l) => l.join(" ")).join("\n");
-  if (newText === el.text) return;
-  if (el.runs && newText.length === el.text.length) {
-    const runs = el.runs.map((r) => ({ ...r }));
-    for (let i = 0; i < newText.length; i++) {
-      if (newText[i] !== el.text[i]) {
-        let acc = 0;
-        for (const r of runs) {
-          /* write the NEW character — a break becoming a space as well as
-             a space becoming a break (writing "\n" for both left the old
-             break in the runs, which the renderers prefer over the text) */
-          if (i < acc + r.t.length) { r.t = r.t.slice(0, i - acc) + newText[i] + r.t.slice(i - acc + 1); break; }
-          acc += r.t.length;
-        }
-      }
-    }
-    el.runs = runs;
-  } else if (el.runs) el.runs = undefined;
-  el.text = newText;
-}
-
 /* Fit to text (Ctrl+\) — every SELECTED balloon and text box, each measured
    and sized individually, so Ctrl+A then Ctrl+\ fits the whole page in one
    stroke. BALLOONS use shape logic only: the text re-wraps to whatever line
-   count reads closest to a clean oval. TEXT BOXES get sentence-aware lines:
-   a sentence of ≤7 words on its own line, longer ones balanced at ~5-7
-   words. Locked and empty items are skipped; art and panels never touched. */
+   count reads closest to a clean oval. TEXT BOXES keep their width and hug
+   the natural wrap. The text itself is never rewritten. Locked and empty
+   items are skipped; art and panels never touched. */
 export function fitBalloonToText(ed: EditorCtx) {
   const { page, selIds, setStatus, commit } = ed;
   if (!page) return;
@@ -200,11 +141,17 @@ export function fitBalloonToText(ed: EditorCtx) {
       newW = clamp(Math.round(targetTW / fracW), 60, page.w);
       newH = clamp(Math.round(targetTH / fracH), 44, page.h);
     } else {
-      /* text boxes: sentence-aware line breaks written into the text
-         itself, then a snug box around the longest line. Warped SFX keeps
-         its lines — an arc reflows badly. */
-      if (!(el.type === "text" && el.warp)) applyLineBreaks(el, planCaptionLines(el, page.w * 0.8));
-      const { w: lineW, h: lineH } = measureLettering(el);
+      /* text boxes and caption-style balloons: the words are left exactly
+         as written. The box keeps the width the letterer gave it (a caption
+         is usually drawn to span its panel) and hugs the text's natural
+         wrap at that width — shrinking only when the whole text fits on
+         one shorter line. Author line breaks are honoured as-is. */
+      let innerW: number;
+      if (el.type === "balloon") innerW = balloonGeom(el).textRect[2];
+      else innerW = el.w - Math.round(ts.size * 0.6);
+      const hug = measureLettering(el);           // longest line, unwrapped
+      const wrapW = /\n/.test(el.text) || hug.w <= innerW ? undefined : Math.max(ts.size * 2, innerW);
+      const { w: lineW, h: lineH } = wrapW === undefined ? hug : measureLettering(el, wrapW);
       if (el.type === "balloon") {
         /* a box balloon still pads its lettering by its own geometry */
         const g = balloonGeom(el);

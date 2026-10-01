@@ -8,7 +8,7 @@ import {
 } from "@/lib/model";
 import { arcTextLayout, balloonGeom, connectorMid } from "@/lib/geometry";
 import { fillCss } from "@/lib/fills";
-import { displayText, measureBlock, measureCharWidths, onLetteringPaste, renderRuns, textCss, textOverflows } from "./textHelpers";
+import { displayText, editingCss, measureBlock, measureCharWidths, onLetteringPaste, renderRuns, textCss, textOverflows } from "./textHelpers";
 import { BalloonShape, JoinBandShape, MergeBaseInfo } from "./BalloonShape";
 import { EditorCtx } from "./ctx";
 import { WarpedText } from "./WarpedText";
@@ -399,7 +399,7 @@ export function renderEl(ed: EditorCtx, el: El) {
         <div
           key={editing ? "edit" : "static"}
           className="txt"
-          style={{ ...textCss(el.ts), left: tx, top: ty, width: tw, height: th }}
+          style={{ ...textCss(el.ts), ...(editing ? editingCss(el.ts) : {}), left: tx, top: ty, width: tw, height: th }}
           contentEditable={editing}
           suppressContentEditableWarning
           spellCheck={editing}
@@ -482,7 +482,7 @@ export function renderEl(ed: EditorCtx, el: El) {
       <div
         key={editing ? "edit" : "static"}
         className="txt"
-        style={{ ...textCss(el.ts), left: 0, top: 0, width: el.w, height: el.h }}
+        style={{ ...textCss(el.ts), ...(editing ? editingCss(el.ts) : {}), left: 0, top: 0, width: el.w, height: el.h }}
         contentEditable={editing}
         suppressContentEditableWarning
         spellCheck={editing}

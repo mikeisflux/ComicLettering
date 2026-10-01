@@ -71,6 +71,19 @@ export function textCss(ts: TextStyle): CSSProperties {
   return st;
 }
 
+/* while the words are being typed the caret must stay visible: a gradient
+   fill paints the text transparent (and the caret is currentColor), a
+   brush mask eats the caret along with the letters' gaps, and a drop
+   shadow/glow filter blurs it. Plain fill and outline stay so the words
+   still look like themselves. */
+export function editingCss(ts: TextStyle): CSSProperties {
+  return {
+    caretColor: ts.fillA || "#000",
+    WebkitMaskImage: "none", maskImage: "none",
+    filter: "none",
+  } as CSSProperties;
+}
+
 /* small field helper — MODULE level: defining it inside Editor would make it
    a new component type each render, unmounting inspector inputs on every
    keystroke (focus loss after one character) */
