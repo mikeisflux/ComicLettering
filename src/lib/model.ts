@@ -690,11 +690,11 @@ export interface Page {
 /* Pixels per inch used across rulers, paper sizes and Page Setup. */
 export const DPI = 225;
 
-/* Default size for dialogue and caption lettering, in page units. At 225dpi
-   this is a hair under an eighth of an inch — the size hand lettering has
-   been set at for decades, and small enough that a balloon reads as a
-   balloon rather than a poster. Sound effects set their own, far larger. */
-export const DEFAULT_TEXT_SIZE = 24;
+/* Default size for dialogue and caption lettering, in page units (225dpi
+   → about 0.09in, a touch under traditional hand lettering). Small enough
+   that a balloon reads as a balloon rather than a poster; the owner's
+   chosen default. Sound effects set their own, far larger. */
+export const DEFAULT_TEXT_SIZE = 20;
 
 /* Standard US comic page, quoted the way printers quote it: the full-bleed
    sheet, an eighth of an inch of bleed on each edge, so the trim is
