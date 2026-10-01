@@ -468,6 +468,7 @@ export const elLabel = (el: El) =>
     : el.type === "text" ? `Lettering: ${el.text.slice(0, 18) || "(empty)"}`
     : el.type === "panel" ? "Panel"
     : el.type === "adjust" ? `✨ ${ADJUST_META[el.kind]?.label ?? "Adjustment"}`
+    : el.type === "action" ? "Instaction lines"
     : "Image";
 
 /* the script parser lives in its own module now — re-exported so the

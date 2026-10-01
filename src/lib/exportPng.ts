@@ -1,4 +1,5 @@
 /* Full-resolution canvas renderer — used for PNG export and page thumbnails. */
+import { actionWedges } from "./actionLines";
 import {
   ArtPan, Assets, BalloonEl, Doc, El, FILTERS, FONTS, ImageEl, JoinLink, Page, TextEl, TextRun, TextStyle,
   Fade,
@@ -657,6 +658,18 @@ function drawEl(
   ctx.scale(el.flipH ? -1 : 1, el.flipV ? -1 : 1);
   ctx.translate(-el.w / 2, -el.h / 2);
 
+  if (el.type === "action") {
+    /* the same wedges the editor's SVG draws — one geometry, both outputs */
+    ctx.fillStyle = el.color;
+    for (const wdg of actionWedges(el)) {
+      ctx.beginPath();
+      wdg.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+    return;
+  }
   if (el.type === "panel" || el.type === "image") {
     const paintBody = (c: CanvasRenderingContext2D) => {
       /* pen-drawn ("Draw Your Own") panels carry their outline in pts — the
@@ -955,7 +968,7 @@ function drawPageEls(
     const clip = lc?.mode === "clip" && elCrossesTrim(el, lc);
     if (clip) clipAtTrim();
     /* lettering-only keeps SFX STAMPS — they follow the lettering rules */
-    const artOnly = el.type === "panel" || (el.type === "image" && !el.stamp);
+    const artOnly = el.type === "panel" || el.type === "action" || (el.type === "image" && !el.stamp);
     const deferredCut = skipCutouts && el.type === "image" && el.cut;
     if (!(letteringOnly && artOnly) && !deferredCut) {
       if (el.type === "balloon") {

@@ -2,7 +2,7 @@
    Plain exported render functions taking the EditorCtx bag. */
 import { NumField, Slider } from "./chrome";
 import {
-  AdjustKind, BALLOON_KINDS, BLEED, BalloonEl, BalloonKind, FILTERS, FONTS, FadeDir, PAGE_SIZES,
+  ActionEl, AdjustKind, BALLOON_KINDS, BLEED, BalloonEl, BalloonKind, FILTERS, FONTS, FadeDir, PAGE_SIZES,
   PanelEl, TAILLESS_KINDS, TextEl, TextStyle, clamp,
 } from "@/lib/model";
 import { ADJUST_META, makeAdjust } from "@/lib/pageAdjust";
@@ -339,6 +339,40 @@ export function renderInspector(ed: EditorCtx) {
           <div className="tips" style={{ fontSize: 11 }}>Bend SFX text along an arc — positive curves up, negative curves down. Double-click to edit, then release for the warped look.</div>
         </div>
       )}
+      {el.type === "action" && (() => {
+        const a = el as ActionEl;
+        const live = (f: (x: ActionEl) => void) => mutateSel<ActionEl>(f, false);
+        const row = (label: string, key: "count" | "len" | "gap" | "weight" | "jitter", min: number, max: number, step: number, scale = 1) => (
+          <Fld label={label}>
+            <Slider min={min} max={max} step={step} value={Math.round(a[key] * scale * 1000) / 1000}
+              onChange={(e) => live((x) => { x[key] = (+e.target.value) / scale; })} onCommit={() => commit()} />
+          </Fld>
+        );
+        return (
+          <div className="inspSection">
+            <div className="inspHead">Instaction</div>
+            <Fld label="Style">
+              <select value={a.style} onChange={(e) => mutateSel<ActionEl>((x) => { x.style = e.target.value as ActionEl["style"]; })}>
+                <option value="burst">Burst — out from the object</option>
+                <option value="focus">Focus — in from the edges</option>
+              </select>
+            </Fld>
+            {row("Lines", "count", 6, 160, 1)}
+            {a.style === "burst" && row("Length", "len", 0.1, 2.5, 0.05)}
+            {row("Gap", "gap", 0, 0.6, 0.01)}
+            {row("Weight", "weight", 0.01, 0.25, 0.005)}
+            {row("Jitter", "jitter", 0, 1, 0.05)}
+            <Fld label="Ink">
+              <input type="color" value={a.color} onChange={(e) => mutateSel<ActionEl>((x) => { x.color = e.target.value; })} />
+            </Fld>
+            <div className="btnRow">
+              <button title="Re-roll the hand jitter for a different set of strokes"
+                onClick={() => mutateSel<ActionEl>((x) => { x.seed = Math.floor(Math.random() * 1e9) + 1; })}>Shuffle</button>
+            </div>
+            <div className="tips">Drag the box handles to grow the burst; the lines scale with it. Focus lines always reach the box edge.</div>
+          </div>
+        );
+      })()}
       {(el.type === "panel" || el.type === "image") && (
         <>
           <div className="inspSection">

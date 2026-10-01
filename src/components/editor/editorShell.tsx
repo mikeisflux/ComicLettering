@@ -112,7 +112,7 @@ function renderPenLayer(ed: EditorCtx, sh: ShellProps, curOff: number, wide?: { 
       )}
       {penning && (
         <div className="penTools" onPointerDown={stop}>
-          {tuckPen && <span className="penHint">Tuck Back pen — outline the art</span>}
+          {tuckPen && <span className="penHint">{ed.tracePurpose === "action" ? "Instaction pen — outline the object" : "Tuck Back pen — outline the art"}</span>}
           <button onClick={sh.penUndoPoint} title="Remove the last point (Ctrl+Z)">⌫ Undo point</button>
           <button onClick={sh.penClose} title="Close the shape (Enter)">✓ Close</button>
           <button onClick={sh.penCancel} title="Cancel (Esc)">✕ Cancel</button>

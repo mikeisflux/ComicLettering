@@ -592,6 +592,12 @@ export function normalizeDoc(doc: Doc): Doc {
         if (typeof el.ts.outlineW !== "number" || !Number.isFinite(el.ts.outlineW)) el.ts.outlineW = 0;
         if (typeof el.ts.size !== "number" || !(el.ts.size > 0)) el.ts.size = DEFAULT_TEXT_SIZE;
       }
+      if (el.type === "action") {
+        if (!Array.isArray(el.pts)) el.pts = [];
+        if (!(el.count > 0)) el.count = 36;
+        if (!(el.seed > 0)) el.seed = 1;
+        continue;
+      }
       if (el.type !== "balloon") continue;
       delete el.band;                       // transient — must never persist
       if (el.tail) {
@@ -676,7 +682,22 @@ export type AdjustKind =
   | "invert" | "posterize" | "threshold"
   | "gradientmap" | "grain" | "clarity";
 
-export type El = PanelEl | ImageEl | BalloonEl | TextEl | AdjustEl;
+/* Instaction: action lines generated around a traced outline (see
+   lib/actionLines.ts). `pts` is the ring normalised to the box, like a
+   custom balloon; len/gap/weight are fractions of the ring's mean radius
+   so resizing scales the effect. Counts as page ART at the bleed line —
+   it may live in the bleed like the drawing it emphasises. */
+export type ActionStyle = "burst" | "focus";
+export interface ActionEl extends BaseEl {
+  type: "action";
+  pts: [number, number][];
+  style: ActionStyle;
+  count: number; len: number; gap: number; weight: number; jitter: number;
+  color: string;
+  seed: number;
+}
+
+export type El = PanelEl | ImageEl | BalloonEl | TextEl | AdjustEl | ActionEl;
 
 export interface PageMargin { t: number; r: number; b: number; l: number }
 export interface Page {
@@ -1263,6 +1284,14 @@ export function panelPathD(el: PanelEl): string | null {
 
 export function makeImage(x: number, y: number, w: number, h: number, img: string): ImageEl {
   return { ...base(x, y, w, h), type: "image", img, filter: "none", borderW: 0, borderC: "#111111" };
+}
+
+export function makeAction(x: number, y: number, w: number, h: number, pts: [number, number][]): ActionEl {
+  return {
+    ...base(x, y, w, h), type: "action", pts,
+    style: "burst", count: 36, len: 0.55, gap: 0.08, weight: 0.055, jitter: 0.5,
+    color: "#111111", seed: Math.floor(Math.random() * 1e9) + 1,
+  };
 }
 
 export function makeText(x: number, y: number, w: number, h: number, sfx: boolean): TextEl {

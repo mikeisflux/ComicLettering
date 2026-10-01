@@ -19,6 +19,7 @@ import {
 } from "@/lib/exportPng";
 import { pageBleed } from "@/lib/model";
 import { onLetteringInput, refitLetteringEl } from "./ops";
+import { actionPathD } from "@/lib/actionLines";
 import { clipboardReadInFlight } from "./editGuard";
 import { dragInProgress, isDoubleTap, touchCount } from "./penInput";
 import { textInkFractions, warpInkBounds } from "./textInk";
@@ -282,6 +283,19 @@ export function renderEl(ed: EditorCtx, el: El) {
     },
   };
 
+  if (el.type === "action") {
+    /* the box covers the object the lines surround, so the box itself must
+       not swallow clicks meant for the art under it: only the inked
+       strokes are hit (they bubble to the common handlers) */
+    return (
+      <div {...common} className="el action" style={{ ...style, pointerEvents: "none" }}>
+        <svg width={el.w} height={el.h} viewBox={`0 0 ${el.w} ${el.h}`}
+          style={{ position: "absolute", inset: 0, overflow: "visible", pointerEvents: "none" }}>
+          <path d={actionPathD(el)} fill={el.color} style={{ pointerEvents: "visiblePainted", cursor: el.locked ? "default" : "move" }} />
+        </svg>
+      </div>
+    );
+  }
   if (el.type === "panel" || el.type === "image") {
     const src = el.img ? assetsRef.current[el.img] : null;
     /* artwork pan/zoom inside the frame. The oversized box (z×) with a

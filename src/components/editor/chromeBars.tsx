@@ -170,6 +170,7 @@ export function renderMenuBar(ed: EditorCtx) {
         ["Fit Balloon to Text (Ctrl+\\)", () => fitBalloonToText(ed)],
         ["Balance Line Breaks", () => balanceRag(ed)],
         ["Tuck Back…", () => ed.startTuck()],
+        ["Instaction (action lines)…", () => ed.startInstaction()],
         ["Center Horizontally (Ctrl+[)", () => alignSel(ed, "hcenter")],
         ["Center Vertically (Ctrl+])", () => alignSel(ed, "vcenter")],
         ["Flip Horizontal", () => mutateSel((x) => { x.flipH = !x.flipH; })],
@@ -269,6 +270,8 @@ export function renderToolbar(ed: EditorCtx) {
       disabled={!selEl || (selEl.type !== "image" && selEl.type !== "panel") || !selEl.img}
       onClick={() => { if (selEl && (selEl.type === "image" || selEl.type === "panel") && selEl.img) runInstantAlpha(ed, selEl.id, selEl.img); }} />
     {renderTuckBtn(ed)}
+    <ToolBtn label="Instaction" icon="✺" accent onClick={() => ed.startInstaction()}
+      title="Instaction — draw around any object and action lines burst out around it. Uses the same magnetic lasso or pen as Tuck Back; tune the lines in the Inspector afterwards." />
     <ToolBtn label="Note" icon="📌"
       title="Pin a review note to the page — teammates on the shared book see it (File → Share & Review)"
       onClick={() => {

@@ -32,6 +32,16 @@ export interface TuckDragDeps {
      units (screen mapping) — lets a trace sweep across the spine and cut the
      facing page's artwork */
   facing: { index: number; offX: number; offY: number } | null;
+  /* Instaction: when set, a closed ring goes here (cleaned the same way)
+     instead of opening the Tuck Back dialog */
+  onRing?: (ring: number[][]) => void;
+}
+
+/* the raw lasso stroke as a closed, evenly spaced, hand-shake-free ring */
+export function cleanRing(raw: number[][]): number[][] {
+  let ring = closeSketchLoop(raw);
+  if (ring.length < 6) ring = raw;
+  return smoothSketchRing(resampleRing(ring, Math.min(200, Math.max(48, ring.length))), 2);
 }
 
 /* Points closer than this add nothing but work — the outline is smoothed
@@ -209,6 +219,12 @@ export function beginTuckLasso(d: TuckDragDeps, e: React.PointerEvent) {
     d.ptsRef.current = null;
     d.setTuckMode(false);
     if (!raw) return;
+    if (d.onRing) {
+      if (raw.length < 6) d.setStatus("Draw a loop around the object.");
+      else d.onRing(cleanRing(raw));
+      d.force();
+      return;
+    }
     const ask = await buildTuckAsk(d, raw);
     if (ask) d.setTuckAsk(ask);
     d.force();
@@ -231,12 +247,7 @@ export async function buildTuckAsk(d: TuckDragDeps, raw: number[][], clean = tru
   }
   /* the stroke rarely closes exactly where it started; trim the overshoot,
      even out the spacing, then take the hand-shake out of it */
-  let ring = raw;
-  if (clean) {
-    ring = closeSketchLoop(raw);
-    if (ring.length < 6) ring = raw;
-    ring = smoothSketchRing(resampleRing(ring, Math.min(200, Math.max(48, ring.length))), 2);
-  }
+  const ring = clean ? cleanRing(raw) : raw;
 
   const b = pathBounds(ring);
   if (b.w < 12 || b.h < 12) {

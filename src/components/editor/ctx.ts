@@ -158,6 +158,9 @@ export interface EditorCtx {
   fitZoom: (forceFit: boolean) => void;
   /* enter Tuck Back trace mode (requires lettering, balloon or text box selected) */
   startTuck: () => void;
+  /* Instaction: arm the same trace tool to draw action lines around an object */
+  startInstaction: () => void;
+  tracePurpose: "tuck" | "action";
   /* which Tuck Back trace tool is armed: magnetic lasso or pen path
      (picked by press-and-holding the toolbar's Tuck Back button) */
   tuckTool: "lasso" | "pen";

@@ -177,6 +177,10 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const [tuckMode, setTuckMode] = useState(false);
   const tuckPtsRef = useRef<number[][] | null>(null);
   const [tuckAsk, setTuckAsk] = useState<TuckAsk | null>(null);
+  /* what the armed trace is for — Tuck Back cutout or Instaction lines */
+  const [tracePurpose, setTracePurpose] = useState<"tuck" | "action">("tuck");
+  const showTabRef = useRef<((k: "inspector") => void) | null>(null);
+  const tracePurposeRef = useRef<"tuck" | "action">("tuck");
   const [textAsk, setTextAsk] = useState<TextAsk | null>(null);
   /* collaboration (shared books): team, pinned notes, review passes */
   const [collab, setCollab] = useState<CollabState | null>(null);
@@ -1044,7 +1048,9 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   /* ---------------- Tuck Back (traced clipping mask) ---------------- */
   /* plain per-render closures — they travel in the EditorCtx bag, so
      callback identity doesn't matter (see tuckOps.ts) */
-  const { startTuck, startTuckDrag, finishTuckPen, retuneTuck, runTuckAuto, applyTuck } = makeTuckHandlers({
+  const { startTuck, startInstaction, startTuckDrag, finishTuckPen, retuneTuck, runTuckAuto, applyTuck } = makeTuckHandlers({
+    purposeRef: tracePurposeRef, setTracePurpose, pendingLockRef, setSelId, setPageIndex,
+    showTab: (k) => showTabRef.current?.(k),
     docRef, assetsRef, pageIndexRef, pageDivRef,
     tuckPtsRef, tuckAskRef,
     selId, zoom, pagePoint, force, commit, rebuildThumbs,
@@ -1166,6 +1172,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     setTab(k);
     setWinHide((h) => (h.right ? { ...h, right: false } : h));
   }, []);
+  showTabRef.current = showTab;
   const toggleWindow = useCallback((k: "left" | "right" | "tray" | "format" | "all") => {
     setWinHide((w) => {
       const next = k === "all"
@@ -1204,7 +1211,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     customFontIdsRef, fileImageRef, filePanelImageRef, fileOpenRef,
     fileFontRef, fileStampRef,
     force, commit, autosave, undo, redo, setStatus, select, setSelId,
-    setEditingId, finishEditing, mutateSel, startDrag, pagePoint, fitZoom, startTuck,
+    setEditingId, finishEditing, mutateSel, startDrag, pagePoint, fitZoom, startTuck, startInstaction, tracePurpose,
     selectAllOnPage, installApp, appInstalled, showInstallHelp, setShowInstallHelp,
     showAssocHelp, setShowAssocHelp, showShortcuts, setShowShortcuts, winHide, toggleWindow, showTab, setAskAddPage,
     thumbOf, exportCancelRef, ensureCustomFont, areaRef, pageDivRef,

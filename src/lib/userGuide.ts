@@ -97,6 +97,18 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     ],
   },
   {
+    id: "instaction",
+    title: "Instaction: action lines around anything",
+    blocks: [
+      { p: "Instaction draws hand-inked action lines around any object on the page. Click the toolbar's Instaction button (or Arrange → Instaction…), then draw around the object — the same magnetic lasso as Tuck Back, so the line snaps to the art's edges; hold Alt for freehand, or press-and-hold the Tuck Back button to switch to the pen. When the loop closes, a burst of strokes appears around the outline and the Inspector opens." },
+      { ul: [
+        "Burst sends tapered strokes outward from the object; Focus runs lines in from the box edges and tapers them to a point at the object (the manga focus-line look).",
+        "Lines, Length, Gap, Weight and Jitter shape the burst; Ink sets its colour; Shuffle re-rolls the hand jitter for a fresh set.",
+        "Resize the box to grow or shrink the whole effect — the strokes scale with it. The lines count as page art: they may run into the bleed and export at full resolution in every format.",
+      ] },
+    ],
+  },
+  {
     id: "tuck",
     title: "Tuck Back: lettering behind the art",
     blocks: [
