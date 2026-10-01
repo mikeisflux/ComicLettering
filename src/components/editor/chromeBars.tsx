@@ -272,6 +272,8 @@ export function renderToolbar(ed: EditorCtx) {
     {renderTuckBtn(ed)}
     <ToolBtn label="Instaction" icon="✺" accent onClick={() => ed.startInstaction()}
       title="Instaction — draw around any object and action lines burst out around it. Uses the same magnetic lasso or pen as Tuck Back; tune the lines in the Inspector afterwards." />
+    <ToolBtn label="Trim Up" icon="✂" accent onClick={() => ed.startTrimUp()}
+      title="Trim Up — with action lines selected, loop the strokes you don't want and they're removed. Loop again for more; Esc when done." />
     <ToolBtn label="Note" icon="📌"
       title="Pin a review note to the page — teammates on the shared book see it (File → Share & Review)"
       onClick={() => {
