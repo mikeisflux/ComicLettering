@@ -72,6 +72,25 @@ function rayToBox(C: [number, number], dx: number, dy: number, w: number, h: num
   return Number.isFinite(t) ? t : Math.max(w, h);
 }
 
+/* even-odd point-in-polygon */
+export function pointInRing(x: number, y: number, ring: number[][]): boolean {
+  let c = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i], [xj, yj] = ring[j];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) c = !c;
+  }
+  return c;
+}
+
+/* a stroke is trimmed when ANY part of it falls inside a cut loop */
+function trimmed(w: number[][], cuts: number[][][]): boolean {
+  if (!cuts.length) return false;
+  const base = [(w[0][0] + w[1][0]) / 2, (w[0][1] + w[1][1]) / 2];
+  const mid = [(base[0] + w[2][0]) / 2, (base[1] + w[2][1]) / 2];
+  const probes = [w[0], w[1], w[2], base, mid];
+  return cuts.some((c) => c.length >= 3 && probes.some((p) => pointInRing(p[0], p[1], c)));
+}
+
 export const ACTION_DEFAULTS = {
   style: "burst" as const, count: 36, len: 0.55, gap: 0.08, weight: 0.055, jitter: 0.5, color: "#111111",
 };
@@ -84,6 +103,7 @@ export function actionWedges(el: ActionEl): number[][][] {
   const R = P.reduce((s, p) => s + Math.hypot(p[0] - C[0], p[1] - C[1]), 0) / P.length;
   if (!(R > 0)) return [];
   const rand = rng(el.seed || 1);
+  const cuts = (el.cuts || []).map((c) => c.map(([nx, ny]) => [nx * el.w, ny * el.h]));
   const count = Math.max(3, Math.min(240, Math.round(el.count)));
   const jit = Math.max(0, Math.min(1, el.jitter));
   const out: number[][][] = [];
@@ -105,9 +125,10 @@ export function actionWedges(el: ActionEl): number[][][] {
     const nx = -dy * w0 / 2, ny = dx * w0 / 2;
     const S = [C[0] + dx * start, C[1] + dy * start];
     const E = [C[0] + dx * end, C[1] + dy * end];
-    out.push(el.style === "focus"
+    const wdg = el.style === "focus"
       ? [[E[0] + nx, E[1] + ny], [E[0] - nx, E[1] - ny], S]
-      : [[S[0] + nx, S[1] + ny], [S[0] - nx, S[1] - ny], E]);
+      : [[S[0] + nx, S[1] + ny], [S[0] - nx, S[1] - ny], E];
+    if (!trimmed(wdg, cuts)) out.push(wdg);
   }
   return out;
 }

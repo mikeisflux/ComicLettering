@@ -695,6 +695,10 @@ export interface ActionEl extends BaseEl {
   count: number; len: number; gap: number; weight: number; jitter: number;
   color: string;
   seed: number;
+  /* Trim Up: loops (normalised to the box) whose strokes are removed — a
+     burst rarely needs to go all the way round, and must not hang off
+     the page. Kept as regions so re-tuning count/length re-applies them. */
+  cuts?: [number, number][][];
 }
 
 export type El = PanelEl | ImageEl | BalloonEl | TextEl | AdjustEl | ActionEl;

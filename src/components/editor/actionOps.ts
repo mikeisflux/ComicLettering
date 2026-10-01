@@ -5,7 +5,8 @@
 import type React from "react";
 import type { Doc } from "@/lib/model";
 import { makeAction } from "@/lib/model";
-import { actionBoxFor } from "@/lib/actionLines";
+import type { ActionEl } from "@/lib/model";
+import { actionBoxFor, actionWedges } from "@/lib/actionLines";
 import { pathBounds } from "./tuck";
 
 export interface ActionDeps {
@@ -22,6 +23,41 @@ export interface ActionDeps {
   /* spread view: the facing page and where its origin sits in current-page
      units, so a ring drawn over the other page lands on THAT page */
   facing: { index: number; offX: number; offY: number } | null;
+}
+
+/* Trim Up: the selected burst loses every stroke the loop touches. The
+   loop is drawn in page coordinates; the element may be rotated/flipped,
+   so it is mapped into the element's own space and stored normalised. */
+export function trimActionLines(d: ActionDeps & { selId: string | null }, ringIn: number[][]) {
+  const doc = d.docRef.current!;
+  const page = doc.pages[d.pageIndexRef.current];
+  const el = page.els.find((x) => x.id === d.selId);
+  if (!el || el.type !== "action") { d.setTuckMode(false); d.setStatus("Select the action lines first, then Trim Up."); return; }
+  if (ringIn.length < 3) { d.setStatus("Draw a loop over the lines to remove."); return; }
+  const a = el as ActionEl;
+  const cx = a.x + a.w / 2, cy = a.y + a.h / 2;
+  const r = -(a.rot || 0) * Math.PI / 180, cs = Math.cos(r), sn = Math.sin(r);
+  const ring: [number, number][] = ringIn.map(([px, py]) => {
+    const dx = px - cx, dy = py - cy;
+    let lx = dx * cs - dy * sn + a.w / 2, ly = dx * sn + dy * cs + a.h / 2;
+    if (a.flipH) lx = a.w - lx;
+    if (a.flipV) ly = a.h - ly;
+    return [lx / a.w, ly / a.h];
+  });
+  const before = actionWedges(a).length;
+  a.cuts = [...(a.cuts || []), ring];
+  const after = actionWedges(a).length;
+  if (after === before) {
+    a.cuts.pop();
+    if (!a.cuts.length) a.cuts = undefined;
+    d.setStatus("No lines inside that loop — draw over the strokes you want gone (still armed, Esc to stop).");
+    return;
+  }
+  d.commit();
+  d.rebuildThumbs();
+  /* stay armed: a burst is usually trimmed in a few passes */
+  d.setTuckMode(true);
+  d.setStatus(`Trimmed ${before - after} line${before - after === 1 ? "" : "s"} — loop more to remove, Esc when done. "Restore all" in the Inspector brings them back.`);
 }
 
 export function placeActionLines(d: ActionDeps, ringIn: number[][]) {

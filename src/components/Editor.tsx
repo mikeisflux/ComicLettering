@@ -178,9 +178,9 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const tuckPtsRef = useRef<number[][] | null>(null);
   const [tuckAsk, setTuckAsk] = useState<TuckAsk | null>(null);
   /* what the armed trace is for — Tuck Back cutout or Instaction lines */
-  const [tracePurpose, setTracePurpose] = useState<"tuck" | "action">("tuck");
+  const [tracePurpose, setTracePurpose] = useState<"tuck" | "action" | "trim">("tuck");
   const showTabRef = useRef<((k: "inspector") => void) | null>(null);
-  const tracePurposeRef = useRef<"tuck" | "action">("tuck");
+  const tracePurposeRef = useRef<"tuck" | "action" | "trim">("tuck");
   const [textAsk, setTextAsk] = useState<TextAsk | null>(null);
   /* collaboration (shared books): team, pinned notes, review passes */
   const [collab, setCollab] = useState<CollabState | null>(null);
@@ -1048,7 +1048,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   /* ---------------- Tuck Back (traced clipping mask) ---------------- */
   /* plain per-render closures — they travel in the EditorCtx bag, so
      callback identity doesn't matter (see tuckOps.ts) */
-  const { startTuck, startInstaction, startTuckDrag, finishTuckPen, retuneTuck, runTuckAuto, applyTuck } = makeTuckHandlers({
+  const { startTuck, startInstaction, startTrimUp, startTuckDrag, finishTuckPen, retuneTuck, runTuckAuto, applyTuck } = makeTuckHandlers({
     purposeRef: tracePurposeRef, setTracePurpose, pendingLockRef, setSelId, setPageIndex,
     showTab: (k) => showTabRef.current?.(k),
     docRef, assetsRef, pageIndexRef, pageDivRef,
@@ -1211,7 +1211,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     customFontIdsRef, fileImageRef, filePanelImageRef, fileOpenRef,
     fileFontRef, fileStampRef,
     force, commit, autosave, undo, redo, setStatus, select, setSelId,
-    setEditingId, finishEditing, mutateSel, startDrag, pagePoint, fitZoom, startTuck, startInstaction, tracePurpose,
+    setEditingId, finishEditing, mutateSel, startDrag, pagePoint, fitZoom, startTuck, startInstaction, startTrimUp, tracePurpose,
     selectAllOnPage, installApp, appInstalled, showInstallHelp, setShowInstallHelp,
     showAssocHelp, setShowAssocHelp, showShortcuts, setShowShortcuts, winHide, toggleWindow, showTab, setAskAddPage,
     thumbOf, exportCancelRef, ensureCustomFont, areaRef, pageDivRef,

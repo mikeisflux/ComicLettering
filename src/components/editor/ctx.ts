@@ -160,7 +160,9 @@ export interface EditorCtx {
   startTuck: () => void;
   /* Instaction: arm the same trace tool to draw action lines around an object */
   startInstaction: () => void;
-  tracePurpose: "tuck" | "action";
+  /* Trim Up: lasso strokes of the selected Instaction burst to remove them */
+  startTrimUp: () => void;
+  tracePurpose: "tuck" | "action" | "trim";
   /* which Tuck Back trace tool is armed: magnetic lasso or pen path
      (picked by press-and-holding the toolbar's Tuck Back button) */
   tuckTool: "lasso" | "pen";

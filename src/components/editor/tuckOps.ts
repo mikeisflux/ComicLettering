@@ -9,7 +9,7 @@ import { beginTuckLasso, buildTuckAsk } from "./tuckDrag";
 import { facingOffset } from "./spreadOps";
 import { nextAid } from "./ops";
 import type { EditorCtx } from "./ctx";
-import { placeActionLines } from "./actionOps";
+import { placeActionLines, trimActionLines } from "./actionOps";
 
 type SetTuckAsk = (v: TuckAsk | null | ((t: TuckAsk | null) => TuckAsk | null)) => void;
 
@@ -36,8 +36,8 @@ export interface TuckDeps {
   /* for nextAid — read at call time, so the latest ctx bag is used */
   getEd: () => EditorCtx;
   /* what the armed trace is FOR: a Tuck Back cutout, or Instaction lines */
-  purposeRef: React.RefObject<"tuck" | "action">;
-  setTracePurpose: (p: "tuck" | "action") => void;
+  purposeRef: React.RefObject<"tuck" | "action" | "trim">;
+  setTracePurpose: (p: "tuck" | "action" | "trim") => void;
   pendingLockRef: React.RefObject<Set<string>>;
   setSelId: (id: string | null) => void;
   setPageIndex: (i: number) => void;
@@ -55,7 +55,7 @@ export function makeTuckHandlers(d: TuckDeps) {
       d.setStatus("Select the lettering, balloon or text box to tuck first, then Tuck Back.");
       return;
     }
-    (d.purposeRef as { current: "tuck" | "action" }).current = "tuck";
+    (d.purposeRef as { current: "tuck" | "action" | "trim" }).current = "tuck";
     d.setTracePurpose("tuck");
     d.setTuckMode(true);
     d.setStatus(d.getTool() === "pen"
@@ -66,14 +66,26 @@ export function makeTuckHandlers(d: TuckDeps) {
   /* Instaction: the same lasso/pen, armed for action lines instead of a
      cutout. Needs no selection — the object is whatever gets traced. */
   const startInstaction = () => {
-    (d.purposeRef as { current: "tuck" | "action" }).current = "action";
+    (d.purposeRef as { current: "tuck" | "action" | "trim" }).current = "action";
     d.setTracePurpose("action");
     d.setTuckMode(true);
     d.setStatus(d.getTool() === "pen"
       ? "Instaction pen: click around the object that gets action lines — close on your first point (Enter closes, Esc cancels)."
       : "Instaction: draw around the object that gets action lines — the lasso snaps to the art's edges, hold Alt for freehand. Esc cancels.");
   };
+  /* Trim Up: lasso the strokes of the SELECTED burst that should go */
+  const startTrimUp = () => {
+    const s = d.docRef.current?.pages[d.pageIndexRef.current].els.find((x) => x.id === d.selId);
+    if (!s || s.type !== "action") { d.setStatus("Select the action lines to trim first, then Trim Up."); return; }
+    (d.purposeRef as { current: "tuck" | "action" | "trim" }).current = "trim";
+    d.setTracePurpose("trim");
+    d.setTuckMode(true);
+    d.setStatus(d.getTool() === "pen"
+      ? "Trim Up pen: click around the lines to remove — close on your first point (Enter closes, Esc stops)."
+      : "Trim Up: draw a loop over the lines to remove (hold Alt if the lasso snaps where you don't want it). Esc stops.");
+  };
   const actionDeps = () => ({
+    selId: d.selId,
     docRef: d.docRef, pageIndexRef: d.pageIndexRef, pendingLockRef: d.pendingLockRef,
     commit: d.commit, rebuildThumbs: d.rebuildThumbs, setSelId: d.setSelId, setPageIndex: d.setPageIndex, setStatus: d.setStatus,
     setTuckMode: d.setTuckMode, showTab: d.showTab,
@@ -83,7 +95,8 @@ export function makeTuckHandlers(d: TuckDeps) {
   /* spread view: hand the trace the facing page and where it sits on
      screen, so it can sweep across the spine and cut the facing page's art */
   const dragDeps = () => ({
-    ...(d.purposeRef.current === "action" ? { onRing: (ring: number[][]) => placeActionLines(actionDeps(), ring) } : {}),
+    ...(d.purposeRef.current === "action" ? { onRing: (ring: number[][]) => placeActionLines(actionDeps(), ring) }
+      : d.purposeRef.current === "trim" ? { onRing: (ring: number[][]) => trimActionLines(actionDeps(), ring) } : {}),
     docRef: d.docRef, assetsRef: d.assetsRef, pageIndexRef: d.pageIndexRef,
     ptsRef: d.tuckPtsRef,
     pagePoint: d.pagePoint, zoom: d.zoom, force: d.force,
@@ -98,6 +111,7 @@ export function makeTuckHandlers(d: TuckDeps) {
   const finishTuckPen = async (body: number[][]) => {
     d.setTuckMode(false);
     if (d.purposeRef.current === "action") { placeActionLines(actionDeps(), body); d.force(); return; }
+    if (d.purposeRef.current === "trim") { trimActionLines(actionDeps(), body); d.force(); return; }
     const ask = await buildTuckAsk(dragDeps(), body, false);
     if (ask) d.setTuckAsk(ask);
     d.force();
@@ -167,5 +181,5 @@ export function makeTuckHandlers(d: TuckDeps) {
       : "Cutout placed — draw around the next letter, or press Esc when the word is done.");
   };
 
-  return { startTuck, startInstaction, startTuckDrag, finishTuckPen, retuneTuck, runTuckAuto, applyTuck };
+  return { startTuck, startInstaction, startTrimUp, startTuckDrag, finishTuckPen, retuneTuck, runTuckAuto, applyTuck };
 }
