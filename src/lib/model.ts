@@ -1279,11 +1279,11 @@ const base = (x: number, y: number, w: number, h: number) =>
 /* A new balloon's tail tip, relative to the balloon centre — EVERY kind,
    every path that gives a balloon a fresh tail. It leaves from the
    absolute bottom middle and points straight down (never off a side),
-   and reaches 0.45h past the body. (The length everyone saw before was
-   ~1.5h: the tail was set from the box BEFORE it shrank to its
-   placeholder text. 0.45h is 70% shorter than that, as asked.) The
-   letterer aims it at the speaker from there. */
-export const defaultTail = (w: number, h: number) => ({ dx: 0, dy: Math.round(h * 0.95) });
+   and reaches 0.75h past the body — the owner's reference look: tip a
+   good three-quarters of the balloon's height below it, the bend dot
+   midway between the body and the tip. The letterer aims it at the
+   speaker from there. */
+export const defaultTail = (w: number, h: number) => ({ dx: 0, dy: Math.round(h * 1.25) });
 
 export function makeBalloon(kind: BalloonKind, x: number, y: number, w: number, h: number): BalloonEl {
   const caption = TAILLESS_KINDS.includes(kind);
