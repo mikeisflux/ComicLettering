@@ -150,8 +150,9 @@ function polygonWithTail(
   if (!tail) return linePath(pts);
   const cx = w / 2, cy = h / 2;
   const tip = [cx + tail.dx, cy + tail.dy];
-  /* a joined connector's bend point steers where the band leaves the shape */
-  const aim = band && tail.bx != null && tail.by != null ? [cx + tail.bx, cy + tail.by] : tip;
+  /* the bend point steers where the tail (or a joined connector's band)
+     leaves the shape — dragging the lever walks the base round the outline */
+  const aim = tail.bx != null && tail.by != null ? [cx + tail.bx, cy + tail.by] : tip;
   const dx = aim[0] - cx, dy = aim[1] - cy;
   const dLen = Math.hypot(dx, dy);
   if (dLen < 4) return linePath(pts);
@@ -199,7 +200,26 @@ function polygonWithTail(
   };
   const B = pointAt(sB), A = pointAt(sA);
 
+  /* a bent tail: both legs curve through the bend point (the same
+     construction as the ellipse family's tail) */
+  const bent = !band && tail.bx != null && tail.by != null ? [cx + tail.bx, cy + tail.by] : null;
+  const E = pointAt(exitS);
   const leg = (from: number[], to: number[]): number[][] => {
+    if (bent) {
+      const edge = from === tip ? to : from;          // the base end of this leg
+      const c = [bent[0] + (edge[0] - E[0]) * 0.35, bent[1] + (edge[1] - E[1]) * 0.35];
+      const pts2 = quadPts(from, c, to, 12);
+      pts2.pop();                                       // `to` is pushed by the caller
+      if (!zigzag) return pts2;
+      /* TV's lightning legs keep their kinks, riding the curve */
+      const amp = Math.min(w, h) * 0.06;
+      return pts2.map((p, i) => {
+        const k = i === 3 ? amp : i === 7 ? -amp : 0;
+        if (!k) return p;
+        const q = pts2[i + 1] || to, vx = q[0] - p[0], vy = q[1] - p[1], len = Math.hypot(vx, vy) || 1;
+        return [p[0] - vy / len * k, p[1] + vx / len * k];
+      });
+    }
     if (!zigzag) return [];
     const vx = to[0] - from[0], vy = to[1] - from[1];
     const len = Math.hypot(vx, vy) || 1;
@@ -297,10 +317,13 @@ function ellipseTailPath(
 
 function jitterRing(
   el: BalloonEl, mode: "rough" | "buzz",
-  tail: { dx: number; dy: number } | null
+  tail: { dx: number; dy: number; bx?: number; by?: number } | null
 ): string {
   const w = el.w, h = el.h, cx = w / 2, cy = h / 2, rx = w / 2, ry = h / 2;
-  const t = tail ? Math.atan2(tail.dy, tail.dx) : 0;
+  /* the bend lever steers where the tail leaves the ring, as on a smooth
+     balloon; its legs then curve through the bend point */
+  const bent = tail && tail.bx != null && tail.by != null ? [cx + tail.bx, cy + tail.by] : null;
+  const t = tail ? (bent ? Math.atan2(tail.by!, tail.bx!) : Math.atan2(tail.dy, tail.dx)) : 0;
   const delta = tail ? 0.1 : 0;
   const K = mode === "buzz" ? 40 : 20;
   const rnd = prng(mode === "buzz" ? 77 : 13);
@@ -314,9 +337,18 @@ function jitterRing(
     pts.push(ellipsePt(cx, cy, rx * f, ry * f, a));
   }
   const tip = tail ? [cx + tail.dx, cy + tail.dy] : null;
+  /* bent legs: both edges of the tail curve through the bend point */
+  const E = ellipsePt(cx, cy, rx, ry, t);
+  const legs = (last: number[], first: number[]) => {
+    if (!tip) return "";
+    if (!bent) return ` L ${fmt(tip[0])} ${fmt(tip[1])}`;
+    const mB = [bent[0] + (last[0] - E[0]) * 0.35, bent[1] + (last[1] - E[1]) * 0.35];
+    const mA = [bent[0] + (first[0] - E[0]) * 0.35, bent[1] + (first[1] - E[1]) * 0.35];
+    return ` Q ${fmt(mB[0])} ${fmt(mB[1])} ${fmt(tip[0])} ${fmt(tip[1])}` +
+      ` Q ${fmt(mA[0])} ${fmt(mA[1])} ${fmt(first[0])} ${fmt(first[1])}`;
+  };
   if (mode === "buzz") {
-    if (tip) pts.push(tip);
-    return linePath(pts);
+    return linePath(pts, false) + legs(pts[pts.length - 1], pts[0]) + " Z";
   }
   /* rough: smooth hand-drawn line through the jittered points */
   let d = `M ${fmt(pts[0][0])} ${fmt(pts[0][1])}`;
@@ -326,7 +358,7 @@ function jitterRing(
   }
   const last = pts[pts.length - 1];
   d += ` L ${fmt(last[0])} ${fmt(last[1])}`;
-  if (tip) d += ` L ${fmt(tip[0])} ${fmt(tip[1])}`;
+  d += legs(last, pts[0]);
   return d + " Z";
 }
 
@@ -549,20 +581,27 @@ export function balloonGeom(el: BalloonEl): BalloonGeom {
       if (tail && el.tailStyle === "thought") {
         /* thought-bubble trail: shrinking circles from the body edge to the tip */
         const tipX = cx + tail.dx, tipY = cy + tail.dy;
-        const len = Math.hypot(tipX - cx, tipY - cy);
+        /* the bend lever steers which way the trail leaves and curves it */
+        const M = tail.bx != null && tail.by != null ? [cx + tail.bx, cy + tail.by] : null;
+        const aimX = M ? M[0] : tipX, aimY = M ? M[1] : tipY;
+        const len = Math.hypot(aimX - cx, aimY - cy);
         let d = linePath(pts);
         if (len > 8) {
-          const dirX = (tipX - cx) / len, dirY = (tipY - cy) / len;
+          const dirX = (aimX - cx) / len, dirY = (aimY - cy) / len;
           let edge = 0;
           for (const p of pts) {
             const proj = (p[0] - cx) * dirX + (p[1] - cy) * dirY;
             if (proj > edge) edge = proj;
           }
+          const E = [cx + dirX * edge, cy + dirY * edge];
           const r0 = Math.min(w, h) * 0.085;
           for (let k = 0; k < 3; k++) {
-            const t = edge + (len - edge) * ((k + 0.6) / 3.2);
-            if (t <= edge * 0.9) continue;
-            d += circleSub(cx + dirX * t, cy + dirY * t, Math.max(2, r0 * (1 - k * 0.32)));
+            const f = (k + 0.6) / 3.2;
+            const c = M
+              ? [(1 - f) * (1 - f) * E[0] + 2 * (1 - f) * f * M[0] + f * f * tipX,
+                 (1 - f) * (1 - f) * E[1] + 2 * (1 - f) * f * M[1] + f * f * tipY]
+              : [E[0] + (tipX - E[0]) * f, E[1] + (tipY - E[1]) * f];
+            d += circleSub(c[0], c[1], Math.max(2, r0 * (1 - k * 0.32)));
           }
         }
         return { d, textRect, dash: null };
@@ -598,7 +637,7 @@ export function balloonGeom(el: BalloonEl): BalloonGeom {
       /* skritchy pen: clean line plus a jittered second pass */
       return {
         d: ellipseTailPath(el, "smooth"),
-        d2: jitterRing(el, "rough", tail ? { dx: tail.dx, dy: tail.dy } : null),
+        d2: jitterRing(el, "rough", tail),
         textRect: ellipseRect, dash: null,
       };
     }
@@ -660,7 +699,10 @@ export function balloonGeom(el: BalloonEl): BalloonGeom {
       const innerF = dense ? 0.68 : 0.74;
       const irx = rx * innerF, iry = ry * innerF;
       const wob = dense ? [1, 0.97] : [1, 0.96, 1.02];
-      const tAng = tail ? Math.atan2(tail.dy, tail.dx) : null;
+      /* the bend lever picks which spike becomes the tail (walks it round
+         the burst) and curves the spike's legs through the bend point */
+      const bent = tail && tail.bx != null && tail.by != null ? [cx + tail.bx, cy + tail.by] : null;
+      const tAng = tail ? (bent ? Math.atan2(tail.by!, tail.bx!) : Math.atan2(tail.dy, tail.dx)) : null;
       let tailIdx = -1, best = 1e9;
       const pts: number[][] = [];
       for (let j = 0; j < N * 2; j++) {
@@ -676,9 +718,29 @@ export function balloonGeom(el: BalloonEl): BalloonGeom {
           pts.push(ellipsePt(cx, cy, irx, iry, th));
         }
       }
-      if (tailIdx >= 0 && tip) pts[tailIdx] = tip;
+      let d: string;
+      if (tailIdx >= 0 && tip) {
+        const E = pts[tailIdx];
+        pts[tailIdx] = tip;
+        if (bent) {
+          const n = pts.length;
+          const B = pts[(tailIdx - 1 + n) % n], A = pts[(tailIdx + 1) % n];
+          const mB = [bent[0] + (B[0] - E[0]) * 0.35, bent[1] + (B[1] - E[1]) * 0.35];
+          const mA = [bent[0] + (A[0] - E[0]) * 0.35, bent[1] + (A[1] - E[1]) * 0.35];
+          /* walk the polygon so the tail's two legs are the curved segments */
+          d = "";
+          for (let k = 0; k < n; k++) {
+            const i = (tailIdx + 1 + k) % n;      // start just AFTER the tip
+            const p = pts[i];
+            if (k === 0) d += `M ${fmt(p[0])} ${fmt(p[1])}`;
+            else if (i === tailIdx) d += ` Q ${fmt(mB[0])} ${fmt(mB[1])} ${fmt(p[0])} ${fmt(p[1])}`;
+            else d += ` L ${fmt(p[0])} ${fmt(p[1])}`;
+          }
+          d += ` Q ${fmt(mA[0])} ${fmt(mA[1])} ${fmt(A[0])} ${fmt(A[1])} Z`;
+        } else d = linePath(pts);
+      } else d = linePath(pts);
       return {
-        d: linePath(pts),
+        d,
         textRect: dense ? [w * 0.24, h * 0.24, w * 0.52, h * 0.52] : [w * 0.22, h * 0.22, w * 0.56, h * 0.56],
         dash: null,
       };

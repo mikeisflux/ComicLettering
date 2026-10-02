@@ -4,7 +4,7 @@
    contentEditable text keeps focus while editing). */
 import React, { CSSProperties } from "react";
 import {
-  El, FILTERS, JoinLink, PanelEl, TextEl, aabbOverlap, applyCrossbarI, fadeMaskCss, fadeOverlayCss, joinGroupRect, joinLinks, panelPathD, resolveBalloon, rotVec,
+  El, FILTERS, JoinLink, PanelEl, TAILLESS_KINDS, TextEl, aabbOverlap, applyCrossbarI, fadeMaskCss, fadeOverlayCss, joinGroupRect, joinLinks, panelPathD, resolveBalloon, rotVec,
 } from "@/lib/model";
 import { arcTextLayout, balloonGeom, connectorMid } from "@/lib/geometry";
 import { fillCss } from "@/lib/fills";
@@ -762,9 +762,10 @@ export function renderOverlay(ed: EditorCtx) {
         );
       })()}
       {/* single-tail bend handle — NOT on joined bubbles, which get the
-          dedicated three-point connector axis below instead */}
-      {el.type === "balloon" && el.tail && !el.attachTo &&
-        ["speech", "whisper", "double", "thought"].includes(el.kind) && (() => {
+          dedicated three-point connector axis below instead. Every tailed
+          kind has it: the ellipse family, thought trails, shout/exclaim
+          spikes and the rough/buzz rings all bend through the point. */}
+      {el.type === "balloon" && el.tail && !el.attachTo && !TAILLESS_KINDS.includes(el.kind) && (() => {
         const t = Math.atan2(el.tail.dy, el.tail.dx);
         const ex = el.w / 2 + (el.w / 2) * Math.cos(t);
         const ey = el.h / 2 + (el.h / 2) * Math.sin(t);
