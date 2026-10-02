@@ -47,6 +47,46 @@ function circleSub(cx: number, cy: number, r: number) {
 const linePath = (pts: number[][], close = true) =>
   `M ${pts.map((p) => `${fmt(p[0])} ${fmt(p[1])}`).join(" L ")}${close ? " Z" : ""}`;
 
+/* A bent tail leg from `from` to `to`. Without a tilt it is the classic
+   single quadratic with `via` as its control point. With a tilt (the
+   axis the letterer set by double-clicking the bend dot) the leg PASSES
+   THROUGH `via` with tangent T there — two quadratics meeting at `via`,
+   so the tail leans the way the axis points instead of bulging symmetrically. */
+type Tilt = number[] | null | undefined;
+function tiltFor(tail: { tx?: number; ty?: number } | null | undefined): Tilt {
+  if (!tail || tail.tx == null || tail.ty == null) return null;
+  const L = Math.hypot(tail.tx, tail.ty);
+  return L < 0.01 ? null : [tail.tx / L, tail.ty / L];
+}
+function legCtrls(from: number[], via: number[], to: number[], T: Tilt): [number[], number[]] | null {
+  if (!T) return null;
+  /* orient the axis along this leg's direction of travel */
+  const dx = to[0] - from[0], dy = to[1] - from[1];
+  const t = T[0] * dx + T[1] * dy < 0 ? [-T[0], -T[1]] : T;
+  const k1 = Math.hypot(via[0] - from[0], via[1] - from[1]) * 0.5;
+  const k2 = Math.hypot(to[0] - via[0], to[1] - via[1]) * 0.5;
+  return [[via[0] - t[0] * k1, via[1] - t[1] * k1], [via[0] + t[0] * k2, via[1] + t[1] * k2]];
+}
+function legD(from: number[], via: number[], to: number[], T: Tilt): string {
+  const c = legCtrls(from, via, to, T);
+  if (!c) return ` Q ${fmt(via[0])} ${fmt(via[1])} ${fmt(to[0])} ${fmt(to[1])}`;
+  return ` Q ${fmt(c[0][0])} ${fmt(c[0][1])} ${fmt(via[0])} ${fmt(via[1])} Q ${fmt(c[1][0])} ${fmt(c[1][1])} ${fmt(to[0])} ${fmt(to[1])}`;
+}
+/* the same leg as sampled points (excluding `from`, including `to`) */
+function legPts(from: number[], via: number[], to: number[], T: Tilt, n = 12): number[][] {
+  const c = legCtrls(from, via, to, T);
+  if (!c) return quadPts(from, via, to, n);
+  return [...quadPts(from, c[0], via, Math.ceil(n / 2)), ...quadPts(via, c[1], to, Math.ceil(n / 2))];
+}
+/* a point a fraction f along a leg (0 = from, 1 = to) */
+function legAt(from: number[], via: number[], to: number[], T: Tilt, f: number): number[] {
+  const c = legCtrls(from, via, to, T);
+  const q = (p0: number[], cc: number[], p1: number[], t: number) =>
+    [(1 - t) * (1 - t) * p0[0] + 2 * (1 - t) * t * cc[0] + t * t * p1[0], (1 - t) * (1 - t) * p0[1] + 2 * (1 - t) * t * cc[1] + t * t * p1[1]];
+  if (!c) return q(from, via, to, f);
+  return f < 0.5 ? q(from, c[0], via, f * 2) : q(via, c[1], to, (f - 0.5) * 2);
+}
+
 /* sampled quadratic bezier (excluding the start point) */
 function quadPts(p0: number[], c: number[], p1: number[], n = 14): number[][] {
   const out: number[][] = [];
@@ -204,11 +244,12 @@ function polygonWithTail(
      construction as the ellipse family's tail) */
   const bent = !band && tail.bx != null && tail.by != null ? [cx + tail.bx, cy + tail.by] : null;
   const E = pointAt(exitS);
+  const T = tiltFor(tail);
   const leg = (from: number[], to: number[]): number[][] => {
     if (bent) {
       const edge = from === tip ? to : from;          // the base end of this leg
       const c = [bent[0] + (edge[0] - E[0]) * 0.35, bent[1] + (edge[1] - E[1]) * 0.35];
-      const pts2 = quadPts(from, c, to, 12);
+      const pts2 = legPts(from, c, to, T, 12);
       pts2.pop();                                       // `to` is pushed by the caller
       if (!zigzag) return pts2;
       /* TV's lightning legs keep their kinks, riding the curve */
@@ -299,11 +340,14 @@ function ellipseTailPath(
       " Z";
   }
   let mB: number[], mA: number[];
+  let T: Tilt = null;
   if (tail.bx != null && tail.by != null) {
-    /* user-bent tail: both edges curve through the bend point */
+    /* user-bent tail: both edges curve through the bend point, leaning
+       along the tilt axis when one is set */
     const M = [cx + tail.bx, cy + tail.by];
     mB = [M[0] + (B[0] - E[0]) * 0.35, M[1] + (B[1] - E[1]) * 0.35];
     mA = [M[0] + (A[0] - E[0]) * 0.35, M[1] + (A[1] - E[1]) * 0.35];
+    T = tiltFor(tail);
   } else {
     /* gentle inward bow so the tail curves like hand-drawn lettering */
     mB = lerpPt(lerpPt(B, tip, 0.55), lerpPt(E, tip, 0.5), 0.65);
@@ -311,13 +355,12 @@ function ellipseTailPath(
   }
   return `M ${fmt(A[0])} ${fmt(A[1])}` +
     ` A ${fmt(rx)} ${fmt(ry)} 0 1 1 ${fmt(B[0])} ${fmt(B[1])}` +
-    ` Q ${fmt(mB[0])} ${fmt(mB[1])} ${fmt(tip[0])} ${fmt(tip[1])}` +
-    ` Q ${fmt(mA[0])} ${fmt(mA[1])} ${fmt(A[0])} ${fmt(A[1])} Z`;
+    legD(B, mB, tip, T) + legD(tip, mA, A, T) + " Z";
 }
 
 function jitterRing(
   el: BalloonEl, mode: "rough" | "buzz",
-  tail: { dx: number; dy: number; bx?: number; by?: number } | null
+  tail: { dx: number; dy: number; bx?: number; by?: number; tx?: number; ty?: number } | null
 ): string {
   const w = el.w, h = el.h, cx = w / 2, cy = h / 2, rx = w / 2, ry = h / 2;
   /* the bend lever steers where the tail leaves the ring, as on a smooth
@@ -344,8 +387,8 @@ function jitterRing(
     if (!bent) return ` L ${fmt(tip[0])} ${fmt(tip[1])}`;
     const mB = [bent[0] + (last[0] - E[0]) * 0.35, bent[1] + (last[1] - E[1]) * 0.35];
     const mA = [bent[0] + (first[0] - E[0]) * 0.35, bent[1] + (first[1] - E[1]) * 0.35];
-    return ` Q ${fmt(mB[0])} ${fmt(mB[1])} ${fmt(tip[0])} ${fmt(tip[1])}` +
-      ` Q ${fmt(mA[0])} ${fmt(mA[1])} ${fmt(first[0])} ${fmt(first[1])}`;
+    const T = tiltFor(tail);
+    return legD(last, mB, tip, T) + legD(tip, mA, first, T);
   };
   if (mode === "buzz") {
     return linePath(pts, false) + legs(pts[pts.length - 1], pts[0]) + " Z";
@@ -595,12 +638,10 @@ export function balloonGeom(el: BalloonEl): BalloonGeom {
           }
           const E = [cx + dirX * edge, cy + dirY * edge];
           const r0 = Math.min(w, h) * 0.085;
+          const T = tiltFor(tail);
           for (let k = 0; k < 3; k++) {
             const f = (k + 0.6) / 3.2;
-            const c = M
-              ? [(1 - f) * (1 - f) * E[0] + 2 * (1 - f) * f * M[0] + f * f * tipX,
-                 (1 - f) * (1 - f) * E[1] + 2 * (1 - f) * f * M[1] + f * f * tipY]
-              : [E[0] + (tipX - E[0]) * f, E[1] + (tipY - E[1]) * f];
+            const c = M ? legAt(E, M, [tipX, tipY], T, f) : [E[0] + (tipX - E[0]) * f, E[1] + (tipY - E[1]) * f];
             d += circleSub(c[0], c[1], Math.max(2, r0 * (1 - k * 0.32)));
           }
         }
@@ -680,14 +721,10 @@ export function balloonGeom(el: BalloonEl): BalloonGeom {
         const E = ellipsePt(cx, cy, rx, ry, t);
         const base = Math.min(w, h);
         const M = tail.bx != null && tail.by != null ? [cx + tail.bx, cy + tail.by] : null;
+        const T = tiltFor(tail);
         ([[0.32, 0.085], [0.62, 0.055], [0.88, 0.035]] as const).forEach(([f, rf]) => {
-          /* trail follows the bend point when set (quadratic bezier) */
-          const c = M
-            ? [
-                (1 - f) * (1 - f) * E[0] + 2 * (1 - f) * f * M[0] + f * f * tip[0],
-                (1 - f) * (1 - f) * E[1] + 2 * (1 - f) * f * M[1] + f * f * tip[1],
-              ]
-            : lerpPt(E, tip, f);
+          /* trail follows the bend point when set, leaning along the tilt */
+          const c = M ? legAt(E, M, tip, T, f) : lerpPt(E, tip, f);
           d += circleSub(c[0], c[1], Math.max(3, base * rf));
         });
       }
@@ -727,16 +764,17 @@ export function balloonGeom(el: BalloonEl): BalloonGeom {
           const B = pts[(tailIdx - 1 + n) % n], A = pts[(tailIdx + 1) % n];
           const mB = [bent[0] + (B[0] - E[0]) * 0.35, bent[1] + (B[1] - E[1]) * 0.35];
           const mA = [bent[0] + (A[0] - E[0]) * 0.35, bent[1] + (A[1] - E[1]) * 0.35];
+          const T = tiltFor(tail);
           /* walk the polygon so the tail's two legs are the curved segments */
           d = "";
           for (let k = 0; k < n; k++) {
             const i = (tailIdx + 1 + k) % n;      // start just AFTER the tip
             const p = pts[i];
             if (k === 0) d += `M ${fmt(p[0])} ${fmt(p[1])}`;
-            else if (i === tailIdx) d += ` Q ${fmt(mB[0])} ${fmt(mB[1])} ${fmt(p[0])} ${fmt(p[1])}`;
+            else if (i === tailIdx) d += legD(B, mB, p, T);
             else d += ` L ${fmt(p[0])} ${fmt(p[1])}`;
           }
-          d += ` Q ${fmt(mA[0])} ${fmt(mA[1])} ${fmt(A[0])} ${fmt(A[1])} Z`;
+          d += legD(tip, mA, A, T) + " Z";
         } else d = linePath(pts);
       } else d = linePath(pts);
       return {

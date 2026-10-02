@@ -778,10 +778,39 @@ export function renderOverlay(ed: EditorCtx) {
         const bx = el.tail.bx ?? (ex + el.w / 2 + el.tail.dx) / 2 - el.w / 2;
         const by = el.tail.by ?? (ey + el.h / 2 + el.tail.dy) / 2 - el.h / 2;
         const [vx, vy] = vis(el.x + el.w / 2 + bx, el.y + el.h / 2 + by);
+        /* double-click the bend dot: the tilt axis — two satellite dots
+           that lean the tail's curve through the bend, exactly like the
+           joined-balloon connector's axis */
+        const showTilt = tiltConn === el.id;
+        const M = [el.w / 2 + bx, el.h / 2 + by];
+        let T = el.tail.tx != null && el.tail.ty != null ? [el.tail.tx, el.tail.ty] : [el.w / 2 + el.tail.dx - ex, el.h / 2 + el.tail.dy - ey];
+        const tl = Math.hypot(T[0], T[1]) || 1;
+        T = [T[0] / tl, T[1] / tl];
+        const L = 55 / z;
+        const v1 = vis(el.x + M[0] + T[0] * L, el.y + M[1] + T[1] * L);
+        const v2 = vis(el.x + M[0] - T[0] * L, el.y + M[1] - T[1] * L);
         return (
-          <div className="handle tailBow" title="Drag to bend the tail"
-            style={{ left: (vx - el.x) * z - 6, top: (vy - el.y) * z - 6 }}
-            onPointerDown={(e) => startDrag(e, el, "bow")} />
+          <>
+            {showTilt && (
+              <svg style={{ position: "absolute", left: 0, top: 0, width: 1, height: 1, overflow: "visible", pointerEvents: "none" }}>
+                <line x1={(v1[0] - el.x) * z} y1={(v1[1] - el.y) * z} x2={(v2[0] - el.x) * z} y2={(v2[1] - el.y) * z} stroke="#777" strokeWidth={1} />
+              </svg>
+            )}
+            {showTilt && (
+              <div className="handle tiltDot" title="Tilt the tail's curve"
+                style={{ left: (v1[0] - el.x) * z - 5, top: (v1[1] - el.y) * z - 5 }}
+                onPointerDown={(e) => startDrag(e, el, "tilt", "t1")} />
+            )}
+            {showTilt && (
+              <div className="handle tiltDot" title="Tilt the tail's curve"
+                style={{ left: (v2[0] - el.x) * z - 5, top: (v2[1] - el.y) * z - 5 }}
+                onPointerDown={(e) => startDrag(e, el, "tilt", "t2")} />
+            )}
+            <div className="handle tailBow" title="Drag to bend the tail · double-click for the tilt axis"
+              style={{ left: (vx - el.x) * z - 6, top: (vy - el.y) * z - 6 }}
+              onPointerDown={(e) => startDrag(e, el, "bow")}
+              onDoubleClick={(e) => { e.stopPropagation(); setTiltConn(showTilt ? null : el.id); }} />
+          </>
         );
       })()}
       {el.type === "balloon" && el.tail && el.attachTo && (() => {

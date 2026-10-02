@@ -405,7 +405,18 @@ export function useStartDrag(deps: DragDeps) {
            at the current midpoint so the tilt has something to curve through. */
         const cx = orig.x + orig.w / 2, cy = orig.y + orig.h / 2;
         const [lx, ly] = rotVec(pt.x - cx, pt.y - cy, -orig.rot);
-        const bx = cur.tail.bx ?? cur.tail.dx / 2, by = cur.tail.by ?? cur.tail.dy / 2;
+        /* a single tail's bend dot sits midway between the body's edge and
+           the tip (the overlay's formula) — seed the bend THERE, or the
+           first tilt drag jumped the dot to centre→tip's midpoint */
+        let bx = cur.tail.bx, by = cur.tail.by;
+        if (bx == null || by == null) {
+          if (cur.attachTo) { bx = cur.tail.dx / 2; by = cur.tail.dy / 2; }
+          else {
+            const t = Math.atan2(cur.tail.dy, cur.tail.dx);
+            const ex = (orig.w / 2) * Math.cos(t), ey = (orig.h / 2) * Math.sin(t);
+            bx = (ex + cur.tail.dx) / 2; by = (ey + cur.tail.dy) / 2;
+          }
+        }
         let vx = lx - bx, vy = ly - by;
         if (handle === "t2") { vx = -vx; vy = -vy; }
         const L = Math.hypot(vx, vy) || 1;
