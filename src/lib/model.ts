@@ -1248,6 +1248,14 @@ export function newDoc(): Doc {
 const base = (x: number, y: number, w: number, h: number) =>
   ({ id: uid(), x, y, w, h, rot: 0, shadow: false });
 
+/* A new speech balloon's tail tip, relative to the balloon centre. The
+   old default (-0.25w, 0.85h) put the tip 0.37h past the body's edge — a
+   tail longer than the balloon was tall on a wide bubble. This halves
+   that overhang (the tip is at the edge plus half the old reach); the
+   direction, lower-left, is unchanged. ONE helper so every path that
+   gives a balloon a fresh tail agrees. */
+export const defaultTail = (w: number, h: number) => ({ dx: Math.round(-w * 0.2), dy: Math.round(h * 0.665) });
+
 export function makeBalloon(kind: BalloonKind, x: number, y: number, w: number, h: number): BalloonEl {
   const caption = TAILLESS_KINDS.includes(kind);
   return {
@@ -1260,7 +1268,7 @@ export function makeBalloon(kind: BalloonKind, x: number, y: number, w: number, 
     fill: solid(caption ? "#fff7c9" : "#ffffff"),
     stroke: "#111111",
     strokeW: kind === "shout" || kind === "burst2" ? 5 : 3,
-    tail: caption ? null : { dx: -w * 0.25, dy: h * 0.85 },
+    tail: caption ? null : defaultTail(w, h),
   };
 }
 

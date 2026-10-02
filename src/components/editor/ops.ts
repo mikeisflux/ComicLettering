@@ -3,7 +3,7 @@
    EditorCtx bag (plain function calls, not components). */
 import React from "react";
 import {
-  BalloonEl, BalloonKind, DEFAULT_TEXT_SIZE, DPI, Doc, El, FONTS, FillStyle,
+  BalloonEl, BalloonKind, DEFAULT_TEXT_SIZE, DPI, Doc, El, FONTS, FillStyle, defaultTail,
   GradStop, Page,
   TAILLESS_KINDS, TextEl, TextStyle, applyCrossbarI, applyRunEmphasis, clamp, makeBalloon, makeImage, newPage,
   pageMargins, rotVec,
@@ -86,7 +86,7 @@ export function resolveTailAsk(ed: EditorCtx, choice: "speech" | "thought" | "no
   if (choice === "none") {
     el.tail = null;
   } else {
-    el.tail = { dx: -Math.round(el.w * 0.25), dy: Math.round(el.h * 0.85) };
+    el.tail = defaultTail(el.w, el.h);
     el.tailStyle = choice;
   }
   commit();
@@ -353,7 +353,7 @@ export function applyBalloonPreset(ed: EditorCtx, name: string) {
   ed.mutateBalloon((b) => {
     b.kind = p.kind;
     if (TAILLESS_KINDS.includes(b.kind)) b.tail = null;
-    else if (!b.tail) b.tail = { dx: -b.w * 0.25, dy: b.h * 0.85 };
+    else if (!b.tail) b.tail = defaultTail(b.w, b.h);
     b.fill = JSON.parse(JSON.stringify(p.fill));
     b.stroke = p.stroke; b.strokeW = p.strokeW; b.shadow = p.shadow;
     b.ts = JSON.parse(JSON.stringify(p.ts));
@@ -881,7 +881,7 @@ export function addFromTray(ed: EditorCtx, kind: string) {
       b.kind = kind as BalloonKind;
       /* captions have no tail; give one back when leaving caption shapes */
       if (nowCaption) b.tail = null;
-      else if (wasCaption && !b.tail) b.tail = { dx: Math.round(b.w * 0.2), dy: Math.round(b.h * 0.75) };
+      else if (wasCaption && !b.tail) b.tail = defaultTail(b.w, b.h);
       commit();
       return;
     }
