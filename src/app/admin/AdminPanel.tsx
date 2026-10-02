@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import "./admin.css";
+import Sentinel from "./Sentinel";
 
 interface Msg {
   id: string; direction: string; channel: string; fromEmail: string;
@@ -13,18 +14,26 @@ interface UserRow {
 }
 interface KnownSetting { key: string; label: string; hint?: string; secret?: boolean; value: string; set: boolean }
 
-type Tab = "inbox" | "settings" | "users" | "payments";
+type Tab = "inbox" | "sentinel" | "settings" | "users" | "payments";
 
 export default function AdminPanel({ adminEmail }: { adminEmail: string }) {
   const [tab, setTab] = useState<Tab>("inbox");
+  const [bugCount, setBugCount] = useState<number | null>(null);
+  /* the active-bug count shows on the tab even before Sentinel is opened */
+  useEffect(() => {
+    fetch("/api/admin/bugs?status=active").then((r) => r.ok ? r.json() : null)
+      .then((d) => { if (d?.tally) setBugCount(["open", "triaged", "in_progress"].reduce((n, s) => n + (d.tally[s] || 0), 0)); })
+      .catch(() => { /* offline */ });
+  }, []);
   return (
     <div className="adm">
       <header className="admHeader">
         <div className="brand">Letter<span>My</span>Comic <small style={{ fontFamily: "sans-serif", fontSize: 12 }}>ADMIN</small></div>
         <nav>
-          {(["inbox", "settings", "users", "payments"] as Tab[]).map((t) => (
+          {(["inbox", "sentinel", "settings", "users", "payments"] as Tab[]).map((t) => (
             <button key={t} className={tab === t ? "on" : ""} onClick={() => setTab(t)}>
               {t[0].toUpperCase() + t.slice(1)}
+              {t === "sentinel" && !!bugCount && <span className="navCount">{bugCount}</span>}
             </button>
           ))}
         </nav>
@@ -36,6 +45,7 @@ export default function AdminPanel({ adminEmail }: { adminEmail: string }) {
       </header>
       <div className="admBody">
         {tab === "inbox" && <Inbox />}
+        {tab === "sentinel" && <Sentinel onCount={setBugCount} />}
         {tab === "settings" && <Settings />}
         {tab === "users" && <Users adminEmail={adminEmail} />}
         {tab === "payments" && <Payments />}

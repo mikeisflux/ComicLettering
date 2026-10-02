@@ -125,6 +125,9 @@ export interface EditorCtx {
   showAssocHelp: boolean;
   setShowAssocHelp: SetState<boolean>;
   /* Help → Keyboard Shortcuts (a styled dialog, not a browser alert) */
+  /* Help → Report a bug… (Sentinel) */
+  showBugReport: boolean;
+  setShowBugReport: SetState<boolean>;
   showShortcuts: boolean;
   setShowShortcuts: SetState<boolean>;
   /* the live selection / editing ids — the per-half ctx copies on the

@@ -394,3 +394,13 @@
   /* marketing hero sells the product; in the app you already have it */
   .heroNote, .relatedLinks { display: none; }
 }
+
+/* bug report form (site page + studio dialog) */
+.formCard select { width: 100%; padding: 10px; font: inherit; border: 1px solid #c8ced6; border-radius: 8px; background: #fff; }
+.bugRow { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 520px) { .bugRow { grid-template-columns: 1fr; } }
+.bugAttach { margin: 16px 0 4px; display: flex; flex-direction: column; gap: 8px; font-size: 13.5px; color: #3c4654; }
+.bugAttach label { display: flex; gap: 8px; align-items: flex-start; font-weight: 400; margin: 0; }
+.bugAttach input { width: auto; margin-top: 3px; }
+.bugBtns { display: flex; gap: 10px; align-items: center; }
+.bugBtns .plain { background: #fff; color: #24303f; border: 1px solid #c8ced6; }

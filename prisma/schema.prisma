@@ -177,3 +177,44 @@ model Message {
 
   @@index([direction, read])
 }
+
+// Sentinel — bug reports from the studio and the site, with a timeline of
+// admin notes, status changes and emailed replies.
+model BugReport {
+  id          String     @id @default(cuid())
+  status      String     @default("open")   // open | triaged | in_progress | fixed | closed | wontfix
+  severity    String     @default("normal") // low | normal | high | critical
+  title       String
+  description String
+  steps       String?
+  email       String?
+  name        String?
+  userId      String?
+  build       String?    // NEXT_PUBLIC_LMC_BUILD the reporter was running
+  url         String?
+  form        String?    // browser | installed-pwa | android-app | ios-app | desktop-electron
+  userAgent   String?
+  context     String?    // JSON: environment + document stats captured at report time
+  errors      String?    // recent runtime errors (text)
+  screenshot  String?    // data URL (PNG), optional
+  ip          String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  resolvedAt  DateTime?
+  events      BugEvent[]
+
+  @@index([status, createdAt])
+  @@index([severity])
+}
+
+model BugEvent {
+  id        String    @id @default(cuid())
+  bugId     String
+  bug       BugReport @relation(fields: [bugId], references: [id], onDelete: Cascade)
+  kind      String    // note | status | reply
+  author    String    // admin email
+  body      String
+  createdAt DateTime  @default(now())
+
+  @@index([bugId, createdAt])
+}

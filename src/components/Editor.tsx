@@ -27,6 +27,8 @@ import {
 } from "./editor/textHelpers";
 import { SmartTip, pickTip } from "./editor/smartTips";
 import { TuckAsk } from "./editor/tuck";
+import { renderBugDialog } from "./editor/bugDialog";
+import { installErrorLog } from "@/lib/errorLog";
 import type { TextAsk } from "./editor/askText";
 import { makeTuckHandlers } from "./editor/tuckOps";
 import { makeCrossPageDrop } from "./editor/spreadOps";
@@ -236,6 +238,9 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const styleClipRef = useRef<Partial<TextStyle> & { fill?: FillStyle; stroke?: string; strokeW?: number } | null>(null);
   const [presets, setPresets] = useState<BalloonPreset[]>([]);
   const [showFind, setShowFind] = useState(false);
+  const [showBugReport, setShowBugReport] = useState(false);
+  /* Sentinel: keep the last runtime errors so a bug report can carry them */
+  useEffect(() => { installErrorLog(); }, []);
   const [findText, setFindText] = useState("");
   const [replaceText, setReplaceText] = useState("");
   const [findCase, setFindCase] = useState(false);
@@ -1137,8 +1142,8 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
        removed the selected element behind it. */
     modalOpenRef.current =
       showSetup || showExport || showFind || showScript || showGradMaker || !!tuckAsk || !!tailAsk || !!textAsk
-      || showTeam || !!composer || showAssocHelp || showShortcuts || showInstallHelp || askAddPage;
-  }, [showSetup, showExport, showFind, showScript, showGradMaker, tuckAsk, tailAsk, textAsk, showTeam, composer, showAssocHelp, showShortcuts, showInstallHelp, askAddPage]);
+      || showTeam || !!composer || showAssocHelp || showShortcuts || showInstallHelp || askAddPage || showBugReport;
+  }, [showSetup, showExport, showFind, showScript, showGradMaker, tuckAsk, tailAsk, textAsk, showTeam, composer, showAssocHelp, showShortcuts, showInstallHelp, askAddPage, showBugReport]);
   useEffect(() => {
     try {
       const installed = window.matchMedia?.("(display-mode: standalone)").matches
@@ -1213,7 +1218,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     force, commit, autosave, undo, redo, setStatus, select, setSelId,
     setEditingId, finishEditing, mutateSel, startDrag, pagePoint, fitZoom, startTuck, startInstaction, startTrimUp, tracePurpose,
     selectAllOnPage, installApp, appInstalled, showInstallHelp, setShowInstallHelp,
-    showAssocHelp, setShowAssocHelp, showShortcuts, setShowShortcuts, winHide, toggleWindow, showTab, setAskAddPage,
+    showAssocHelp, setShowAssocHelp, showShortcuts, setShowShortcuts, showBugReport, setShowBugReport, winHide, toggleWindow, showTab, setAskAddPage,
     thumbOf, exportCancelRef, ensureCustomFont, areaRef, pageDivRef,
     selIdsRef, editingIdRef, setSelIds,
     mutateText, mutateBalloon, mutateLettering, mutateArt, mutatePanel,
@@ -1279,6 +1284,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
         setShowFill(false); setShowStroke(false); setShowTextColor(false); setStampOpen(false); return true;
       }
       if (adjustEdit) { setAdjustEdit(null); return true; }
+      if (showBugReport) { setShowBugReport(false); return true; }
       if (showShortcuts) { setShowShortcuts(false); return true; }
       if (showAssocHelp) { setShowAssocHelp(false); return true; }
       if (showInstallHelp) { setShowInstallHelp(false); return true; }
@@ -1368,6 +1374,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       {renderInstallHelp(ed)}
       {renderAssocHelp(ed)}
       {renderShortcutsDialog(ed)}
+      {renderBugDialog(ed)}
       {renderScriptDialog(ed)}
       {renderAdjustDialog(ed)}
 

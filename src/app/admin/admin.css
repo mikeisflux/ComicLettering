@@ -49,3 +49,30 @@
 .replyBox textarea { width: 100%; min-height: 110px; font: inherit; padding: 8px; border: 1px solid #b9c0ca; border-radius: 6px; }
 .okNote { color: #17693a; font-weight: 600; }
 .errNote { color: #a02525; font-weight: 600; }
+
+/* ---- Sentinel (bug console) ---- */
+.admHeader nav .navCount { margin-left: 6px; background: #f0812c; color: #1d1105; border-radius: 9px; padding: 0 6px; font-size: 11px; }
+.sentStats { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+.sentStat { background: #f7f8fa; border: 1px solid #dfe3e9; border-radius: 8px; padding: 6px 12px; font: inherit; cursor: pointer; display: flex; flex-direction: column; align-items: center; min-width: 74px; }
+.sentStat b { font-size: 18px; } .sentStat span { font-size: 11px; color: #6a7280; text-transform: uppercase; letter-spacing: .5px; }
+.sentStat.on { border-color: #2f7fd6; background: #eaf2fc; }
+.sentTable tr { cursor: pointer; } .sentTable tr:hover td { background: #f7fafd; } .sentTable tr.sentOpen td { background: #eaf2fc; }
+.sentTable td a { color: inherit; text-decoration: none; font-weight: 600; } .sentEv { color: #8a919c; font-size: 12px; }
+.sev-critical { background: #7a1313; color: #fff; } .sev-high { background: #fde3e3; color: #a02525; }
+.sev-normal { background: #e3e9fd; color: #2540a0; } .sev-low { background: #eee; color: #666; }
+.sentHead { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.sentCols { display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px; }
+@media (max-width: 760px) { .sentCols { grid-template-columns: 1fr; } }
+.sentDetail h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #6a7280; margin: 14px 0 6px; }
+.sentKv { margin: 0; font-size: 13px; }
+.sentErrors { background: #1e2430; color: #e8edf4; font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace; padding: 10px 12px; border-radius: 6px; white-space: pre-wrap; max-height: 260px; overflow: auto; }
+.sentCtx { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.sentCtx th { text-align: left; font-weight: 600; color: #4b5563; padding: 3px 8px 3px 0; vertical-align: top; white-space: nowrap; width: 1%; }
+.sentCtx td { padding: 3px 0; word-break: break-word; border-bottom: 1px solid #f0f2f5; }
+.sentShot { max-width: 100%; border: 1px solid #cdd3db; border-radius: 6px; display: block; }
+.sentTimeline { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.sentEvent { border-left: 3px solid #cdd3db; padding: 4px 10px; white-space: pre-wrap; font-size: 13.5px; }
+.sentEvent.kind-reply { border-color: #f0812c; } .sentEvent.kind-status { border-color: #2f7fd6; font-style: italic; }
+.sentForms { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 760px) { .sentForms { grid-template-columns: 1fr; } }
+.sentForms textarea { min-height: 80px; }

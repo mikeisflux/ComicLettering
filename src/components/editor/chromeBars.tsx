@@ -194,6 +194,7 @@ export function renderMenuBar(ed: EditorCtx) {
         ["Open .lmc files with this app…", () => ed.setShowAssocHelp(true)],
         ["Keyboard Shortcuts", () => ed.setShowShortcuts(true)],
         ["FAQ & Support", () => window.open("/faq", "_blank")],
+        ["Report a bug…", () => ed.setShowBugReport(true)],
         ["—", null],
         ["Check for Updates…", () => { void checkForUpdates(ed); }],
       ]],
