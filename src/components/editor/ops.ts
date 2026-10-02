@@ -607,7 +607,7 @@ export function refitLetteringEl(el: TextEl): boolean {
        box size — shrink symmetrically about the centre and nothing moves
        (safe under rotation and flips too) */
     let raw = (ts.caps ? el.text.toUpperCase() : el.text).replace(/\s*\n\s*/g, " ");
-    if (ts.crossbarI) raw = applyCrossbarI(raw);
+    if (ts.crossbarI) raw = applyCrossbarI(raw, ts.font);
     const chars = raw.match(/\P{M}\p{M}*/gu) || [];
     if (!chars.length) return false;
     const widths = measureCharWidths(ts, chars);

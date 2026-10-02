@@ -112,7 +112,7 @@ function drawRichText(
   const clusters: Cl[] = [];
   for (const run of runs) {
     const t0 = ts.caps ? run.t.toUpperCase() : run.t;
-    const t = ts.crossbarI ? applyCrossbarI(t0) : t0;
+    const t = ts.crossbarI ? applyCrossbarI(t0, ts.font) : t0;
     for (const cl of (t.match(/\P{M}\p{M}*|\n/gu) || [])) clusters.push({ ch: cl, b: !!run.b, i: !!run.i, u: !!run.u });
   }
   const measure = (cl: Cl) => { ctx.font = fontFor(cl.b, cl.i); return ctx.measureText(cl.ch).width + tr; };
@@ -253,7 +253,7 @@ function drawWarpedText(
 ) {
   const [rx, ry, rw, rh] = rect;
   let t = (ts.caps ? String(text).toUpperCase() : String(text)).replace(/\s*\n\s*/g, " ");
-  if (ts.crossbarI) t = applyCrossbarI(t);
+  if (ts.crossbarI) t = applyCrossbarI(t, ts.font);
   const chars = t.match(/\P{M}\p{M}*/gu) || []; // keep combining marks with their base glyph
   try { (ctx as unknown as { letterSpacing: string }).letterSpacing = "0px"; } catch { /* ignore */ }
   const tr = ts.tracking ?? 0;
@@ -386,7 +386,7 @@ export function drawStyledText(
   ctx.font = fontString(ts);
   ctx.textBaseline = "middle";
   if (warp) { drawWarpedText(ctx, ts, text, rect, warp); return; }
-  const preText = ts.crossbarI ? applyCrossbarI(ts.caps ? String(text).toUpperCase() : String(text)) : text;
+  const preText = ts.crossbarI ? applyCrossbarI(ts.caps ? String(text).toUpperCase() : String(text), ts.font) : text;
   // letter-spacing (tracking) — supported in the browser canvas used for export
   try { (ctx as unknown as { letterSpacing: string }).letterSpacing = `${ts.tracking ?? 0}px`; } catch { /* older engines */ }
   const t = ts.caps ? String(preText).toUpperCase() : String(preText);
@@ -879,7 +879,7 @@ export function textInkBounds(el: TextEl): TrimRect {
       if (cx2) {
         cx2.font = fontString(el.ts);
         let t = (el.ts.caps ? el.text.toUpperCase() : el.text).replace(/\s*\n\s*/g, " ");
-        if (el.ts.crossbarI) t = applyCrossbarI(t);
+        if (el.ts.crossbarI) t = applyCrossbarI(t, el.ts.font);
         const chars = t.match(/\P{M}\p{M}*/gu) || [];
         const widths = chars.map((ch) => cx2.measureText(ch).width + (el.ts.tracking ?? 0));
         let ex = el.w / 2, ey = el.h / 2;

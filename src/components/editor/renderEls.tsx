@@ -466,7 +466,7 @@ export function renderEl(ed: EditorCtx, el: El) {
   }
   if (el.warp && !editing && el.text) {
     let raw = (el.ts.caps ? el.text.toUpperCase() : el.text).replace(/\s*\n\s*/g, " ");
-    if (el.ts.crossbarI) raw = applyCrossbarI(raw);
+    if (el.ts.crossbarI) raw = applyCrossbarI(raw, el.ts.font);
     const chars = raw.match(/\P{M}\p{M}*/gu) || [];
     const widths = measureCharWidths(el.ts, chars);
     const layout = arcTextLayout(widths, el.warp);

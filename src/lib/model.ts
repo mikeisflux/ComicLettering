@@ -272,12 +272,20 @@ export function normalizeRuns(runs: TextRun[]): TextRun[] | undefined {
 }
 
 /* Comic crossbar-I: the pronoun "I" (and I-contractions) gets a bar above and
-   below. Implemented with combining macrons so it renders identically in the
-   DOM editor and the canvas/PDF export, in any font. Never touches "I" inside
-   other words (BIG, IT'S, …). */
-const CROSSBAR_I = "Ī̱";
-export function applyCrossbarI(text: string): string {
-  return text.replace(/\bI(?=\b|['’])/g, CROSSBAR_I);
+   below. Every BUNDLED font carries a real crossbar-I glyph at U+E000, built
+   from its own I stem (scripts/add-crossbar-i.py) — the DOM editor and the
+   canvas/PDF export both just draw that character. Fonts the studio does not
+   ship (imported, system stacks) have no such glyph and fall back to
+   combining macrons. Never touches "I" inside other words (BIG, IT'S, …). */
+const CROSSBAR_GLYPH = "\uE000";
+const CROSSBAR_MARKS = "I\u0304\u0331";
+const hasCrossbarGlyph = (font?: string) => {
+  if (!font) return true;
+  const g = FONTS[font]?.group;
+  return !!g && g !== "My Fonts" && g !== "Site Fonts" && g !== "System";
+};
+export function applyCrossbarI(text: string, font?: string): string {
+  return text.replace(/\bI(?=\b|['’])/g, hasCrossbarGlyph(font) ? CROSSBAR_GLYPH : CROSSBAR_MARKS);
 }
 
 export interface BaseEl {

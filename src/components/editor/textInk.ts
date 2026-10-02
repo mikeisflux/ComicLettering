@@ -23,7 +23,7 @@ export function textInkFractions(el: TextEl): InkFractions | null {
     /* arc-warped SFX: replicate the render layout and take the extents of the
        rotated per-glyph boxes */
     let raw = (ts.caps ? el.text.toUpperCase() : el.text).replace(/\s*\n\s*/g, " ");
-    if (ts.crossbarI) raw = applyCrossbarI(raw);
+    if (ts.crossbarI) raw = applyCrossbarI(raw, ts.font);
     const chars = raw.match(/\P{M}\p{M}*/gu) || [];
     if (!chars.length) return null;
     const widths = measureCharWidths(ts, chars);

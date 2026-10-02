@@ -94,7 +94,7 @@ export const Fld = ({ label, children }: { label: string; children: ReactNode })
 /* apply crossbar-I for static display (not while editing) */
 export function displayText(text: string, ts: TextStyle, editing: boolean): string {
   if (editing || !ts.crossbarI) return text;
-  return applyCrossbarI(ts.caps ? text.toUpperCase() : text);
+  return applyCrossbarI(ts.caps ? text.toUpperCase() : text, ts.font);
 }
 
 /* ---- inline emphasis (rich text runs) ---- */
@@ -344,7 +344,7 @@ export function domSelectionOffsets(root: HTMLElement): { start: number; end: nu
 }
 export function renderRuns(runs: TextRun[], ts: TextStyle): ReactNode {
   return runs.map((r, idx) => {
-    const txt = ts.crossbarI ? applyCrossbarI(ts.caps ? r.t.toUpperCase() : r.t) : r.t;
+    const txt = ts.crossbarI ? applyCrossbarI(ts.caps ? r.t.toUpperCase() : r.t, ts.font) : r.t;
     const parts = txt.split("\n");
     const content: ReactNode[] = [];
     parts.forEach((p, i) => { if (i > 0) content.push(<br key={`b${idx}-${i}`} />); content.push(p); });
