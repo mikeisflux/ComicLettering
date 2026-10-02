@@ -19,7 +19,7 @@ import {
   BALLOON_STYLES, BOX_STYLES, ShapeStyle, applyShapeStyle, captureShapeStyle,
 } from "@/lib/balloonStyles";
 import { forgetImage, loadImage, spreadNeighbor } from "@/lib/exportPng";
-import { BalloonPreset, measureBlock, measureCharWidths, parseScript, toggleEmphasis } from "./textHelpers";
+import { BalloonPreset, measureBlock, measureCharWidths, parseScript, pasteMarkup, toggleEmphasis } from "./textHelpers";
 import { EditorCtx } from "./ctx";
 import { askText } from "./askText";
 import { beginClipboardRead, endClipboardRead } from "./editGuard";
@@ -280,18 +280,36 @@ export async function clipboardText(ed: EditorCtx, mode: "cut" | "copy" | "paste
     const range = sel && sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
     if (!root || !range) { setStatus("Click where the words should go first, then paste."); return; }
     const keyHint = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘V" : "Ctrl+V";
-    let t = "";
+    /* the SAME cleaning Ctrl+V gets (pasteMarkup): Word, Google Docs and
+       web pages hand over HTML wrapped in blocks and Windows "\r\n" line
+       endings — inserted raw, every paragraph broke twice and a stray
+       carriage return rode along. Rich read first (keeps bold/italic),
+       plain text when the browser only allows that. */
+    let t = "", html = "";
     beginClipboardRead();
-    try { t = await navigator.clipboard.readText(); }
-    catch {
+    try {
+      if (navigator.clipboard.read) {
+        for (const item of await navigator.clipboard.read()) {
+          if (!html && item.types.includes("text/html")) html = await (await item.getType("text/html")).text();
+          if (!t && item.types.includes("text/plain")) t = await (await item.getType("text/plain")).text();
+        }
+      }
+      if (!t && !html) t = await navigator.clipboard.readText();
+    } catch {
       /* reading the clipboard from a menu is blocked in some browsers; the
          keystroke is never blocked */
-      endClipboardRead();
-      setStatus(`This browser won't let a menu read the clipboard — press ${keyHint} instead.`);
-      return;
+      try { if (!t && !html) t = await navigator.clipboard.readText(); } catch { /* still blocked */ }
+      if (!t && !html) {
+        endClipboardRead();
+        setStatus(`This browser won't let a menu read the clipboard — press ${keyHint} instead.`);
+        return;
+      }
     }
     endClipboardRead();
-    if (!t) { setStatus("Nothing on the clipboard."); return; }
+    if (!t && !html) { setStatus("Nothing on the clipboard."); return; }
+    const markup = pasteMarkup(html, t);
+    if (!markup) { setStatus("Nothing on the clipboard."); return; }
+    t = markup.replace(/<br>/g, "\n").replace(/<[^>]+>/g, "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
     if (!root.isConnected || root.contentEditable !== "true") {
       setStatus(`The edit ended before the clipboard answered — click into the text and press ${keyHint}.`);
       return;
@@ -300,7 +318,7 @@ export async function clipboardText(ed: EditorCtx, mode: "cut" | "copy" | "paste
     const live = window.getSelection();
     if (live) { live.removeAllRanges(); live.addRange(range); }
     let ok = false;
-    try { ok = document.execCommand("insertText", false, t); } catch { ok = false; }
+    try { ok = document.execCommand("insertHTML", false, markup); } catch { ok = false; }
     if (!ok) {
       /* no execCommand (or it refused): splice the text in by hand and
          raise the same input event the keystroke would, so the element's

@@ -193,6 +193,10 @@ export function pasteMarkup(html: string, text: string): string {
     const plain = text.replace(/\r\n?/g, "\n").replace(/^\n+|\n+$/g, "");
     return escapeHtml(plain).replace(/\n/g, BR);
   }
+  /* Windows CF_HTML marks the copied part of the document; keep only that
+     (the header lines and the document's own style/body shell go) */
+  const fs = html.indexOf("<!--StartFragment-->"), fe = html.indexOf("<!--EndFragment-->");
+  if (fs >= 0 && fe > fs) html = html.slice(fs + 20, fe);
   const doc = new DOMParser().parseFromString(html, "text/html");
   /* pass 1: a flat token stream — text with its emphasis, and line breaks
      (one per <br>, one at each block edge) */
