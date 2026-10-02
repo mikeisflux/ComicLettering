@@ -923,6 +923,9 @@ export function addFromTray(ed: EditorCtx, kind: string) {
     const b = makeBalloon(kind as BalloonKind, s.x, s.y, w, h);
     /* a new balloon should hug its placeholder, not sprawl across the page */
     sizeBalloonToText(p, b);
+    /* the tail was sized from the box BEFORE it shrank to the placeholder —
+       re-derive it from the final height, or the stub became a long spike */
+    if (b.tail) b.tail = defaultTail(b.w, b.h);
     b.x = Math.round(s.x + (w - b.w) / 2);
     b.y = Math.round(s.y + (h - b.h) / 2);
     /* new balloons use the colourway picked in the STYLES panel */
