@@ -12,7 +12,7 @@ import {
   addAttachedBubble, addFromTray, alignSel, copySel, cutSel, deleteSel,
   doFindReplace, duplicateSel, importScript, insertCustomStamp, insertSfxStamp,
   fitToArtwork, fitToPage, pasteClip, removeCustomStamp, reorder, resizeToActual,
-  clipboardText, resolveTailAsk, runExport, saveStyleFromSelection, setLocked } from "./ops";
+  resolveTailAsk, runExport, saveStyleFromSelection, setLocked } from "./ops";
 import { detectPanelsFromArt } from "./panelOps";
 import { SFX_STAMPS } from "@/lib/sfxStamps";
 import type { TuckMode } from "./tuck";
@@ -299,25 +299,12 @@ export function renderContextMenu(ed: EditorCtx) {
             );
           })()}
           <div className="ctxSep" />
-          {/* Editing this element? Then these mean the words, not the object.
-              onMouseDown is swallowed so focus never leaves the text — the
-              moment it does, the selection goes with it. */}
-          {ed.editingId === el.id ? (
-            <>
-              <button onMouseDown={(e) => e.preventDefault()}
-                onClick={() => { clipboardText(ed, "cut"); close(); }}>Cut Text</button>
-              <button onMouseDown={(e) => e.preventDefault()}
-                onClick={() => { clipboardText(ed, "copy"); close(); }}>Copy Text</button>
-              <button onMouseDown={(e) => e.preventDefault()}
-                onClick={() => { clipboardText(ed, "paste"); close(); }}>Paste Text</button>
-            </>
-          ) : (
-            <>
-              <button disabled={el.locked} onClick={() => { cutSel(ed); close(); }}>Cut</button>
-              <button onClick={() => { copySel(ed); close(); }}>Copy</button>
-              <button disabled={!clipboardRef.current} onClick={() => { pasteClip(ed); close(); }}>Paste</button>
-            </>
-          )}
+          {/* while a balloon is being typed in, right-click shows the
+              browser's own menu instead (see renderEls onContextMenu) —
+              these act on the object */}
+          <button disabled={el.locked} onClick={() => { cutSel(ed); close(); }}>Cut</button>
+          <button onClick={() => { copySel(ed); close(); }}>Copy</button>
+          <button disabled={!clipboardRef.current} onClick={() => { pasteClip(ed); close(); }}>Paste</button>
           <button onClick={() => { duplicateSel(ed); close(); }}>Duplicate</button>
           <button disabled={el.locked} className="danger" onClick={() => { deleteSel(ed); close(); }}>Delete</button>
           {(el.type === "balloon" || el.type === "text") && (

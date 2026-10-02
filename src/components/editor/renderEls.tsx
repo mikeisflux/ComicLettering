@@ -272,6 +272,12 @@ export function renderEl(ed: EditorCtx, el: El) {
       else if (el.type === "panel" || el.type === "image") { panelImageTarget.current = el.id; filePanelImageRef.current?.click(); }
     },
     onContextMenu: (e: React.MouseEvent) => {
+      /* typing in this balloon: the BROWSER's menu, not ours. Only a real
+         paste gesture may read the clipboard without a permission pop-up —
+         our own "Paste Text" item had to ask every time (Firefox always,
+         Chrome until allowed), and the native menu also brings spelling
+         suggestions. Cut/Copy/Paste there act on the words, as they should. */
+      if (editingId === el.id || ed.editingIdRef.current === el.id) return;
       e.preventDefault();
       claimPage(ed);
       /* right-clicking inside an existing multi-selection keeps it, so the
