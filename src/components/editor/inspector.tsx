@@ -3,7 +3,7 @@
 import { NumField, Slider } from "./chrome";
 import {
   ActionEl, AdjustKind, BALLOON_KINDS, BLEED, BalloonEl, BalloonKind, FILTERS, FONTS, FadeDir, PAGE_SIZES,
-  PanelEl, TAILLESS_KINDS, TextEl, TextStyle, clamp,
+  PanelEl, TAILLESS_KINDS, TextEl, TextStyle, clamp, defaultTail,
 } from "@/lib/model";
 import { ADJUST_META, makeAdjust } from "@/lib/pageAdjust";
 import { Fld } from "./textHelpers";
@@ -267,7 +267,7 @@ export function renderInspector(ed: EditorCtx) {
             <select value={el.kind} onChange={(e) => ed.mutateBalloon((b) => {
               b.kind = e.target.value as BalloonKind;
               if (TAILLESS_KINDS.includes(b.kind)) b.tail = null;
-              else if (!b.tail) b.tail = { dx: -b.w * 0.25, dy: b.h * 0.85 };
+              else if (!b.tail) b.tail = defaultTail(b.w, b.h);
             })}>
               {Object.entries(BALLOON_KINDS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
