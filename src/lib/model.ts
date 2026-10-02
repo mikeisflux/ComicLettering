@@ -1279,10 +1279,10 @@ const base = (x: number, y: number, w: number, h: number) =>
 /* A new balloon's tail tip, relative to the balloon centre — EVERY kind,
    every path that gives a balloon a fresh tail. It leaves from the
    absolute bottom middle and points straight down (never off a side),
-   and reaches 0.11h past the body — a short stub (the original default's
-   0.37h overhang was longer than a wide bubble was tall). The letterer
-   aims it at the speaker from there. */
-export const defaultTail = (w: number, h: number) => ({ dx: 0, dy: Math.round(h * 0.61) });
+   and reaches 0.22h past the body: the original 0.37h overhang was longer
+   than a wide bubble was tall, 0.11h vanished under the tip handle on a
+   small one. The letterer aims it at the speaker from there. */
+export const defaultTail = (w: number, h: number) => ({ dx: 0, dy: Math.round(h * 0.72) });
 
 export function makeBalloon(kind: BalloonKind, x: number, y: number, w: number, h: number): BalloonEl {
   const caption = TAILLESS_KINDS.includes(kind);
