@@ -210,6 +210,9 @@ export function applyQuickStroke(ed: EditorCtx, color: string) {
   } else if (el.type === "text") {
     el.ts.outlineC = color;
     if (!el.ts.outlineW) el.ts.outlineW = Math.max(2, Math.round(el.ts.size * 0.08));
+  } else if (el.type === "action") {
+    /* Instaction strokes are ink — the toolbar's stroke colour is their colour */
+    el.color = color;
   }
   commit();
   setShowStroke(false);
