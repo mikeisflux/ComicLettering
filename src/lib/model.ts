@@ -279,10 +279,30 @@ export function normalizeRuns(runs: TextRun[]): TextRun[] | undefined {
    combining macrons. Never touches "I" inside other words (BIG, IT'S, …). */
 const CROSSBAR_GLYPH = "\uE000";
 const CROSSBAR_MARKS = "I\u0304\u0331";
+/* does THIS font, as loaded in this browser, actually have the glyph? A
+   bundled font should — but a browser that cached the pre-rebuild file
+   has no U+E000 and drew a missing-glyph box. Measured once per font:
+   a present glyph is wider than the box drawn for an unmapped PUA code. */
+const glyphOk = new Map<string, boolean>();
 const hasCrossbarGlyph = (font?: string) => {
   if (!font) return true;
-  const g = FONTS[font]?.group;
-  return !!g && g !== "My Fonts" && g !== "Site Fonts" && g !== "System";
+  const def = FONTS[font];
+  const g = def?.group;
+  if (!g || g === "My Fonts" || g === "Site Fonts" || g === "System") return false;
+  const known = glyphOk.get(font);
+  if (known !== undefined) return known;
+  if (typeof document === "undefined") return true;
+  try {
+    const c = document.createElement("canvas").getContext("2d");
+    if (!c) return true;
+    c.font = `40px ${def.css}`;
+    const ok = Math.abs(c.measureText("\uE000").width - c.measureText("\uE001").width) > 0.5;
+    /* a font still loading measures with the fallback face — do not
+       remember that answer */
+    if (typeof document.fonts?.check === "function" && !document.fonts.check(`40px ${def.css}`)) return ok;
+    glyphOk.set(font, ok);
+    return ok;
+  } catch { return true; }
 };
 export function applyCrossbarI(text: string, font?: string): string {
   return text.replace(/\bI(?=\b|['’])/g, hasCrossbarGlyph(font) ? CROSSBAR_GLYPH : CROSSBAR_MARKS);
