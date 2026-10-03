@@ -83,6 +83,14 @@ export function NumField({ value, min, max, step, disabled, width, title, classN
 }) {
   const [draft, setDraft] = useState<string | null>(null);
   const parse = (s: string) => (step && step !== Math.floor(step) ? parseFloat(s) : parseInt(s, 10));
+  /* the field keeps focus when another element is picked on the canvas
+     (the canvas swallows the focus change), so a draft typed for the LAST
+     selection stayed on screen over the new one's value. A value change
+     that is not the one being typed means the subject changed: show it. */
+  useEffect(() => {
+    if (draft !== null && parse(draft) !== value) setDraft(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
   /* Escape: the blur it triggers must not settle the draft — put the
      original value back (undoing any live preview) instead */
   const cancelRef = useRef(false);
