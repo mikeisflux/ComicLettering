@@ -1340,7 +1340,8 @@ export function makeText(x: number, y: number, w: number, h: number, sfx: boolea
     ...base(x, y, w, h), type: "text",
     text: sfx ? "POW!" : "Abc",
     ts: sfx
-      ? defaultTextStyle({ font: "bangers", size: 140, fillA: "#ffd21f", fillB: "#ff7a00", outlineC: "#111111", outlineW: 16, shadow: true })
+      /* 70px: 140 filled a third of the page with the placeholder alone */
+      ? defaultTextStyle({ font: "bangers", size: 70, fillA: "#ffd21f", fillB: "#ff7a00", outlineC: "#111111", outlineW: 8, shadow: true })
       : defaultTextStyle({ font: "lmccasual" }),
   };
 }
