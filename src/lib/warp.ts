@@ -64,11 +64,38 @@ export function warpBounds(w: Warp): { x0: number; y0: number; x1: number; y1: n
   return { x0, y0, x1, y1 };
 }
 
+/** How much the envelope MAGNIFIES the flat block at its most stretched
+    point (1 = never larger than the box). The flat raster is rendered this
+    many times larger, so a stretched cell still has at least one source
+    pixel per output pixel — sampling a box-sized raster through a warp
+    that doubled a word's width is what made warped SFX pixelate. */
+export function warpStretch(w: Warp): number {
+  let s = 1;
+  const G = 16;
+  for (let i = 0; i <= G; i++) {
+    for (let k = 0; k <= G; k++) {
+      const p = warpPoint(w, i / G, k / G);
+      if (i < G) { const q = warpPoint(w, (i + 1) / G, k / G); s = Math.max(s, Math.hypot(q[0] - p[0], q[1] - p[1]) * G); }
+      if (k < G) { const q = warpPoint(w, i / G, (k + 1) / G); s = Math.max(s, Math.hypot(q[0] - p[0], q[1] - p[1]) * G); }
+    }
+  }
+  return Number.isFinite(s) ? s : 1;
+}
+
+/** Mesh density for a block drawn `w`×`h` output pixels: about one cell per
+    12px, 20 at least, 64 at most — a wide SFX through 20 cells showed the
+    curve as a chain of straight pieces (the "distortion"). */
+export function warpCells(w: number, h: number): number {
+  return Math.max(20, Math.min(64, Math.ceil(Math.max(w, h) / 12)));
+}
+
 /** Draw `src` (which covers the unwarped box) through the warp. */
 export function drawWarped(
   ctx: CanvasRenderingContext2D, src: CanvasImageSource,
-  sw: number, sh: number, warp: Warp, w: number, h: number, N = 20,
+  sw: number, sh: number, warp: Warp, w: number, h: number, N = warpCells(w, h),
 ) {
+  ctx.imageSmoothingEnabled = true;
+  try { ctx.imageSmoothingQuality = "high"; } catch { /* older engines */ }
   const at = (i: number, k: number): Pt => {
     const p = warpPoint(warp, i / N, k / N);
     return [p[0] * w, p[1] * h];

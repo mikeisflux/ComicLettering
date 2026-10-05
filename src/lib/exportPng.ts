@@ -9,7 +9,7 @@ import { balloonGeom, arcTextLayout } from "./geometry";
 import { paintFill } from "./fills";
 import { BrushKey, brushScale, brushTile } from "./brushes";
 import { glowPasses } from "./glows";
-import { Warp, drawWarped, isWarped, warpBounds } from "./warp";
+import { Warp, drawWarped, isWarped, warpBounds, warpCells, warpStretch } from "./warp";
 import { canvasFilterSupported, pixelFilter } from "./canvasCompat";
 import { pageAdjustCanvas, pageAdjustLayers } from "./pageAdjust";
 
@@ -318,17 +318,21 @@ export function drawStyledText(
     /* size the scratch by the context's real scale (print dpi), or the
        warped block came out soft next to crisp plain lettering */
     const k = ctxScale(ctx);
+    /* oversample by the envelope's magnification (as the editor does) so
+       stretched letters stay sharp in print; capped by canvas limits */
+    const fs = Math.min(k * Math.min(4, warpStretch(env)), 8192 / Math.max(rw, rh));
     const sc = document.createElement("canvas");
-    sc.width = Math.max(1, Math.ceil(rw * k));
-    sc.height = Math.max(1, Math.ceil(rh * k));
+    sc.width = Math.max(1, Math.ceil(rw * fs));
+    sc.height = Math.max(1, Math.ceil(rh * fs));
     const sctx = sc.getContext("2d");
     if (sctx) {
-      sctx.scale(k, k);
+      sctx.scale(fs, fs);
       sctx.translate(-rx, -ry);
       drawStyledText(sctx, { ...ts, env: undefined }, text, rect, warp, runs);
       ctx.save();
       ctx.translate(rx, ry);
-      drawWarped(ctx, sc, sc.width, sc.height, env, rw, rh);
+      /* mesh density from the OUTPUT size in device pixels */
+      drawWarped(ctx, sc, sc.width, sc.height, env, rw, rh, warpCells(rw * k, rh * k));
       ctx.restore();
       return;
     }

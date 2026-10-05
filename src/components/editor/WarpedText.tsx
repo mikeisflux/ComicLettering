@@ -5,7 +5,7 @@
 import { useEffect, useRef } from "react";
 import { TextEl, TextStyle } from "@/lib/model";
 import { drawStyledText } from "@/lib/exportPng";
-import { Warp, drawWarped, warpBounds } from "@/lib/warp";
+import { Warp, drawWarped, warpBounds, warpStretch } from "@/lib/warp";
 
 export function WarpedText({ el, env, zoom }: { el: TextEl; env: Warp; zoom: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -32,11 +32,16 @@ export function WarpedText({ el, env, zoom }: { el: TextEl; env: Warp; zoom: num
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, cw, chh);
+    /* the flat block is rendered as many times larger as the envelope
+       magnifies it (capped by canvas memory), so stretched cells sample a
+       raster that is at least as fine as the pixels they fill */
+    const stretch = Math.min(4, warpStretch(env));
+    const fs = Math.min(dpr * stretch, 8192 / Math.max(w, h));
     const flat = document.createElement("canvas");
-    flat.width = Math.round(w * dpr); flat.height = Math.round(h * dpr);
+    flat.width = Math.max(1, Math.round(w * fs)); flat.height = Math.max(1, Math.round(h * fs));
     const fctx = flat.getContext("2d");
     if (!fctx) return;
-    fctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    fctx.setTransform(fs, 0, 0, fs, 0, 0);
     drawStyledText(fctx, { ...el.ts, env: undefined } as TextStyle, el.text,
       [0, 0, w, h], el.warp || 0, el.runs);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
