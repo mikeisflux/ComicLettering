@@ -548,11 +548,21 @@ export function growBalloonToFit(page: Page, el: BalloonEl, textOverride?: strin
     be a fixed slab of the page with the word floating in the middle of it. */
 export function sizeTextToContent(el: TextEl, pageW: number) {
   if (!el.text.trim()) return;
-  const m = measureBlock(el.ts, el.text, Math.max(el.ts.size * 2, pageW * 0.92));
   const padX = Math.round(el.ts.size * 0.18 + el.ts.outlineW * 1.2);
   const padY = Math.round(el.ts.size * 0.14 + el.ts.outlineW * 1.2);
+  /* wrap within the PAGE from where the box sits: a long paste used to
+     size the box to the words and run it off the right edge, which
+     widened the whole canvas (scrollbars appeared — "the document got
+     bigger"). Lettering never belongs past the page anyway. */
+  const room = pageW - Math.max(0, el.x) - padX * 2;
+  const maxW = Math.max(el.ts.size * 2, Math.min(pageW * 0.92, room));
+  const m = measureBlock(el.ts, el.text, maxW);
   el.w = Math.max(24, Math.round(m.w) + padX * 2);
   el.h = Math.max(20, Math.round(m.h) + padY * 2);
+  /* and keep the box on the page even if a single word is wider than
+     the room (it wraps mid-word in the renderer, the box must not hang) */
+  if (el.x + el.w > pageW) el.x = Math.max(0, Math.round(pageW - el.w));
+  if (el.x < 0) el.x = 0;
 }
 
 /* Legacy lettering migration — the sibling of normalizeDoc for TextEls.
