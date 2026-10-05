@@ -100,6 +100,12 @@ export function drawWarped(
     const p = warpPoint(warp, i / N, k / N);
     return [p[0] * w, p[1] * h];
   };
+  /* neighbouring cells overdraw each other by a hair so no background
+     leaks through the antialiased seam. The hair is measured in SOURCE
+     pixels — with an oversampled source (finer than the output) a fixed
+     0.6 shrank below one output pixel and the mesh showed as faint lines,
+     so it scales with source pixels per output pixel (always > 1 out px). */
+  const pad = 0.6 + Math.max(1, sw / Math.max(1, w), sh / Math.max(1, h)) * 0.9;
   for (let i = 0; i < N; i++) {
     for (let k = 0; k < N; k++) {
       const sx = (i / N) * sw, sy = (k / N) * sh, cw = sw / N, ch = sh / N;
@@ -114,8 +120,8 @@ export function drawWarped(
          instead — their content matches to sub-pixel accuracy at the seam, so
          the overlap is invisible and the grid is gone. */
       ctx.transform(ax, ay, bx, by, p00[0] - ax * sx - bx * sy, p00[1] - ay * sx - by * sy);
-      ctx.drawImage(src, sx - 0.6, sy - 0.6, cw + 1.2, ch + 1.2,
-        sx - 0.6, sy - 0.6, cw + 1.2, ch + 1.2);
+      ctx.drawImage(src, sx - pad, sy - pad, cw + pad * 2, ch + pad * 2,
+        sx - pad, sy - pad, cw + pad * 2, ch + pad * 2);
       ctx.restore();
     }
   }
