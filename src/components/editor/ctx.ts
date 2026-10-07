@@ -59,6 +59,9 @@ export interface EditorCtx {
   hIndexRef: React.RefObject<number>;
   pageIndexRef: React.RefObject<number>;
   pendingLockRef: React.RefObject<Set<string>>;
+  /* pull one page's artwork from the local store (the boot/page-change
+     loader) — opening a book must call it for the page it lands on */
+  loadPageArt: (pi: number) => Promise<void>;
   /* the scroll container and the on-screen page box — what is in VIEW
      (viewSpot.ts), so new elements land where the letterer is looking */
   areaRef: React.RefObject<HTMLDivElement | null>;

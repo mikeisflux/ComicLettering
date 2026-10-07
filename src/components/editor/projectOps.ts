@@ -56,6 +56,20 @@ async function confirmMissingArt(ed: EditorCtx): Promise<boolean> {
   return window.confirm(`${missing.length} image${missing.length > 1 ? "s" : ""} in this book ${missing.length > 1 ? "are" : "is"} not on this computer (they stay where they were imported). ${missing.length > 1 ? "Those frames" : "That frame"} will export blank — continue?`);
 }
 
+/* after a book is opened: its landing page's art (and the facing page's,
+   for spread view) from the local store, then a repaint */
+async function loadOpenedPageArt(ed: EditorCtx, pi: number) {
+  try {
+    await ed.loadPageArt(pi);
+    const d = ed.docRef.current;
+    const pn = pi + 1;
+    const fi = pn === 1 ? -1 : pn % 2 === 0 ? pi + 1 : pi - 1;
+    if (d && fi >= 0 && fi < d.pages.length) await ed.loadPageArt(fi);
+    ed.force();
+    ed.rebuildThumbs();
+  } catch { /* no art store — lettering still shows */ }
+}
+
 /* ---------------- project library (SQL) ---------------- */
 
 /* the library's HTTP failures as sentences a letterer can act on: an
@@ -220,6 +234,11 @@ export async function loadProject(ed: EditorCtx, id: string) {
     fitZoom(true);
     ed.rebuildThumbs(); // bumps the thumb generation → stale in-flight renders die
     setStatus(`Opened “${p.name}”.`);
+    /* the opened book's big page scans live in the LOCAL art store (too
+       large to upload). The page-change effect pulls them in, but opening
+       lands on page 1 — and when page 1 was already showing, no change
+       fires and the art stayed blank until the next page flip or reload. */
+    await loadOpenedPageArt(ed, 0);
   } catch (err) {
     setStatus("Load failed: " + String(err).slice(0, 120));
   }
@@ -401,6 +420,7 @@ export async function importJSON(ed: EditorCtx, f: File) {
     setSelId(null); setEditingId(null); setPageIndex(0); setThumbs({});
     autosave(); force(); fitZoom(true);
     ed.rebuildThumbs(); // bumps the thumb generation → stale in-flight renders die
+    await loadOpenedPageArt(ed, 0);
     setStatus("Project imported.");
   } catch (err) {
     window.alert("Could not open that file: " + (err as Error).message);

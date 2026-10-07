@@ -1219,7 +1219,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     setEditingId, finishEditing, mutateSel, startDrag, pagePoint, fitZoom, startTuck, startInstaction, startTrimUp, tracePurpose,
     selectAllOnPage, installApp, appInstalled, showInstallHelp, setShowInstallHelp,
     showAssocHelp, setShowAssocHelp, showShortcuts, setShowShortcuts, showBugReport, setShowBugReport, winHide, toggleWindow, showTab, setAskAddPage,
-    thumbOf, exportCancelRef, ensureCustomFont, areaRef, pageDivRef,
+    thumbOf, exportCancelRef, ensureCustomFont, areaRef, pageDivRef, loadPageArt,
     selIdsRef, editingIdRef, setSelIds,
     mutateText, mutateBalloon, mutateLettering, mutateArt, mutatePanel,
     tuckAsk, setTuckAsk, retuneTuck, runTuckAuto, applyTuck, tuckTool, setTuckTool,
