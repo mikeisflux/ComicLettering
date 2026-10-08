@@ -15,6 +15,16 @@ export interface LetterStyle {
   shadow: boolean;
   italic?: boolean;
   lower?: boolean;
+  /* the rest of the LOOK — present on styles saved from lettering, so a
+     saved style reproduces exactly what was on the page. Built-in presets
+     leave these undefined, which keeps the current value. */
+  bold?: boolean;
+  shadowC?: string;
+  glow?: string;      // "none" clears it
+  glowW?: number;
+  brush?: string;     // "none" clears it
+  trackingF?: number; // letter-spacing as a fraction of the size
+  lineHeight?: number;
 }
 
 export const LETTER_STYLES: LetterStyle[] = [
@@ -145,6 +155,13 @@ export function captureLetterStyle(ts: TextStyle, name: string): LetterStyle {
     shadow: ts.shadow,
     italic: ts.italic,
     lower: !ts.caps,
+    bold: ts.bold,
+    shadowC: ts.shadowC,
+    glow: ts.glow || "none",
+    glowW: ts.glowW ?? 1,
+    brush: ts.brush || "none",
+    trackingF: ts.size > 0 ? +((ts.tracking ?? 0) / ts.size).toFixed(4) : 0,
+    lineHeight: ts.lineHeight,
   };
 }
 
@@ -159,5 +176,11 @@ export function applyLetterStyle(ts: TextStyle, s: LetterStyle): TextStyle {
     shadow: s.shadow,
     italic: s.italic ?? ts.italic,
     caps: s.lower ? false : ts.caps,
+    ...(s.bold != null ? { bold: s.bold } : {}),
+    ...(s.shadowC ? { shadowC: s.shadowC } : {}),
+    ...(s.glow != null ? { glow: s.glow, glowW: s.glowW ?? ts.glowW } : {}),
+    ...(s.brush != null ? { brush: s.brush } : {}),
+    ...(s.trackingF != null ? { tracking: Math.round(ts.size * s.trackingF) } : {}),
+    ...(s.lineHeight != null ? { lineHeight: s.lineHeight } : {}),
   };
 }
