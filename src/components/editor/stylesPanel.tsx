@@ -36,8 +36,9 @@ function ShapeSwatch({ s, on, box, mine, onPick, onRemove }: {
       )}
       <span className={"shapeSw" + (box ? " box" : "") + (s.none ? " none" : "")}
         style={{ background: shapeCss(s), borderColor: s.stroke, borderWidth: Math.max(1, Math.round(s.strokeW / 1.6)) }}>
-        {/* a saved style carries its bubble's font — preview it live */}
-        <i style={{ color: s.ink ?? "#000000", fontFamily: s.font ? FONTS[s.font]?.css : undefined }}>ABC</i>
+        {/* a saved style carries its bubble's whole lettering look (glow,
+            brush, outline…) — preview it live; colourways show the ink */}
+        <i style={s.letter ? { ...letterStyleCss(s.letter, 13), display: "inline-block" } : { color: s.ink ?? "#000000", fontFamily: s.font ? FONTS[s.font]?.css : undefined }}>ABC</i>
       </span>
     </button>
   );

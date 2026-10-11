@@ -2,6 +2,7 @@
    a word balloon or a caption box is selected. Lettering keeps its own list
    in presets.ts; these describe the SHAPE's fill, outline and ink colour. */
 import { BalloonEl, FillStyle } from "./model";
+import { LetterStyle, applyLetterStyle, captureLetterStyle } from "./presets";
 
 export interface ShapeStyle {
   name: string;
@@ -17,6 +18,11 @@ export interface ShapeStyle {
   font?: string;
   /** transparent body: no fill drawn at all */
   none?: boolean;
+  /** the WHOLE lettering look — glow, brush, outline, shadow, bold, tracking,
+      leading — saved user styles carry it so "Save Style" on a balloon
+      reproduces exactly what was on the page; built-in colourways leave it
+      out and only set the ink colour */
+  letter?: LetterStyle;
 }
 
 export function shapeFill(s: ShapeStyle): FillStyle {
@@ -51,6 +57,8 @@ export function captureShapeStyle(el: BalloonEl, name: string): ShapeStyle {
     /* the bubble's lettering font travels with the saved style */
     font: el.ts?.font,
     none: f.kind === "solid" && (f.a === "transparent" || f.a === "none"),
+    /* …and so does everything else about its lettering (glow included) */
+    letter: el.ts ? captureLetterStyle(el.ts, name) : undefined,
   };
 }
 
@@ -58,6 +66,12 @@ export function applyShapeStyle(el: BalloonEl, s: ShapeStyle) {
   el.fill = shapeFill(s);
   el.stroke = s.stroke;
   el.strokeW = s.strokeW;
+  if (s.letter) {
+    /* a saved style: the complete lettering look, scaled to this balloon's
+       type size (outline and tracking are fractions of the size) */
+    el.ts = applyLetterStyle(el.ts, s.letter);
+    return;
+  }
   el.ts = {
     ...el.ts,
     fillA: s.ink ?? "#000000", fillB: null, outlineW: 0, shadow: false,
