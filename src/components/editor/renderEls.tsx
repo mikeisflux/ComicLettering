@@ -12,6 +12,8 @@ import { displayText, editingCss, measureBlock, measureCharWidths, onLetteringPa
 import { BalloonShape, JoinBandShape, MergeBaseInfo } from "./BalloonShape";
 import { EditorCtx } from "./ctx";
 import { WarpedText } from "./WarpedText";
+import { RasterText } from "./RasterText";
+import { glowByKey } from "@/lib/glows";
 import { FLAT, Warp, isWarped, warpBounds, warpPoint } from "@/lib/warp";
 import {
   TrimRect, balloonCrossesSpine, balloonCrossesTrim, elCrossesSpine, spreadNeighbor,
@@ -410,6 +412,7 @@ export function renderEl(ed: EditorCtx, el: El) {
     const g = balloonGeom(bEl);
     const [tx, ty, tw, th] = g.textRect;
     const editing = editingId === el.id;
+    const bolt = !!glowByKey(el.ts.glow).bolt;
     /* joined group: fills span the whole group so styles flow across the join */
     const jg = joinGroupRect(page!, el);
     const joinRect = jg ? { x: jg.x - el.x, y: jg.y - el.y, w: jg.w, h: jg.h } : null;
@@ -426,7 +429,10 @@ export function renderEl(ed: EditorCtx, el: El) {
           onBlur={() => editing && !clipboardReadInFlight() && finishEditing()}
           onInput={editing ? (e) => onLetteringInput(ed, el.id, e.currentTarget) : undefined}
           onPaste={editing ? onLetteringPaste : undefined}
-        >{editing ? null : el.runs ? renderRuns(el.runs, el.ts) : displayText(el.text, el.ts, false)}</div>
+        >{editing || bolt ? null : el.runs ? renderRuns(el.runs, el.ts) : displayText(el.text, el.ts, false)}</div>
+        {/* a Lightning glow is drawn from the letters' mask — through the
+            exporter's own routine, so the screen matches the print */}
+        {!editing && bolt && <RasterText ts={el.ts} text={el.text} runs={el.runs} rect={[tx, ty, tw, th]} warp={0} zoom={zoom} />}
         {!editing && textOverflows(el.ts, el.text, tw, th) && (
           /* chrome, not artwork: counter-scale so it stays legible at any zoom */
           <div className="ovfBadge" style={{ transform: `translateX(-50%) scale(${1 / zoom})` }}
@@ -467,6 +473,15 @@ export function renderEl(ed: EditorCtx, el: El) {
     return (
       <div {...common} className="el text warped" style={wStyle}>
         <WarpedText el={el} env={env} zoom={zoom} />
+      </div>
+    );
+  }
+  if (!editing && glowByKey(el.ts.glow).bolt) {
+    /* Lightning: the bolts grow from the letters' alpha mask, which CSS
+       cannot do — render through the exporter's routine (arc warp included) */
+    return (
+      <div {...common} className="el text" style={style}>
+        <RasterText ts={el.ts} text={el.text} runs={el.runs} rect={[0, 0, el.w, el.h]} warp={el.warp ?? 0} zoom={zoom} />
       </div>
     );
   }

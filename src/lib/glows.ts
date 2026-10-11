@@ -15,12 +15,18 @@ export interface Glow {
   ramp: string[];
   /** spread as a fraction of the type size */
   spread: number;
+  /** lightning: forked filaments crackle off the letter edges in this
+      colour (the ramp's last stop is their hot core) — see lightning.ts */
+  bolt?: string;
 }
 
 export const GLOWS: Glow[] = [
   { k: "none",    label: "No glow",    ramp: [], spread: 0 },
   { k: "hotpink", label: "Hot Pink",   ramp: ["#8a0046", "#e00c7a", "#ff8ad0"], spread: 0.30 },
   { k: "electric",label: "Electric",   ramp: ["#00307a", "#0d7cff", "#a8f0ff"], spread: 0.30 },
+  /* the purple runs from deep violet through the base purple up to white
+     at the hot edge; the bolts carry the same purple with white cores */
+  { k: "lightning", label: "Lightning ⚡", ramp: ["#6a08b8", "#b20af5", "#ffffff"], spread: 0.15, bolt: "#b20af5" },
   { k: "radio",   label: "Radioactive",ramp: ["#1f5c00", "#7fd400", "#f4ff8a"], spread: 0.32 },
   { k: "inferno", label: "Inferno",    ramp: ["#7a0b00", "#ff5a00", "#ffe14d"], spread: 0.30 },
   { k: "violet",  label: "Arcane",     ramp: ["#33006b", "#8a2be2", "#e6c8ff"], spread: 0.30 },

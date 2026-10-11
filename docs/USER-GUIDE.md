@@ -89,7 +89,7 @@ Lettering warps two ways: arc/bend controls in the format bar, and the envelope 
 
 ### Fills, outlines, glows
 
-Letters take solid colours, two-colour and multi-stop gradients, textures and halftones; outlines have their own width and colour; brush edges and glows finish the look. Nearly 100 ready lettering styles apply from the Styles panel.
+Letters take solid colours, two-colour and multi-stop gradients, textures and halftones; outlines have their own width and colour; brush edges and glows finish the look — the Lightning glow adds forked purple bolts crackling off the letter edges, and Soft/Normal/Strong/Blazing sets how far they reach. Nearly 100 ready lettering styles apply from the Styles panel.
 
 ### Stamps
 

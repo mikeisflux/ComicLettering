@@ -8,7 +8,8 @@ import {
 import { balloonGeom, arcTextLayout } from "./geometry";
 import { paintFill } from "./fills";
 import { BrushKey, brushScale, brushTile } from "./brushes";
-import { glowPasses } from "./glows";
+import { glowByKey, glowPasses } from "./glows";
+import { boltReach, boltSeed, drawBolts } from "./lightning";
 import { Warp, drawWarped, isWarped, warpBounds, warpCells, warpStretch } from "./warp";
 import { canvasFilterSupported, pixelFilter } from "./canvasCompat";
 import { pageAdjustCanvas, pageAdjustLayers } from "./pageAdjust";
@@ -344,7 +345,9 @@ export function drawStyledText(
     if (tile || glow.length) {
       const [rx, ry, rw, rh] = rect;
       const glowPad = glow.length ? Math.ceil(Math.max(...glow.map((g) => g.blur)) * 2.4) : 0;
-      const pad = Math.ceil(ts.size * 0.8 + ts.outlineW * 2) + glowPad;
+      const bolt = glow.length ? glowByKey(ts.glow).bolt : undefined;
+      const boltPad = bolt ? Math.ceil(ts.size * boltReach(ts.glowW ?? 1) * 1.1) : 0;
+      const pad = Math.ceil(ts.size * 0.8 + ts.outlineW * 2) + Math.max(glowPad, boltPad);
       const w = Math.max(1, Math.ceil(rw) + pad * 2), h = Math.max(1, Math.ceil(rh) + pad * 2);
       /* scratch at the context's real scale — see the envelope branch */
       const k = ctxScale(ctx);
@@ -380,6 +383,8 @@ export function drawStyledText(
           ctx.drawImage(sc, rx - pad, ry - pad, w, h);
           ctx.restore();
         }
+        /* lightning crackles between the halo and the ink */
+        if (bolt) drawBolts(ctx, sc, rx - pad, ry - pad, k, ts.size, ts.glowW ?? 1, boltSeed(text, ts.size), glowByKey(ts.glow));
         ctx.drawImage(sc, rx - pad, ry - pad, w, h);
         return;
       }

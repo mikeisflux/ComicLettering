@@ -94,7 +94,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
       { h: "Warping" },
       { p: "Lettering warps two ways: arc/bend controls in the format bar, and the envelope warp tool — red dots on the corners and edges that you pull to reshape the word like taffy. Both work identically on the spread canvas, rotated or not." },
       { h: "Fills, outlines, glows" },
-      { p: "Letters take solid colours, two-colour and multi-stop gradients, textures and halftones; outlines have their own width and colour; brush edges and glows finish the look. Nearly 100 ready lettering styles apply from the Styles panel." },
+      { p: "Letters take solid colours, two-colour and multi-stop gradients, textures and halftones; outlines have their own width and colour; brush edges and glows finish the look — the Lightning glow adds forked purple bolts crackling off the letter edges, and Soft/Normal/Strong/Blazing sets how far they reach. Nearly 100 ready lettering styles apply from the Styles panel." },
       { h: "Stamps" },
       { p: "Insert → Stamps… opens a searchable library of ready SFX word art; Import Custom Stamps… adds your own PNGs. A stamp follows the LETTERING rules at the bleed line — right-click an imported image → Clip At Bleed (Stamp) marks it as one." },
     ],
