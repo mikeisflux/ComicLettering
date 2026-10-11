@@ -40,6 +40,10 @@ regenerating when the manifest changes).
   auto-detect) and the traced art is cut out and placed in front of the
   lettering, balloon or text box: clipping masks with zero Photoshop. Works
   across the spread spine.
+- **Instaction** — lasso any object and action lines burst out around it
+  (Burst or manga Focus, tunable count/length/weight/jitter/ink); Trim Up
+  loops away unwanted strokes. Generated from the outline, so it prints
+  crisp at any DPI.
 - **Pages** — panel-layout library by era/style plus **custom saved layouts**
   and **Draw Your Own Panel** (pen tool with curved anchors, rect/oval/circle
   marquees), auto panel detection from page art, two-page spread view and
@@ -57,10 +61,16 @@ regenerating when the manifest changes).
   right-click menu, pinned control strip.
 - **Collaboration** — shared books, pinned comments and review passes
   (editors mark up read-only; the letterer saves).
-- **Import/export** — comic-script import that auto-builds balloons; export
-  to PNG/JPG/TIFF/PDF/CBZ up to 450 dpi with bleed/crop marks, page ranges,
+- **Import/export** — comic-script import that auto-builds balloons;
+  **Import Art Pages** (a folder of numbered scans → the whole book, fitted
+  edge to edge); **Export/Import Lettering & Styles** (a `.lmc` with no page
+  art that merges back onto any book) and **Clear Art**; export to
+  PNG/JPG/TIFF/PDF/CBZ up to 450 dpi with bleed/crop marks, page ranges,
   transparent lettering-only overlays; `.lmc` project files that open with
   the installed apps by double-click.
+- **Bug reports** — Help → Report a bug… attaches the build, app form,
+  device, document stats, the app's own error log and (optionally) a page
+  render; the Sentinel console in `/admin` triages them.
 - **Bleed discipline** — balloons, text and stamps hard-clip at the trim and
   continue across the spine on the facing page; only page art may live in the
   bleed. The DOM editor and the canvas/PDF exporter share geometry, so what

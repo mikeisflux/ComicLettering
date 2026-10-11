@@ -17,6 +17,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "getting-started",
     title: "Getting started",
     blocks: [
+      { p: "Found something broken? Help → Report a bug… sends your description with the app version, which form of the app you are in, device and document stats, the app's own error log and, if you allow it, a picture of the page — all listed on the form before you send. Outside the studio, use Report a bug in the site footer." },
       { p: "Create an account and the full studio opens at lettermycomic.com/app. Demo mode lets you try every tool; a subscription unlocks saving to your library, printing and print-ready export." },
       { p: "Your work saves itself: every change autosaves to the browser, and Save (Ctrl+S) writes the project to your online library so it follows you across devices. File → Save As… writes a real .lmc project file to disk, desktop-app style — double-clicking an .lmc file opens it straight into the studio once LetterMyComic is installed as an app." },
       { ul: [

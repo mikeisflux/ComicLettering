@@ -23,7 +23,7 @@ archiving (the GitHub Actions `ios.yml` build picks it up from the project).
 ## Promotional text (170 chars max)
 
     Word balloons that behave like ink, 150+ comic fonts, SFX warps, Tuck
-    Back, and print-ready export — pen-first comic lettering on iPad.
+    Back, Instaction, and print-ready export — pen-first lettering on iPad.
 
 ## Description
 

@@ -443,7 +443,10 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
       ((s as BalloonEl).attachTo ||
         page?.els.some((e) => e.type === "balloon" && (e as BalloonEl).attachTo === s.id)));
     const next = pickTip({
-      selType: s ? (s.type as "balloon" | "text" | "panel" | "image") : null,
+      selType: s ? (s.type as "balloon" | "text" | "panel" | "image" | "action") : null,
+      artCount: page ? page.els.filter((e) => e.type === "image" && !e.stamp && !e.cut).length : 0,
+      lockedArt: !!page?.els.some((e) => e.type === "image" && !e.stamp && !e.cut && e.locked),
+      pageCount: docRef.current?.pages.length ?? 0,
       selHasTail: !!(s && s.type === "balloon" && (s as BalloonEl).tail),
       selJoined: joined,
       selIsSfx: !!(s && s.type === "text" && s.ts.outlineW >= 4),

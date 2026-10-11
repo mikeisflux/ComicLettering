@@ -14,6 +14,7 @@ const GROUPS: { h: string; items: [string, string][] }[] = [
     items: [
       ["Draw your own balloons", "Sketch a balloon by hand and it auto-smooths into a clean, closed shape — rounding your line into the most balanced bubble it can while keeping your composition."],
       ["Pick your tail", "Draw a tail and it's used automatically, or pick speech, thought or none from a popup. Tails start full-width where they meet the balloon, just like a pro letterer draws them."],
+      ["Bend and tilt any tail", "Every tail has a bend dot that curves it, and a double-click reveals a tilt axis that leans the curve — on speech, thought, exclaim, rough, square, pill and hand-drawn balloons alike."],
       ["Join balloons together", "Add a linked bubble with one button. Drag two balloons close and they merge into a single shape with a smooth connector band; drag apart and they split again — the joined bubble inherits the first one's style."],
       ["Three-point connector control", "The band joining two balloons has a middle handle for position and side handles for tilt, so you can bend and angle the join around the shape exactly how you want it."],
       ["Every classic type too", "Speech, rough, buzz, radio, thought, exclaim, whisper, square, TV, pill, rounded box and caption — any fill, outline weight, dashed strokes and shadows."],
@@ -28,7 +29,7 @@ const GROUPS: { h: string; items: [string, string][] }[] = [
       ["Balance the rag", "Auto-rebalance line breaks so every line in a balloon is close to the same length. Even 'rag' is the detail that reads as professional lettering."],
       ["Line spacing & tracking", "Dial in leading (line height) and letter tracking right from the format bar — the tight, even spacing that separates pro lettering from default type."],
       ["Rotate anything", "Rotate balloons, SFX and artwork clockwise or counter-clockwise in 90° or 15° steps, or reset to level in one click."],
-      ["Format painter & presets", "Copy a style off one balloon and paint it onto others, or save a balloon look as a named preset you reuse across every project."],
+      ["Format painter & presets", "Copy a style off one balloon and paint it onto others, or save a balloon look as a named preset you reuse across every project. Saved lettering styles keep the whole look — glow, brush, shadow colour, tracking and leading included."],
       ["Find & replace", "Fix a name or a typo across every page and every balloon at once, with optional case matching. Locked items stay untouched."],
     ],
   },
@@ -37,6 +38,7 @@ const GROUPS: { h: string; items: [string, string][] }[] = [
     items: [
       ["Warp your SFX", "Bend sound-effect lettering along an arc — curve KABOOM up into a shockwave or dip it down — with a live, WYSIWYG preview that exports exactly as you see it."],
       ["Tuck Back", "Drag a region over your artwork and the app cuts out its foreground and places it in front of your lettering — a magic-wand version of the letterer's traced mask, with a strength slider and live preview."],
+      ["Instaction", "Lasso any object and hand-inked action lines burst out around it: Burst wedges radiating from the outline or manga-style Focus lines running in from the edges, with count, length, weight, jitter and ink colour — and Trim Up to loop away the strokes you don't want."],
       ["Import your script", "Paste a comic script — CHARACTER: dialogue, CAPTION:, SFX:, parentheticals — and get speech, thought, whisper and caption balloons laid out on the page automatically."],
       ["Two-page spread view", "See facing pages side by side with correct left/right pairing, so your lettering reads right across the gutter."],
       ["Print-ready proofing", "Toggle a safe-area guide and add printer crop marks with a bleed margin on PDF export — everything a printer needs to trim your book."],
@@ -70,6 +72,8 @@ const GROUPS: { h: string; items: [string, string][] }[] = [
     h: "Artwork & Export",
     items: [
       ["Drop-in artwork", "Drag images straight onto the page or double-click a panel to fill it — PNG, JPG, WebP, GIF, AVIF, BMP, SVG, TIFF or PDF. Print-res TIFFs convert automatically on drop. Images resize proportionally and snap to the border for a perfect fit."],
+      ["Import a whole book of art", "Import Art Pages takes every page scan at once: the number in each file name decides its page, pages are added to hold them, and each picture is fitted edge to edge and centred — behind any lettering already there."],
+      ["Lettering travels without the art", "Export Lettering & Styles writes a small project file with no page art — balloons, captions, stamps, cutouts and saved styles — that merges back onto any book, page for page. Clear Art strips the scans from a lettered book so it can be re-used on new pages."],
       ["Lettering-only export", "Export just your balloons and text as a transparent PNG — drop your lettering straight onto artwork in any other tool."],
       ["Print-ready formats", "Full-resolution PNG, JPG, print TIFF, PDF and CBZ, at up to 450 dpi — plus a cloud project library, JSON backups and autosave."],
     ],

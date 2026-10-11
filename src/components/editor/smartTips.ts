@@ -6,7 +6,12 @@
 export interface SmartTip { id: string; title: string; text: string }
 
 export interface TipContext {
-  selType: "balloon" | "text" | "panel" | "image" | null;
+  selType: "balloon" | "text" | "panel" | "image" | "action" | null;
+  /* page art on the page — and whether some of it is locked (a finished
+     book, about to be re-lettered or sent on) */
+  artCount: number;
+  lockedArt: boolean;
+  pageCount: number;
   selHasTail: boolean;
   selJoined: boolean;       // selected balloon is part of a joined pair
   selIsSfx: boolean;        // text element styled as display lettering
@@ -21,9 +26,33 @@ const TIPS: { tip: SmartTip; when: (c: TipContext) => boolean }[] = [
     tip: {
       id: "tail-aim",
       title: "Aim the tail at the head",
-      text: "A tail points at the speaker's head — never the shoulder or feet — and should look like it grows from the balloon's centre. Drag the orange dot to aim it.",
+      text: "A tail points at the speaker's head — never the shoulder or feet — and should look like it grows from the balloon's centre. Drag the orange dot to aim it; the red dot bends the tail, and double-clicking it shows a tilt axis.",
     },
     when: (c) => c.selType === "balloon" && c.selHasTail && !c.editing,
+  },
+  {
+    tip: {
+      id: "instaction",
+      title: "Tune the burst",
+      text: "Action lines come from the outline you drew. In the Inspector pick Burst (out from the object) or Focus (in from the edges), set the count, length and weight, and Shuffle for a fresh hand. Trim Up loops away the strokes you don't want — a burst rarely needs to go all the way round.",
+    },
+    when: (c) => c.selType === "action",
+  },
+  {
+    tip: {
+      id: "import-art-pages",
+      title: "A whole book of art in one go",
+      text: "File → Import Art Pages… takes every page scan at once: the number in each file name (page03, 07, 012) decides its page, pages are added as needed, and each picture is fitted edge to edge and centred.",
+    },
+    when: (c) => c.pageCount >= 2 && c.artCount === 0,
+  },
+  {
+    tip: {
+      id: "lettering-only",
+      title: "Send the lettering, keep the art",
+      text: "File → Export Lettering & Styles… writes a small .lmc with no page art — every balloon, caption, stamp, cutout and saved style. Import Lettering & Styles… merges one back onto any book, and Edit → Clear Art… strips the art so a lettered book can be re-used on new pages.",
+    },
+    when: (c) => c.lockedArt && c.balloonCount >= 2,
   },
   {
     tip: {

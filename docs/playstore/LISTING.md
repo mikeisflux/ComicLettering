@@ -43,9 +43,14 @@ also work as extra phone/tablet screenshots on Play — mix in as many as you li
     • Arc and envelope warping, gradient and texture fills, brush edges, glows
     • Tuck Back slips sound effects behind the artwork — its magnetic tracer
       snaps to the art's own edges
+    • Instaction: lasso any object and action lines burst out around it
 
     FROM SCRIPT TO PRINTER
     • Import a whole comic script and break it into balloons automatically
+    • Import a folder of page scans at once — numbered files land on their
+      pages, fitted edge to edge
+    • Send the lettering without the art: a small project file of balloons,
+      captions and styles that merges back onto any copy of the book
     • Real comic page sizes with bleed and safe-area guides at print resolution
     • Auto panel detection reads your drawn pages and lays panel frames over
       the gutters it finds
