@@ -84,6 +84,8 @@ export interface EditorCtx {
   fileOpenRef: React.RefObject<HTMLInputElement | null>;
   /* Insert → Import Art Pages… (a folder of numbered page scans) */
   fileArtPagesRef: React.RefObject<HTMLInputElement | null>;
+  /* File → Import Lettering & Styles… (merge a lettering-only .lmc) */
+  fileLetteringRef: React.RefObject<HTMLInputElement | null>;
   fileFontRef: React.RefObject<HTMLInputElement | null>;
   fileStampRef: React.RefObject<HTMLInputElement | null>;
 

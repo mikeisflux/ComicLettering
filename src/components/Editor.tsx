@@ -1121,6 +1121,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   const filePanelImageRef = useRef<HTMLInputElement>(null);
   const fileOpenRef = useRef<HTMLInputElement>(null);
   const fileArtPagesRef = useRef<HTMLInputElement>(null);
+  const fileLetteringRef = useRef<HTMLInputElement>(null);
   const fileFontRef = useRef<HTMLInputElement>(null);
   const fileStampRef = useRef<HTMLInputElement>(null);
   /* custom fonts & stamps — see useFontsStamps */
@@ -1214,7 +1215,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
     demo, doc, page, selId, selIds, selEl, selEls, editingId, zoom, status, pageIndex,
     docRef, assetsRef, histRef, hIndexRef, pageIndexRef, pendingLockRef,
     panelImageTarget, aidRef, activeStyleRef, styleClipRef, selRangeRef, clipboardRef,
-    customFontIdsRef, fileImageRef, filePanelImageRef, fileOpenRef, fileArtPagesRef,
+    customFontIdsRef, fileImageRef, filePanelImageRef, fileOpenRef, fileArtPagesRef, fileLetteringRef,
     fileFontRef, fileStampRef,
     force, commit, autosave, undo, redo, setStatus, select, setSelId,
     setEditingId, finishEditing, mutateSel, startDrag, pagePoint, fitZoom, startTuck, startInstaction, startTrimUp, tracePurpose,

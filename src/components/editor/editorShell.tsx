@@ -36,6 +36,7 @@ import {
   nextAid, normalizeArtFile, onDrop, readAsDataURL,
 } from "./ops";
 import { importArtPages } from "./artPages";
+import { importLettering } from "./letteringIO";
 
 /* Editor-local state and refs the shell needs but the shared ctx doesn't
    carry (they are render-plumbing, not editing surface). */
@@ -527,11 +528,17 @@ export function renderCanvasArea(ed: EditorCtx, sh: ShellProps) {
 
 export function renderHiddenInputs(ed: EditorCtx) {
   const {
-    fileImageRef, filePanelImageRef, fileFontRef, fileStampRef, fileOpenRef, fileArtPagesRef,
+    fileImageRef, filePanelImageRef, fileFontRef, fileStampRef, fileOpenRef, fileArtPagesRef, fileLetteringRef,
     panelImageTarget, assetsRef, setStatus,
   } = ed;
   return (
     <>
+      <input ref={fileLetteringRef} type="file" accept=".lmc,.json,application/x-lettermycomic,application/json" hidden
+        onChange={async (e) => {
+          const f = e.target.files?.[0];
+          e.target.value = "";
+          if (f) await importLettering(ed, f);
+        }} />
       <input ref={fileArtPagesRef} type="file" accept={ART_ACCEPT.replace(/,?application\/pdf|,?\.pdf/g, "")} multiple hidden
         onChange={async (e) => {
           const files = Array.from(e.target.files || []);

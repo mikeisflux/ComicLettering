@@ -17,6 +17,7 @@ import {
   copySel, copyStyle, cutSel, deleteCustomFont, deleteSel, duplicatePage,
   duplicateSel, exportJSON, fitBalloonToText, pasteClip, pasteStyle,
   printPage, reorder, rotateSel, runInstantAlpha, runProof, saveProject, toggleSelEmphasis, setLocked } from "./ops";
+import { clearArt, exportLettering } from "./letteringIO";
 import { detectPanelsFromArt } from "./panelOps";
 import { newDocument } from "./projectOps";
 
@@ -81,6 +82,10 @@ export function renderMenuBar(ed: EditorCtx) {
         ["Save a Copy to Library…", () => saveProject(ed, true)],
         ["Open Project File…", () => fileOpenRef.current?.click()],
         ["Import Art Pages…", () => ed.fileArtPagesRef.current?.click()],
+        ["—", null],
+        ["Export Lettering & Styles… (.lmc, no art)", () => { void exportLettering(ed); }],
+        ["Import Lettering & Styles…", () => ed.fileLetteringRef.current?.click()],
+        ["—", null],
         ["Share & Review…", () => ed.setShowTeam(true)],
         ["Install as App…", () => ed.installApp()],
         ["—", null],
@@ -97,6 +102,8 @@ export function renderMenuBar(ed: EditorCtx) {
         ["Paste", () => ed.editingId ? clipboardText(ed, "paste") : pasteClip(ed)],
         ["Duplicate", () => duplicateSel(ed)],
         ["Delete", () => deleteSel(ed)],
+        ["—", null],
+        ["Clear Art…", () => clearArt(ed)],
         ["—", null],
         ["Copy Style", () => copyStyle(ed)],
         ["Paste Style to Selection", () => pasteStyle(ed)],

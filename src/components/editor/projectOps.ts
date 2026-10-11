@@ -287,7 +287,7 @@ async function storeInlineAssets(assets: Assets) {
   }
 }
 
-const extFor = (type: string) =>
+export const extFor = (type: string) =>
   type === "image/png" ? "png" : type === "image/jpeg" ? "jpg" : type === "image/webp" ? "webp"
     : type === "image/gif" ? "gif" : type === "image/svg+xml" ? "svg" : type === "image/avif" ? "avif" : "bin";
 
@@ -297,6 +297,36 @@ const extFor = (type: string) =>
    of full-size scans never has to fit in JavaScript memory — the old
    single-JSON format base64'd every scan into one giant string, which sank
    the tab on save and could not be re-opened at all past ~400 MB. */
+/* a Blob to disk the way a desktop app does it: the browser's real save
+   dialog where there is one (Chromium's File System Access API), a
+   download elsewhere */
+export async function downloadBlob(blob: Blob, name: string): Promise<"saved" | "downloaded" | "cancelled"> {
+  const picker = (window as unknown as {
+    showSaveFilePicker?: (opts: unknown) => Promise<{ createWritable: () => Promise<{ write: (b: Blob) => Promise<void>; close: () => Promise<void> }> }>;
+  }).showSaveFilePicker;
+  if (picker) {
+    try {
+      const handle = await picker({
+        suggestedName: name,
+        types: [{ description: "LetterMyComic Project", accept: { "application/x-lettermycomic": [".lmc"] } }],
+      });
+      const w = await handle.createWritable();
+      await w.write(blob);
+      await w.close();
+      return "saved";
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return "cancelled";
+      /* picker unavailable/blocked — fall through to the download path */
+    }
+  }
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  return "downloaded";
+}
+
 export async function exportJSON(ed: EditorCtx) {
   const { demo, setStatus, docRef, assetsRef, current } = ed;
   if (demo) { setStatus(demoLock("Saving project files is off in the demo — subscribe to unlock.", "Saving project files")); return; }
@@ -333,31 +363,9 @@ export async function exportJSON(ed: EditorCtx) {
   const name = (current?.name || "comic-project") + ".lmc";
   const doneMsg = (where: string) =>
     `Saved “${name}”${where} — artwork included (${fmtBytes(blob.size)}${skipped ? `, ${skipped} image${skipped > 1 ? "s" : ""} unreadable and skipped` : ""}).`;
-  const picker = (window as unknown as {
-    showSaveFilePicker?: (opts: unknown) => Promise<{ createWritable: () => Promise<{ write: (b: Blob) => Promise<void>; close: () => Promise<void> }> }>;
-  }).showSaveFilePicker;
-  if (picker) {
-    try {
-      const handle = await picker({
-        suggestedName: name,
-        types: [{ description: "LetterMyComic Project", accept: { "application/x-lettermycomic": [".lmc"] } }],
-      });
-      const w = await handle.createWritable();
-      await w.write(blob);
-      await w.close();
-      setStatus(doneMsg(""));
-      return;
-    } catch (err) {
-      if ((err as Error).name === "AbortError") return;   // user cancelled
-      /* picker unavailable/blocked — fall through to the download path */
-    }
-  }
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = name;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-  setStatus(doneMsg(" to your downloads"));
+  const how = await downloadBlob(blob, name);
+  if (how === "cancelled") return;
+  setStatus(doneMsg(how === "saved" ? "" : " to your downloads"));
 }
 
 export async function importJSON(ed: EditorCtx, f: File) {
