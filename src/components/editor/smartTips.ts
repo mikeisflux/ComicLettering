@@ -34,7 +34,7 @@ const TIPS: { tip: SmartTip; when: (c: TipContext) => boolean }[] = [
     tip: {
       id: "instaction",
       title: "Tune the burst",
-      text: "Action lines come from the outline you drew. In the Inspector pick Burst (out from the object) or Focus (in from the edges), set the count, length and weight, and Shuffle for a fresh hand. Trim Up loops away the strokes you don't want — a burst rarely needs to go all the way round.",
+      text: "Action lines come from the outline you drew. Press and hold the toolbar's Instaction button (or open the Inspector) for the controls: Burst or Focus, count, length, weight, spread and direction for a fan, and Shuffle for a fresh hand. Trim Up loops away strokes you don't want.",
     },
     when: (c) => c.selType === "action",
   },

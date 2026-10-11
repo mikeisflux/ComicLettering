@@ -2,7 +2,7 @@
    Plain exported render functions taking the EditorCtx bag. */
 import { demoLock } from "@/lib/storeMode";
 import {
-  BalloonEl, COLOR_PALETTE, DEFAULT_TEXT_SIZE, FONTS, GRADIENT_PRESETS,
+  ActionEl, BalloonEl, COLOR_PALETTE, DEFAULT_TEXT_SIZE, FONTS, GRADIENT_PRESETS,
   MULTI_GRADIENTS, TextEl, clamp,
 } from "@/lib/model";
 import { fillCss } from "@/lib/fills";
@@ -17,6 +17,7 @@ import {
   copySel, copyStyle, cutSel, deleteCustomFont, deleteSel, duplicatePage,
   duplicateSel, exportJSON, fitBalloonToText, pasteClip, pasteStyle,
   printPage, reorder, rotateSel, runInstantAlpha, runProof, saveProject, toggleSelEmphasis, setLocked } from "./ops";
+import { ActionControls } from "./ActionControls";
 import { clearArt, exportLettering } from "./letteringIO";
 import { detectPanelsFromArt } from "./panelOps";
 import { newDocument } from "./projectOps";
@@ -280,8 +281,7 @@ export function renderToolbar(ed: EditorCtx) {
       disabled={!selEl || (selEl.type !== "image" && selEl.type !== "panel") || !selEl.img}
       onClick={() => { if (selEl && (selEl.type === "image" || selEl.type === "panel") && selEl.img) runInstantAlpha(ed, selEl.id, selEl.img); }} />
     {renderTuckBtn(ed)}
-    <ToolBtn label="Instaction" icon="✺" accent onClick={() => ed.startInstaction()}
-      title="Instaction — draw around any object and action lines burst out around it. Uses the same magnetic lasso or pen as Tuck Back; tune the lines in the Inspector afterwards." />
+    {renderActionBtn(ed)}
     <ToolBtn label="Trim Up" icon="✂" accent onClick={() => ed.startTrimUp()}
       title="Trim Up — with action lines selected, loop the strokes you don't want and they're removed. Loop again for more; Esc when done." />
     <ToolBtn label="Note" icon="📌"
@@ -298,6 +298,65 @@ export function renderToolbar(ed: EditorCtx) {
     <div className="tbSpacer" />
     <div className="tbHint">Runs entirely in your browser — nothing is uploaded.</div>
   </header>
+  );
+}
+
+/* ---------------- Instaction button with a controls flyout ---------------- */
+
+/* A quick press arms the lasso. PRESS AND HOLD (or right-click) opens a
+   panel of the selected burst's controls — the same panel the Inspector
+   shows — so the lines can be tuned without leaving the toolbar. Same
+   fixed-position mechanics as the Tuck Back flyout. */
+let actHold: ReturnType<typeof setTimeout> | null = null;
+let actFlyJustOpened = false;
+let actFlyPos = { left: 0, top: 0 };
+
+function renderActionBtn(ed: EditorCtx) {
+  const { openMenu, setOpenMenu, selEl } = ed;
+  const act = selEl && selEl.type === "action" ? (selEl as ActionEl) : null;
+  const anchor = (el: HTMLElement) => {
+    const r = el.getBoundingClientRect();
+    actFlyPos = { left: Math.max(4, Math.min(r.left, window.innerWidth - 300)), top: r.bottom + 4 };
+  };
+  const openFly = () => { actFlyJustOpened = true; setOpenMenu("actionfly"); };
+  const arm = (el: HTMLElement) => {
+    anchor(el);
+    if (actHold) clearTimeout(actHold);
+    actHold = setTimeout(openFly, 450);
+  };
+  const disarm = () => { if (actHold) { clearTimeout(actHold); actHold = null; } };
+  return (
+    <span className="tuckWrap">
+      <button className="toolBtn accent"
+        title="Instaction — draw around any object and action lines burst out around it (same magnetic lasso or pen as Tuck Back). PRESS AND HOLD with action lines selected to tune them: thickness, length, direction, spread, count, jitter, ink."
+        onPointerDown={(e) => arm(e.currentTarget)}
+        onPointerUp={disarm} onPointerLeave={disarm}
+        onContextMenu={(e) => { e.preventDefault(); anchor(e.currentTarget); openFly(); }}
+        onClick={() => {
+          disarm();
+          if (actFlyJustOpened) { actFlyJustOpened = false; return; }
+          ed.startInstaction();
+        }}>
+        <span className="tIcon">✺</span>
+        <span className="tLabel">Instaction ▾</span>
+      </button>
+      {openMenu === "actionfly" && (
+        <>
+          <div className="menuBackdrop" onPointerDown={() => { actFlyJustOpened = false; setOpenMenu(null); }} />
+          <div className="tuckFly actionFly" style={{ left: actFlyPos.left, top: actFlyPos.top }}
+            onPointerDown={(e) => e.stopPropagation()}>
+            {act ? (
+              <>
+                <div className="actionFlyHead">Instaction lines</div>
+                <ActionControls ed={ed} a={act} compact />
+              </>
+            ) : (
+              <div className="actionFlyHint">Select a set of action lines to tune them here — or click the button and lasso an object to make some.</div>
+            )}
+          </div>
+        </>
+      )}
+    </span>
   );
 }
 

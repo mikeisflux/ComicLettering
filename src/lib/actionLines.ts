@@ -107,8 +107,16 @@ export function actionWedges(el: ActionEl): number[][][] {
   const count = Math.max(3, Math.min(240, Math.round(el.count)));
   const jit = Math.max(0, Math.min(1, el.jitter));
   const out: number[][][] = [];
+  const spread = Math.max(10, Math.min(360, el.spread ?? 360)) * Math.PI / 180;
+  const full = spread >= Math.PI * 2 - 1e-6;
+  const dir = ((el.dir ?? 90) * Math.PI) / 180;
   for (let i = 0; i < count; i++) {
-    const a = ((i + 0.5) / count) * Math.PI * 2 + jit * (rand() - 0.5) * (Math.PI * 2 / count) * 0.9;
+    /* a full ring spaces the strokes round the circle; a fan spaces them
+       across its arc, centred on the direction */
+    const base = full
+      ? ((i + 0.5) / count) * Math.PI * 2
+      : dir - spread / 2 + ((i + 0.5) / count) * spread;
+    const a = base + jit * (rand() - 0.5) * (spread / count) * 0.9;
     const dx = Math.cos(a), dy = Math.sin(a);
     const edge = rayHit(P, C, dx, dy) ?? R;
     const start = edge + el.gap * R * (1 + jit * 0.6 * (rand() - 0.5));

@@ -1631,3 +1631,15 @@ kbd.k {
 .bugForm.compact .bugBtns button.plain, .bugForm.compact > button { background: #fff; color: var(--ink); border-color: var(--edge2); font-weight: 400; }
 .bugForm.compact .formErr { color: #c22; margin: 8px 0 0; }
 .bugForm.compact p { margin: 6px 0 10px; }
+
+/* Instaction press-and-hold flyout: a control panel, not a menu */
+.actionFly { width: 290px; padding: 10px 12px; gap: 0; color: #dbe4ef; cursor: default; }
+.actionFlyHead { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: #8fa3bb; margin: 0 0 6px; }
+.actionFlyHint { font-size: 12.5px; line-height: 1.4; color: #c5d0dc; padding: 4px 2px; }
+.actionFly .fld { margin: 4px 0; }
+.actionFly .fld > label { color: #aab8c8; font-size: 12px; }
+.actionFly .fld input[type="range"] { width: 150px; }
+.actionFly .fld select { font-size: 12px; max-width: 170px; }
+.actionFly .btnRow { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.actionFly .btnRow button { display: inline-block; padding: 5px 9px; background: #24304a; border: 1px solid #33465c; border-radius: 6px; color: #dbe4ef; font-size: 12px; text-align: center; }
+.actionFly .btnRow button:hover { background: #2f7fd633; transform: none; box-shadow: none; }

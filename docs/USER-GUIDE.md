@@ -100,7 +100,7 @@ Insert → Stamps… opens a searchable library of ready SFX word art; Import Cu
 Instaction draws hand-inked action lines around any object on the page. Click the toolbar's Instaction button (or Arrange → Instaction…), then draw around the object — the same magnetic lasso as Tuck Back, so the line snaps to the art's edges; hold Alt for freehand, or press-and-hold the Tuck Back button to switch to the pen. When the loop closes, a burst of strokes appears around the outline and the Inspector opens.
 
 - Burst sends tapered strokes outward from the object; Focus runs lines in from the box edges and tapers them to a point at the object (the manga focus-line look).
-- Lines, Length, Gap, Weight and Jitter shape the burst; Ink sets its colour; Shuffle re-rolls the hand jitter for a fresh set.
+- Lines, Length, Gap, Weight and Jitter shape the burst; Spread and Direction turn the ring into a fan pointing one way; Ink sets its colour; Shuffle re-rolls the hand jitter for a fresh set. With the lines selected, press and hold the toolbar's Instaction button (or right-click it) for the same controls in a popup, without opening the Inspector.
 - Resize the box to grow or shrink the whole effect — the strokes scale with it. The lines count as page art: they may run into the bleed and export at full resolution in every format.
 
 ## Tuck Back: lettering behind the art

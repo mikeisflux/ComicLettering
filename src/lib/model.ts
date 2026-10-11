@@ -727,6 +727,10 @@ export interface ActionEl extends BaseEl {
      burst rarely needs to go all the way round, and must not hang off
      the page. Kept as regions so re-tuning count/length re-applies them. */
   cuts?: [number, number][][];
+  /* a FAN rather than a ring: `spread` degrees of strokes (360 = all the
+     way round) centred on `dir` degrees (0 right, 90 down, 180 left) */
+  dir?: number;
+  spread?: number;
 }
 
 export type El = PanelEl | ImageEl | BalloonEl | TextEl | AdjustEl | ActionEl;
