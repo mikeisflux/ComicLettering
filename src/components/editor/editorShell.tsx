@@ -35,6 +35,7 @@ import {
   importImageFile, importJSON, importStampFiles, isSupportedArtFile, movePage,
   nextAid, normalizeArtFile, onDrop, readAsDataURL,
 } from "./ops";
+import { importArtPages } from "./artPages";
 
 /* Editor-local state and refs the shell needs but the shared ctx doesn't
    carry (they are render-plumbing, not editing surface). */
@@ -526,11 +527,17 @@ export function renderCanvasArea(ed: EditorCtx, sh: ShellProps) {
 
 export function renderHiddenInputs(ed: EditorCtx) {
   const {
-    fileImageRef, filePanelImageRef, fileFontRef, fileStampRef, fileOpenRef,
+    fileImageRef, filePanelImageRef, fileFontRef, fileStampRef, fileOpenRef, fileArtPagesRef,
     panelImageTarget, assetsRef, setStatus,
   } = ed;
   return (
     <>
+      <input ref={fileArtPagesRef} type="file" accept={ART_ACCEPT.replace(/,?application\/pdf|,?\.pdf/g, "")} multiple hidden
+        onChange={async (e) => {
+          const files = Array.from(e.target.files || []);
+          e.target.value = "";
+          if (files.length) await importArtPages(ed, files);
+        }} />
       <input ref={fileImageRef} type="file" accept={ART_ACCEPT} multiple hidden
         onChange={async (e) => {
           for (const f of Array.from(e.target.files || [])) await importImageFile(ed, f);

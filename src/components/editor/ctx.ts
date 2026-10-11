@@ -82,6 +82,8 @@ export interface EditorCtx {
   fileImageRef: React.RefObject<HTMLInputElement | null>;
   filePanelImageRef: React.RefObject<HTMLInputElement | null>;
   fileOpenRef: React.RefObject<HTMLInputElement | null>;
+  /* Insert → Import Art Pages… (a folder of numbered page scans) */
+  fileArtPagesRef: React.RefObject<HTMLInputElement | null>;
   fileFontRef: React.RefObject<HTMLInputElement | null>;
   fileStampRef: React.RefObject<HTMLInputElement | null>;
 

@@ -35,6 +35,8 @@ File → Page Setup… picks the paper: standard comic trim, manga sizes, US and
 
 Insert → New Page adds pages (the toolbar and filmstrip can too); Duplicate Page copies one wholesale, and pages reorder from the filmstrip.
 
+Import Art Pages… (File or Insert menu) takes a whole folder of page scans at once. The number in each file name decides its page — page03.png, SW3_07.jpg, 012.tif — so files land on pages 3, 7 and 12, and the book grows to hold them; files without a number follow in name order. Each picture is scaled so its left and right edges meet the page's exactly and centred vertically (a taller scan overhangs into the bleed), placed behind any lettering already on the page.
+
 ## Panels and artwork
 
 The Layouts tab applies classic panel grids — pick a category and click a layout; balloons, lettering and images on the page are kept. Panels are also elements in their own right: draw one from the tray, resize it, give it a border and a fill.

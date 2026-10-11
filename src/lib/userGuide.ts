@@ -52,6 +52,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     blocks: [
       { p: "File → Page Setup… picks the paper: standard comic trim, manga sizes, US and international paper, or custom dimensions — all at print resolution with real bleed. View → Show Safe Area draws the trim (bleed line) and safe-area guides." },
       { p: "Insert → New Page adds pages (the toolbar and filmstrip can too); Duplicate Page copies one wholesale, and pages reorder from the filmstrip." },
+      { p: "Import Art Pages… (File or Insert menu) takes a whole folder of page scans at once. The number in each file name decides its page — page03.png, SW3_07.jpg, 012.tif — so files land on pages 3, 7 and 12, and the book grows to hold them; files without a number follow in name order. Each picture is scaled so its left and right edges meet the page's exactly and centred vertically (a taller scan overhangs into the bleed), placed behind any lettering already on the page." },
     ],
   },
   {
