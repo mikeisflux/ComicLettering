@@ -195,6 +195,11 @@ export interface TextStyle {
   glowW?: number;
   /* envelope warp control points, in units of the element box (see lib/warp) */
   env?: number[][];
+  /* vertical stretch of the letterforms (1 = natural). The top/bottom
+     handles of SFX lettering set it, so the letters grow taller without
+     the type size or the length changing. The element box is the VISUAL
+     box: the block is laid out in w × h/stretch and scaled up to fill it. */
+  stretch?: number;
   align: Align;
   lineHeight?: number; // line-spacing multiplier (default 1.05 — comic leading is tight)
   tracking?: number;   // letter-spacing in px (default 0)
@@ -211,6 +216,9 @@ export interface TextStyle {
    optionally bold and/or italic, on top of the element's base TextStyle. When
    `runs` is absent the plain `text` (with the base style) is used. */
 export interface TextRun { t: string; b?: boolean; i?: boolean; u?: boolean }
+/** the lettering's vertical stretch factor (1 when unset or nonsense) */
+export const textStretch = (ts: { stretch?: number }) =>
+  ts.stretch && Number.isFinite(ts.stretch) && ts.stretch > 0 ? ts.stretch : 1;
 export function runsToText(runs: TextRun[]): string {
   return runs.map((r) => r.t).join("");
 }

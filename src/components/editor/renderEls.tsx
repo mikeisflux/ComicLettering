@@ -4,8 +4,7 @@
    contentEditable text keeps focus while editing). */
 import React, { CSSProperties } from "react";
 import {
-  El, FILTERS, JoinLink, PanelEl, TAILLESS_KINDS, TextEl, aabbOverlap, applyCrossbarI, fadeMaskCss, fadeOverlayCss, joinGroupRect, joinLinks, panelPathD, resolveBalloon, rotVec,
-} from "@/lib/model";
+  El, FILTERS, JoinLink, PanelEl, TAILLESS_KINDS, TextEl, aabbOverlap, applyCrossbarI, fadeMaskCss, fadeOverlayCss, joinGroupRect, joinLinks, panelPathD, resolveBalloon, rotVec, textStretch } from "@/lib/model";
 import { arcTextLayout, balloonGeom, connectorMid } from "@/lib/geometry";
 import { fillCss } from "@/lib/fills";
 import { displayText, editingCss, measureBlock, measureCharWidths, onLetteringPaste, renderRuns, textCss, textOverflows } from "./textHelpers";
@@ -495,7 +494,7 @@ export function renderEl(ed: EditorCtx, el: El) {
     const gcss = textCss(el.ts);
     return (
       <div {...common} className="el text" style={style}>
-        <div className="txt warp" style={{ position: "absolute", left: 0, top: 0, width: el.w, height: el.h }}>
+        <div className="txt warp" style={{ position: "absolute", left: 0, top: 0, width: el.w, ...stretchCss(el) }}>
           {chars.map((ch, i) => ch === " " ? null : (
             <span key={i} style={{
               ...gcss, position: "absolute",
@@ -517,7 +516,7 @@ export function renderEl(ed: EditorCtx, el: El) {
       <div
         key={editing ? "edit" : "static"}
         className="txt"
-        style={{ ...textCss(el.ts), ...(editing ? editingCss(el.ts) : {}), left: 0, top: 0, width: el.w, height: el.h }}
+        style={{ ...textCss(el.ts), ...(editing ? editingCss(el.ts) : {}), left: 0, top: 0, width: el.w, ...stretchCss(el) }}
         contentEditable={editing}
         suppressContentEditableWarning
         spellCheck={editing}
@@ -527,6 +526,14 @@ export function renderEl(ed: EditorCtx, el: El) {
       >{editing ? null : el.runs ? renderRuns(el.runs, el.ts) : displayText(el.text, el.ts, false)}</div>
     </div>
   );
+}
+
+/* the lettering block is laid out at the UNSTRETCHED height and scaled up
+   to fill the box — the same thing drawStyledText does, so screen = print */
+function stretchCss(el: TextEl): CSSProperties {
+  const st = textStretch(el.ts);
+  if (st === 1) return { height: el.h };
+  return { height: el.h / st, transform: `scaleY(${st})`, transformOrigin: "0 0" };
 }
 
 /* ONE way into warp mode (touch double-tap + mouse double-click both land

@@ -3,8 +3,7 @@
 import { demoLock } from "@/lib/storeMode";
 import {
   ActionEl, BalloonEl, COLOR_PALETTE, DEFAULT_TEXT_SIZE, FONTS, GRADIENT_PRESETS,
-  MULTI_GRADIENTS, TextEl, clamp,
-} from "@/lib/model";
+  MULTI_GRADIENTS, TextEl, clamp, textStretch } from "@/lib/model";
 import { fillCss } from "@/lib/fills";
 import { NumField, ToolBtn, Slider } from "./chrome";
 import { FontMenu, SubtypeSelect, tsVariant } from "./FontMenu";
@@ -652,6 +651,37 @@ export function renderFormatBar(ed: EditorCtx) {
         <option value="10">+10</option>
       </select>
     </span>
+
+    {/* stretch: the SFX top/bottom handles set this too — taller or squatter
+        letterforms at the same type size and length; the box follows */}
+    {ed.selEl?.type === "text" && (
+      <span className="fbLead" title="Stretch the letters taller or squatter (the top/bottom handles do this too)">
+        <span className="fbLeadIcon" aria-hidden>A↕</span>
+        <select className="fbLeadSel"
+          value={String(Math.round(textStretch(selTs ?? {}) * 100))}
+          onChange={(e) => {
+            const n = parseInt(e.target.value, 10) / 100;
+            ed.mutateText((x) => {
+              if (x.type !== "text") return;
+              const o = textStretch(x.ts), cy = x.y + x.h / 2;
+              x.h = Math.max(20, Math.round(x.h / o * n));
+              x.y = Math.round(cy - x.h / 2);
+              if (Math.abs(n - 1) < 0.01) delete x.ts.stretch; else x.ts.stretch = n;
+            });
+          }}>
+          {[50, 75, 100, 125, 150, 200, 250, 300].includes(Math.round(textStretch(selTs ?? {}) * 100)) ? null
+            : <option value={String(Math.round(textStretch(selTs ?? {}) * 100))}>{Math.round(textStretch(selTs ?? {}) * 100)}%</option>}
+          <option value="50">Squat 50%</option>
+          <option value="75">75%</option>
+          <option value="100">Normal</option>
+          <option value="125">125%</option>
+          <option value="150">Tall 150%</option>
+          <option value="200">200%</option>
+          <option value="250">250%</option>
+          <option value="300">300%</option>
+        </select>
+      </span>
+    )}
 
     {/* brushes: dry-media texture masked over the lettering */}
     <span className="fbGroup fbBrush">

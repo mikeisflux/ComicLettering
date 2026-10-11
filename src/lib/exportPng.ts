@@ -3,8 +3,7 @@ import { actionWedges } from "./actionLines";
 import {
   ArtPan, Assets, BalloonEl, Doc, El, FILTERS, FONTS, ImageEl, JoinLink, Page, TextEl, TextRun, TextStyle,
   Fade,
-  aabbOverlap, applyCrossbarI, deg2rad, joinGroupRect, joinLinks, lightenHex, pageBleed, panelPathD, resolveBalloon, rotVec,
-} from "./model";
+  aabbOverlap, applyCrossbarI, deg2rad, joinGroupRect, joinLinks, lightenHex, pageBleed, panelPathD, resolveBalloon, rotVec, textStretch } from "./model";
 import { balloonGeom, arcTextLayout } from "./geometry";
 import { paintFill } from "./fills";
 import { BrushKey, brushScale, brushTile } from "./brushes";
@@ -24,7 +23,8 @@ export function forgetImage(src: string) { imgCache.delete(src); }
 
 /* the context's current uniform scale (page units → device pixels) */
 function ctxScale(ctx: CanvasRenderingContext2D): number {
-  try { const m = ctx.getTransform(); return Math.max(1, Math.hypot(m.a, m.b)); } catch { return 1; }
+  /* the larger axis: a vertically stretched block must not come out soft */
+  try { const m = ctx.getTransform(); return Math.max(1, Math.hypot(m.a, m.b), Math.hypot(m.c, m.d)); } catch { return 1; }
 }
 
 export function loadImage(src: string): Promise<HTMLImageElement> {
@@ -306,6 +306,19 @@ export function drawStyledText(
      fill, gradient, outline and shadow alike — is drawn to a scratch canvas
      first and the texture punched out of it. Wrapping the one entry point
      keeps plain, rich and warped text identical to the DOM editor. */
+  /* vertical stretch (the SFX top/bottom handles): lay the block out in
+     the unstretched height and scale it up to fill the box — OUTERMOST, so
+     warps, glows and brushes all ride along. The DOM does the same with a
+     scaleY on the text box. */
+  const st = textStretch(ts);
+  if (st !== 1) {
+    const [rx, ry, rw, rh] = rect;
+    ctx.save();
+    ctx.translate(rx, ry); ctx.scale(1, st); ctx.translate(-rx, -ry);
+    drawStyledText(ctx, { ...ts, stretch: undefined }, text, [rx, ry, rw, rh / st], warp, runs);
+    ctx.restore();
+    return;
+  }
   /* an envelope warp is not a linear transform, so the block is rendered flat
      to a scratch canvas and pushed through the patch — the same routine the
      editor uses, so screen and print cannot drift apart */
@@ -891,11 +904,12 @@ export function textInkBounds(el: TextEl): TrimRect {
         if (el.ts.crossbarI) t = applyCrossbarI(t, el.ts.font);
         const chars = t.match(/\P{M}\p{M}*/gu) || [];
         const widths = chars.map((ch) => cx2.measureText(ch).width + (el.ts.tracking ?? 0));
+        const st = textStretch(el.ts);          // the arc is laid out unstretched, then scaled up
         let ex = el.w / 2, ey = el.h / 2;
         arcTextLayout(widths, el.warp).forEach((q, i) => {
           const hw = widths[i] / 2, hh = el.ts.size / 2, cs = Math.abs(Math.cos(q.rot)), sn = Math.abs(Math.sin(q.rot));
           ex = Math.max(ex, Math.abs(q.x) + cs * hw + sn * hh);
-          ey = Math.max(ey, Math.abs(q.y) + sn * hw + cs * hh);
+          ey = Math.max(ey, (Math.abs(q.y) + sn * hw + cs * hh) * st);
         });
         x = el.x + el.w / 2 - ex; w = ex * 2;
         y = el.y + el.h / 2 - ey; h = ey * 2;

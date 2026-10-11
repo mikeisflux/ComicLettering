@@ -7,8 +7,7 @@ import {
   GradStop, Page,
   TAILLESS_KINDS, TextEl, TextStyle, applyCrossbarI, applyRunEmphasis, clamp, makeBalloon, makeImage, newPage,
   pageMargins, rotVec,
-  makePanel, makeText, solid, uid,
-} from "@/lib/model";
+  makePanel, makeText, solid, uid, textStretch } from "@/lib/model";
 import { balloonGeom, arcTextLayout } from "@/lib/geometry";
 import { Warp, isWarped } from "@/lib/warp";
 import {
@@ -557,8 +556,9 @@ export function sizeTextToContent(el: TextEl, pageW: number) {
   const room = pageW - Math.max(0, el.x) - padX * 2;
   const maxW = Math.max(el.ts.size * 2, Math.min(pageW * 0.92, room));
   const m = measureBlock(el.ts, el.text, maxW);
+  const st = textStretch(el.ts);     // the box is the VISUAL (stretched) box
   el.w = Math.max(24, Math.round(m.w) + padX * 2);
-  el.h = Math.max(20, Math.round(m.h) + padY * 2);
+  el.h = Math.max(20, Math.round((m.h + padY * 2) * st));
   /* and keep the box on the page even if a single word is wider than
      the room (it wraps mid-word in the renderer, the box must not hang) */
   if (el.x + el.w > pageW) el.x = Math.max(0, Math.round(pageW - el.w));

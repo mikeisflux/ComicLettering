@@ -5,12 +5,13 @@
    uses, so the screen shows exactly what prints. The canvas is padded all
    round so the bolts and halo are not cut at the box edge. */
 import { useEffect, useRef } from "react";
-import { TextRun, TextStyle } from "@/lib/model";
+import { TextRun, TextStyle, textStretch } from "@/lib/model";
 import { drawStyledText } from "@/lib/exportPng";
 import { boltReach } from "@/lib/lightning";
 
 export function rasterPad(ts: TextStyle): number {
-  return Math.ceil(ts.size * (0.8 + Math.max(boltReach(ts.glowW ?? 1) * 1.1, 0.36 * (ts.glowW ?? 1) * 2.4)) + ts.outlineW * 2);
+  /* stretched lettering stretches its halo and bolts too */
+  return Math.ceil((ts.size * (0.8 + Math.max(boltReach(ts.glowW ?? 1) * 1.1, 0.36 * (ts.glowW ?? 1) * 2.4)) + ts.outlineW * 2) * Math.max(1, textStretch(ts)));
 }
 
 export function RasterText({ ts, text, runs, rect, warp, zoom }: {

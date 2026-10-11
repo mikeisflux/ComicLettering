@@ -6,7 +6,7 @@
    newlines, which read as stacked words and had to be deleted by hand
    after every script import. Only the explicit "Balance Line Breaks"
    command (balanceRag) changes the text. ops.ts re-exports these. */
-import { BalloonEl, FONTS, TAILLESS_KINDS, TextEl, TextStyle, clamp } from "@/lib/model";
+import { BalloonEl, FONTS, TAILLESS_KINDS, TextEl, TextStyle, clamp, textStretch } from "@/lib/model";
 import { balloonGeom } from "@/lib/geometry";
 import { EditorCtx } from "./ctx";
 
@@ -162,7 +162,7 @@ export function fitBalloonToText(ed: EditorCtx) {
         newH = clamp(Math.round((lineH + ts.size * 0.35) / fracH), 44, page.h);
       } else {
         newW = clamp(Math.round(lineW + ts.size * 0.6), 40, page.w);
-        newH = clamp(Math.round(lineH + ts.size * 0.4), 24, page.h);
+        newH = clamp(Math.round((lineH + ts.size * 0.4) * textStretch(ts)), 24, page.h);
       }
     }
     /* keep each item centred where it was while it resizes */

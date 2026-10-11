@@ -7,8 +7,7 @@
 import React, { useCallback } from "react";
 import {
   Assets, BalloonEl, Doc, El, GRAB_MARGIN, ImageEl, PanelEl, TextEl, aabbOverlap, clamp,
-  pageMargins, rotVec,
-} from "@/lib/model";
+  pageMargins, rotVec, textStretch } from "@/lib/model";
 import { FLAT } from "@/lib/warp";
 import { elCrossesSpine } from "@/lib/exportPng";
 import { claimDrag, rejectPalm, releaseDrag } from "./penInput";
@@ -326,12 +325,19 @@ export function useStartDrag(deps: DragDeps) {
           }
           snapRef.current = { x: sx, y: sy };
         }
-        /* lettering scales with its box, like Comic Life */
+        /* lettering scales with its box, like Comic Life — except the TOP
+           and BOTTOM handles, which STRETCH the letterforms: taller or
+           squatter without the type size or the length changing */
         if (cur.type === "text" && orig.type === "text") {
-          const ratio = Math.min(cur.w / orig.w, cur.h / orig.h);
-          cur.ts.size = clamp(Math.round(orig.ts.size * ratio), 8, 800);
-          cur.ts.outlineW = Math.max(0, Math.round(orig.ts.outlineW * ratio));
-          if (orig.ts.tracking) cur.ts.tracking = Math.round(orig.ts.tracking * ratio * 10) / 10;
+          if ((handle === "n" || handle === "s") && !lockAspect) {
+            cur.ts.stretch = clamp(Math.round(textStretch(orig.ts) * (cur.h / orig.h) * 1000) / 1000, 0.2, 6);
+            if (Math.abs(cur.ts.stretch - 1) < 0.01) delete cur.ts.stretch;
+          } else {
+            const ratio = Math.min(cur.w / orig.w, cur.h / orig.h);
+            cur.ts.size = clamp(Math.round(orig.ts.size * ratio), 8, 800);
+            cur.ts.outlineW = Math.max(0, Math.round(orig.ts.outlineW * ratio));
+            if (orig.ts.tracking) cur.ts.tracking = Math.round(orig.ts.tracking * ratio * 10) / 10;
+          }
         }
         /* A rotated element rotates about its CENTRE, so the x/y bookkeeping
            above — exact at rot 0 — lets the whole box drift around the page

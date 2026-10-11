@@ -3,7 +3,7 @@
    overlay (renderEls places the resize handles and warp dots on this rect)
    and the resize drag (useStartDrag pins this rect's opposite corner so the
    letters stay planted while the box resizes around them). */
-import { TextEl, applyCrossbarI } from "@/lib/model";
+import { TextEl, applyCrossbarI, textStretch } from "@/lib/model";
 import { arcTextLayout } from "@/lib/geometry";
 import { Warp, isWarped, warpPoint } from "@/lib/warp";
 import { measureBlock, measureCharWidths } from "./textHelpers";
@@ -18,6 +18,7 @@ export interface InkFractions { x0: number; y0: number; x1: number; y1: number }
 export function textInkFractions(el: TextEl): InkFractions | null {
   if (!el.text || !el.text.trim() || el.w < 2 || el.h < 2) return null;
   const ts = el.ts;
+  const st = textStretch(ts);       // the block is laid out at h/st and scaled up
   const pad = ts.outlineW / 2 + 2; // centred text-stroke spills half out, plus a hair
   if (el.warp) {
     /* arc-warped SFX: replicate the render layout and take the extents of the
@@ -34,8 +35,8 @@ export function textInkFractions(el: TextEl): InkFractions | null {
       if (chars[i] === " ") continue;
       const hw = widths[i] / 2, hh = ts.size / 2;
       const c = Math.abs(Math.cos(layout[i].rot)), s = Math.abs(Math.sin(layout[i].rot));
-      const ex = c * hw + s * hh, ey = s * hw + c * hh;
-      const px = cx + layout[i].x, py = cy + layout[i].y;
+      const ex = c * hw + s * hh, ey = (s * hw + c * hh) * st;
+      const px = cx + layout[i].x, py = cy + layout[i].y * st;
       if (px - ex < x0) x0 = px - ex;
       if (px + ex > x1) x1 = px + ex;
       if (py - ey < y0) y0 = py - ey;
@@ -44,7 +45,7 @@ export function textInkFractions(el: TextEl): InkFractions | null {
     if (x1 <= x0 || y1 <= y0) return null;
     /* snug box → no re-hug (see the straight branch below) */
     const fx = ts.size * 0.18 + ts.outlineW * 1.2 + 3;
-    const fy = ts.size * 0.14 + ts.outlineW * 1.2 + 3;
+    const fy = (ts.size * 0.14 + ts.outlineW * 1.2 + 3) * st;
     if (x0 <= fx && el.w - x1 <= fx && y0 <= fy && el.h - y1 <= fy) return null;
     return {
       x0: (x0 - pad) / el.w, y0: (y0 - pad) / el.h,
@@ -55,6 +56,7 @@ export function textInkFractions(el: TextEl): InkFractions | null {
      and placed horizontally by ts.align inside the box */
   const m = measureBlock(ts, el.text, el.w);
   if (m.w < 1 || m.h < 1) return null;
+  m.h *= st;                        // visual height of the stretched block
   const y0 = (el.h - m.h) / 2;
   const x0 = ts.align === "center" ? (el.w - m.w) / 2
     : ts.align === "right" ? el.w - m.w : 0;
@@ -62,7 +64,7 @@ export function textInkFractions(el: TextEl): InkFractions | null {
      re-hugged: the selection box, resize handles and warp dots then all sit
      on the SAME rect instead of three subtly different ones */
   const fitX = ts.size * 0.18 + ts.outlineW * 1.2 + 3;
-  const fitY = ts.size * 0.14 + ts.outlineW * 1.2 + 3;
+  const fitY = (ts.size * 0.14 + ts.outlineW * 1.2 + 3) * st;
   if (x0 <= fitX && el.w - (x0 + m.w) <= fitX && y0 <= fitY && el.h - (y0 + m.h) <= fitY) return null;
   return {
     x0: (x0 - pad) / el.w, y0: (y0 - pad) / el.h,
