@@ -514,8 +514,6 @@ function connectorBand(el: BalloonEl): { fill: string; edges: string } | null {
   const tip = [cx + tail.dx, cy + tail.dy];
   const dLen = Math.hypot(tail.dx, tail.dy);
   if (dLen < 6) return null;
-  const u = [tail.dx / dLen, tail.dy / dLen];
-  const perp = [-u[1], u[0]];
   /* A slim, RELATIVELY PARALLEL band (CLAUDE.md): both ends the same width,
      never a wedge. Width scales gently with the balloon but is capped, so a
      large balloon does not grow an absurdly fat connector — the old
@@ -533,19 +531,99 @@ function connectorBand(el: BalloonEl): { fill: string; edges: string } | null {
     const L = Math.hypot(vx, vy) || 1;
     return [P[0] + (vx / L) * tuck, P[1] + (vy / L) * tuck];
   };
-  const A = seat([E[0] + perp[0] * halfW, E[1] + perp[1] * halfW]);
-  const B = seat([E[0] - perp[0] * halfW, E[1] - perp[1] * halfW]);
-  let sideA: number[][], sideB: number[][];
-  if (tail.bx != null && tail.by != null) {
-    /* user-bent band: curve through the bend point */
-    const g = bendGeom(tail, cx, cy, tip, E, B, halfW * 1.12, tipHalf);
-    sideB = bentSide(B, g.M_B, g.tipB, g.T);
-    sideA = bentSide(A, g.M_A, g.tipA, g.T);
-  } else {
-    /* DEAD STRAIGHT by default — no midpoint routing, no curve */
-    sideA = [[tip[0] + perp[0] * tipHalf, tip[1] + perp[1] * tipHalf]];
-    sideB = [[tip[0] - perp[0] * tipHalf, tip[1] - perp[1] * tipHalf]];
+  /* ONE centreline, then both sides are the SAME curve offset by ±halfW
+     along its local normal. Offsetting one smooth line cannot cross itself
+     when the band is far thinner than any bend's radius, whereas the old
+     build — base points perpendicular to the straight centre→tip line,
+     bend points perpendicular to the tilt axis, tip points perpendicular
+     to the arrival — put the two sides on different frames, and a long
+     curved join twisted them over each other at the base.
+     Two things still fold a band: a bend dragged right onto the balloon's
+     edge (a tiny first leg skews the base width), and a hairpin bend whose
+     two legs lie closer together than the band is wide. The tangent is
+     therefore taken over a window as long as the band is wide, and if the
+     sides STILL cross, the bend is eased back towards straight until they
+     do not — a straight band can never cross. */
+  const bent = tail.bx != null && tail.by != null;
+  const mid = [(E[0] + tip[0]) / 2, (E[1] + tip[1]) / 2];
+  const straightT = (() => { const L = Math.hypot(tip[0] - E[0], tip[1] - E[1]) || 1; return [(tip[0] - E[0]) / L, (tip[1] - E[1]) / L]; })();
+  const bendT = bent ? bendGeom(tail, cx, cy, tip, E, E, 0, 0).T : straightT;
+  const bendM = bent ? [cx + tail.bx!, cy + tail.by!] : mid;
+  const build = (ease: number) => {
+    let centre: number[][];
+    if (bent && ease < 1) {
+      const M = [bendM[0] + (mid[0] - bendM[0]) * ease, bendM[1] + (mid[1] - bendM[1]) * ease];
+      let T = [bendT[0] + (straightT[0] - bendT[0]) * ease, bendT[1] + (straightT[1] - bendT[1]) * ease];
+      const tl = Math.hypot(T[0], T[1]);
+      T = tl > 1e-6 ? [T[0] / tl, T[1] / tl] : straightT;
+      const k1 = 0.5 * Math.hypot(E[0] - M[0], E[1] - M[1]);
+      const k2 = 0.5 * Math.hypot(tip[0] - M[0], tip[1] - M[1]);
+      const c1 = [M[0] - T[0] * k1, M[1] - T[1] * k1];
+      const c2 = [M[0] + T[0] * k2, M[1] + T[1] * k2];
+      centre = [E, ...quadPts(E, c1, M), ...quadPts(M, c2, tip)];
+    } else {
+      /* DEAD STRAIGHT by default — no midpoint routing, no curve */
+      centre = [E, tip];
+    }
+    /* drop samples that sit on top of each other so every tangent is real */
+    centre = centre.filter((q, i) => i === 0 || Math.hypot(q[0] - centre[i - 1][0], q[1] - centre[i - 1][1]) > 0.05);
+    if (centre.length < 2) return null;
+    const n = centre.length;
+    const win = halfW * 1.5;
+    const normalAt = (i: number): number[] => {
+      let a = i, b = i;
+      while (a > 0 && Math.hypot(centre[i][0] - centre[a][0], centre[i][1] - centre[a][1]) < win) a--;
+      while (b < n - 1 && Math.hypot(centre[b][0] - centre[i][0], centre[b][1] - centre[i][1]) < win) b++;
+      const tx = centre[b][0] - centre[a][0], ty = centre[b][1] - centre[a][1];
+      const L = Math.hypot(tx, ty) || 1;
+      return [-ty / L, tx / L];
+    };
+    const n0 = normalAt(0);
+    const A = seat([E[0] + n0[0] * halfW, E[1] + n0[1] * halfW]);
+    const B = seat([E[0] - n0[0] * halfW, E[1] - n0[1] * halfW]);
+    const rawA: number[][] = [A], rawB: number[][] = [B];
+    for (let i = 1; i < n; i++) {
+      const nn = normalAt(i), q = centre[i];
+      const hw = i === n - 1 ? tipHalf : halfW;
+      rawA.push([q[0] + nn[0] * hw, q[1] + nn[1] * hw]);
+      rawB.push([q[0] - nn[0] * hw, q[1] - nn[1] * hw]);
+    }
+    /* a hairpin tighter than the band is wide folds the INNER side back on
+       itself (the classic offset cusp) — drop every point that moves
+       backwards against the centreline, so that side cuts the corner. The
+       tip end always stays so the band still reaches the partner. */
+    const clean = (raw: number[][]): number[][] => {
+      const out: number[][] = [raw[0]];
+      for (let i = 1; i < raw.length; i++) {
+        const a = centre[i - 1], b = centre[i], last = out[out.length - 1];
+        const fwd = (raw[i][0] - last[0]) * (b[0] - a[0]) + (raw[i][1] - last[1]) * (b[1] - a[1]);
+        if (fwd > 0 || i === raw.length - 1) out.push(raw[i]);
+      }
+      return out.slice(1);
+    };
+    return { A, B, sideA: clean(rawA), sideB: clean(rawB) };
+  };
+  /* the two inked sides must never touch or cross — ease a bend that
+     folds the band back towards straight until they are clear */
+  const segCross = (p: number[], q: number[], r: number[], t: number[]) => {
+    const o = (a: number[], b: number[], c: number[]) => Math.sign((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]));
+    const o1 = o(p, q, r), o2 = o(p, q, t), o3 = o(r, t, p), o4 = o(r, t, q);
+    return o1 !== o2 && o3 !== o4 && o1 !== 0 && o3 !== 0;
+  };
+  const twisted = (g: { A: number[]; B: number[]; sideA: number[][]; sideB: number[][] }) => {
+    const PA = [g.A, ...g.sideA], PB = [g.B, ...g.sideB];
+    for (let i = 1; i < PA.length; i++) for (let j = 1; j < PB.length; j++) {
+      if (segCross(PA[i - 1], PA[i], PB[j - 1], PB[j])) return true;
+    }
+    return false;
+  };
+  let built = build(0);
+  for (const ease of [0.25, 0.5, 0.75, 1]) {
+    if (!built || !twisted(built)) break;
+    built = build(ease);
   }
+  if (!built) return null;
+  const { A, B, sideA, sideB } = built;
   const inset = Math.max(6, el.strokeW * 2);
   const inw = (P: number[]) => {
     const vx = cx - P[0], vy = cy - P[1];
