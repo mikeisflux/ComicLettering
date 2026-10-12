@@ -13,6 +13,7 @@ import {
   doFindReplace, duplicateSel, importScript, insertCustomStamp, insertSfxStamp,
   fitToArtwork, fitToPage, pasteClip, removeCustomStamp, reorder, resizeToActual,
   resolveTailAsk, runExport, saveStyleFromSelection, setLocked } from "./ops";
+import { readScriptFile } from "./scriptImport";
 import { detectPanelsFromArt } from "./panelOps";
 import { SFX_STAMPS } from "@/lib/sfxStamps";
 import type { TuckMode } from "./tuck";
@@ -770,6 +771,20 @@ export function renderScriptDialog(ed: EditorCtx) {
             Paste a script in any common format — <code>CHARACTER: dialogue</code>, or the
             screenplay style with the name on its own line. PAGE and PANEL headers place
             each balloon on the right page, near its panel.
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, fontSize: 12.5 }}>
+            <label className="fileBtn" style={{ cursor: "pointer" }}>
+              <span className="btnLike" style={{ border: "1px solid #9aa1ac", borderRadius: 6, padding: "3px 10px", background: "#f6f7f9" }}>Open script file…</span>
+              <input type="file" accept=".txt,.docx,.md,.text,.fountain" style={{ display: "none" }}
+                onChange={async (e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  if (!f) return;
+                  try { setScriptText(await readScriptFile(f)); }
+                  catch (err) { ed.setStatus("Could not read that script: " + String((err as Error).message || err)); }
+                }} />
+            </label>
+            <span style={{ opacity: .75 }}>Word (.docx) or plain text — or paste below.</span>
           </div>
           <textarea value={scriptText} autoFocus
             onChange={(e) => setScriptText(e.target.value)}

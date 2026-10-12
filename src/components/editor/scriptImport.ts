@@ -6,8 +6,36 @@ import {
 } from "@/lib/model";
 import { LETTER_STYLES, applyLetterStyle } from "@/lib/presets";
 import { parseScript } from "@/lib/scriptParse";
+import { isZip, readZipDirectory, zipEntryText } from "@/lib/zipFile";
 import { EditorCtx } from "./ctx";
 import { sizeTextToContent } from "./ops";
+
+/* The text of a script file: plain text as-is, a Word .docx by reading its
+   document.xml — one paragraph per line, tabs and line breaks kept — so a
+   writer's script opens straight into the import box without a copy-paste
+   through Word (which also loses the curly quotes the parser strips). */
+export async function readScriptFile(f: File): Promise<string> {
+  if (/\.docx$/i.test(f.name) || (!/\.(txt|md|text|fountain)$/i.test(f.name) && await isZip(f))) {
+    const dir = await readZipDirectory(f);
+    const e = dir.get("word/document.xml");
+    if (!e) throw new Error("not a Word document");
+    return docxText(await zipEntryText(f, e));
+  }
+  return f.text();
+}
+
+function docxText(xml: string): string {
+  const ent: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: "\"", apos: "'" };
+  return xml
+    .replace(/<w:tab\/>/g, "\t")
+    .replace(/<w:br[^>]*\/>/g, "\n")
+    .replace(/<\/w:p>/g, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&(#x[0-9a-f]+|#\d+|amp|lt|gt|quot|apos);/gi, (_, c: string) =>
+      c[0] === "#" ? String.fromCodePoint(c[1].toLowerCase() === "x" ? parseInt(c.slice(2), 16) : parseInt(c.slice(1), 10)) : (ent[c.toLowerCase()] ?? _))
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
 
 export function importScript(ed: EditorCtx) {
   const { scriptText, setStatus, docRef, pageIndexRef, activeStyleRef, commit, rebuildThumbs, setShowScript, setScriptText, setSelId } = ed;

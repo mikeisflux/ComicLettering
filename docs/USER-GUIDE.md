@@ -119,7 +119,7 @@ Whatever part of those items crosses the SPINE-side bleed line continues on the 
 
 ## Scripts, proofing and text tools
 
-- Insert → Import Script → Balloons… breaks a whole comic script into balloons automatically, page by page.
+- Insert → Import Script → Balloons… breaks a whole comic script into balloons automatically, page by page. Open a Word (.docx) or plain-text script straight from the dialog or paste it in. It reads PAGE and PANEL headers, CHARACTER: lines and screenplay-style names, (thought)/(whisper)/(radio) cues, CAPTION: and TEXT BOXES blocks, SFX: lines, and full artist scripts where only the lines under DIALOGUE: are balloons — SHOT:, LIGHTING: and character descriptions are left out, quotation marks are dropped and “None.” lines are skipped.
 - The Proof tab checks every balloon and lettering item with LanguageTool (free & open source); typos get red underlines while you type.
 - Edit → Find & Replace… searches every balloon and lettering item in the whole book.
 - Arrange → Balance Line Breaks evens out a balloon's rag the way letterers break dialogue by hand.

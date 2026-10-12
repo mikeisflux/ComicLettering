@@ -14,10 +14,20 @@
                                                    onomatopoeia lines too)
      JANE (CONT'D): / (LINK) / (LINKED)            joins to the previous balloon
      JANE (OFF): / (O.P.) / (OFF PANEL)            off-panel speech
+     DIALOGUE:                                     "full artist script" blocks:
+     JANE: "Hi."                                   only lines under DIALOGUE:
+     SFX: kkkk (radio click)                       are balloons; SHOT:,
+                                                   LIGHTING:, FREYA: (her
+                                                   description) and the like
+                                                   are art notes and skipped
+     TEXT BOXES (black, white text):               caption blocks — each
+     Upper left: "Year 78 of the Reich."           labelled line is a box
 
    Kinds map straight onto BalloonKind (plus "sfx" for lettering). Prose
    panel descriptions are skipped; a bare line continues the previous
-   balloon only when it follows it directly (no blank line between). */
+   balloon only when it follows it directly (no blank line between).
+   Surrounding quotation marks are dropped, "None." lines are not items,
+   and an SFX's trailing "(engine rumble)" note is stripped. */
 import type { BalloonKind } from "./model";
 
 export type ScriptKind = Exclude<BalloonKind, "custom" | "square" | "tv" | "extend" | "rounded"> | "sfx";
@@ -57,7 +67,7 @@ const NUMBER_WORDS = "one|two|three|four|five|six|seven|eight|nine|ten|eleven|tw
 const pageRx = new RegExp(`^PA?GE?S?\\.?\\s*#?\\s*(\\d+|${NUMBER_WORDS})\\b`, "i");
 /* a panel header carries a number, or stands alone / ends in a colon —
    "Frame it and hang it." mid-dialogue is not a panel break */
-const panelRx = new RegExp(`^(?:PANELS?|PNL|FRAME)\\.?\\s*#?\\s*(?:(\\d+[A-Za-z]?|[A-Z]|${NUMBER_WORDS})\\b|(?=[:\\-—]|$))`, "i");
+const panelRx = new RegExp(`^(?:(?:INSET|INSERT|SUB|MAIN|SMALL|LARGE|BIG|WIDE|TALL|SPLASH)[ -]+)?(?:PANELS?|PNL|FRAME)\\.?\\s*#?\\s*(?:(\\d+[A-Za-z]?|[A-Z]|${NUMBER_WORDS})\\b|(?=[:\\-—(]|$))`, "i");
 /* "3." alone on a line is a panel number in a lot of scripts */
 const barePanelRx = /^(\d{1,2})[.)]$/;
 const transitionRx = /^(SCENE|INT\b|EXT\b|CUT TO|FADE (IN|OUT|TO)|SMASH CUT|MATCH CUT|SPLASH\b|DOUBLE[- ]PAGE|SPREAD\b|TITLE PAGE|THE END\b|END\b|CREDITS|TO BE CONTINUED|NO (DIALOGUE|COPY|BALLOONS?)|SILENT)\b/i;
@@ -80,7 +90,36 @@ const lineRx = /^\s*(?:\d{1,3}[.)]?\s+)?((?:[A-Z0-9 .,'’&\-/]{1,28}?|[A-Z][a-z
 /* screenplay style: the speaker alone on a line, dialogue below */
 const speakerLineRx = /^\s*(?:\d{1,3}[.)]?\s+)?([A-Z][A-Z0-9 .'’&\-/]{0,27}?)\s*(?:\((\d{1,3})\))?\s*(?:\(([^)]*)\))?\s*:?\s*$/;
 const SFX_SPEAKER = /^(SFX|S\.?F\.?X\.?|SOUND(?: ?FX| EFFECTS?)?|FX|EFX|SND|ONOMATOPOEIA)$/;
-const CAPTION_SPEAKER = /^(CAPTION|CAPTIONS|CAP|CAPT|NARRATION|NARR|NARRATOR|BOX|TITLE|TITLES|LOCATION|LOC|TIME|CREDIT|CREDITS|VOICE ?OVER|V\.?O\.?|TEXT BOX)(?:\s*[-/].*)?$/;
+/* "LABEL: prose" lines that describe the ART, never a balloon — a full
+   artist script is mostly these */
+const DESCRIPTION_SPEAKER = /^(SHOT|SHOTS|LIGHTING|LIGHT|SKY|LANDSCAPE|ENVIRONMENT|ENV|VIEW|HANDS|LAYOUT|LAYOUTS|ACTION|DESCRIPTION|DESC|SETTING|CAMERA|ANGLE|BACKGROUND|FOREGROUND|BG|FG|NOTE|NOTES|ART|ART NOTE|ART NOTES|ARTIST NOTE|ARTIST NOTES|ARTIST|COLOR|COLORS|COLOUR|COLOURS|COLOR NOTE|COLOR NOTES|COLOR TRANSITION|MOOD|TONE|EXPRESSION|EXPRESSIONS|COSTUME|COSTUMES|WARDROBE|PROPS|PROP|DETAILS|DETAIL|CHARACTERS|CHARACTER|COMPOSITION|KEY ELEMENT|KEY ELEMENTS|VISUAL MOTIF|VISUAL|VISUALS|FOCUS|BEAT|EMOTION|EFFECT|EFFECTS|VFX|REFERENCE|REFERENCES|REF|STAGING|BLOCKING|POSE|POSES|WEATHER|PLACE|TRANSITION|PANEL DESCRIPTION|PANEL DESC|SCENE|MUSIC|SOUND DESIGN|CONTINUITY|INSET|PAGE NOTE|PAGE NOTES|DIALOGUE NOTE|LETTERING NOTE|LETTERING NOTES|LETTERER NOTE|LETTERER|EDITOR|EDITOR NOTE|WRITER NOTE)$/;
+/* in-art writing — a poster, a sign, a chyron — is drawn, not lettered */
+const IN_ART_SPEAKER = /\b(POSTER|SIGN|SIGNAGE|SCREEN|CHYRON|MONITOR|BANNER|GRAFFITI|LABEL|PLAQUE|HEADLINE|NEWSPAPER|TATTOO|LOGO)\b.*\bTEXT$|^(CHYRON|POSTER|SIGN|BANNER|GRAFFITI|PLAQUE|HEADLINE)$/;
+/* a caption BLOCK header: the boxes follow, one labelled line each */
+const CAPTION_BLOCK = /^(TEXT ?BOXES?|CAPTION ?BOXES?|CAPTIONS|BOXES|NARRATION ?BOXES?|NARRATIVE ?BOXES?)\b(?:\s*\([^)]*\))?[^:“”"]*(?::\s*(.*))?$/i;
+/* "Large stylized text:" / "Title lettering:" — the next line is lettering */
+const LETTERING_CUE = /^[^:“”"]{0,40}\b(text|lettering|title|logo|type)\s*:\s*$/i;
+/* "DIALOGUE:" — the gate in a full artist script */
+const DIALOGUE_HEADER = /^(DIALOGUE|DIALOG|BALLOONS|LETTERING|COPY|TEXT)\s*:\s*(.*)$/i;
+/* the writer saying there is nothing here */
+const NOTHING = /^(none|nothing|n\/a|nil|silent|silence|no (dialogue|dialog|sfx|copy|balloons?|text|lettering)|-+|—)\b[.!]*\s*(silent\.?)?$/i;
+
+/* drop the quotation marks a writer wraps dialogue in — only an outer
+   pair, so "Yes." "No." (two quoted sentences) keeps its inner marks */
+function unquote(t: string): string {
+  const s = t.trim();
+  const open = /^["“”„«]/.test(s), close = /["“”»]$/.test(s);
+  if (!open || !close || s.length < 2) return s;
+  const inner = s.slice(1, -1);
+  if (/["“”„«»]/.test(inner.replace(/[“”"]/g, (q) => q))) {
+    /* inner quotes: only strip when they pair up as nested speech, which
+       they never do in comics — keep the line as written */
+    const n = (inner.match(/[“”"]/g) || []).length;
+    if (n % 2 === 1) return s;
+  }
+  return inner.trim();
+}
+const CAPTION_SPEAKER = /^(CAPTION|CAPTIONS|CAP|CAPT|NARRATION|NARR|NARRATOR|BOX|TITLE|TITLES|LOCATION|LOC|TIME|CREDIT|CREDITS|VOICE ?OVER|V\.?O\.?|TEXT BOX)(?:\s*#?\s*\d{1,3}[A-Z]?)?(?:\s*[-/].*)?$/;
 
 /* onomatopoeia on its own line: all caps, short, shouty or stuttery */
 function looksLikeSfx(line: string): boolean {
@@ -101,7 +140,8 @@ function resolveKind(speaker: string, cue: string, text: string): { kind: Script
   let kind: ScriptKind = "speech";
   let link = /\b(link(ed)?|cont'?d|continued|continuing|cont)\b/.test(c);
   let off = /\b(off|o\.?p\.?|o\.?s\.?|off[- ]?panel|off[- ]?screen|from off)\b/.test(c);
-  let body = text;
+  /* "[would this hit harder as a question?]" — an editor's note, not copy */
+  let body = text.replace(/\s*\[[^\]]*(\]|$)/g, "").trim();
 
   /* an inline cue at the START of the dialogue — "(thinking) He's lying." */
   const inline = body.match(/^\(([^)]{1,40})\)\s*(.*)$/);
@@ -113,7 +153,11 @@ function resolveKind(speaker: string, cue: string, text: string): { kind: Script
     }
   }
 
-  if (SFX_SPEAKER.test(speaker) || /\b(sfx|sound ?fx|sound effect)\b/.test(c)) kind = "sfx";
+  if (SFX_SPEAKER.test(speaker) || /\b(sfx|sound ?fx|sound effect)\b/.test(c)) {
+    kind = "sfx";
+    /* "kkkk (radio click, near headset)" — the notes are for the letterer */
+    body = body.replace(/\s*\([^)]*\)/g, "").replace(/^(multiple|several|various)\s*:\s*/i, "").trim();
+  }
   else if (CAPTION_SPEAKER.test(speaker) || /\b(caption|cap|narration|narrat|v\.?o\.?|voice ?over|box|title)\b/.test(c)) kind = "caption";
   else if (/\b(thought|thinks?|thinking|internal|inner|to (him|her|them)self)\b/.test(c)) kind = "thought";
   else if (/\b(whisper(s|ing|ed)?|quiet(ly)?|soft(ly)?|small|mutter(s|ing|ed)?|hush(ed)?|under (his|her|their) breath|low|sotto)\b/.test(c)) kind = "whisper";
@@ -126,7 +170,7 @@ function resolveKind(speaker: string, cue: string, text: string): { kind: Script
   if (kind === "speech") {
     if (/!{2,}/.test(body)) kind = "shout";
   }
-  return { kind, link, off, text: body };
+  return { kind, link, off, text: unquote(body) };
 }
 
 function cleanSpeaker(raw: string): string {
@@ -137,6 +181,13 @@ export function parseScript(src: string): ScriptItem[] {
   const items: ScriptItem[] = [];
   const lines = src.split(/\r?\n/).map((l) => l.replace(/\t/g, " ").trim());
   let page = 1, panel = 1, seenPage = false;
+  /* a full artist script marks its balloons with DIALOGUE: — then ONLY the
+     lines under that marker (until the next header/SFX) are dialogue, and
+     "FREYA: tall, blonde…" above it is her description, not her line */
+  const gated = lines.some((l) => DIALOGUE_HEADER.test(l) && !/:\s*\S/.test(l) || /^DIALOGUE\s*:/i.test(l));
+  let inDialogue = false;
+  /* inside a TEXT BOXES block every labelled line is a caption */
+  let inCaptions = false;
   /* screenplay-style state: a speaker line waiting for its dialogue */
   let pending: { speaker: string; cue: string } | null = null;
   /* the last line produced or extended an item and no blank line has
@@ -147,32 +198,90 @@ export function parseScript(src: string): ScriptItem[] {
   const isHeader = (line: string) => pageRx.test(line) || panelRx.test(line) || barePanelRx.test(line) || isShotLine(line);
 
   const push = (speaker: string, cue: string, rawText: string) => {
+    if (NOTHING.test(rawText.trim())) { continuing = false; return; }
     const r = resolveKind(speaker, cue, rawText.trim());
-    if (!r.text) return;
-    items.push({ kind: r.kind, text: r.text, speaker, page: seenPage ? page : 1, panel,
-      ...(r.link ? { link: true } : {}), ...(r.off ? { off: true } : {}) });
+    if (!r.text || NOTHING.test(r.text)) { continuing = false; return; }
+    /* "SFX: - THOOM - TAKTAKTAK - PING PING" — one effect each */
+    const texts = r.kind === "sfx" && /(^|\s)-\s+\S/.test(r.text)
+      ? r.text.split(/(?:^|\s)-\s+/).map((t) => t.trim()).filter((t) => t && !NOTHING.test(t))
+      : [r.text];
+    for (const text of texts) {
+      items.push({ kind: r.kind, text, speaker, page: seenPage ? page : 1, panel,
+        ...(r.link ? { link: true } : {}), ...(r.off ? { off: true } : {}) });
+    }
     continuing = true;
   };
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    if (!line) { continuing = false; if (pending && !pending.speaker) pending = null; continue; }
+    if (!line) { continuing = false; inCaptions = false; if (pending && !pending.speaker) pending = null; continue; }
+    /* "Large stylized text:" then “TO BE CONTINUED…” — lettering, even
+       though the words would otherwise read as a transition */
+    if (pending?.speaker === "SFX" && /^[“"]/.test(line)) { push("SFX", "", line); pending = null; continue; }
 
     /* headers come first — "PANEL 2: Jane walks in." has a colon too */
     const pm = line.match(pageRx);
     if (pm) {
       const n = num(pm[1]); if (n != null) { page = n; panel = 1; seenPage = true; }
-      pending = null; continuing = false; continue;
+      pending = null; continuing = false; inDialogue = false; inCaptions = false; continue;
     }
     const nm = line.match(panelRx);
     if (nm) {
       const n = num(nm[1]); panel = n != null ? n : panel + 1;
-      pending = null; continuing = false; continue;
+      pending = null; continuing = false; inDialogue = false; inCaptions = false; continue;
     }
     const bp = line.match(barePanelRx);
-    if (bp) { panel = parseInt(bp[1], 10); pending = null; continuing = false; continue; }
-    if (isShotLine(line)) { pending = null; continuing = false; continue; }
+    if (bp) { panel = parseInt(bp[1], 10); pending = null; continuing = false; inDialogue = false; continue; }
+    if (isShotLine(line)) { pending = null; continuing = false; inDialogue = false; continue; }
     if (asideRx.test(line) && !pending) { continuing = false; continue; }
+
+    /* DIALOGUE: — opens the balloon block ("DIALOGUE: None." closes it) */
+    const dh = line.match(DIALOGUE_HEADER);
+    if (dh && gated) {
+      const rest = (dh[2] || "").trim();
+      inDialogue = !rest || !NOTHING.test(rest);
+      inCaptions = false;
+      pending = null; continuing = false;
+      /* "DIALOGUE: JANE: Hi." all on one line — fall through with the rest */
+      if (!rest || NOTHING.test(rest) || !lineRx.test(rest)) continue;
+      lines[i] = rest; i--; continue;
+    }
+    /* TEXT BOXES (…): — a block of captions, one labelled line each */
+    const cb = line.match(CAPTION_BLOCK);
+    if (cb) {
+      inCaptions = true; pending = null; continuing = false;
+      const rest = (cb[2] || "").trim();
+      if (rest && !NOTHING.test(rest)) push("CAPTION", "", rest);
+      continue;
+    }
+    /* "Large stylized text:" — whatever follows is display lettering */
+    if (LETTERING_CUE.test(line)) { pending = { speaker: "SFX", cue: "" }; inCaptions = false; continuing = false; continue; }
+    if (inCaptions) {
+      /* "Upper left: “…”" or a bare quoted line — the label is placement */
+      const lab = line.match(/^([^:“”"]{1,40}):\s*(.+)$/);
+      const body = lab ? lab[2] : line;
+      if (!NOTHING.test(body)) push("CAPTION", "", body);
+      continue;
+    }
+    /* art notes: "SHOT: …", "LIGHTING: …", "POSTER TEXT: …" */
+    const lm = line.match(lineRx);
+    if (lm) {
+      const sp = cleanSpeaker(lm[1]);
+      if (DESCRIPTION_SPEAKER.test(sp) || IN_ART_SPEAKER.test(sp)) { pending = null; continuing = false; continue; }
+      /* in a gated script the SFX: line closes the panel's balloon block —
+         the character sheet that follows "SFX: None." is not dialogue */
+      if (gated && SFX_SPEAKER.test(sp)) inDialogue = false;
+      /* in a gated script a NAME: line OUTSIDE the DIALOGUE block is that
+         character's description — unless it is an SFX or a caption, which
+         writers put anywhere */
+      if (gated && !inDialogue && !SFX_SPEAKER.test(sp) && !CAPTION_SPEAKER.test(sp)
+        && !/\b(sfx|sound|caption|cap|narration|box|title)\b/i.test(lm[3] || "")) {
+        pending = null; continuing = false; continue;
+      }
+    } else if (gated && !inDialogue && !looksLikeSfx(line)) {
+      /* prose, or a screenplay-style name, outside the block: art notes */
+      continuing = false; continue;
+    }
 
     /* dialogue waiting for a screenplay-style speaker */
     if (pending) {
