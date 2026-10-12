@@ -756,10 +756,6 @@ export function renderTuckDialog(ed: EditorCtx) {
   );
 }
 
-/* the last file-open failure, shown inside the dialog (a status-bar
-   message is easy to miss under a modal) */
-let scriptFileError = "";
-
 export function renderScriptDialog(ed: EditorCtx) {
   const { showScript, setShowScript, scriptText, setScriptText } = ed;
   if (!showScript) return null;
@@ -786,21 +782,22 @@ export function renderScriptDialog(ed: EditorCtx) {
             <input id="scriptFileInput" type="file" accept=".txt,.docx,.md,.text,.fountain" style={{ display: "none" }}
               onChange={async (e) => {
                 const f = e.target.files?.[0];
-                e.target.value = "";
                 if (!f) return;
-                scriptFileError = "";
+                let text = "";
                 try {
-                  const text = await readScriptFile(f);
-                  if (!text.trim()) scriptFileError = `“${f.name}” has no text in it.`;
-                  setScriptText(text);
+                  text = await readScriptFile(f);
+                  if (!text.trim()) text = `⚠ “${f.name}” has no text in it.`;
                 } catch (err) {
-                  scriptFileError = `Could not read “${f.name}”: ${String((err as Error).message || err)}`;
-                  setScriptText(scriptText + " ");
-                  setScriptText(scriptText);
+                  text = `⚠ Could not read “${f.name}”: ${String((err as Error).message || err)}`;
                 }
+                /* the input is cleared AFTER the read, and the outcome —
+                   the words or the error — lands in the box itself where
+                   it cannot be missed (a status-bar line hides under the
+                   dialog, and a same-value setState never re-rendered) */
+                e.target.value = "";
+                setScriptText(text);
               }} />
             <span style={{ opacity: .75 }}>Word (.docx) or plain text — or paste below.</span>
-            {scriptFileError && <span style={{ color: "#b00020", flexBasis: "100%" }}>{scriptFileError}</span>}
           </div>
           <textarea value={scriptText} autoFocus
             onChange={(e) => setScriptText(e.target.value)}

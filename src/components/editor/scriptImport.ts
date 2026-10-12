@@ -15,7 +15,7 @@ import { sizeTextToContent } from "./ops";
    writer's script opens straight into the import box without a copy-paste
    through Word (which also loses the curly quotes the parser strips). */
 export async function readScriptFile(f: File): Promise<string> {
-  if (/\.docx$/i.test(f.name) || (!/\.(txt|md|text|fountain)$/i.test(f.name) && await isZip(f))) {
+  if (await isZip(f)) {
     const dir = await readZipDirectory(f);
     const e = dir.get("word/document.xml");
     if (!e) throw new Error("not a Word document");

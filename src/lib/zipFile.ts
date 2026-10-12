@@ -115,8 +115,11 @@ export async function readZipDirectory(file: Blob): Promise<Map<string, ZipEntry
   for (let i = 0; i < count && p + 46 <= cd.length; i++) {
     if (dv.getUint32(p, true) !== 0x02014b50) break;
     const method = dv.getUint16(p + 10, true);
-    const csize = dv.getUint32(p + 16, true);
-    const size = dv.getUint32(p + 20, true);
+    /* central-directory layout: crc @16, COMPRESSED size @20, uncompressed
+       size @24 — (stored entries have the two equal, which is why reading
+       @20 as "the size" never showed until a deflated .docx came along) */
+    const csize = dv.getUint32(p + 20, true);
+    const size = dv.getUint32(p + 24, true);
     const nLen = dv.getUint16(p + 28, true), xLen = dv.getUint16(p + 30, true), cLen = dv.getUint16(p + 32, true);
     const localOffset = dv.getUint32(p + 42, true);
     const name = dec.decode(cd.subarray(p + 46, p + 46 + nLen));
@@ -141,11 +144,106 @@ export function zipEntryBlob(file: Blob, e: ZipEntry, type = ""): Blob {
 export async function zipEntryBytes(file: Blob, e: ZipEntry): Promise<Uint8Array> {
   if (e.method === 0) return new Uint8Array(await file.slice(e.dataOffset, e.dataOffset + e.size).arrayBuffer());
   if (e.method !== 8) throw new Error(`compressed entry "${e.name}" is not supported`);
-  if (typeof DecompressionStream === "undefined") throw new Error("this browser cannot read compressed zip files");
-  const raw = file.slice(e.dataOffset, e.dataOffset + e.csize);
-  const ds = new DecompressionStream("deflate-raw");
-  const out = new Response(raw.stream().pipeThrough(ds));
-  return new Uint8Array(await out.arrayBuffer());
+  const raw = new Uint8Array(await file.slice(e.dataOffset, e.dataOffset + e.csize).arrayBuffer());
+  if (typeof DecompressionStream !== "undefined") {
+    try {
+      const ds = new DecompressionStream("deflate-raw");
+      const out = new Response(new Blob([raw as BlobPart]).stream().pipeThrough(ds));
+      return new Uint8Array(await out.arrayBuffer());
+    } catch { /* fall through to the JS inflater */ }
+  }
+  return inflateRaw(raw, e.size);
+}
+
+/* A plain-JS raw DEFLATE decoder (RFC 1951) for browsers without
+   DecompressionStream — older Safari and the iOS wrapper. Small inputs
+   only (a script's document.xml), so clarity over speed. */
+export function inflateRaw(src: Uint8Array, sizeHint = 0): Uint8Array {
+  let out = new Uint8Array(Math.max(1024, sizeHint || src.length * 4)), op = 0;
+  let pos = 0, bitBuf = 0, bitCnt = 0;
+  const bits = (n: number) => {
+    while (bitCnt < n) { if (pos >= src.length) throw new Error("truncated deflate data"); bitBuf |= src[pos++] << bitCnt; bitCnt += 8; }
+    const v = bitBuf & ((1 << n) - 1); bitBuf >>>= n; bitCnt -= n; return v;
+  };
+  const put = (b: number) => {
+    if (op >= out.length) { const n = new Uint8Array(out.length * 2); n.set(out); out = n; }
+    out[op++] = b;
+  };
+  /* canonical Huffman table: counts per length + symbols in order */
+  const build = (lengths: number[]) => {
+    const count = new Array(16).fill(0);
+    for (const l of lengths) count[l]++;
+    count[0] = 0;
+    const offs = new Array(16).fill(0);
+    for (let i = 1; i < 16; i++) offs[i] = offs[i - 1] + count[i - 1];
+    const symbol = new Array(lengths.length).fill(0);
+    lengths.forEach((l, sym) => { if (l) symbol[offs[l]++] = sym; });
+    return { count, symbol };
+  };
+  const decode = (h: { count: number[]; symbol: number[] }) => {
+    let code = 0, first = 0, index = 0;
+    for (let len = 1; len < 16; len++) {
+      code |= bits(1);
+      const c = h.count[len];
+      if (code - c < first) return h.symbol[index + (code - first)];
+      index += c; first += c; first <<= 1; code <<= 1;
+    }
+    throw new Error("bad huffman code");
+  };
+  const LBASE = [3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258];
+  const LEXT = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0];
+  const DBASE = [1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577];
+  const DEXT = [0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13];
+  const codes = (lit: { count: number[]; symbol: number[] }, dist: { count: number[]; symbol: number[] }) => {
+    for (;;) {
+      const sym = decode(lit);
+      if (sym < 256) { put(sym); continue; }
+      if (sym === 256) return;
+      const li = sym - 257;
+      if (li >= 29) throw new Error("bad length code");
+      const len = LBASE[li] + bits(LEXT[li]);
+      const di = decode(dist);
+      if (di >= 30) throw new Error("bad distance code");
+      const d = DBASE[di] + bits(DEXT[di]);
+      if (d > op) throw new Error("distance too far back");
+      for (let i = 0; i < len; i++) put(out[op - d]);
+    }
+  };
+  let fixedLit: { count: number[]; symbol: number[] } | null = null, fixedDist: { count: number[]; symbol: number[] } | null = null;
+  const ORDER = [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15];
+  let last = 0;
+  do {
+    last = bits(1);
+    const type = bits(2);
+    if (type === 0) {
+      bitBuf = 0; bitCnt = 0;
+      if (pos + 4 > src.length) throw new Error("truncated deflate data");
+      const len = src[pos] | (src[pos + 1] << 8); pos += 4;
+      for (let i = 0; i < len; i++) put(src[pos++]);
+    } else if (type === 1) {
+      if (!fixedLit) {
+        const l: number[] = [];
+        for (let i = 0; i < 288; i++) l.push(i < 144 ? 8 : i < 256 ? 9 : i < 280 ? 7 : 8);
+        fixedLit = build(l); fixedDist = build(new Array(30).fill(5));
+      }
+      codes(fixedLit, fixedDist!);
+    } else if (type === 2) {
+      const nlen = bits(5) + 257, ndist = bits(5) + 1, ncode = bits(4) + 4;
+      const lengths = new Array(19).fill(0);
+      for (let i = 0; i < ncode; i++) lengths[ORDER[i]] = bits(3);
+      const lencode = build(lengths);
+      const all: number[] = [];
+      while (all.length < nlen + ndist) {
+        const sym = decode(lencode);
+        if (sym < 16) all.push(sym);
+        else if (sym === 16) { const prev = all[all.length - 1] ?? 0; for (let r = 3 + bits(2); r > 0; r--) all.push(prev); }
+        else if (sym === 17) { for (let r = 3 + bits(3); r > 0; r--) all.push(0); }
+        else { for (let r = 11 + bits(7); r > 0; r--) all.push(0); }
+      }
+      codes(build(all.slice(0, nlen)), build(all.slice(nlen)));
+    } else throw new Error("bad deflate block type");
+  } while (!last);
+  return out.subarray(0, op);
 }
 
 export async function zipEntryText(file: Blob, e: ZipEntry): Promise<string> {
