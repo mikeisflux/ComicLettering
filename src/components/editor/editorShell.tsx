@@ -3,7 +3,7 @@
    page itself, guides, lasso layers) and the hidden file inputs. Plain
    render functions taking the per-render EditorCtx bag plus a small bag of
    Editor-local state/refs that don't belong in the shared ctx. */
-import React from "react";
+import React, { useState } from "react";
 import { DPI, clamp, pageBleed, pageGuides } from "@/lib/model";
 import { fillCss } from "@/lib/fills";
 import { loadImage } from "@/lib/exportPng";
@@ -12,7 +12,7 @@ import { EditorCtx } from "./ctx";
 import { renderCarriedLettering, renderEl, renderJoinBands, renderOverlay } from "./renderEls";
 import { renderCommentCatcher, renderCommentPins } from "./collab";
 import { StylesPanel } from "./stylesPanel";
-import { addPageAt, remapComments } from "./spreadOps";
+import { addPageAt } from "./spreadOps";
 import { dragInProgress } from "./penInput";
 import { PenPt, ShapeBox, flattenPen } from "./usePenPanel";
 import { adjustFilterMarkup, pageAdjustLayers } from "@/lib/pageAdjust";
@@ -31,7 +31,7 @@ const renderAdjustDefs = (ed: EditorCtx) => (
   </svg>
 );
 import {
-  ART_ACCEPT, ART_FORMATS_LABEL, assignImageToPanel, duplicatePage, importFontFiles,
+  ART_ACCEPT, ART_FORMATS_LABEL, assignImageToPanel, deletePage, duplicatePage, importFontFiles,
   importImageFile, importJSON, importStampFiles, isSupportedArtFile, movePage,
   nextAid, normalizeArtFile, onDrop, readAsDataURL,
 } from "./ops";
@@ -137,39 +137,71 @@ const addPageQty = () => {
   return Number.isFinite(v) ? Math.max(1, Math.min(200, Math.round(v!))) : 1;
 };
 
+/* The page thumbnails. Right-click (or long-press) one for a menu that
+   acts on THAT page — delete, duplicate, move, add after — through the
+   same ops as the sidebar buttons and the Insert menu. */
+function PageList({ ed, thumbs }: { ed: EditorCtx; thumbs: Record<number, string> }) {
+  const { setPageIndex, setSelId, pageIndex } = ed;
+  const doc = ed.doc!;
+  const [menu, setMenu] = useState<{ x: number; y: number; i: number } | null>(null);
+  const close = () => setMenu(null);
+  const open = (e: React.MouseEvent, i: number) => {
+    e.preventDefault(); e.stopPropagation();
+    setMenu({ x: e.clientX, y: e.clientY, i });
+  };
+  const n = doc.pages.length;
+  return (
+    <div className="pageList">
+      {doc.pages.map((p, i) => (
+        <button key={i} className={"pageThumb" + (i === pageIndex ? " on" : "")}
+          style={{ aspectRatio: `${p.w} / ${p.h}` }}
+          title={`Page ${i + 1} — right-click for page options`}
+          onClick={() => { setPageIndex(i); setSelId(null); }}
+          onContextMenu={(e) => open(e, i)}>
+          {thumbs[i] ? <img src={thumbs[i]} alt="" /> : null}
+          <span>{i + 1}</span>
+        </button>
+      ))}
+      {menu && (
+        <>
+          <div className="ctxBackdrop" onClick={close} onContextMenu={(e) => { e.preventDefault(); close(); }} />
+          <div className="ctxMenu" style={(() => {
+            const M = 8;
+            const left = Math.max(M, Math.min(menu.x, window.innerWidth - 190));
+            const below = window.innerHeight - menu.y - M, above = menu.y - M;
+            return above > below
+              ? { left, bottom: window.innerHeight - menu.y, maxHeight: above }
+              : { left, top: Math.max(M, menu.y), maxHeight: below };
+          })()}>
+            <div className="ctxSep" style={{ background: "none", padding: "2px 10px", fontSize: 12, color: "#667", height: "auto" }}>Page {menu.i + 1}</div>
+            <button onClick={() => { close(); setPageIndex(menu.i); setSelId(null); }}>Go to Page</button>
+            <button onClick={() => { close(); addPageAt(ed, menu.i + 1, 1); }}>Add Page After</button>
+            <button onClick={() => { close(); addPageAt(ed, menu.i, 1); }}>Add Page Before</button>
+            <button onClick={() => { close(); duplicatePage(ed, menu.i); }}>Duplicate Page</button>
+            <div className="ctxSep" />
+            <button disabled={menu.i === 0} onClick={() => { close(); movePage(ed, -1, menu.i); }}>Move Up</button>
+            <button disabled={menu.i >= n - 1} onClick={() => { close(); movePage(ed, 1, menu.i); }}>Move Down</button>
+            <div className="ctxSep" />
+            <button className="danger" disabled={n <= 1} onClick={() => { close(); deletePage(ed, menu.i); }}>Delete Page</button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export function renderPagesPanel(ed: EditorCtx, sh: ShellProps) {
-  const { setPageIndex, setSelId, setStatus, commit, rebuildThumbs, setAskAddPage, docRef, pageIndex } = ed;
+  const { setAskAddPage, pageIndex } = ed;
   const doc = ed.doc!;
   return (
     <aside className="leftbar">
       {/* phone drawer: the rail floats over the canvas and needs a way out */}
       <button className="railClose" onClick={() => ed.toggleWindow("left")}>✕ Close</button>
       <div className="sideTitle">Pages</div>
-      <div className="pageList">
-        {doc.pages.map((p, i) => (
-          <button key={i} className={"pageThumb" + (i === pageIndex ? " on" : "")}
-            style={{ aspectRatio: `${p.w} / ${p.h}` }}
-            onClick={() => { setPageIndex(i); setSelId(null); }}>
-            {sh.thumbs[i] ? <img src={sh.thumbs[i]} alt="" /> : null}
-            <span>{i + 1}</span>
-          </button>
-        ))}
-      </div>
+      <PageList ed={ed} thumbs={sh.thumbs} />
       <div className="pageActs">
         <button onClick={() => setAskAddPage(true)}>+ Page</button>
-        <button onClick={() => {
-          const d = docRef.current!;
-          if (d.pages.length <= 1) { setStatus("A document needs at least one page."); return; }
-          if (!window.confirm(`Delete page ${pageIndex + 1}?`)) return;
-          d.pages.splice(pageIndex, 1);
-          /* notes on later pages shift down; notes on the deleted page stay
-             at that index (they now sit on the page that took its place) */
-          remapComments(ed, (i) => (i > pageIndex ? i - 1 : i));
-          setPageIndex((p) => clamp(p, 0, d.pages.length - 1));
-          setSelId(null);
-          commit();
-          rebuildThumbs();
-        }}>Delete</button>
+        <button onClick={() => deletePage(ed)} title="Delete this page (right-click a thumbnail for more)">Delete</button>
       </div>
       {sh.askAddPage && (
         /* where should the new page go? Inserting shifts every later

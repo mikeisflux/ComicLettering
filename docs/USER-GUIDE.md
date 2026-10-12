@@ -35,7 +35,7 @@ View → Single Page View shows one page at a time. Two-Page Spread View puts bo
 
 File → Page Setup… picks the paper: standard comic trim, manga sizes, US and international paper, or custom dimensions — all at print resolution with real bleed. View → Show Safe Area draws the trim (bleed line) and safe-area guides.
 
-Insert → New Page adds pages (the toolbar and filmstrip can too); Duplicate Page copies one wholesale, and pages reorder from the filmstrip.
+Insert → New Page adds pages (the toolbar and filmstrip can too); Duplicate Page copies one wholesale, and pages reorder from the filmstrip. Right-click any page thumbnail in the Pages panel for a menu that acts on that page: go to it, add a page before or after, duplicate, move up or down, or delete it (Undo brings a deleted page back).
 
 File → Export Lettering & Styles… writes a .lmc of the book WITHOUT its page art: balloons, captions, lettering, action lines, panel frames (as empty masks), stamps, Tuck Back cutouts and the book's saved styles — small enough to email, and it opens like any project file. File → Import Lettering & Styles… merges such a file onto the open book, page for page (pages are added as needed), and adds its saved styles by name; the art already here is left alone. Edit → Clear Art… strips the page art from every page — locked or not, after a confirmation — and keeps everything else, so a lettered book can be re-used on new art.
 

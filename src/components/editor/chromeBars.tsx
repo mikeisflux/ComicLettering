@@ -13,7 +13,7 @@ import { GLOWS } from "@/lib/glows";
 import { EditorCtx } from "./ctx";
 import {
   addFromTray, alignSel, applyQuickFill, applyQuickStroke, balanceRag, clipboardText,
-  copySel, copyStyle, cutSel, deleteCustomFont, deleteSel, duplicatePage,
+  copySel, copyStyle, cutSel, deleteCustomFont, deleteSel, deletePage, duplicatePage,
   duplicateSel, exportJSON, fitBalloonToText, pasteClip, pasteStyle,
   printPage, reorder, rotateSel, runInstantAlpha, runProof, saveProject, toggleSelEmphasis, setLocked } from "./ops";
 import { ActionControls } from "./ActionControls";
@@ -135,6 +135,7 @@ export function renderMenuBar(ed: EditorCtx) {
       ["Insert", [
         ["New Page", () => ed.setAskAddPage(true)],
         ["Duplicate Page", () => duplicatePage(ed)],
+        ["Delete Page", () => deletePage(ed)],
         ["—", null],
         ["Panel", () => addFromTray(ed, "panel")],
         ["Detect Panels From Art", () => detectPanelsFromArt(ed)],

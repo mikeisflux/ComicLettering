@@ -444,10 +444,14 @@ export function doFindReplace(ed: EditorCtx, all: boolean) {
   else setStatus(`No matches for “${needle}”.`);
 }
 
-export function duplicatePage(ed: EditorCtx) {
-  const { docRef, pageIndexRef, setPageIndex, setSelId, commit, rebuildThumbs, setStatus } = ed;
+/* Page ops take the page to act on (default: the current one) so the
+   thumbnail's right-click menu, the sidebar buttons, the Insert menu and
+   the shortcuts all run through the SAME code. */
+export function duplicatePage(ed: EditorCtx, at = ed.pageIndexRef.current) {
+  const { docRef, setPageIndex, setSelId, commit, rebuildThumbs, setStatus } = ed;
   const d = docRef.current!;
-  const src = d.pages[pageIndexRef.current];
+  const src = d.pages[at];
+  if (!src) return;
   const copy = JSON.parse(JSON.stringify(src)) as Page;
   /* fresh ids — and remap attachTo so joined balloons stay joined on the copy */
   const idMap = new Map<string, string>();
@@ -455,25 +459,42 @@ export function duplicatePage(ed: EditorCtx) {
   for (const el of copy.els) {
     if (el.type === "balloon" && el.attachTo) el.attachTo = idMap.get(el.attachTo) ?? null;
   }
-  d.pages.splice(pageIndexRef.current + 1, 0, copy);
-  remapComments(ed, (i) => (i > pageIndexRef.current ? i + 1 : i));
-  setPageIndex(pageIndexRef.current + 1);
+  d.pages.splice(at + 1, 0, copy);
+  remapComments(ed, (i) => (i > at ? i + 1 : i));
+  setPageIndex(at + 1);
   setSelId(null);
   commit();
   rebuildThumbs();
   setStatus("Page duplicated.");
 }
 
-export function movePage(ed: EditorCtx, dir: -1 | 1) {
-  const { docRef, pageIndexRef, setPageIndex, commit, rebuildThumbs } = ed;
+export function movePage(ed: EditorCtx, dir: -1 | 1, at = ed.pageIndexRef.current) {
+  const { docRef, setPageIndex, commit, rebuildThumbs } = ed;
   const d = docRef.current!;
-  const i = pageIndexRef.current, j = i + dir;
-  if (j < 0 || j >= d.pages.length) return;
+  const i = at, j = i + dir;
+  if (i < 0 || i >= d.pages.length || j < 0 || j >= d.pages.length) return;
   [d.pages[i], d.pages[j]] = [d.pages[j], d.pages[i]];
   remapComments(ed, (k) => (k === i ? j : k === j ? i : k));
   setPageIndex(j);
   commit();
   rebuildThumbs();
+}
+
+export function deletePage(ed: EditorCtx, at = ed.pageIndexRef.current) {
+  const { docRef, setPageIndex, setSelId, setStatus, commit, rebuildThumbs } = ed;
+  const d = docRef.current!;
+  if (at < 0 || at >= d.pages.length) return;
+  if (d.pages.length <= 1) { setStatus("A document needs at least one page."); return; }
+  if (!window.confirm(`Delete page ${at + 1}?`)) return;
+  d.pages.splice(at, 1);
+  /* notes on later pages shift down; notes on the deleted page stay at
+     that index (they now sit on the page that took its place) */
+  remapComments(ed, (i) => (i > at ? i - 1 : i));
+  setPageIndex((p) => clamp(p > at ? p - 1 : p, 0, d.pages.length - 1));
+  setSelId(null);
+  commit();
+  rebuildThumbs();
+  setStatus(`Deleted page ${at + 1}. Undo brings it back.`);
 }
 
 
