@@ -86,7 +86,7 @@ export class ZipWriter {
   }
 }
 
-export interface ZipEntry { name: string; size: number; dataOffset: number; method: number }
+export interface ZipEntry { name: string; size: number; dataOffset: number; method: number; csize: number }
 
 /* true when the first bytes are a local-file-header signature */
 export async function isZip(file: Blob): Promise<boolean> {
@@ -115,6 +115,7 @@ export async function readZipDirectory(file: Blob): Promise<Map<string, ZipEntry
   for (let i = 0; i < count && p + 46 <= cd.length; i++) {
     if (dv.getUint32(p, true) !== 0x02014b50) break;
     const method = dv.getUint16(p + 10, true);
+    const csize = dv.getUint32(p + 16, true);
     const size = dv.getUint32(p + 20, true);
     const nLen = dv.getUint16(p + 28, true), xLen = dv.getUint16(p + 30, true), cLen = dv.getUint16(p + 32, true);
     const localOffset = dv.getUint32(p + 42, true);
@@ -122,7 +123,7 @@ export async function readZipDirectory(file: Blob): Promise<Map<string, ZipEntry
     /* the local header's own name/extra lengths decide where the data starts */
     const lh = new DataView(await file.slice(localOffset, localOffset + 30).arrayBuffer());
     const dataOffset = localOffset + 30 + lh.getUint16(26, true) + lh.getUint16(28, true);
-    out.set(name, { name, size, dataOffset, method });
+    out.set(name, { name, size, dataOffset, method, csize });
     p += 46 + nLen + xLen + cLen;
   }
   return out;
@@ -134,6 +135,19 @@ export function zipEntryBlob(file: Blob, e: ZipEntry, type = ""): Blob {
   return file.slice(e.dataOffset, e.dataOffset + e.size, type);
 }
 
+/* an entry's bytes, inflating a DEFLATED entry (method 8) through the
+   browser's DecompressionStream — what a Word .docx or any ordinary zip
+   uses; our own .lmc archives are stored and skip it */
+export async function zipEntryBytes(file: Blob, e: ZipEntry): Promise<Uint8Array> {
+  if (e.method === 0) return new Uint8Array(await file.slice(e.dataOffset, e.dataOffset + e.size).arrayBuffer());
+  if (e.method !== 8) throw new Error(`compressed entry "${e.name}" is not supported`);
+  if (typeof DecompressionStream === "undefined") throw new Error("this browser cannot read compressed zip files");
+  const raw = file.slice(e.dataOffset, e.dataOffset + e.csize);
+  const ds = new DecompressionStream("deflate-raw");
+  const out = new Response(raw.stream().pipeThrough(ds));
+  return new Uint8Array(await out.arrayBuffer());
+}
+
 export async function zipEntryText(file: Blob, e: ZipEntry): Promise<string> {
-  return dec.decode(new Uint8Array(await zipEntryBlob(file, e).arrayBuffer()));
+  return dec.decode(await zipEntryBytes(file, e));
 }

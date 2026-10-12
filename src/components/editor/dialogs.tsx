@@ -756,6 +756,10 @@ export function renderTuckDialog(ed: EditorCtx) {
   );
 }
 
+/* the last file-open failure, shown inside the dialog (a status-bar
+   message is easy to miss under a modal) */
+let scriptFileError = "";
+
 export function renderScriptDialog(ed: EditorCtx) {
   const { showScript, setShowScript, scriptText, setScriptText } = ed;
   if (!showScript) return null;
@@ -772,19 +776,31 @@ export function renderScriptDialog(ed: EditorCtx) {
             screenplay style with the name on its own line. PAGE and PANEL headers place
             each balloon on the right page, near its panel.
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, fontSize: 12.5 }}>
-            <label className="fileBtn" style={{ cursor: "pointer" }}>
-              <span className="btnLike" style={{ border: "1px solid #9aa1ac", borderRadius: 6, padding: "3px 10px", background: "#f6f7f9" }}>Open script file…</span>
-              <input type="file" accept=".txt,.docx,.md,.text,.fountain" style={{ display: "none" }}
-                onChange={async (e) => {
-                  const f = e.target.files?.[0];
-                  e.target.value = "";
-                  if (!f) return;
-                  try { setScriptText(await readScriptFile(f)); }
-                  catch (err) { ed.setStatus("Could not read that script: " + String((err as Error).message || err)); }
-                }} />
-            </label>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, fontSize: 12.5, flexWrap: "wrap" }}>
+            {/* an explicit button + hidden input (the pattern every other
+                file picker here uses) — a label-wrapped input did not open
+                the picker inside this dialog */}
+            <button type="button" onClick={() => (document.getElementById("scriptFileInput") as HTMLInputElement | null)?.click()}>
+              Open script file…
+            </button>
+            <input id="scriptFileInput" type="file" accept=".txt,.docx,.md,.text,.fountain" style={{ display: "none" }}
+              onChange={async (e) => {
+                const f = e.target.files?.[0];
+                e.target.value = "";
+                if (!f) return;
+                scriptFileError = "";
+                try {
+                  const text = await readScriptFile(f);
+                  if (!text.trim()) scriptFileError = `“${f.name}” has no text in it.`;
+                  setScriptText(text);
+                } catch (err) {
+                  scriptFileError = `Could not read “${f.name}”: ${String((err as Error).message || err)}`;
+                  setScriptText(scriptText + " ");
+                  setScriptText(scriptText);
+                }
+              }} />
             <span style={{ opacity: .75 }}>Word (.docx) or plain text — or paste below.</span>
+            {scriptFileError && <span style={{ color: "#b00020", flexBasis: "100%" }}>{scriptFileError}</span>}
           </div>
           <textarea value={scriptText} autoFocus
             onChange={(e) => setScriptText(e.target.value)}
