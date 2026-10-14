@@ -15,7 +15,7 @@ import {
   addFromTray, alignSel, applyQuickFill, applyQuickStroke, balanceRag, clipboardText,
   copySel, copyStyle, cutSel, deleteCustomFont, deleteSel, deletePage, duplicatePage,
   duplicateSel, exportJSON, fitBalloonToText, pasteClip, pasteStyle,
-  printPage, reorder, rotateSel, runInstantAlpha, runProof, saveProject, toggleSelEmphasis, setLocked } from "./ops";
+  printPage, reorder, rotateSel, runInstantAlpha, runProof, saveProject, selectPastBleed, toggleSelEmphasis, setLocked } from "./ops";
 import { ActionControls } from "./ActionControls";
 import { clearArt, exportLettering } from "./letteringIO";
 import { detectPanelsFromArt } from "./panelOps";
@@ -102,6 +102,7 @@ export function renderMenuBar(ed: EditorCtx) {
         ["Paste", () => ed.editingId ? clipboardText(ed, "paste") : pasteClip(ed)],
         ["Duplicate", () => duplicateSel(ed)],
         ["Delete", () => deleteSel(ed)],
+        ["Select Items Past the Bleed Line", () => selectPastBleed(ed)],
         ["—", null],
         ["Clear Art…", () => clearArt(ed)],
         ["—", null],

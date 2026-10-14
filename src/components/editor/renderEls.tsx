@@ -15,7 +15,7 @@ import { RasterText } from "./RasterText";
 import { glowByKey } from "@/lib/glows";
 import { FLAT, Warp, isWarped, warpBounds, warpPoint } from "@/lib/warp";
 import {
-  TrimRect, balloonCrossesSpine, balloonCrossesTrim, elCrossesSpine, spreadNeighbor,
+  TrimRect, balloonCrossesSpine, balloonCrossesTrim, elCrossesSpine, spreadNeighbor, trimSliver,
   stampCrossesTrim, textCrossesTrim,
 } from "@/lib/exportPng";
 import { pageBleed } from "@/lib/model";
@@ -209,6 +209,10 @@ export function renderEl(ed: EditorCtx, el: El) {
     if (el.type === "balloon" && balloonCrossesTrim(el, bc)) style.clipPath = bleedClipPath(el, bc);
     else if (el.type === "text" && textCrossesTrim(el, bc)) style.clipPath = bleedClipPath(el, bc);
     else if (el.type === "image" && stampCrossesTrim(el, bc)) style.clipPath = bleedClipPath(el, bc);
+    /* all but entirely past the bleed line — the export draws nothing of
+       it (trimSliver), so neither does the editor; Edit → Select Items
+       Past the Bleed Line finds such strays */
+    if (trimSliver(el, bc)) style.display = "none";
   }
   const common = {
     "data-id": el.id,

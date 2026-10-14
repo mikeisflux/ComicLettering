@@ -947,6 +947,25 @@ export function textCrossesSpine(el: TextEl, trimX: number, side: 1 | -1) { retu
 export function stampCrossesSpine(el: ImageEl, trimX: number, side: 1 | -1) { return !!el.stamp && pastSpine(stampInkBounds(el), trimX, side); }
 
 /* dispatch to each item's own test; anything else (art, panels) is exempt */
+/* the ink bounds of anything the bleed line governs (null for page art) */
+export function elInkBounds(el: El): TrimRect | null {
+  if (el.type === "balloon") return balloonInkBounds(el);
+  if (el.type === "text") return textInkBounds(el);
+  if (el.type === "image" && el.stamp) return stampInkBounds(el);
+  return null;
+}
+/* An item that is (all but) entirely past the bleed line: what the trim
+   leaves of it is thinner than a couple of page units — a hairline of a
+   balloon outline at the trim, from a box that slid off the page where
+   the editor (which clips at the page edge) no longer shows it. Those
+   hairlines printed as "weird black lines"; such an item draws NOTHING. */
+export function trimSliver(el: El, r: TrimRect): boolean {
+  const b = elInkBounds(el);
+  if (!b) return false;
+  const w = Math.min(b.x1, r.x1) - Math.max(b.x0, r.x0);
+  const h = Math.min(b.y1, r.y1) - Math.max(b.y0, r.y0);
+  return w < 2 || h < 2;
+}
 export function elCrossesTrim(el: El, r: TrimRect): boolean {
   if (el.type === "balloon") return balloonCrossesTrim(el, r);
   if (el.type === "text") return textCrossesTrim(el, r);
@@ -989,11 +1008,14 @@ function drawPageEls(
       }
     }
     const clip = lc?.mode === "clip" && elCrossesTrim(el, lc);
+    /* nothing of it is really on the page: skip it rather than print the
+       hairline the trim would leave */
+    const sliver = lc?.mode === "clip" && trimSliver(el, lc);
     if (clip) clipAtTrim();
     /* lettering-only keeps SFX STAMPS — they follow the lettering rules */
     const artOnly = el.type === "panel" || el.type === "action" || (el.type === "image" && !el.stamp);
     const deferredCut = skipCutouts && el.type === "image" && el.cut;
-    if (!(letteringOnly && artOnly) && !deferredCut) {
+    if (!sliver && !(letteringOnly && artOnly) && !deferredCut) {
       if (el.type === "balloon") {
         const { el: bEl, base } = resolveBalloon(page, el);
         let merge: MergeInfo | null = null;

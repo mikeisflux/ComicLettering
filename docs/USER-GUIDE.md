@@ -113,7 +113,7 @@ Tuck Back slips a sound effect behind foreground artwork so it reads like it was
 
 ## The bleed line and facing pages
 
-The bleed line (trim) is a hard border for word balloons, text boxes, lettering and stamps: no part of them is ever visible past it, in any view or export. Only page art may live in the bleed.
+The bleed line (trim) is a hard border for word balloons, text boxes, lettering and stamps: no part of them is ever visible past it, in any view or export. Only page art may live in the bleed. An item that has slid (all but) entirely past the line — off the page edge, where the editor no longer shows it — draws nothing at all rather than a hairline; Edit → Select Items Past the Bleed Line finds such strays so you can delete them or drag them back.
 
 Whatever part of those items crosses the SPINE-side bleed line continues on the facing page, starting at that page's bleed line — the studio clips the near side and renders the remainder across the spread automatically (autoclipping self-replication), keeping the exact style, warp and Tuck Back. In single-page view a warning tip appears when a drag would carry an item onto the next page, so it never happens by mistake.
 

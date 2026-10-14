@@ -83,9 +83,12 @@ export function importScript(ed: EditorCtx) {
          bubble instead of a separate one, the way a letterer breaks one
          character's two sentences across connected balloons */
       let prev: { el: BalloonEl; speaker: string } | null = null;
+      const bandTop = Math.round(m.t + bi * band);
+      const bottom = p.h - m.b;
       for (const it of inPanel) {
         const lineCt = Math.max(1, Math.ceil(it.text.length / 26));
         let el: El;
+        let joinToPrev: BalloonEl | null = null;
         if (it.kind === "sfx") {
           el = makeText(x, y, colW, Math.round(p.w * 0.16), true);
           const st = LETTER_STYLES.find((s) => s.name === activeStyleRef.current) || LETTER_STYLES[0];
@@ -107,29 +110,34 @@ export function importScript(ed: EditorCtx) {
              never captions (not a character) and never a bare/■ SFX */
           const named = kind !== "caption" && !!it.speaker
             && !/^(SFX|SOUND|FX|CAPTION|CAP|NARRATION|NARR|BOX|TITLE)$/.test(it.speaker);
-          const joinToPrev = named && prev && (prev.speaker === it.speaker || it.link);
+          joinToPrev = named && prev && (prev.speaker === it.speaker || it.link) ? prev.el : null;
           const bel = makeBalloon(kind, x, y, joinToPrev ? Math.round(colW * 0.9) : colW, h);
           bel.text = it.text;
-          if (joinToPrev && prev) {
-            bel.attachTo = prev.el.id;
-            /* the connector aims from this child's centre at the parent's;
-               resolveBalloon turns that into the open band */
-            const pcx = (prev.el.x + prev.el.w / 2) - (bel.x + bel.w / 2);
-            const pcy = (prev.el.y + prev.el.h / 2) - (bel.y + bel.h / 2);
-            bel.tail = { dx: Math.round(pcx), dy: Math.round(pcy) };
-          }
           el = bel;
           prev = named ? { el: bel, speaker: it.speaker } : null;
+        }
+        /* FIT BEFORE PLACING: an item that would run off the bottom moves
+           to the next column first; when the columns are used up it is
+           pulled back up so it still sits on the page — anything placed
+           below the page is invisible in the editor (the page clips at its
+           edge) and printed only as a hairline at the bleed line */
+        if (y + el.h > bottom && y > bandTop) {
+          y = bandTop;
+          x = x + colW + gap <= p.w - m.r - colW ? x + colW + gap : m.l;
+        }
+        if (y + el.h > bottom) y = Math.max(m.t, bottom - el.h);
+        el.x = x; el.y = y;
+        if (joinToPrev && el.type === "balloon") {
+          el.attachTo = joinToPrev.id;
+          /* the connector aims from this child's centre at the parent's;
+             resolveBalloon turns that into the open band */
+          const pcx = (joinToPrev.x + joinToPrev.w / 2) - (el.x + el.w / 2);
+          const pcy = (joinToPrev.y + joinToPrev.h / 2) - (el.y + el.h / 2);
+          el.tail = { dx: Math.round(pcx), dy: Math.round(pcy) };
         }
         p.els.push(el);
         count++;
         y += el.h + gap;
-        /* a talky panel spills into the second column rather than over the
-           next panel's balloons */
-        if (y > p.h - m.b) {
-          y = Math.round(m.t + bi * band);
-          x = x + colW + gap <= p.w - m.r - colW ? x + colW + gap : m.l;
-        }
       }
     }
   }
