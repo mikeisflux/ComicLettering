@@ -15,9 +15,10 @@ import {
   addFromTray, alignSel, applyQuickFill, applyQuickStroke, balanceRag, clipboardText,
   copySel, copyStyle, cutSel, deleteCustomFont, deleteSel, deletePage, duplicatePage,
   duplicateSel, exportJSON, fitBalloonToText, pasteClip, pasteStyle,
-  printPage, reorder, rotateSel, runInstantAlpha, runProof, saveProject, selectPastBleed, toggleSelEmphasis, setLocked } from "./ops";
+  printPage, reorder, rotateSel, runInstantAlpha, runProof, saveProject, toggleSelEmphasis, setLocked } from "./ops";
 import { ActionControls } from "./ActionControls";
 import { clearArt, exportLettering } from "./letteringIO";
+import { gatherPastBleed, selectPastBleed } from "./bleedOps";
 import { detectPanelsFromArt } from "./panelOps";
 import { newDocument } from "./projectOps";
 
@@ -103,6 +104,7 @@ export function renderMenuBar(ed: EditorCtx) {
         ["Duplicate", () => duplicateSel(ed)],
         ["Delete", () => deleteSel(ed)],
         ["Select Items Past the Bleed Line", () => selectPastBleed(ed)],
+        ["Gather Items at the Bleed Line (Ctrl+Shift+G)", () => gatherPastBleed(ed)],
         ["—", null],
         ["Clear Art…", () => clearArt(ed)],
         ["—", null],

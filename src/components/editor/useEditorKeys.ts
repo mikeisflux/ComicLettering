@@ -21,6 +21,7 @@ export interface KeyFns {
   finishEditing: () => void; reorder: (d: number) => void;
   fitBalloonToText: () => void; printPage: () => void;
   duplicatePage: () => void;
+  gatherPastBleed: () => void;
   closeTopDialog: () => boolean;
   /* the as-you-type autosave (a B/I/U toggle changes the model too) */
   autosaveSoon: () => void;
@@ -157,6 +158,8 @@ export function useEditorKeys(deps: EditorKeyDeps) {
       if (mod && e.key.toLowerCase() === "p") { e.preventDefault(); fns.printPage(); return; }
       if (mod && e.key.toLowerCase() === "e") { e.preventDefault(); if (!demo) setShowExport(true); return; }
       if (mod && e.shiftKey && e.key.toLowerCase() === "n") { e.preventDefault(); fns.duplicatePage(); return; }
+      /* Ctrl+Shift+G: gather everything touching the bleed line to the page centre */
+      if (mod && e.shiftKey && e.key.toLowerCase() === "g") { e.preventDefault(); fns.gatherPastBleed(); return; }
       /* page navigation */
       if (!mod && (e.key === "PageDown" || e.key === "PageUp")) {
         e.preventDefault();

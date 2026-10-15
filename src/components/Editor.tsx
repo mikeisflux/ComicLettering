@@ -44,8 +44,8 @@ import {
   addFromTray, alignSel, applyQuickFill, copySel, cutSel, deleteSel, setLocked,
   duplicatePage, duplicateSel, growBalloonToFit, sizeTextToContent,
   fitBalloonToText, pasteClip,
-  printPage, refitLegacyLettering, refreshProjects, reorder, saveProject,
-} from "./editor/ops";
+  printPage, refitLegacyLettering, refreshProjects, reorder, saveProject } from "./editor/ops";
+import { gatherPastBleed } from "./editor/bleedOps";
 import { useInstallPrompt, useOpenFileBridge, usePinchZoom } from "./editor/usePlatform";
 import { useStartDrag } from "./editor/useStartDrag";
 import { renderInspector } from "./editor/inspector";
@@ -1260,6 +1260,7 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
   /* keep the shortcut handlers fresh (see keyFnsRef above) */
   keyFnsRef.current = {
     duplicateSel: () => duplicateSel(ed),
+    gatherPastBleed: () => gatherPastBleed(ed),
     saveProject: (b: boolean) => { saveProject(ed, b); },
     copySel: () => copySel(ed),
     cutSel: () => cutSel(ed),

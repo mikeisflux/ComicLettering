@@ -848,6 +848,7 @@ const SHORTCUTS: { group: string; rows: [string[], string][] }[] = [
     [["Ctrl", "["], "Centre across"], [["Ctrl", "]"], "Centre down"],
     [["Ctrl", "\\"], "Fit balloons & text to their text"],
     [["Ctrl", "Shift", "["], "Send to back"], [["Ctrl", "Shift", "]"], "Bring to front"],
+    [["Ctrl", "Shift", "G"], "Gather everything touching the bleed line to the page centre"],
   ]},
   { group: "While dragging", rows: [
     [["Shift"], "Keep proportions · snap 15° rotating"],

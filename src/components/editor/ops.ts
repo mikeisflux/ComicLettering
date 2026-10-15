@@ -7,7 +7,7 @@ import {
   GradStop, Page,
   TAILLESS_KINDS, TextEl, TextStyle, applyCrossbarI, applyRunEmphasis, clamp, makeBalloon, makeImage, newPage,
   pageMargins, rotVec,
-  makePanel, makeText, solid, uid, textStretch, pageBleed } from "@/lib/model";
+  makePanel, makeText, solid, uid, textStretch } from "@/lib/model";
 import { balloonGeom, arcTextLayout } from "@/lib/geometry";
 import { Warp, isWarped } from "@/lib/warp";
 import {
@@ -17,7 +17,7 @@ import { LETTER_STYLES, LetterStyle, applyLetterStyle, captureLetterStyle } from
 import {
   BALLOON_STYLES, BOX_STYLES, ShapeStyle, applyShapeStyle, captureShapeStyle,
 } from "@/lib/balloonStyles";
-import { forgetImage, loadImage, spreadNeighbor, TrimRect, trimSliver } from "@/lib/exportPng";
+import { forgetImage, loadImage, spreadNeighbor } from "@/lib/exportPng";
 import { BalloonPreset, measureBlock, measureCharWidths, parseScript, pasteMarkup, toggleEmphasis } from "./textHelpers";
 import { EditorCtx } from "./ctx";
 import { askText } from "./askText";
@@ -104,29 +104,6 @@ export function removeEls(page: Page, ids: Set<string>) {
   for (const b of page.els) {
     if (b.type === "balloon" && b.attachTo && ids.has(b.attachTo)) b.attachTo = null;
   }
-}
-
-/* Edit → Select Items Past the Bleed Line: everything on this page that
-   the trim leaves (all but) nothing of — a balloon that slid off the page
-   edge, an imported caption that landed below the margin. The editor
-   clips at the page edge, so such strays were invisible here and printed
-   as a hairline at the bleed line. Other pages are counted in the status. */
-export function selectPastBleed(ed: EditorCtx) {
-  const { docRef, pageIndexRef, setSelIds, setSelId, setStatus } = ed;
-  const d = docRef.current;
-  if (!d) return;
-  const strays = (pg: Page) => {
-    const b = pageBleed(pg);
-    const r: TrimRect = { x0: b, y0: b, x1: pg.w - b, y1: pg.h - b };
-    return pg.els.filter((e) => !e.hidden && trimSliver(e, r));
-  };
-  const here = strays(d.pages[pageIndexRef.current]);
-  const elsewhere = d.pages.map((pg, i) => [i + 1, strays(pg).length] as const).filter(([i, n]) => n && i !== pageIndexRef.current + 1);
-  const other = elsewhere.length ? ` Other pages with strays: ${elsewhere.map(([i, n]) => `${i} (${n})`).join(", ")}.` : "";
-  if (!here.length) { setStatus("Nothing on this page is hiding past the bleed line." + other); return; }
-  setSelIds(here.map((e) => e.id));
-  setSelId(here[here.length - 1].id);
-  setStatus(`Selected ${here.length} item${here.length === 1 ? "" : "s"} sitting past the bleed line — Delete removes ${here.length === 1 ? "it" : "them"}, or drag ${here.length === 1 ? "it" : "them"} back onto the page.` + other);
 }
 
 export function deleteSel(ed: EditorCtx) {
