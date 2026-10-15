@@ -51,6 +51,34 @@ export function clearArt(ed: EditorCtx) {
   setStatus(`Cleared ${what}. The lettering, frames, stamps and cutouts are all still here (Ctrl+Z undoes).`);
 }
 
+/* ---------------- Lock Art All Pages ---------------- */
+
+/* Edit → Lock Art All Pages: every piece of page art — pictures, and panel
+   frames that hold art — on EVERY page is locked in one go, so a whole
+   imported book can be lettered without the art ever sliding under a
+   drag. Unlock individually (Arrange → Unlock) or with Edit → Clear Art…
+   when the art needs to go. Lettering, stamps and cutouts are untouched. */
+export function lockArtAllPages(ed: EditorCtx) {
+  const { docRef, setStatus, commit, pendingLockRef } = ed;
+  const d = docRef.current;
+  if (!d) return;
+  let locked = 0, already = 0;
+  for (const pg of d.pages) {
+    for (const e of pg.els) {
+      if (!(isPageArt(e) || (e.type === "panel" && e.img))) continue;
+      if (e.locked) { already++; continue; }
+      e.locked = true;
+      pendingLockRef.current.delete(e.id);
+      locked++;
+    }
+  }
+  if (!locked && !already) { setStatus("There is no page art in this book to lock."); return; }
+  if (!locked) { setStatus(`All ${already} piece${already === 1 ? "" : "s"} of art across the book ${already === 1 ? "is" : "are"} already locked.`); return; }
+  commit();
+  setStatus(`Locked ${locked} piece${locked === 1 ? "" : "s"} of art across ${d.pages.length} page${d.pages.length === 1 ? "" : "s"}`
+    + (already ? ` (${already} already locked)` : "") + ". Arrange → Unlock frees one again.");
+}
+
 /* ---------------- Export Lettering & Styles ---------------- */
 
 export async function exportLettering(ed: EditorCtx) {
