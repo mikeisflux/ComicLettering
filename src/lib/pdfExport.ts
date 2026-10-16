@@ -1,6 +1,16 @@
 /* Dependency-free multi-page PDF export: each page rendered to JPEG and
    embedded via DCTDecode. Output sized in points from the page's DPI.
 
+   Page boxes, the way a print-ready PDF carries them: the MediaBox is the
+   whole sheet INCLUDING the bleed (so the file drops straight into a
+   layout app set up at sheet size), the TrimBox is the trim rectangle
+   inside it (so an app set up at trim size can place by it), the
+   BleedBox is the sheet. No crop marks unless asked. The page size comes
+   from the page's units, never from the rounded pixel count of the
+   rendered image, and a size within a few thousandths of a sixteenth of
+   an inch snaps to it — pages made from the old 6.88in preset export as
+   the 6.875in sheet they were always meant to be.
+
    Every object is written to the output as soon as it exists (the object
    numbering is fixed by the page count up front), and page images go in as
    Blob parts — the file is never held twice in JavaScript memory. */
@@ -18,6 +28,13 @@ function cornerMarks(x: number, y: number, sx: number, sy: number, b: number): s
   const h = `${(x + sx * g).toFixed(2)} ${y.toFixed(2)} m ${(x + sx * (g + len)).toFixed(2)} ${y.toFixed(2)} l\n`;
   const v = `${x.toFixed(2)} ${(y + sy * g).toFixed(2)} m ${x.toFixed(2)} ${(y + sy * (g + len)).toFixed(2)} l\n`;
   return h + v;
+}
+
+/* inches → points, snapping to the nearest 1/16in when within 0.006in */
+function pts(units: number): number {
+  const inches = units / DPI;
+  const sixteenth = Math.round(inches * 16) / 16;
+  return (Math.abs(sixteenth - inches) <= 0.006 ? sixteenth : inches) * 72;
 }
 
 export async function exportPdf(
@@ -56,18 +73,22 @@ export async function exportPdf(
     const canvas = await renderPageToCanvas(doc.pages[i], assets, dpi / DPI, false, neighbors?.[i] ?? null);
     const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", 0.92));
     if (!blob) throw new Error(`Page ${i + 1} could not be rendered at ${dpi} dpi (${canvas.width}×${canvas.height} px) — try a lower DPI.`);
-    const W = (canvas.width * 72) / dpi;
-    const H = (canvas.height * 72) / dpi;
+    const W = pts(doc.pages[i].w);
+    const H = pts(doc.pages[i].h);
     /* the page already carries its bleed, so the trim is INSIDE the sheet:
        marks at the sheet corners would cut on the bleed line. With crop
        marks the sheet grows by a quiet margin that holds the marks
        (bleed + 3pt gap + 12pt mark + 6pt clearance). */
-    const b = cropMarks ? (pageBleed(doc.pages[i]) / DPI) * 72 : 0;
+    const b = (pageBleed(doc.pages[i]) / DPI) * 72;
     const M = cropMarks ? Math.max(18, b + 21) : 0;
     const MW = W + 2 * M, MH = H + 2 * M;
+    const f = (v: number) => v.toFixed(3);
+    const boxes = `/MediaBox [0 0 ${f(MW)} ${f(MH)}] /CropBox [0 0 ${f(MW)} ${f(MH)}]`
+      + ` /BleedBox [${f(M)} ${f(M)} ${f(M + W)} ${f(M + H)}]`
+      + ` /TrimBox [${f(M + b)} ${f(M + b)} ${f(M + W - b)} ${f(M + H - b)}]`;
     beginObj(pageObj(i));
-    push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${MW.toFixed(2)} ${MH.toFixed(2)}] /Contents ${contObj(i)} 0 R /Resources << /XObject << /Im0 ${imgObj(i)} 0 R >> >> >>\nendobj\n`);
-    let content = `q ${W.toFixed(2)} 0 0 ${H.toFixed(2)} ${M.toFixed(2)} ${M.toFixed(2)} cm /Im0 Do Q`;
+    push(`<< /Type /Page /Parent 2 0 R ${boxes} /Contents ${contObj(i)} 0 R /Resources << /XObject << /Im0 ${imgObj(i)} 0 R >> >> >>\nendobj\n`);
+    let content = `q ${f(W)} 0 0 ${f(H)} ${f(M)} ${f(M)} cm /Im0 Do Q`;
     if (cropMarks) {
       const x0 = M + b, y0 = M + b, x1 = M + W - b, y1 = M + H - b;
       const marks =

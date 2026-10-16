@@ -1404,6 +1404,12 @@ export default function Editor({ demo = false }: { demo?: boolean }) {
             const d = docRef.current!;
             const targets = applyAll ? d.pages : [page];
             for (const p of targets) {
+              /* a sheet that grows or shrinks keeps its content CENTRED —
+                 e.g. adding the bleed outside a page that was set up at
+                 trim size leaves the art and lettering where they were
+                 relative to the trim, not pinned to the top-left corner */
+              const dx = (w - p.w) / 2, dy = (h - p.h) / 2;
+              if (dx || dy) for (const e of p.els) { e.x = Math.round(e.x + dx); e.y = Math.round(e.y + dy); }
               p.w = w; p.h = h; p.bleed = bleed;
               if (margin) p.margin = { ...margin }; else delete p.margin;
             }

@@ -764,7 +764,15 @@ export const DEFAULT_TEXT_SIZE = 20;
 /* Standard US comic page, quoted the way printers quote it: the full-bleed
    sheet, an eighth of an inch of bleed on each edge, so the trim is
    6.63 × 10.25in. Art runs to the page edge; the blade lands on the trim. */
-export const COMIC_W_IN = 6.88;
+/* The standard US comic PAGE is 6.625 × 10.25 (the trim); the 0.125in bleed
+   is added OUTSIDE it on all four sides, so the sheet the file holds —
+   and the PDF page — is 6.875 × 10.5. Page Setup quotes the page (trim)
+   size and the bleed separately, the way layout apps do; `page.w/h` is
+   always the SHEET. (The sheet used to be 6.88 — a rounded value that
+   made every PDF page 0.005in wider than it was meant to be.) */
+export const COMIC_TRIM_W_IN = 6.625;
+export const COMIC_TRIM_H_IN = 10.25;
+export const COMIC_W_IN = 6.875;
 export const COMIC_H_IN = 10.5;
 export const BLEED_IN = 0.125;
 export const BLEED = BLEED_IN * DPI;
@@ -817,8 +825,9 @@ export const PAPER_CATEGORIES: PaperCategory[] = [
   {
     name: "Comic Sizes",
     sizes: [
-      ["Standard Comic (full bleed)", COMIC_W_IN, COMIC_H_IN],
-      ["Standard Comic +1.5 (oversize)", COMIC_W_IN * OVERSIZE, COMIC_H_IN * OVERSIZE],
+      /* page (trim) sizes — the bleed is added outside them */
+      ["Standard Comic 6.625×10.25", COMIC_TRIM_W_IN, COMIC_TRIM_H_IN],
+      ["Standard Comic +1.5 (oversize)", COMIC_TRIM_W_IN * OVERSIZE, COMIC_TRIM_H_IN * OVERSIZE],
       ["Golden Age", 7.75, 10.5],
       ["Digest", 5.5, 8.25],
       ["Magazine", 8.5, 11],
@@ -1078,9 +1087,12 @@ export const FILTERS: Record<FilterKey, { label: string; css: string }> = {
 /* ---------------- page sizes & layouts ---------------- */
 
 export const PAGE_SIZES: { k: string; label: string; w: number; h: number; bleed?: number }[] = [
-  { k: "comic",  label: 'US Comic 6.88×10.5" (full bleed)', w: 1548, h: 2363 },
+  /* exact sheet sizes — page units may be fractional; every renderer
+     rounds the PIXELS it draws, and the PDF takes its page size from the
+     units so a 6.875in sheet comes out 6.875in */
+  { k: "comic",  label: 'US Comic 6.625×10.25" + bleed', w: COMIC_W_IN * DPI, h: COMIC_H_IN * DPI },
   /* letter big, reduce on export — the lettering comes out finer */
-  { k: "comic15", label: 'US Comic +1.5 (10.32×15.75")', w: 2322, h: 3544, bleed: BLEED * OVERSIZE },
+  { k: "comic15", label: 'US Comic +1.5 (9.9375×15.375" + bleed)', w: COMIC_W_IN * OVERSIZE * DPI, h: COMIC_H_IN * OVERSIZE * DPI, bleed: BLEED * OVERSIZE },
   { k: "manga",  label: "Manga B5 (1516×2150)",   w: 1516, h: 2150 },
   { k: "a4",     label: "A4 Portrait (1654×2339)", w: 1654, h: 2339 },
   { k: "square", label: "Square (2000×2000)",     w: 2000, h: 2000 },
@@ -1273,7 +1285,7 @@ export const defaultTextStyle = (over: Partial<TextStyle> = {}): TextStyle => ({
   ...over,
 });
 
-export function newPage(w = Math.round(COMIC_W_IN * DPI), h = Math.round(COMIC_H_IN * DPI), margin?: PageMargin): Page {
+export function newPage(w = COMIC_W_IN * DPI, h = COMIC_H_IN * DPI, margin?: PageMargin): Page {
   /* No margin by default. A dashed box at 3.5% of the page width is not a
      print measurement, and drawn near the edge it reads as the trim line —
      which had readers believing the bleed was three times what they set.

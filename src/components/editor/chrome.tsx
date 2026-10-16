@@ -2,7 +2,7 @@
 /* ComicLettering Studio — editor chrome: rulers, toolbar/tray buttons and
    the Page Setup dialog, split out of Editor.tsx (module-level code, unchanged). */
 import React, { ReactNode, useEffect, useRef, useState } from "react";
-import { COMIC_H_IN, COMIC_W_IN, DPI, MARGIN_IN, PAPER_CATEGORIES, Page, PageMargin, bleedFor, clamp, pageBleed, pageMargins } from "@/lib/model";
+import { DPI, MARGIN_IN, PAPER_CATEGORIES, Page, PageMargin, bleedFor, clamp, pageBleed, pageMargins, COMIC_TRIM_W_IN, COMIC_TRIM_H_IN } from "@/lib/model";
 
 /* ---------------- rulers ---------------- */
 
@@ -185,8 +185,11 @@ export function PageSetupDialog({ page, onClose, onApply }: {
 }) {
   const m0 = pageMargins(page);
   const [cat, setCat] = useState(0);
-  const [wIn, setWIn] = useState(inch(page.w));
-  const [hIn, setHIn] = useState(inch(page.h));
+  /* the PAGE size shown is the trim — the sheet in the file is page +
+     2 × bleed, the way a layout app quotes it; the bleed is added outside */
+  const b0 = pageBleed(page);
+  const [wIn, setWIn] = useState(inch(page.w - 2 * b0));
+  const [hIn, setHIn] = useState(inch(page.h - 2 * b0));
   const [mT, setMT] = useState(inch(m0.t));
   const [mR, setMR] = useState(inch(m0.r));
   const [mB, setMB] = useState(inch(m0.b));
@@ -202,8 +205,13 @@ export function PageSetupDialog({ page, onClose, onApply }: {
   };
 
   const ok = () => {
-    const w = Math.round((parseFloat(wIn) || COMIC_W_IN) * DPI);
-    const h = Math.round((parseFloat(hIn) || COMIC_H_IN) * DPI);
+    /* page units kept to a thousandth, not whole pixels: 6.875in is
+       1546.875 units, and rounding it made the exported PDF a hair off
+       the sheet size the letterer typed. The sheet = page + bleed on
+       every edge. */
+    const bleedIn = Math.max(0, parseFloat(bIn) || 0);
+    const w = Math.round(((parseFloat(wIn) || COMIC_TRIM_W_IN) + 2 * bleedIn) * DPI * 1000) / 1000;
+    const h = Math.round(((parseFloat(hIn) || COMIC_TRIM_H_IN) + 2 * bleedIn) * DPI * 1000) / 1000;
     /* kept exact: an eighth or a tenth of an inch is not a whole number of
        pixels at this DPI, and rounding hands the value back changed */
     const margin: PageMargin = {
@@ -238,8 +246,9 @@ export function PageSetupDialog({ page, onClose, onApply }: {
                     setSelSize(i);
                     if (landscape) { setWIn(h.toFixed(3)); setHIn(w.toFixed(3)); }
                     else { setWIn(w.toFixed(3)); setHIn(h.toFixed(3)); }
-                    /* the listed comic sizes are quoted WITH bleed, and an
-                       oversize board scales its bleed with everything else */
+                    /* sizes are PAGE (trim) sizes; the comic boards carry
+                       their own bleed, and an oversize board scales its
+                       bleed with everything else */
                     if (bleedFor(name) != null) setBIn(bleedFor(name)!.toFixed(4));
                   }}>{name}</div>
               ))}
@@ -256,8 +265,9 @@ export function PageSetupDialog({ page, onClose, onApply }: {
                 <span className="setupLbl">Bleed:</span>
                 <span className="dimBox"><input value={bIn} onChange={(e) => setBIn(e.target.value)} /> in<br /><small>each edge</small></span>
                 <small style={{ opacity: .7, maxWidth: 210 }}>
-                  Page size includes this. The trim — where the blade lands —
-                  sits this far inside every edge.
+                  Added outside the page size on every edge — the page is the
+                  trim, where the blade lands; the sheet is page + 2 × bleed
+                  ({((parseFloat(wIn) || 0) + 2 * (parseFloat(bIn) || 0)).toFixed(3)} × {((parseFloat(hIn) || 0) + 2 * (parseFloat(bIn) || 0)).toFixed(3)} in).
                 </small>
               </div>
               <div className="setupRow">

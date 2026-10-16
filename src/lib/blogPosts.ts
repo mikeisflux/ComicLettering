@@ -247,8 +247,8 @@ export const BLOG_POSTS: BlogPost[] = [
       { h: "The three rectangles: bleed, trim, safe" },
       { p: "Every print-ready comic page is governed by three nested rectangles. The trim line is where the blade is supposed to cut. The bleed extends beyond it — for a standard US comic, an extra eighth of an inch on each side — and exists because blades never cut with perfect precision; art must run past the trim so a slightly-off cut never leaves a white sliver at the edge. The safe area sits well inside the trim, and it's the letterer's home turf: every balloon, caption, and sound effect you care about stays inside it, guaranteed to survive the worst-case cut." },
       { ul: [
-        "US standard full bleed: 6.88 × 10.5 inches — the size you set up your page at.",
-        "Trim: 6.63 × 10.25 inches — the intended final page size, an eighth of an inch inside every edge.",
+        "Trim: 6.625 × 10.25 inches — the page size you set up, the intended final size where the blade lands.",
+        "Bleed: an eighth of an inch added outside every edge, making the sheet (and the PDF page) 6.875 × 10.5 inches.",
         "Safe area: 6.13 × 9.75 inches — a further quarter inch in; all lettering lives here.",
         "Facing-page spreads bleed on the top, bottom, and outer edges only — never into the fold between pages.",
       ] },
