@@ -14,6 +14,7 @@ import {
   fitToArtwork, fitToPage, pasteClip, removeCustomStamp, reorder, resizeToActual,
   resolveTailAsk, runExport, saveStyleFromSelection, setLocked } from "./ops";
 import { readScriptFile } from "./scriptImport";
+import { updateScript } from "./scriptUpdate";
 import { detectPanelsFromArt } from "./panelOps";
 import { SFX_STAMPS } from "@/lib/sfxStamps";
 import type { TuckMode } from "./tuck";
@@ -770,7 +771,9 @@ export function renderScriptDialog(ed: EditorCtx) {
           <div className="mutedNote" style={{ fontSize: 12.5, opacity: .8, marginBottom: 6 }}>
             Paste a script in any common format — <code>CHARACTER: dialogue</code>, or the
             screenplay style with the name on its own line. PAGE and PANEL headers place
-            each balloon on the right page, near its panel.
+            each balloon on the right page, near its panel. <b>Build balloons</b> lays out a
+            fresh set; <b>Update existing balloons</b> rewords the ones already placed from a
+            revised script, growing them if needed, without moving anything.
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, fontSize: 12.5, flexWrap: "wrap" }}>
             {/* an explicit button + hidden input (the pattern every other
@@ -817,6 +820,9 @@ export function renderScriptDialog(ed: EditorCtx) {
         </div>
         <div className="setupFoot">
           <button onClick={() => setShowScript(false)}>Cancel</button>
+          <button disabled={!recap} onClick={() => updateScript(ed)}
+            title="Revised script: match its lines to the balloons already on the pages and reword them in place — every balloon stays put and only grows if the new line needs room (locked or not); new lines are added, balloons with no line are left alone">
+            Update existing balloons</button>
           <button className="okBtn" disabled={!recap} onClick={() => importScript(ed)}>Build balloons</button>
         </div>
       </div>
