@@ -9,7 +9,8 @@
    not: a lock protects against stray drags, not against the writer's
    corrections. Lines with no balloon to match are added below the last
    matched one on that page; balloons with no line in the new script are
-   left alone and counted in the status. */
+   left alone and counted in the status. The whole book is updated at
+   once: the script's PAGE n is the book's page n, whatever page is open. */
 import { BalloonEl, El, TextEl, makeBalloon, makeText, pageMargins } from "@/lib/model";
 import { ScriptItem, parseScript } from "@/lib/scriptParse";
 import type { EditorCtx } from "./ctx";
@@ -85,21 +86,22 @@ function growText(el: TextEl, pageW: number) {
 }
 
 export function updateScript(ed: EditorCtx) {
-  const { scriptText, setStatus, docRef, pageIndexRef, commit, rebuildThumbs, setShowScript, setScriptText, setSelId } = ed;
+  const { scriptText, setStatus, docRef, commit, rebuildThumbs, setShowScript, setScriptText, setSelId } = ed;
   const items = parseScript(scriptText);
   if (!items.length) { setStatus("No dialogue found — use CHARACTER: text (one per line)."); return; }
   const d = docRef.current!;
-  const start = pageIndexRef.current;
-  const lowest = Math.min(...items.map((i) => i.page));
+  /* the WHOLE book: the script's PAGE n is the book's page n, whatever
+     page is open (Build balloons starts from the open page; an update
+     has to land on the pages the balloons already live on) */
   const byPage = new Map<number, ScriptItem[]>();
   for (const it of items) {
-    const off = it.page - lowest;
+    const off = Math.max(0, it.page - 1);
     if (!byPage.has(off)) byPage.set(off, []);
     byPage.get(off)!.push(it);
   }
   let updated = 0, grown = 0, same = 0, added = 0, orphaned = 0, missingPages = 0;
   for (const [off, group] of [...byPage.entries()].sort((a, b) => a[0] - b[0])) {
-    const p = d.pages[start + off];
+    const p = d.pages[off];
     if (!p) { missingPages++; continue; }
     const candidates = p.els.filter((e): e is BalloonEl | TextEl => (e.type === "balloon" || e.type === "text") && !e.hidden);
     const matched = align(group, candidates);
@@ -161,5 +163,5 @@ export function updateScript(ed: EditorCtx) {
     orphaned ? `${orphaned} balloon${orphaned === 1 ? "" : "s"} had no line in the new script and ${orphaned === 1 ? "was" : "were"} left alone` : "",
     missingPages ? `${missingPages} script page${missingPages === 1 ? "" : "s"} past the end of the book skipped` : "",
   ].filter(Boolean);
-  setStatus(`Script updated: ${parts.join(", ")}. Every balloon stayed where it was (Ctrl+Z undoes).`);
+  setStatus(`Script updated across ${byPage.size} page${byPage.size === 1 ? "" : "s"}: ${parts.join(", ")}. Every balloon stayed where it was (Ctrl+Z undoes).`);
 }
